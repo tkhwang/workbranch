@@ -1,0 +1,40 @@
+# Local agent/runtime state
+.omc/
+.omx/
+
+# macOS / OS metadata
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+tmp/
+temp/
+.cache/
+
+# Shell/script test artifacts
+coverage/
+*.out
+*.pid
+
+# Release/package artifacts
+dist/
+build/
+release/
+*.tar.gz
+*.zip
+
+# Local monotree sandboxes created during manual testing
+.monotree-test/
