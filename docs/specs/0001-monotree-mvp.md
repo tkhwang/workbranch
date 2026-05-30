@@ -8,6 +8,17 @@ The primary use case is a full-stack task where frontend and backend live in sep
 
 Monotree uses Git worktrees internally so multiple feature tasks can be developed in parallel without manually cloning or wiring every repository for each task.
 
+## Runtime
+
+The MVP CLI is a single `bash` executable.
+
+Runtime constraints:
+
+- Use `#!/usr/bin/env bash`.
+- Stay compatible with macOS default Bash 3.2.
+- Do not require Bash 4+ features such as associative arrays.
+- Users may invoke `monotree` from any interactive shell, including `zsh`; the implementation runtime remains Bash.
+
 ## Non-Goals for MVP
 
 - Monotree does not turn repositories into a real Git monorepo.
@@ -15,6 +26,8 @@ Monotree uses Git worktrees internally so multiple feature tasks can be develope
 - Monotree does not manage package manager workspaces.
 - Monotree does not create pull requests in the MVP.
 - Monotree does not require a fixed frontend/backend repository pair; any number of repositories may be configured.
+- Monotree does not reuse existing feature branches when creating a new task workspace.
+- Monotree does not provide force cleanup options in the MVP.
 
 ## Directory Layout
 
@@ -77,45 +90,55 @@ Configuration is stored at:
 /fullstack/.monotree/config
 ```
 
-The format is intentionally close to a simple `.env`/shell config file.
+The format is a small line-oriented declarative format. It is not shell code and must not be loaded with `source`.
 
 Example:
 
-```bash
-PROJECT_NAME=fullstack
-BASE_DIR=_base
-BASE_BRANCH=master
-BRANCH_PREFIX=feature
-REPOS="frontend backend"
+```text
+project fullstack
+base_dir _base
+branch_prefix feature
 
-frontend="git@github.com:example/frontend.git master"
-backend="git@github.com:example/backend.git master"
+repo frontend git@github.com:example/frontend.git master
+repo backend git@github.com:example/backend.git master
 ```
 
-### Config Fields
+### Config Directives
 
-- `PROJECT_NAME`: Human-readable project name and default root directory name during interactive setup.
-- `BASE_DIR`: Directory name for base worktrees. Default: `_base`.
-- `BASE_BRANCH`: Default base branch for repositories. Default: `main` unless the user enters another value.
-- `BRANCH_PREFIX`: Default branch prefix for tasks. Default: `feature`.
-- `REPOS`: Space-separated list of repository names.
-- `<repoName>`: Per-repository config value in the form `<git-url> <base-branch>`.
-
-A repository may use the global `BASE_BRANCH` by accepting the default during interactive setup. The generated config should still write the resolved branch explicitly for each repo so later commands do not need inference.
-
-Repository names must be directory-safe and match:
+Supported directives:
 
 ```text
-[A-Za-z0-9._-]+
+project <name>
+base_dir <dir>
+branch_prefix <prefix>
+repo <repo-name> <git-url> <base-branch>
 ```
 
-Task names must also match:
+Parsing rules:
 
-```text
-[A-Za-z0-9._-]+
-```
+- Blank lines are allowed.
+- Lines beginning with `#` are comments.
+- Unknown directives fail with a clear error.
+- Duplicate singleton directives fail with a clear error.
+- Duplicate `repo` names fail with a clear error.
+- Values do not support shell expansion, command substitution, or general shell quoting.
+- `repo` lines are the only source of the configured repository list.
 
-The generated Git branch name may contain `/` because it is built from `BRANCH_PREFIX/task-name`.
+Validation rules:
+
+- `project`, `base_dir`, repository names, and task names must match:
+
+  ```text
+  [A-Za-z0-9._-]+
+  ```
+
+- `branch_prefix` must be non-empty and must not contain whitespace.
+- `git-url` must be non-empty and must not contain whitespace.
+- `base-branch` must be non-empty and must not contain whitespace.
+
+A repository may use the interactive setup's default base branch. The generated config still writes the resolved base branch explicitly on each `repo` line so later commands do not need inference.
+
+The generated Git branch name may contain `/` because it is built from `branch_prefix/task-name`.
 
 ## Commands
 
@@ -126,7 +149,7 @@ Initializes a monotree project.
 Execution location rules:
 
 - If the current directory already contains `.monotree/config`, treat the current directory as the project root and initialize from that config.
-- If no config exists, interactive setup creates a new project directory named from `PROJECT_NAME` under the current working directory.
+- If no config exists, interactive setup creates a new project directory named from `project` under the current working directory.
 - The MVP does not initialize into an arbitrary non-empty current directory unless that directory already has `.monotree/config`.
 
 Behavior:
@@ -137,17 +160,17 @@ Behavior:
 4. Ask for:
    - project name
    - base directory, default `_base`
-   - default base branch
+   - default base branch, default `main`
    - branch prefix, default `feature`
    - one or more repositories
 5. For each repository, ask for:
    - repo name
    - Git URL
-   - base branch, defaulting to the global base branch
+   - base branch, defaulting to the interactive default base branch
 6. Create the project root directory when running interactive setup without an existing config.
 7. Create the project structure.
-8. Clone each configured repository into `BASE_DIR/<repoName>`.
-9. Write `.monotree/config`.
+8. Write `.monotree/config` using the declarative config format.
+9. Clone each configured repository into `base_dir/<repoName>`.
 
 MVP clone strategy:
 
@@ -179,7 +202,7 @@ Creates:
 Default branch naming:
 
 ```text
-<BRANCH_PREFIX>/<task>
+<branch_prefix>/<task>
 ```
 
 With the default config:
@@ -198,6 +221,12 @@ git -C _base/frontend worktree add ../../login/frontend -b feature/login origin/
 ```
 
 If the target task directory or branch already exists, MVP behavior is to fail with a clear error instead of reusing or overwriting anything.
+
+Branch collision policy:
+
+- If the target feature branch already exists in any configured repository, the whole `add` command fails.
+- MVP `add` does not check out or reuse existing feature branches.
+- Existing-branch restoration may be added later as an explicit command or option.
 
 ### `monotree list`
 
@@ -258,8 +287,27 @@ MVP behavior:
 - remove worktrees
 - remove the empty task directory
 - do not delete local or remote branches by default
+- do not force remove dirty worktrees
 
 Branch deletion may be added later as an explicit option such as `--delete-branch`.
+
+## Safety and Failure Policy
+
+Mutation commands use a preflight-first, command-local rollback policy.
+
+Rules:
+
+- Before mutating, commands validate names, config, expected repository paths, target paths, and known branch collisions when applicable.
+- If a command fails after creating new files, directories, clones, or worktrees, Monotree removes only resources created by that command invocation.
+- Monotree does not remove or alter pre-existing user resources during rollback.
+- If rollback also fails, Monotree reports the remaining paths that require manual cleanup.
+
+Dirty worktree policy:
+
+- `sync` fails before pulling if any base repository is dirty.
+- `update <task>` fails before rebasing if any target task repository is dirty.
+- `remove <task>` does not remove dirty worktrees.
+- MVP has no `--force` option.
 
 ## Git Flow
 
@@ -313,6 +361,14 @@ The installer places the executable at:
 ~/.local/bin/monotree
 ```
 
+Installer PATH behavior:
+
+- The installer must not assume `~/.local/bin` is already on every user's `PATH`.
+- MVP installer behavior is to install the executable, then warn with shell-specific guidance when the install directory is not on `PATH`.
+- The installer must not automatically edit shell startup files in the MVP.
+
+TODO: Revisit the default install directory and PATH onboarding before public distribution. Options include an explicit `--prefix`, Homebrew packaging, or an opt-in shell-profile update.
+
 The CLI is invoked as:
 
 ```bash
@@ -344,3 +400,4 @@ The MVP is successful when a user can:
 8. Run `monotree push login` to push feature branches.
 9. Run `monotree list` to inspect configured repos and task workspaces.
 10. Run `monotree remove login` to remove task worktrees without deleting branches by default.
+11. Run the local integration test suite without external network access.
