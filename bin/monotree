@@ -9,35 +9,51 @@ BASE_DIR=""
 BRANCH_PREFIX=""
 REPO_NAMES=()
 REPO_URLS=()
-REPO_BRANCHES=()
+REPO_WORKFLOWS=()
+REPO_BASE_BRANCHES=()
+REPO_TARGET_BRANCHES=()
 CREATED_PATHS=()
 CREATED_WORKTREES=()
 CREATED_WORKTREE_BASES=()
 CREATED_BRANCH_REPOS=()
 CREATED_BRANCH_NAMES=()
 
-info() { printf '%s\n' "$*"; }
-die() { printf 'Error: %s\n' "$*" >&2; exit 1; }
+info() { printf '[*] %s\n' "$*"; }
+success() { printf '[+] %s\n' "$*"; }
+die() { printf '[-] Error: %s\n' "$*" >&2; exit 1; }
 
 usage() {
   cat <<USAGE
-Usage: monotree <command> [args]
+Usage:
+  monotree <command> [args]
 
-Commands:
+Workspace:
   init              Initialize a monotree project
-  add <task>        Create a task workspace
   list              List configured repos and task workspaces
-  sync              Fast-forward base repositories
-  update <task>     Rebase task worktrees onto remote base branches
-  push <task>       Push task branches
+  add <task>        Create a task workspace
   remove <task>     Remove task worktrees without deleting branches
+
+Git workflow:
+  pull              Pull workflow base branches
+  rebase <task>     Rebase task branches onto workflow base branches
+
+Free workflow:
+  Use git directly for publishing
+
+Feature workflow:
+  push <task>       Push task branches for pull requests
+
+Stacked workflow:
+  merge <task>      Merge local task branches into parent feature branches
+
+Other:
   help              Show this help
 USAGE
 }
-
 is_safe_name() {
+  [ -n "$1" ] || return 1
   case "$1" in
-    ""|*[!A-Za-z0-9._-]*) return 1 ;;
+    *[!ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-]*) return 1 ;;
     *) return 0 ;;
   esac
 }
@@ -68,7 +84,9 @@ repo_count() { printf '%s' "${#REPO_NAMES[@]}"; }
 
 repo_name_at() { eval "printf '%s' \"\${REPO_NAMES[$1]}\""; }
 repo_url_at() { eval "printf '%s' \"\${REPO_URLS[$1]}\""; }
-repo_branch_at() { eval "printf '%s' \"\${REPO_BRANCHES[$1]}\""; }
+repo_workflow_at() { eval "printf '%s' \"\${REPO_WORKFLOWS[$1]}\""; }
+repo_base_branch_at() { eval "printf '%s' \"\${REPO_BASE_BRANCHES[$1]}\""; }
+repo_target_branch_at() { eval "printf '%s' \"\${REPO_TARGET_BRANCHES[$1]}\""; }
 
 repo_index_by_name() {
   needle=$1
@@ -83,19 +101,42 @@ repo_index_by_name() {
   return 1
 }
 
+set_repo_workflow() {
+  name=$1
+  workflow=$2
+  base_branch=$3
+  target_branch=${4:-$base_branch}
+  validate_nonempty_no_space "workflow" "$workflow"
+  validate_nonempty_no_space "base-branch" "$base_branch"
+  validate_nonempty_no_space "target-branch" "$target_branch"
+  case "$workflow" in
+    free|feature|stacked) ;;
+    *) die "invalid workflow '$workflow' for repo '$name' (expected free, feature, or stacked)" ;;
+  esac
+  idx=$(repo_index_by_name "$name") || die "WORKFLOW references unknown repo '$name'"
+  [ -z "$(repo_workflow_at "$idx")" ] || die "duplicate WORKFLOW for repo '$name'"
+  REPO_WORKFLOWS[$idx]=$workflow
+  REPO_BASE_BRANCHES[$idx]=$base_branch
+  REPO_TARGET_BRANCHES[$idx]=$target_branch
+}
+
 add_repo_config() {
   name=$1
   url=$2
-  branch=$3
+  legacy_branch=${3:-}
   validate_safe_name "repo name" "$name"
   validate_nonempty_no_space "git-url" "$url"
-  validate_nonempty_no_space "base-branch" "$branch"
   if repo_index_by_name "$name" >/dev/null; then
     die "duplicate repo '$name' in config"
   fi
   REPO_NAMES[${#REPO_NAMES[@]}]=$name
   REPO_URLS[${#REPO_URLS[@]}]=$url
-  REPO_BRANCHES[${#REPO_BRANCHES[@]}]=$branch
+  REPO_WORKFLOWS[${#REPO_WORKFLOWS[@]}]=""
+  REPO_BASE_BRANCHES[${#REPO_BASE_BRANCHES[@]}]=""
+  REPO_TARGET_BRANCHES[${#REPO_TARGET_BRANCHES[@]}]=""
+  if [ -n "$legacy_branch" ]; then
+    set_repo_workflow "$name" feature "$legacy_branch"
+  fi
 }
 
 reset_config() {
@@ -104,7 +145,9 @@ reset_config() {
   BRANCH_PREFIX=""
   REPO_NAMES=()
   REPO_URLS=()
-  REPO_BRANCHES=()
+  REPO_WORKFLOWS=()
+  REPO_BASE_BRANCHES=()
+  REPO_TARGET_BRANCHES=()
 }
 
 parse_config() {
@@ -123,27 +166,42 @@ parse_config() {
     set -- $line
     directive=$1
     case "$directive" in
-      project)
-        [ $# -eq 2 ] || die "invalid config line $line_no: project expects 1 value"
-        [ -z "$PROJECT_NAME" ] || die "duplicate project directive in config"
-        validate_safe_name "project" "$2"
+      PROJECT_NAME)
+        [ $# -eq 2 ] || die "invalid config line $line_no: PROJECT_NAME expects 1 value"
+        [ -z "$PROJECT_NAME" ] || die "duplicate PROJECT_NAME directive in config"
+        validate_safe_name "PROJECT_NAME" "$2"
         PROJECT_NAME=$2
         ;;
-      base_dir)
-        [ $# -eq 2 ] || die "invalid config line $line_no: base_dir expects 1 value"
-        [ -z "$BASE_DIR" ] || die "duplicate base_dir directive in config"
-        validate_safe_name "base_dir" "$2"
+      MAIN_WORKTREES_DIR)
+        [ $# -eq 2 ] || die "invalid config line $line_no: MAIN_WORKTREES_DIR expects 1 value"
+        [ -z "$BASE_DIR" ] || die "duplicate MAIN_WORKTREES_DIR directive in config"
+        validate_safe_name "MAIN_WORKTREES_DIR" "$2"
         BASE_DIR=$2
         ;;
-      branch_prefix)
-        [ $# -eq 2 ] || die "invalid config line $line_no: branch_prefix expects 1 value"
-        [ -z "$BRANCH_PREFIX" ] || die "duplicate branch_prefix directive in config"
-        validate_nonempty_no_space "branch_prefix" "$2"
+      BRANCH_PREFIX)
+        [ $# -eq 2 ] || die "invalid config line $line_no: BRANCH_PREFIX expects 1 value"
+        [ -z "$BRANCH_PREFIX" ] || die "duplicate BRANCH_PREFIX directive in config"
+        validate_nonempty_no_space "BRANCH_PREFIX" "$2"
         BRANCH_PREFIX=$2
         ;;
-      repo)
-        [ $# -eq 4 ] || die "invalid config line $line_no: repo expects 3 values"
-        add_repo_config "$2" "$3" "$4"
+      REPO)
+        if [ $# -eq 3 ]; then
+          add_repo_config "$2" "$3"
+        elif [ $# -eq 4 ]; then
+          # Backward-compatible legacy form: REPO <name> <git-url> <main-branch>
+          add_repo_config "$2" "$3" "$4"
+        else
+          die "invalid config line $line_no: REPO expects 2 values (or legacy 3 values)"
+        fi
+        ;;
+      WORKFLOW)
+        if [ $# -eq 4 ]; then
+          set_repo_workflow "$2" "$3" "$4"
+        elif [ $# -eq 5 ]; then
+          set_repo_workflow "$2" "$3" "$4" "$5"
+        else
+          die "invalid config line $line_no: WORKFLOW expects 3 or 4 values"
+        fi
         ;;
       *)
         die "unknown directive '$directive' in config line $line_no"
@@ -151,18 +209,24 @@ parse_config() {
     esac
   done < "$file"
 
-  [ -n "$PROJECT_NAME" ] || die "missing project directive in config"
-  [ -n "$BASE_DIR" ] || die "missing base_dir directive in config"
-  [ -n "$BRANCH_PREFIX" ] || die "missing branch_prefix directive in config"
+  [ -n "$PROJECT_NAME" ] || die "missing PROJECT_NAME directive in config"
+  [ -n "$BASE_DIR" ] || die "missing MAIN_WORKTREES_DIR directive in config"
+  [ -n "$BRANCH_PREFIX" ] || die "missing BRANCH_PREFIX directive in config"
   [ ${#REPO_NAMES[@]} -gt 0 ] || die "config must define at least one repo"
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    [ -n "$(repo_workflow_at "$i")" ] || die "missing WORKFLOW directive for repo '$name'"
+    i=$((i + 1))
+  done
 }
 
 find_project_root() {
   dir=$(pwd -P)
   while :; do
-    if [ -f "$dir/.monotree/config" ]; then
+    if [ -f "$dir/.monotree.config" ]; then
       PROJECT_ROOT=$dir
-      CONFIG_FILE="$dir/.monotree/config"
+      CONFIG_FILE="$dir/.monotree.config"
       return 0
     fi
     [ "$dir" = "/" ] && return 1
@@ -171,13 +235,28 @@ find_project_root() {
 }
 
 require_project() {
-  find_project_root || die "not inside a monotree project (missing .monotree/config)"
+  find_project_root || die "not inside a monotree project (missing .monotree.config)"
   parse_config "$CONFIG_FILE"
 }
 
 base_repo_path() { printf '%s/%s/%s' "$PROJECT_ROOT" "$BASE_DIR" "$1"; }
 task_repo_path() { printf '%s/%s/%s' "$PROJECT_ROOT" "$1" "$2"; }
 feature_branch_for_task() { printf '%s/%s' "$BRANCH_PREFIX" "$1"; }
+stacked_branch_for_task() {
+  parent=$1
+  task=$2
+  printf '%s-%s' "$parent" "$task"
+}
+repo_task_branch_at() {
+  index=$1
+  task=$2
+  workflow=$(repo_workflow_at "$index")
+  base_branch=$(repo_base_branch_at "$index")
+  case "$workflow" in
+    stacked) stacked_branch_for_task "$base_branch" "$task" ;;
+    *) feature_branch_for_task "$task" ;;
+  esac
+}
 
 is_git_dirty() {
   path=$1
@@ -257,14 +336,19 @@ clone_base_repos() {
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     url=$(repo_url_at "$i")
-    branch=$(repo_branch_at "$i")
+    branch=$(repo_base_branch_at "$i")
     target=$(base_repo_path "$name")
     if [ -e "$target" ]; then
       info "Base repo exists: $BASE_DIR/$name"
     else
-      git clone --branch "$branch" "$url" "$target" >/dev/null 2>&1 || fail_with_rollback "failed to clone repo '$name' from $url branch $branch"
+      clone_output=$(git clone --branch "$branch" "$url" "$target" 2>&1)
+      clone_status=$?
+      if [ $clone_status -ne 0 ]; then
+        fail_with_rollback "failed to clone repo '$name' from $url branch $branch
+$clone_output"
+      fi
       track_path "$target"
-      info "Cloned: $BASE_DIR/$name"
+      success "Cloned: $BASE_DIR/$name"
     fi
     i=$((i + 1))
   done
@@ -274,23 +358,45 @@ write_config() {
   file=$1
   mkdir -p "$(dirname "$file")" || die "failed to create config directory"
   {
-    printf 'project %s\n' "$PROJECT_NAME"
-    printf 'base_dir %s\n' "$BASE_DIR"
-    printf 'branch_prefix %s\n' "$BRANCH_PREFIX"
+    printf '# Monotree config\n'
+    printf '# You may edit this file manually.\n'
+    printf '# This file is read by monotree. It is not a shell script.\n'
+    printf '#\n'
+    printf '# Be careful changing MAIN_WORKTREES_DIR, BRANCH_PREFIX, REPO, or WORKFLOW after worktrees exist.\n'
     printf '\n'
+    printf 'PROJECT_NAME %s\n' "$PROJECT_NAME"
+    printf 'MAIN_WORKTREES_DIR %s\n' "$BASE_DIR"
+    printf 'BRANCH_PREFIX %s\n' "$BRANCH_PREFIX"
+    printf '\n'
+    printf '# REPO <name> <git-url>\n'
+    printf '# WORKFLOW <repo-name> free <base-branch>\n'
+    printf '# WORKFLOW <repo-name> feature <main-branch>\n'
+    printf '# WORKFLOW <repo-name> stacked <parent-feature-branch>\n'
     i=0
     while [ $i -lt ${#REPO_NAMES[@]} ]; do
-      printf 'repo %s %s %s\n' "$(repo_name_at "$i")" "$(repo_url_at "$i")" "$(repo_branch_at "$i")"
+      printf 'REPO %s %s\n' "$(repo_name_at "$i")" "$(repo_url_at "$i")"
+      printf 'WORKFLOW %s %s %s\n' "$(repo_name_at "$i")" "$(repo_workflow_at "$i")" "$(repo_base_branch_at "$i")"
       i=$((i + 1))
     done
   } > "$file" || die "failed to write config: $file"
+}
+prompt_read() {
+  prompt=$1
+  value=""
+  if [ -t 0 ]; then
+    # Use readline for interactive editing when a real terminal is attached.
+    IFS= read -r -e -p "$prompt" value || :
+  else
+    printf '%s' "$prompt" >&2
+    IFS= read -r value || :
+  fi
+  printf '%s' "$value"
 }
 
 prompt_with_default() {
   prompt=$1
   default=$2
-  printf '%s [%s]: ' "$prompt" "$default" >&2
-  IFS= read -r value || value=""
+  value=$(prompt_read "[*] $prompt [$default]: ")
   if [ -z "$value" ]; then
     printf '%s' "$default"
   else
@@ -302,47 +408,150 @@ prompt_required() {
   prompt=$1
   value=""
   while [ -z "$value" ]; do
-    printf '%s: ' "$prompt" >&2
-    IFS= read -r value || value=""
+    value=$(prompt_read "[*] $prompt: ")
+    [ -n "$value" ] || printf '[-] %s is required.
+' "$prompt" >&2
   done
   printf '%s' "$value"
 }
 
+expand_path() {
+  value=$1
+  case "$value" in
+    ".") pwd -P ;;
+    "~") printf '%s' "$HOME" ;;
+    "~/"*) printf '%s/%s' "$HOME" "${value#~/}" ;;
+    /*) printf '%s' "$value" ;;
+    *) printf '%s/%s' "$(pwd -P)" "$value" ;;
+  esac
+}
+
 cmd_init_interactive() {
   reset_config
+  info "Create a new monotree project"
+  printf '
+' >&2
+  info "Before monotree"
+  cat >&2 <<'BEFORE'
+    frontend                    // repo
+    └── AI agent                // separate session/context
+
+    backend                     // repo
+    └── AI agent                // separate session/context
+
+    Problem: separate agents do not share context, session, or file search.
+BEFORE
+  printf '
+' >&2
+  info "After monotree"
+  cat >&2 <<'AFTER'
+    fullstack                     // monotree project
+    ├── .monotree.config          // config
+    ├── _base                     // main worktrees
+    │   ├── frontend              // main worktree: frontend
+    │   └── backend               // main worktree: backend
+    └── login                     // task workspace
+        ├── frontend              // linked worktree: frontend
+        ├── backend               // linked worktree: backend
+        └── <run AI agent here>   // cd login && run codex, claude code, ...
+
+    Result: one task workspace, one AI session, repo-local paths.
+AFTER
+  printf '
+' >&2
+  info "Setup guide"
+  printf '    Project name      directory name for this monotree workspace
+' >&2
+  printf '    Main worktrees    directory for each repo main worktree
+' >&2
+  printf '    Default main      default branch for repo main worktrees
+' >&2
+  printf '    Branch prefix     task branch prefix, e.g. feature/login
+' >&2
+  printf '    Repositories      Git repos included in each task workspace
+' >&2
+  printf '
+[*] Press Enter to continue...' >&2
+  IFS= read -r _continue || _continue=""
+  printf '
+
+' >&2
+  info "Project"
+  target_dir_input=$(prompt_with_default "Target directory" ".")
+  TARGET_DIR=$(expand_path "$target_dir_input")
   PROJECT_NAME=$(prompt_with_default "Project name" "fullstack")
   validate_safe_name "project" "$PROJECT_NAME"
-  BASE_DIR=$(prompt_with_default "Base directory" "_base")
-  validate_safe_name "base_dir" "$BASE_DIR"
-  default_branch=$(prompt_with_default "Default base branch" "main")
+  BASE_DIR=$(prompt_with_default "Main worktrees directory" "_base")
+  validate_safe_name "MAIN_WORKTREES_DIR" "$BASE_DIR"
+  default_branch=$(prompt_with_default "Default main branch" "main")
   validate_nonempty_no_space "default base branch" "$default_branch"
   BRANCH_PREFIX=$(prompt_with_default "Branch prefix" "feature")
   validate_nonempty_no_space "branch_prefix" "$BRANCH_PREFIX"
 
+  printf '
+' >&2
+  info "Repositories"
+
+  repo_number=1
   while :; do
+    printf '
+' >&2
+    info "Repo #$repo_number"
     repo_name=$(prompt_required "Repository name")
     validate_safe_name "repo name" "$repo_name"
     repo_url=$(prompt_required "Git URL")
     validate_nonempty_no_space "git-url" "$repo_url"
-    repo_branch=$(prompt_with_default "Base branch" "$default_branch")
-    validate_nonempty_no_space "base-branch" "$repo_branch"
-    add_repo_config "$repo_name" "$repo_url" "$repo_branch"
-    printf 'Add another repo? [y/N]: ' >&2
+    add_repo_config "$repo_name" "$repo_url"
+    repo_workflow=$(prompt_with_default "Workflow [free/feature/stacked]" "free")
+    case "$repo_workflow" in
+      free)
+        repo_branch=$(prompt_with_default "Base branch" "$default_branch")
+        set_repo_workflow "$repo_name" free "$repo_branch"
+        ;;
+      feature)
+        repo_branch=$(prompt_with_default "Base branch" "$default_branch")
+        set_repo_workflow "$repo_name" feature "$repo_branch"
+        ;;
+      stacked)
+        repo_branch=$(prompt_required "Parent feature branch")
+        set_repo_workflow "$repo_name" stacked "$repo_branch"
+        ;;
+      *)
+        die "invalid workflow '$repo_workflow' for repo '$repo_name' (expected free, feature, or stacked)"
+        ;;
+    esac
+    printf '[*] Add another repo? [y/N]: ' >&2
     IFS= read -r answer || answer=""
     case "$answer" in
-      y|Y|yes|YES) continue ;;
+      y|Y|yes|YES) repo_number=$((repo_number + 1)); continue ;;
       *) break ;;
     esac
   done
 
-  PROJECT_ROOT="$(pwd -P)/$PROJECT_NAME"
+  printf '
+' >&2
+  info "Summary"
+  info "Project: $PROJECT_NAME"
+  info "Main worktrees dir: $BASE_DIR"
+  info "Branch prefix: $BRANCH_PREFIX"
+  info "Repositories:"
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    info "  - $(repo_name_at "$i") $(repo_url_at "$i") workflow=$(repo_workflow_at "$i") base=$(repo_base_branch_at "$i") target=$(repo_target_branch_at "$i")"
+    i=$((i + 1))
+  done
+  printf '
+' >&2
+  info "Creating project..."
+
+  PROJECT_ROOT="$TARGET_DIR/$PROJECT_NAME"
   [ ! -e "$PROJECT_ROOT" ] || die "project directory already exists: $PROJECT_ROOT"
-  mkdir -p "$PROJECT_ROOT/.monotree" || die "failed to create project directory: $PROJECT_ROOT"
+  mkdir -p "$PROJECT_ROOT" || die "failed to create project directory: $PROJECT_ROOT"
   track_path "$PROJECT_ROOT"
-  CONFIG_FILE="$PROJECT_ROOT/.monotree/config"
+  CONFIG_FILE="$PROJECT_ROOT/.monotree.config"
   write_config "$CONFIG_FILE"
   clone_base_repos
-  info "Initialized monotree project: $PROJECT_ROOT"
+  success "Initialized monotree project: $PROJECT_ROOT"
 }
 
 cmd_init() {
@@ -351,12 +560,12 @@ cmd_init() {
   CREATED_WORKTREE_BASES=()
   CREATED_BRANCH_REPOS=()
   CREATED_BRANCH_NAMES=()
-  if [ -f ".monotree/config" ]; then
+  if [ -f ".monotree.config" ]; then
     PROJECT_ROOT=$(pwd -P)
-    CONFIG_FILE="$PROJECT_ROOT/.monotree/config"
+    CONFIG_FILE="$PROJECT_ROOT/.monotree.config"
     parse_config "$CONFIG_FILE"
     clone_base_repos
-    info "Initialized monotree project: $PROJECT_ROOT"
+    success "Initialized monotree project: $PROJECT_ROOT"
   else
     cmd_init_interactive
   fi
@@ -373,13 +582,13 @@ cmd_add() {
   CREATED_BRANCH_REPOS=()
   CREATED_BRANCH_NAMES=()
   task_dir="$PROJECT_ROOT/$task"
-  branch=$(feature_branch_for_task "$task")
   [ ! -e "$task_dir" ] || die "task directory already exists: $task_dir"
 
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     base=$(base_repo_path "$name")
+    branch=$(repo_task_branch_at "$i" "$task")
     [ -d "$base/.git" ] || die "base repo missing for '$name': $base"
     if branch_exists "$base" "$branch"; then
       die "branch already exists for repo '$name': $branch"
@@ -394,13 +603,14 @@ cmd_add() {
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     base=$(base_repo_path "$name")
-    base_branch=$(repo_branch_at "$i")
+    base_branch=$(repo_base_branch_at "$i")
+    branch=$(repo_task_branch_at "$i" "$task")
     target=$(task_repo_path "$task" "$name")
     git -C "$base" fetch origin >/dev/null 2>&1 || fail_with_rollback "failed to fetch repo '$name'"
     git -C "$base" worktree add "$target" -b "$branch" "origin/$base_branch" >/dev/null 2>&1 || fail_with_rollback "failed to create worktree for repo '$name'"
     track_worktree "$target" "$base"
     track_branch "$base" "$branch"
-    info "Created: $task/$name"
+    success "Created: $task/$name"
     i=$((i + 1))
   done
 }
@@ -414,6 +624,13 @@ branch_or_unknown() {
   fi
 }
 
+ensure_current_branch() {
+  path=$1
+  expected=$2
+  actual=$(branch_or_unknown "$path")
+  [ "$actual" = "$expected" ] || die "unexpected branch in $path: expected $expected, got $actual"
+}
+
 cmd_list() {
   require_project
   info "Project: $PROJECT_NAME"
@@ -422,9 +639,11 @@ cmd_list() {
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
-    branch=$(repo_branch_at "$i")
+    workflow=$(repo_workflow_at "$i")
+    branch=$(repo_base_branch_at "$i")
+    target_branch=$(repo_target_branch_at "$i")
     current=$(branch_or_unknown "$(base_repo_path "$name")")
-    info "  Repo: $name base=$branch current=$current"
+    info "  Repo: $name workflow=$workflow base=$branch target=$target_branch current=$current"
     i=$((i + 1))
   done
   info "Tasks:"
@@ -433,7 +652,6 @@ cmd_list() {
     [ -d "$path" ] || continue
     dir_name=${path##*/}
     [ "$dir_name" = "$BASE_DIR" ] && continue
-    [ "$dir_name" = ".monotree" ] && continue
     case "$dir_name" in .*) continue ;; esac
     task_has_repo=0
     i=0
@@ -456,23 +674,36 @@ cmd_list() {
   [ $found -eq 1 ] || info "  (none)"
 }
 
-cmd_sync() {
+cmd_pull() {
   require_project
+  managed_count=0
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    workflow=$(repo_workflow_at "$i")
+    if [ "$workflow" = "free" ]; then
+      i=$((i + 1))
+      continue
+    fi
+    managed_count=$((managed_count + 1))
     name=$(repo_name_at "$i")
     base=$(base_repo_path "$name")
     [ -d "$base/.git" ] || die "base repo missing for '$name': $base"
     ensure_clean_worktree "$base"
     i=$((i + 1))
   done
+  [ $managed_count -gt 0 ] || die "no managed workflow repos to pull; use git directly for free workflow repos"
 
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    workflow=$(repo_workflow_at "$i")
+    if [ "$workflow" = "free" ]; then
+      i=$((i + 1))
+      continue
+    fi
     name=$(repo_name_at "$i")
-    branch=$(repo_branch_at "$i")
+    branch=$(repo_base_branch_at "$i")
     base=$(base_repo_path "$name")
-    git -C "$base" pull --ff-only origin "$branch" || die "failed to sync repo '$name'"
+    git -C "$base" pull --ff-only origin "$branch" || die "failed to pull repo '$name'"
     i=$((i + 1))
   done
 }
@@ -489,21 +720,30 @@ require_task_repos_clean() {
   done
 }
 
-cmd_update() {
-  [ $# -eq 1 ] || die "usage: monotree update <task>"
+cmd_rebase() {
+  [ $# -eq 1 ] || die "usage: monotree rebase <task>"
   task=$1
   validate_safe_name "task" "$task"
   require_project
-  require_task_repos_clean "$task"
+  managed_count=0
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    workflow=$(repo_workflow_at "$i")
+    if [ "$workflow" = "free" ]; then
+      i=$((i + 1))
+      continue
+    fi
+    managed_count=$((managed_count + 1))
     name=$(repo_name_at "$i")
-    branch=$(repo_branch_at "$i")
+    branch=$(repo_base_branch_at "$i")
     path=$(task_repo_path "$task" "$name")
+    [ -d "$path" ] || die "task repo missing for '$name': $path"
+    ensure_clean_worktree "$path"
     git -C "$path" fetch origin || die "failed to fetch task repo '$name': $path"
     git -C "$path" rebase "origin/$branch" || die "rebase failed in $path; resolve conflicts manually"
     i=$((i + 1))
   done
+  [ $managed_count -gt 0 ] || die "no managed workflow repos to rebase; use git directly for free workflow repos"
 }
 
 cmd_push() {
@@ -511,13 +751,74 @@ cmd_push() {
   task=$1
   validate_safe_name "task" "$task"
   require_project
-  branch=$(feature_branch_for_task "$task")
+  feature_count=0
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    workflow=$(repo_workflow_at "$i")
+    if [ "$workflow" != "feature" ]; then
+      i=$((i + 1))
+      continue
+    fi
+    feature_count=$((feature_count + 1))
     name=$(repo_name_at "$i")
+    branch=$(repo_task_branch_at "$i" "$task")
     path=$(task_repo_path "$task" "$name")
     [ -d "$path" ] || die "task repo missing for '$name': $path"
+    ensure_current_branch "$path" "$branch"
     git -C "$path" push -u origin "$branch" || die "failed to push repo '$name'"
+    i=$((i + 1))
+  done
+  [ $feature_count -gt 0 ] || die "no feature workflow repos to push; use git directly for free workflow repos or merge for stacked workflow repos"
+}
+
+cmd_merge() {
+  [ $# -eq 1 ] || die "usage: monotree merge <task>"
+  task=$1
+  validate_safe_name "task" "$task"
+  require_project
+  stacked_count=0
+
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    workflow=$(repo_workflow_at "$i")
+    if [ "$workflow" != "stacked" ]; then
+      i=$((i + 1))
+      continue
+    fi
+    stacked_count=$((stacked_count + 1))
+    name=$(repo_name_at "$i")
+    base=$(base_repo_path "$name")
+    path=$(task_repo_path "$task" "$name")
+    branch=$(repo_task_branch_at "$i" "$task")
+    target_branch=$(repo_target_branch_at "$i")
+    [ -d "$path" ] || die "task repo missing for '$name': $path"
+    ensure_current_branch "$path" "$branch"
+    ensure_clean_worktree "$path"
+    [ -d "$base/.git" ] || die "base repo missing for '$name': $base"
+    ensure_clean_worktree "$base"
+    git -C "$base" fetch origin || die "failed to fetch base repo '$name': $base"
+    git -C "$base" show-ref --verify --quiet "refs/remotes/origin/$target_branch" || die "remote target branch missing for repo '$name': origin/$target_branch"
+    i=$((i + 1))
+  done
+  [ $stacked_count -gt 0 ] || die "no stacked workflow repos to merge"
+
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    workflow=$(repo_workflow_at "$i")
+    if [ "$workflow" != "stacked" ]; then
+      i=$((i + 1))
+      continue
+    fi
+    name=$(repo_name_at "$i")
+    base=$(base_repo_path "$name")
+    branch=$(repo_task_branch_at "$i" "$task")
+    target_branch=$(repo_target_branch_at "$i")
+    git -C "$base" checkout "$target_branch" >/dev/null 2>&1 || die "failed to checkout target branch for repo '$name': $target_branch"
+    ensure_current_branch "$base" "$target_branch"
+    git -C "$base" pull --ff-only origin "$target_branch" || die "failed to update target branch for repo '$name': $target_branch"
+    git -C "$base" merge --ff-only "$branch" || die "failed to merge repo '$name'; run monotree rebase $task and resolve conflicts first"
+    git -C "$base" push origin "$target_branch" || die "failed to push target branch for repo '$name': $target_branch"
+    success "Merged: $task/$name -> $target_branch"
     i=$((i + 1))
   done
 }
@@ -547,9 +848,10 @@ main() {
     init) cmd_init "$@" ;;
     add) cmd_add "$@" ;;
     list) cmd_list "$@" ;;
-    sync) cmd_sync "$@" ;;
-    update) cmd_update "$@" ;;
+    pull) cmd_pull "$@" ;;
+    rebase) cmd_rebase "$@" ;;
     push) cmd_push "$@" ;;
+    merge) cmd_merge "$@" ;;
     remove) cmd_remove "$@" ;;
     help|-h|--help) usage ;;
     *) usage >&2; die "unknown command: $cmd" ;;
