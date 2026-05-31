@@ -22,26 +22,27 @@ info() { printf '[*] %s\n' "$*"; }
 success() { printf '[+] %s\n' "$*"; }
 die() { printf '[-] Error: %s\n' "$*" >&2; exit 1; }
 
+
 usage() {
   cat <<USAGE
 Usage:
-  monotree <command> [args]
+  tasktree <command> [args]
 
 Workspace:
-  config            Create .monotree.config without cloning repos
-  init              Initialize a monotree project
+  config            Create or rewrite .tasktree.config without cloning repos
+  init              Initialize a tasktree project
   list              List configured repos and task workspaces
-  status            Show clean/dirty status for base and task worktrees
+  status            Show commits, diff, and dirty state
   add <task>        Create a task workspace
   remove <task>     Remove task worktrees without deleting branches
 
 Git:
   pull              Pull remote base branches into main worktrees
-  rebase            Rebase every task workspace onto remote base branches
-  rebase <task>     Rebase one task workspace onto remote base branches
+  update            Update every task workspace from local base worktrees
+  update <task>     Update one task workspace from local base worktrees
   push              Push base branches to origin
   push <task>       Push task branches to origin
-  merge <task>      Fast-forward base branches from task branches
+  land <task>       Land task branches into base branches
   --repo <repo>     Limit supported commands to one repo
 
 Other:
@@ -203,20 +204,78 @@ parse_config() {
         BRANCH_PREFIX=$2
         ;;
       REPO)
-        if [ $# -eq 3 ]; then
-          add_repo_config "$2" "$3"
-        elif [ $# -eq 4 ]; then
+        [ $# -eq 4 ] || die "invalid config line $line_no: REPO expects 3 values: <name> <git-url> <base-branch>; run 'tasktree config' to rewrite an older config format"
+        add_repo_config "$2" "$3" "$4"
+        ;;
+      WORKFLOW|workflow)
+        die "legacy WORKFLOW directive in config line $line_no; run 'tasktree config' to rewrite .tasktree.config"
+        ;;
+      *)
+        die "unknown directive '$directive' in config line $line_no"
+        ;;
+    esac
+  done < "$file"
+
+  [ -n "$PROJECT_NAME" ] || die "missing PROJECT_NAME directive in config"
+  [ -n "$BASE_DIR" ] || die "missing MAIN_WORKTREES_DIR directive in config"
+  [ -n "$BRANCH_PREFIX" ] || die "missing BRANCH_PREFIX directive in config"
+  [ ${#REPO_NAMES[@]} -gt 0 ] || die "config must define at least one repo"
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    [ -n "$(repo_base_branch_at "$i")" ] || die "missing base branch for repo '$name'"
+    i=$((i + 1))
+  done
+}
+
+parse_config_for_rewrite() {
+  file=$1
+  [ -f "$file" ] || die "config not found: $file"
+  reset_config
+  line_no=0
+  while IFS= read -r raw_line || [ -n "$raw_line" ]; do
+    line_no=$((line_no + 1))
+    line=$(printf '%s' "$raw_line" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+    [ -z "$line" ] && continue
+    case "$line" in \#*) continue ;; esac
+
+    set -- $line
+    directive=$1
+    case "$directive" in
+      PROJECT_NAME|project)
+        [ $# -eq 2 ] || die "invalid config line $line_no: PROJECT_NAME expects 1 value"
+        [ -z "$PROJECT_NAME" ] || die "duplicate PROJECT_NAME directive in config"
+        validate_safe_name "PROJECT_NAME" "$2"
+        PROJECT_NAME=$2
+        ;;
+      MAIN_WORKTREES_DIR|BASE_DIR|base_dir)
+        [ $# -eq 2 ] || die "invalid config line $line_no: MAIN_WORKTREES_DIR expects 1 value"
+        [ -z "$BASE_DIR" ] || die "duplicate MAIN_WORKTREES_DIR directive in config"
+        validate_safe_name "MAIN_WORKTREES_DIR" "$2"
+        BASE_DIR=$2
+        ;;
+      BRANCH_PREFIX|branch_prefix)
+        [ $# -eq 2 ] || die "invalid config line $line_no: BRANCH_PREFIX expects 1 value"
+        [ -z "$BRANCH_PREFIX" ] || die "duplicate BRANCH_PREFIX directive in config"
+        validate_nonempty_no_space "BRANCH_PREFIX" "$2"
+        BRANCH_PREFIX=$2
+        ;;
+      REPO|repo)
+        if [ $# -eq 4 ]; then
           add_repo_config "$2" "$3" "$4"
+        elif [ $# -eq 3 ]; then
+          add_repo_config "$2" "$3" ""
         else
-          die "invalid config line $line_no: REPO expects 2 or 3 values"
+          die "invalid config line $line_no: REPO expects <name> <git-url> [base-branch]"
         fi
         ;;
-      WORKFLOW)
-        if [ $# -eq 4 ] || [ $# -eq 5 ]; then
-          set_repo_base_branch "$2" "$4"
-        else
-          die "invalid config line $line_no: WORKFLOW expects 3 or 4 values"
-        fi
+      BASE_BRANCH|base_branch|REPO_BASE_BRANCH|repo_base_branch)
+        [ $# -eq 3 ] || die "invalid config line $line_no: BASE_BRANCH expects 2 values: <repo> <base-branch>"
+        set_repo_base_branch "$2" "$3"
+        ;;
+      WORKFLOW|workflow)
+        # Legacy directive removed from the tasktree mental model.
+        # `tasktree config` rewrites config without it.
         ;;
       *)
         die "unknown directive '$directive' in config line $line_no"
@@ -239,6 +298,11 @@ parse_config() {
 find_project_root() {
   dir=$(pwd -P)
   while :; do
+    if [ -f "$dir/.tasktree.config" ]; then
+      PROJECT_ROOT=$dir
+      CONFIG_FILE="$dir/.tasktree.config"
+      return 0
+    fi
     if [ -f "$dir/.monotree.config" ]; then
       PROJECT_ROOT=$dir
       CONFIG_FILE="$dir/.monotree.config"
@@ -250,14 +314,14 @@ find_project_root() {
 }
 
 require_project() {
-  find_project_root || die "not inside a monotree project (missing .monotree.config)"
+  find_project_root || die "not inside a tasktree project (missing .tasktree.config)"
   parse_config "$CONFIG_FILE"
 }
 
 base_repo_path() { printf '%s/%s/%s' "$PROJECT_ROOT" "$BASE_DIR" "$1"; }
 task_repo_path() { printf '%s/%s/%s' "$PROJECT_ROOT" "$1" "$2"; }
 feature_branch_for_task() { printf '%s/%s' "$BRANCH_PREFIX" "$1"; }
-stacked_branch_for_task() {
+base_prefixed_branch_for_task() {
   parent=$1
   task=$2
   printf '%s-%s' "$parent" "$task"
@@ -267,7 +331,7 @@ repo_task_branch_at() {
   task=$2
   base_branch=$(repo_base_branch_at "$index")
   case "$base_branch" in
-    "$BRANCH_PREFIX"/*) stacked_branch_for_task "$base_branch" "$task" ;;
+    "$BRANCH_PREFIX"/*) base_prefixed_branch_for_task "$base_branch" "$task" ;;
     *) feature_branch_for_task "$task" ;;
   esac
 }
@@ -372,11 +436,11 @@ write_config() {
   file=$1
   mkdir -p "$(dirname "$file")" || die "failed to create config directory"
   {
-    printf '# Monotree config
+    printf '# Tasktree config
 '
     printf '# You may edit this file manually.
 '
-    printf '# This file is read by monotree. It is not a shell script.
+    printf '# This file is read by tasktree. It is not a shell script.
 '
     printf '#
 '
@@ -444,10 +508,10 @@ expand_path() {
 cmd_init_interactive() {
   clone_after=${1:-yes}
   reset_config
-  info "Create a new monotree project"
+  info "Create a new tasktree project"
   printf '
 ' >&2
-  info "Before monotree"
+  info "Before tasktree"
   cat >&2 <<'BEFORE'
     frontend                    // repo
     └── AI agent                // separate session/context
@@ -459,10 +523,10 @@ cmd_init_interactive() {
 BEFORE
   printf '
 ' >&2
-  info "After monotree"
+  info "After tasktree"
   cat >&2 <<'AFTER'
-    fullstack                     // monotree project
-    ├── .monotree.config          // config
+    fullstack                     // tasktree project
+    ├── .tasktree.config          // config
     ├── _base                     // main worktrees
     │   ├── frontend              // main worktree: frontend
     │   └── backend               // main worktree: backend
@@ -476,7 +540,7 @@ AFTER
   printf '
 ' >&2
   info "Setup guide"
-  printf '    Project name      directory name for this monotree workspace
+  printf '    Project name      directory name for this tasktree workspace
 ' >&2
   printf '    Main worktrees    directory for each repo main worktree
 ' >&2
@@ -551,46 +615,57 @@ AFTER
   [ ! -e "$PROJECT_ROOT" ] || die "project directory already exists: $PROJECT_ROOT"
   mkdir -p "$PROJECT_ROOT" || die "failed to create project directory: $PROJECT_ROOT"
   track_path "$PROJECT_ROOT"
-  CONFIG_FILE="$PROJECT_ROOT/.monotree.config"
+  CONFIG_FILE="$PROJECT_ROOT/.tasktree.config"
   write_config "$CONFIG_FILE"
   if [ "$clone_after" = "yes" ]; then
     clone_base_repos
-    success "Initialized monotree project: $PROJECT_ROOT"
+    success "Initialized tasktree project: $PROJECT_ROOT"
   else
     success "Config written: $CONFIG_FILE"
   fi
 }
 
 cmd_config() {
-  [ $# -eq 0 ] || die "usage: monotree config"
+  [ $# -eq 0 ] || die "usage: tasktree config"
   CREATED_PATHS=()
   CREATED_WORKTREES=()
   CREATED_WORKTREE_BASES=()
   CREATED_BRANCH_REPOS=()
   CREATED_BRANCH_NAMES=()
-  cmd_init_interactive no
+  if find_project_root; then
+    parse_config_for_rewrite "$CONFIG_FILE"
+    CONFIG_FILE="$PROJECT_ROOT/.tasktree.config"
+    write_config "$CONFIG_FILE"
+    success "Config rewritten: $CONFIG_FILE"
+  else
+    cmd_init_interactive no
+  fi
 }
 
 cmd_init() {
-  [ $# -eq 0 ] || die "usage: monotree init"
+  [ $# -eq 0 ] || die "usage: tasktree init"
   CREATED_PATHS=()
   CREATED_WORKTREES=()
   CREATED_WORKTREE_BASES=()
   CREATED_BRANCH_REPOS=()
   CREATED_BRANCH_NAMES=()
-  if [ -f ".monotree.config" ]; then
+  if [ -f ".tasktree.config" ] || [ -f ".monotree.config" ]; then
     PROJECT_ROOT=$(pwd -P)
-    CONFIG_FILE="$PROJECT_ROOT/.monotree.config"
+    if [ -f "$PROJECT_ROOT/.tasktree.config" ]; then
+      CONFIG_FILE="$PROJECT_ROOT/.tasktree.config"
+    else
+      CONFIG_FILE="$PROJECT_ROOT/.monotree.config"
+    fi
     parse_config "$CONFIG_FILE"
     clone_base_repos
-    success "Initialized monotree project: $PROJECT_ROOT"
+    success "Initialized tasktree project: $PROJECT_ROOT"
   else
     cmd_init_interactive yes
   fi
 }
 
 cmd_add() {
-  [ $# -eq 1 ] || die "usage: monotree add <task>"
+  [ $# -eq 1 ] || die "usage: tasktree add <task>"
   task=$1
   validate_safe_name "task" "$task"
   require_project
@@ -670,11 +745,85 @@ worktree_status_label() {
   fi
 }
 
-print_status_item() {
+head_commit_short() {
+  path=$1
+  [ -d "$path" ] || { printf 'missing'; return 0; }
+  git -C "$path" rev-parse --short=9 HEAD 2>/dev/null || printf '?'
+}
+
+head_commit_full() {
+  path=$1
+  [ -d "$path" ] || { printf 'missing'; return 0; }
+  git -C "$path" rev-parse HEAD 2>/dev/null || printf '?'
+}
+
+commit_diff_label() {
+  path=$1
+  base_commit=$2
+  [ -d "$path" ] || { printf 'missing'; return 0; }
+  case "$base_commit" in
+    missing|\?) printf '?' ; return 0 ;;
+  esac
+
+  counts=$(git -C "$path" rev-list --left-right --count "$base_commit...HEAD" 2>/dev/null) || { printf '?'; return 0; }
+  set -- $counts
+  left=${1:-0}
+  right=${2:-0}
+
+  if [ "$left" = 0 ] && [ "$right" = 0 ]; then
+    printf '0'
+  elif [ "$left" = 0 ]; then
+    printf '+%s' "$right"
+  elif [ "$right" = 0 ]; then
+    printf -- '-%s' "$left"
+  else
+    printf '±%s/%s' "$left" "$right"
+  fi
+}
+
+next_action_for_diff() {
+  diff_label=$1
+  case "$diff_label" in
+    0) printf '-' ;;
+    +*) printf 'land' ;;
+    -*) printf 'update' ;;
+    ±*) printf 'update' ;;
+    *) printf 'check' ;;
+  esac
+}
+
+print_base_status_header() {
+  printf '    %-11s %-16s %-10s %s\n' "repo" "branch" "commit" "status"
+}
+
+print_base_status_item() {
   name=$1
   branch=$2
-  state=$3
-  printf '    %-11s %-16s %s\n' "$name" "$branch" "$state"
+  commit=$3
+  state=$4
+  printf '    %-11s %-16s %-10s %s\n' "$name" "$branch" "$commit" "$state"
+}
+
+print_task_status_header() {
+  printf '    %-11s %-10s %-10s %-5s %-9s %s\n' "repo" "base" "task" "diff" "status" "next"
+}
+
+print_task_status_item() {
+  name=$1
+  base_commit=$2
+  task_commit=$3
+  diff_label=$4
+  state=$5
+  next_action=$6
+  printf '    %-11s %-10s %-10s %-5s %-9s %s\n' "$name" "$base_commit" "$task_commit" "$diff_label" "$state" "$next_action"
+}
+
+print_next_legend() {
+  cat <<'LEGEND'
+[*] Next
+    land    task has commits not in base: tasktree land <task>
+    update  task is behind base: tasktree update <task>
+LEGEND
 }
 
 ensure_current_branch() {
@@ -728,15 +877,16 @@ cmd_list() {
 cmd_status() {
   require_project
   parse_repo_option "$@"
-  [ ${#ARGS[@]} -eq 0 ] || die "usage: monotree status [--repo <repo>]"
+  [ ${#ARGS[@]} -eq 0 ] || die "usage: tasktree status [--repo <repo>]"
 
   info "Base worktrees"
+  print_base_status_header
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     repo_matches_filter "$name" || { i=$((i + 1)); continue; }
     path=$(base_repo_path "$name")
-    print_status_item "$name" "$(branch_or_unknown "$path")" "$(worktree_status_label "$path")"
+    print_base_status_item "$name" "$(branch_or_unknown "$path")" "$(head_commit_short "$path")" "$(worktree_status_label "$path")"
     i=$((i + 1))
   done
 
@@ -748,16 +898,24 @@ cmd_status() {
     found=1
     task=${path##*/}
     info "$task"
+    print_task_status_header
     i=0
     while [ $i -lt ${#REPO_NAMES[@]} ]; do
       name=$(repo_name_at "$i")
       repo_matches_filter "$name" || { i=$((i + 1)); continue; }
       repo_path="$path/$name"
       [ -d "$repo_path" ] || { i=$((i + 1)); continue; }
-      print_status_item "$name" "$(branch_or_unknown "$repo_path")" "$(worktree_status_label "$repo_path")"
+      base_path=$(base_repo_path "$name")
+      base_commit=$(head_commit_full "$base_path")
+      diff_label=$(commit_diff_label "$repo_path" "$base_commit")
+      print_task_status_item "$name" "$(head_commit_short "$base_path")" "$(head_commit_short "$repo_path")" "$diff_label" "$(worktree_status_label "$repo_path")" "$(next_action_for_diff "$diff_label")"
       i=$((i + 1))
     done
   done
+  if [ $found -eq 1 ]; then
+    printf '\n'
+    print_next_legend
+  fi
   [ $found -eq 1 ] || info "(none)"
 }
 
@@ -780,7 +938,7 @@ is_task_workspace_path() {
 cmd_pull() {
   require_project
   parse_repo_option "$@"
-  [ ${#ARGS[@]} -eq 0 ] || die "usage: monotree pull [--repo <repo>]"
+  [ ${#ARGS[@]} -eq 0 ] || die "usage: tasktree pull [--repo <repo>]"
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
@@ -797,7 +955,7 @@ cmd_pull() {
     repo_matches_filter "$name" || { i=$((i + 1)); continue; }
     branch=$(repo_base_branch_at "$i")
     base=$(base_repo_path "$name")
-    git -C "$base" pull --ff-only origin "$branch" || die "failed to pull repo '$name'"
+    tasktree_git_pull_base "$name" "$base" "$branch"
     i=$((i + 1))
   done
 }
@@ -814,31 +972,31 @@ require_task_repos_clean() {
   done
 }
 
-rebase_task() {
+update_task() {
   task=$1
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     repo_matches_filter "$name" || { i=$((i + 1)); continue; }
-    branch=$(repo_base_branch_at "$i")
+    base=$(base_repo_path "$name")
     path=$(task_repo_path "$task" "$name")
+    [ -d "$base/.git" ] || die "base repo missing for '$name': $base"
     [ -d "$path" ] || die "task repo missing for '$name': $path"
     ensure_clean_worktree "$path"
-    git -C "$path" fetch origin || die "failed to fetch task repo '$name': $path"
-    git -C "$path" rebase "origin/$branch" || die "rebase failed in $path; resolve conflicts manually"
-    success "Rebased: $task/$name"
+    tasktree_git_update_task "$path" "$(head_commit_full "$base")"
+    success "Updated: $task/$name"
     i=$((i + 1))
   done
 }
 
-cmd_rebase() {
+cmd_update() {
   require_project
   parse_repo_option "$@"
-  [ ${#ARGS[@]} -le 1 ] || die "usage: monotree rebase [task] [--repo <repo>]"
+  [ ${#ARGS[@]} -le 1 ] || die "usage: tasktree update [task] [--repo <repo>]"
   if [ ${#ARGS[@]} -eq 1 ] && [ "$(eval "printf '%s' \"\${ARGS[0]}\"")" != "--all" ]; then
     task=$(eval "printf '%s' \"\${ARGS[0]}\"")
     validate_safe_name "task" "$task"
-    rebase_task "$task"
+    update_task "$task"
     return 0
   fi
 
@@ -846,9 +1004,9 @@ cmd_rebase() {
   for path in "$PROJECT_ROOT"/*; do
     is_task_workspace_path "$path" || continue
     found=1
-    rebase_task "${path##*/}"
+    update_task "${path##*/}"
   done
-  [ $found -eq 1 ] || die "no task workspaces to rebase"
+  [ $found -eq 1 ] || die "no task workspaces to update"
 }
 
 cmd_push_base() {
@@ -860,7 +1018,7 @@ cmd_push_base() {
     base=$(base_repo_path "$name")
     [ -d "$base/.git" ] || die "base repo missing for '$name': $base"
     ensure_current_branch "$base" "$branch"
-    git -C "$base" push origin "$branch" || die "failed to push base branch for repo '$name': $branch"
+    tasktree_git_push_base "$name" "$base" "$branch"
     i=$((i + 1))
   done
 }
@@ -875,7 +1033,7 @@ cmd_push_task() {
     path=$(task_repo_path "$task" "$name")
     [ -d "$path" ] || die "task repo missing for '$name': $path"
     ensure_current_branch "$path" "$branch"
-    git -C "$path" push -u origin "$branch" || die "failed to push repo '$name'"
+    tasktree_git_push_task "$name" "$path" "$branch"
     i=$((i + 1))
   done
 }
@@ -883,7 +1041,7 @@ cmd_push_task() {
 cmd_push() {
   require_project
   parse_repo_option "$@"
-  [ ${#ARGS[@]} -le 1 ] || die "usage: monotree push [task] [--repo <repo>]"
+  [ ${#ARGS[@]} -le 1 ] || die "usage: tasktree push [task] [--repo <repo>]"
   if [ ${#ARGS[@]} -eq 0 ]; then
     cmd_push_base
     return 0
@@ -894,10 +1052,10 @@ cmd_push() {
   cmd_push_task "$task"
 }
 
-cmd_merge() {
+cmd_land() {
   require_project
   parse_repo_option "$@"
-  [ ${#ARGS[@]} -eq 1 ] || die "usage: monotree merge <task> [--repo <repo>]"
+  [ ${#ARGS[@]} -eq 1 ] || die "usage: tasktree land <task> [--repo <repo>]"
   task=$(eval "printf '%s' \"\${ARGS[0]}\"")
   validate_safe_name "task" "$task"
 
@@ -914,8 +1072,8 @@ cmd_merge() {
     ensure_clean_worktree "$path"
     [ -d "$base/.git" ] || die "base repo missing for '$name': $base"
     ensure_clean_worktree "$base"
-    git -C "$base" fetch origin || die "failed to fetch base repo '$name': $base"
-    git -C "$base" show-ref --verify --quiet "refs/remotes/origin/$base_branch" || die "remote base branch missing for repo '$name': origin/$base_branch"
+    tasktree_git_land_fetch_base "$name" "$base"
+    tasktree_git_land_base_remote_exists "$name" "$base" "$base_branch"
     i=$((i + 1))
   done
 
@@ -926,17 +1084,17 @@ cmd_merge() {
     base=$(base_repo_path "$name")
     branch=$(repo_task_branch_at "$i" "$task")
     base_branch=$(repo_base_branch_at "$i")
-    git -C "$base" checkout "$base_branch" >/dev/null 2>&1 || die "failed to checkout base branch for repo '$name': $base_branch"
+    tasktree_git_land_checkout_base "$name" "$base" "$base_branch"
     ensure_current_branch "$base" "$base_branch"
-    git -C "$base" pull --ff-only origin "$base_branch" || die "failed to update base branch for repo '$name': $base_branch"
-    git -C "$base" merge --ff-only "$branch" || die "failed to merge repo '$name'; run monotree rebase $task and resolve conflicts first"
-    success "Merged: $task/$name -> $base_branch"
+    tasktree_git_land_pull_base "$name" "$base" "$base_branch"
+    tasktree_git_land_task "$name" "$base" "$branch" "$task"
+    success "Landed: $task/$name -> $base_branch"
     i=$((i + 1))
   done
 }
 
 cmd_remove() {
-  [ $# -eq 1 ] || die "usage: monotree remove <task>"
+  [ $# -eq 1 ] || die "usage: tasktree remove <task>"
   task=$1
   validate_safe_name "task" "$task"
   require_project
@@ -953,6 +1111,73 @@ cmd_remove() {
   rmdir "$PROJECT_ROOT/$task" 2>/dev/null || true
 }
 
+# -----------------------------------------------------------------------------
+# Git operation definitions
+# -----------------------------------------------------------------------------
+# These helpers define the Git commands documented in docs/git-operations.md.
+
+tasktree_git_pull_base() {
+  repo_name=$1
+  base_path=$2
+  base_branch=$3
+  git -C "$base_path" pull --ff-only origin "$base_branch" || die "failed to pull repo '$repo_name'"
+}
+
+tasktree_git_update_task() {
+  task_path=$1
+  local_base_head=$2
+  git -C "$task_path" rebase "$local_base_head" || die "update failed in $task_path; resolve conflicts manually"
+}
+
+tasktree_git_push_base() {
+  repo_name=$1
+  base_path=$2
+  base_branch=$3
+  git -C "$base_path" push origin "$base_branch" || die "failed to push base branch for repo '$repo_name': $base_branch"
+}
+
+tasktree_git_push_task() {
+  repo_name=$1
+  task_path=$2
+  task_branch=$3
+  git -C "$task_path" push -u origin "$task_branch" || die "failed to push repo '$repo_name'"
+}
+
+tasktree_git_land_fetch_base() {
+  repo_name=$1
+  base_path=$2
+  git -C "$base_path" fetch origin || die "failed to fetch base repo '$repo_name': $base_path"
+}
+
+tasktree_git_land_base_remote_exists() {
+  repo_name=$1
+  base_path=$2
+  base_branch=$3
+  git -C "$base_path" show-ref --verify --quiet "refs/remotes/origin/$base_branch" || die "remote base branch missing for repo '$repo_name': origin/$base_branch"
+}
+
+tasktree_git_land_checkout_base() {
+  repo_name=$1
+  base_path=$2
+  base_branch=$3
+  git -C "$base_path" checkout "$base_branch" >/dev/null 2>&1 || die "failed to checkout base branch for repo '$repo_name': $base_branch"
+}
+
+tasktree_git_land_pull_base() {
+  repo_name=$1
+  base_path=$2
+  base_branch=$3
+  git -C "$base_path" pull --ff-only origin "$base_branch" || die "failed to update base branch for repo '$repo_name': $base_branch"
+}
+
+tasktree_git_land_task() {
+  repo_name=$1
+  base_path=$2
+  task_branch=$3
+  task=$4
+  git -C "$base_path" merge --ff-only "$task_branch" || die "failed to land repo '$repo_name'; run tasktree update $task and resolve conflicts first"
+}
+
 main() {
   cmd=${1:-help}
   if [ $# -gt 0 ]; then shift; fi
@@ -963,9 +1188,9 @@ main() {
     list) cmd_list "$@" ;;
     status) cmd_status "$@" ;;
     pull) cmd_pull "$@" ;;
-    rebase) cmd_rebase "$@" ;;
+    update) cmd_update "$@" ;;
     push) cmd_push "$@" ;;
-    merge) cmd_merge "$@" ;;
+    land) cmd_land "$@" ;;
     remove) cmd_remove "$@" ;;
     help|-h|--help) usage ;;
     *) usage >&2; die "unknown command: $cmd" ;;
