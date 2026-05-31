@@ -107,10 +107,8 @@ PROJECT_NAME fullstack
 MAIN_WORKTREES_DIR _base
 BRANCH_PREFIX feature
 
-REPO frontend $frontend_remote
-WORKFLOW frontend feature master
-REPO backend $backend_remote
-WORKFLOW backend feature master
+REPO frontend $frontend_remote master
+REPO backend $backend_remote master
 CONFIG
   FIXTURE_PROJECT="$TMP_ROOT/fullstack"
 }
@@ -144,13 +142,51 @@ test_invalid_config_rejected_without_execution() {
 PROJECT_NAME fullstack
 MAIN_WORKTREES_DIR _base
 BRANCH_PREFIX feature
-REPO frontend $TMP_ROOT/remotes/frontend.git
-WORKFLOW frontend feature master
+REPO frontend $TMP_ROOT/remotes/frontend.git master
 CONFIG
   printf 'unknown $(touch %s)\n' "$TMP_ROOT/pwned" >> "$project/.monotree.config"
   out=$(cd "$project" && run_expect_fail "$MONOTREE" list)
   assert_contains "$out" "unknown directive"
   assert_not_exists "$TMP_ROOT/pwned"
+}
+
+test_legacy_split_repo_base_config_is_accepted() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cat > "$project/.monotree.config" <<CONFIG
+PROJECT_NAME fullstack
+MAIN_WORKTREES_DIR _base
+BRANCH_PREFIX feature
+
+REPO frontend $TMP_ROOT/remotes/frontend.git
+WORKFLOW frontend feature master
+REPO backend $TMP_ROOT/remotes/backend.git
+WORKFLOW backend stacked feature/cpq
+CONFIG
+  commit_to_remote_branch backend feature/cpq parent-backend
+  out=$(cd "$project" && run_expect_success "$MONOTREE" init)
+  assert_contains "$out" "Initialized"
+  assert_branch "$project/_base/frontend" "master"
+  assert_branch "$project/_base/backend" "feature/cpq"
+}
+
+test_mixed_legacy_and_current_config_is_accepted_when_base_matches() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cat > "$project/.monotree.config" <<CONFIG
+PROJECT_NAME fullstack
+MAIN_WORKTREES_DIR _base
+BRANCH_PREFIX feature
+
+REPO frontend $TMP_ROOT/remotes/frontend.git master
+WORKFLOW frontend feature master
+REPO backend $TMP_ROOT/remotes/backend.git master
+WORKFLOW backend feature master
+CONFIG
+  out=$(cd "$project" && run_expect_success "$MONOTREE" init)
+  assert_contains "$out" "Initialized"
+  assert_branch "$project/_base/frontend" "master"
+  assert_branch "$project/_base/backend" "master"
 }
 
 test_init_existing_config_clones_base_repos() {
@@ -172,10 +208,8 @@ PROJECT_NAME fullstack
 MAIN_WORKTREES_DIR _base
 BRANCH_PREFIX feature
 
-REPO frontend $TMP_ROOT/remotes/frontend.git
-WORKFLOW frontend feature master
-REPO missing $TMP_ROOT/remotes/missing.git
-WORKFLOW missing feature master
+REPO frontend $TMP_ROOT/remotes/frontend.git master
+REPO missing $TMP_ROOT/remotes/missing.git master
 CONFIG
   out=$(cd "$project" && run_expect_fail "$MONOTREE" init)
   assert_contains "$out" "failed to clone repo 'missing'"
@@ -191,8 +225,7 @@ PROJECT_NAME fullstack
 MAIN_WORKTREES_DIR _base
 BRANCH_PREFIX feature
 
-REPO frontend $TMP_ROOT/remotes/frontend.git
-WORKFLOW frontend feature does-not-exist
+REPO frontend $TMP_ROOT/remotes/frontend.git does-not-exist
 CONFIG
   out=$(cd "$project" && run_expect_fail "$MONOTREE" init)
   assert_contains "$out" "failed to clone repo 'frontend'"
@@ -248,34 +281,67 @@ test_full_git_flow() {
   git -C "$project/_base/frontend" rev-parse --verify feature/login >/dev/null
 }
 
-test_merge_requires_stacked_workflow() {
+test_rebase_all_updates_every_task_workspace() {
   new_fixture
   project="$FIXTURE_PROJECT"
   cd "$project" || return 1
+
   run_expect_success "$MONOTREE" init >/dev/null
   run_expect_success "$MONOTREE" add login >/dev/null
+  run_expect_success "$MONOTREE" add payment >/dev/null
+
+  commit_to_remote_master frontend upstream-all
+  run_expect_success "$MONOTREE" pull >/dev/null
+  assert_not_exists "$project/login/frontend/upstream-all.txt"
+  assert_not_exists "$project/payment/frontend/upstream-all.txt"
+
+  run_expect_success "$MONOTREE" rebase >/dev/null
+  assert_file "$project/login/frontend/upstream-all.txt"
+  assert_file "$project/payment/frontend/upstream-all.txt"
+}
+
+test_repo_scope_limits_git_commands_to_one_repo() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  run_expect_success "$MONOTREE" init >/dev/null
+  run_expect_success "$MONOTREE" add login >/dev/null
+
+  commit_to_remote_master frontend frontend-upstream
+  commit_to_remote_master backend backend-upstream
+  run_expect_success "$MONOTREE" pull --repo frontend >/dev/null
+  assert_file "$project/_base/frontend/frontend-upstream.txt"
+  assert_not_exists "$project/_base/backend/backend-upstream.txt"
+
+  run_expect_success "$MONOTREE" rebase login --repo frontend >/dev/null
+  assert_file "$project/login/frontend/frontend-upstream.txt"
+  assert_not_exists "$project/login/backend/backend-upstream.txt"
 
   git -C "$project/login/frontend" config user.name "Monotree Test"
   git -C "$project/login/frontend" config user.email "monotree-test@example.com"
   git -C "$project/login/backend" config user.name "Monotree Test"
   git -C "$project/login/backend" config user.email "monotree-test@example.com"
+  printf '%s
+' "frontend scoped" > "$project/login/frontend/scoped.txt"
+  git -C "$project/login/frontend" add scoped.txt
+  git -C "$project/login/frontend" commit -m "frontend scoped" >/dev/null
+  printf '%s
+' "backend scoped" > "$project/login/backend/scoped.txt"
+  git -C "$project/login/backend" add scoped.txt
+  git -C "$project/login/backend" commit -m "backend scoped" >/dev/null
 
-  printf '%s\n' "merge frontend" > "$project/login/frontend/merge.txt"
-  git -C "$project/login/frontend" add merge.txt
-  git -C "$project/login/frontend" commit -m "merge frontend" >/dev/null
-  printf '%s\n' "merge backend" > "$project/login/backend/merge.txt"
-  git -C "$project/login/backend" add merge.txt
-  git -C "$project/login/backend" commit -m "merge backend" >/dev/null
+  run_expect_success "$MONOTREE" push login --repo frontend >/dev/null
+  assert_remote_file "$TMP_ROOT/remotes/frontend.git" feature/login scoped.txt "frontend scoped"
+  assert_remote_missing_file "$TMP_ROOT/remotes/backend.git" feature/login scoped.txt
 
-  run_expect_success "$MONOTREE" push login >/dev/null
-  assert_remote_missing_file "$TMP_ROOT/remotes/frontend.git" master merge.txt
-  out=$(run_expect_fail "$MONOTREE" merge login)
-  assert_contains "$out" "no stacked workflow repos to merge"
-  assert_remote_missing_file "$TMP_ROOT/remotes/frontend.git" master merge.txt
-  assert_remote_missing_file "$TMP_ROOT/remotes/backend.git" master merge.txt
+  run_expect_success "$MONOTREE" merge login --repo frontend >/dev/null
+  run_expect_success "$MONOTREE" push --repo frontend >/dev/null
+  assert_remote_file "$TMP_ROOT/remotes/frontend.git" master scoped.txt "frontend scoped"
+  assert_remote_missing_file "$TMP_ROOT/remotes/backend.git" master scoped.txt
 }
 
-test_stacked_workflow_rebases_pushes_feature_and_merges_parent_feature() {
+test_push_supports_task_and_base_branches_after_fast_forward_merge() {
   new_fixture
   project="$FIXTURE_PROJECT"
   commit_to_remote_branch frontend feature/cpq parent-frontend
@@ -284,10 +350,8 @@ PROJECT_NAME fullstack
 MAIN_WORKTREES_DIR _base
 BRANCH_PREFIX feature
 
-REPO frontend $TMP_ROOT/remotes/frontend.git
-WORKFLOW frontend stacked feature/cpq
-REPO backend $TMP_ROOT/remotes/backend.git
-WORKFLOW backend feature master
+REPO frontend $TMP_ROOT/remotes/frontend.git feature/cpq
+REPO backend $TMP_ROOT/remotes/backend.git master
 CONFIG
   cd "$project" || return 1
   run_expect_success "$MONOTREE" init >/dev/null
@@ -308,59 +372,18 @@ CONFIG
   git -C "$project/ui/backend" commit -m "feature backend" >/dev/null
 
   run_expect_success "$MONOTREE" push ui >/dev/null
-  assert_remote_missing_file "$TMP_ROOT/remotes/frontend.git" feature/cpq-ui stacked.txt
+  assert_remote_file "$TMP_ROOT/remotes/frontend.git" feature/cpq-ui stacked.txt "stacked frontend"
   assert_remote_file "$TMP_ROOT/remotes/backend.git" feature/ui normal.txt "feature backend"
   assert_remote_missing_file "$TMP_ROOT/remotes/frontend.git" feature/cpq stacked.txt
   run_expect_success "$MONOTREE" merge ui >/dev/null
   assert_branch "$project/_base/frontend" "feature/cpq"
+  assert_remote_missing_file "$TMP_ROOT/remotes/frontend.git" feature/cpq stacked.txt
+  assert_remote_missing_file "$TMP_ROOT/remotes/backend.git" master normal.txt
+
+  run_expect_success "$MONOTREE" push >/dev/null
   assert_remote_file "$TMP_ROOT/remotes/frontend.git" feature/cpq stacked.txt "stacked frontend"
   assert_remote_missing_file "$TMP_ROOT/remotes/frontend.git" master stacked.txt
-  assert_remote_missing_file "$TMP_ROOT/remotes/backend.git" master normal.txt
-}
-
-test_push_requires_feature_workflow() {
-  new_fixture
-  project="$FIXTURE_PROJECT"
-  commit_to_remote_branch frontend feature/cpq parent-frontend
-  cat > "$project/.monotree.config" <<CONFIG
-PROJECT_NAME fullstack
-MAIN_WORKTREES_DIR _base
-BRANCH_PREFIX feature
-
-REPO frontend $TMP_ROOT/remotes/frontend.git
-WORKFLOW frontend stacked feature/cpq
-CONFIG
-  cd "$project" || return 1
-  run_expect_success "$MONOTREE" init >/dev/null
-  run_expect_success "$MONOTREE" add cpq-ui >/dev/null
-  out=$(run_expect_fail "$MONOTREE" push cpq-ui)
-  assert_contains "$out" "no feature workflow repos to push"
-}
-
-test_free_workflow_uses_git_directly_for_git_operations() {
-  new_fixture
-  project="$FIXTURE_PROJECT"
-  cat > "$project/.monotree.config" <<CONFIG
-PROJECT_NAME fullstack
-MAIN_WORKTREES_DIR _base
-BRANCH_PREFIX feature
-
-REPO frontend $TMP_ROOT/remotes/frontend.git
-WORKFLOW frontend free master
-CONFIG
-  cd "$project" || return 1
-  run_expect_success "$MONOTREE" init >/dev/null
-  run_expect_success "$MONOTREE" add scratch >/dev/null
-  assert_branch "$project/scratch/frontend" "feature/scratch"
-
-  out=$(run_expect_fail "$MONOTREE" pull)
-  assert_contains "$out" "use git directly for free workflow repos"
-  out=$(run_expect_fail "$MONOTREE" rebase scratch)
-  assert_contains "$out" "use git directly for free workflow repos"
-  out=$(run_expect_fail "$MONOTREE" push scratch)
-  assert_contains "$out" "no feature workflow repos to push"
-  out=$(run_expect_fail "$MONOTREE" merge scratch)
-  assert_contains "$out" "no stacked workflow repos to merge"
+  assert_remote_file "$TMP_ROOT/remotes/backend.git" master normal.txt "feature backend"
 }
 
 test_branch_collision_fails_whole_add() {
@@ -372,6 +395,30 @@ test_branch_collision_fails_whole_add() {
   out=$(run_expect_fail "$MONOTREE" add login)
   assert_contains "$out" "branch already exists"
   assert_not_exists "$project/login"
+}
+
+test_status_reports_base_and_task_dirty_state() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$MONOTREE" init >/dev/null
+  run_expect_success "$MONOTREE" add login >/dev/null
+
+  printf '%s\n' "local note" > "$project/_base/frontend/local.txt"
+  printf '%s\n' "changed" >> "$project/login/backend/README.md"
+
+  out=$(run_expect_success "$MONOTREE" status)
+  assert_contains "$out" "[*] Base worktrees"
+  assert_contains "$out" "    frontend    master           untracked"
+  assert_contains "$out" "    backend     master           clean"
+  case "$out" in
+    *"backend     master           clean"$'\n\n'"[*] Task workspaces"*) ;;
+    *) fail "expected blank line between base worktrees and task workspaces; got: $out" ;;
+  esac
+  assert_contains "$out" "[*] Task workspaces"
+  assert_contains "$out" "[*] login"
+  assert_contains "$out" "    frontend    feature/login    clean"
+  assert_contains "$out" "    backend     feature/login    modified"
 }
 
 test_dirty_worktree_safety() {
@@ -395,6 +442,31 @@ test_dirty_worktree_safety() {
   assert_file "$project/login/frontend/.git"
 }
 
+test_config_writes_config_without_cloning() {
+  TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t monotree-test)
+  mkdir -p "$TMP_ROOT/remotes" "$TMP_ROOT/seeds" "$TMP_ROOT/work"
+  frontend_remote=$(make_repo frontend)
+  input=$(cat <<INPUT
+
+.
+fullstack
+_base
+master
+feature
+frontend
+$frontend_remote
+
+n
+INPUT
+)
+  out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | run_expect_success "$MONOTREE" config)
+  assert_contains "$out" "Config written"
+  project="$TMP_ROOT/work/fullstack"
+  assert_file "$project/.monotree.config"
+  assert_contains "$(cat "$project/.monotree.config")" "REPO frontend $frontend_remote master"
+  assert_not_exists "$project/_base"
+}
+
 test_interactive_init_writes_config_and_clones() {
   TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t monotree-test)
   mkdir -p "$TMP_ROOT/remotes" "$TMP_ROOT/seeds" "$TMP_ROOT/work"
@@ -409,13 +481,11 @@ master
 feature
 frontend
 $frontend_remote
-feature
 
 Y
 backend
 $backend_remote
-feature
-master
+
 n
 INPUT
 )
@@ -435,7 +505,6 @@ INPUT
   assert_contains "$out" "Main worktrees    directory for each repo main worktree"
   assert_contains "$out" "Default main      default branch for repo main worktrees"
   assert_contains "$out" "[*] Default main branch [main]:"
-  assert_contains "$out" "[*] Workflow [free/feature/stacked] [free]:"
   assert_contains "$out" "[*] Base branch [master]:"
   assert_contains "$out" "[*] Main worktrees directory [_base]:"
   assert_contains "$out" "fullstack                     // monotree project"
@@ -456,10 +525,8 @@ INPUT
   assert_contains "$out" "[+] Initialized"
   project="$TMP_ROOT/work/fullstack"
   assert_file "$project/.monotree.config"
-  assert_contains "$(cat "$project/.monotree.config")" "REPO frontend $frontend_remote"
-  assert_contains "$(cat "$project/.monotree.config")" "WORKFLOW frontend feature master"
-  assert_contains "$(cat "$project/.monotree.config")" "REPO backend $backend_remote"
-  assert_contains "$(cat "$project/.monotree.config")" "WORKFLOW backend feature master"
+  assert_contains "$(cat "$project/.monotree.config")" "REPO frontend $frontend_remote master"
+  assert_contains "$(cat "$project/.monotree.config")" "REPO backend $backend_remote master"
   assert_dir "$project/_base/frontend/.git"
   assert_dir "$project/_base/backend/.git"
 }
@@ -477,7 +544,6 @@ master
 feature
 frontend
 $frontend_remote
-feature
 
 n
 INPUT
@@ -503,42 +569,14 @@ feature/cpq
 feature
 frontend
 $frontend_remote
-feature
 
 n
 INPUT
 )
   out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | run_expect_success "$MONOTREE" init)
   assert_contains "$out" "[+] Initialized"
-  assert_contains "$(cat "$TMP_ROOT/work/fullstack/.monotree.config")" "WORKFLOW frontend feature feature/cpq"
+  assert_contains "$(cat "$TMP_ROOT/work/fullstack/.monotree.config")" "REPO frontend $frontend_remote feature/cpq"
   assert_branch "$TMP_ROOT/work/fullstack/_base/frontend" "feature/cpq"
-}
-
-test_interactive_init_writes_stacked_workflow() {
-  TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t monotree-test)
-  mkdir -p "$TMP_ROOT/remotes" "$TMP_ROOT/seeds" "$TMP_ROOT/work"
-  frontend_remote=$(make_repo frontend)
-  commit_to_remote_branch frontend feature/cpq parent-frontend
-  input=$(cat <<INPUT
-
-.
-fullstack
-_base
-master
-feature
-frontend
-$frontend_remote
-stacked
-feature/cpq
-n
-INPUT
-)
-  out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | run_expect_success "$MONOTREE" init)
-  assert_contains "$out" "[*] Workflow [free/feature/stacked] [free]:"
-  assert_contains "$out" "[*] Parent feature branch:"
-  project="$TMP_ROOT/work/fullstack"
-  assert_contains "$(cat "$project/.monotree.config")" "WORKFLOW frontend stacked feature/cpq"
-  assert_branch "$project/_base/frontend" "feature/cpq"
 }
 
 test_interactive_init_rejects_slash_in_main_worktrees_directory() {
@@ -597,17 +635,19 @@ test_installer_can_add_target_directory_to_zshrc() {
 test_help_groups_commands() {
   out=$(run_expect_success "$MONOTREE" help)
   assert_contains "$out" "Workspace:"
-  assert_contains "$out" "Git workflow:"
-  assert_contains "$out" "Free workflow:"
-  assert_contains "$out" "Feature workflow:"
-  assert_contains "$out" "Stacked workflow:"
+  assert_contains "$out" "config            Create .monotree.config without cloning repos"
+  assert_contains "$out" "Git:"
   assert_contains "$out" "Other:"
-  assert_contains "$out" "pull              Pull workflow base branches"
-  assert_contains "$out" "rebase <task>     Rebase task branches onto workflow base branches"
-  assert_contains "$out" "push <task>       Push task branches for pull requests"
-  assert_contains "$out" "merge <task>      Merge local task branches into parent feature branches"
+  assert_contains "$out" "status            Show clean/dirty status for base and task worktrees"
+  assert_contains "$out" "pull              Pull remote base branches into main worktrees"
+  assert_contains "$out" "--repo <repo>     Limit supported commands to one repo"
+  assert_contains "$out" "rebase <task>     Rebase one task workspace onto remote base branches"
+  assert_contains "$out" "rebase            Rebase every task workspace onto remote base branches"
+  assert_contains "$out" "push              Push base branches to origin"
+  assert_contains "$out" "push <task>       Push task branches to origin"
+  assert_contains "$out" "merge <task>      Fast-forward base branches from task branches"
   case "$out" in
-    *"Workspace:"*"Git workflow:"*"Free workflow:"*"Feature workflow:"*"Stacked workflow:"*"Other:"*) ;;
+    *"Workspace:"*"Git:"*"Other:"*) ;;
     *) fail "expected grouped help ordering; got: $out" ;;
   esac
 }
@@ -618,20 +658,22 @@ main() {
 
   run_test test_help_groups_commands
   run_test test_invalid_config_rejected_without_execution
+  run_test test_legacy_split_repo_base_config_is_accepted
+  run_test test_mixed_legacy_and_current_config_is_accepted_when_base_matches
   run_test test_init_existing_config_clones_base_repos
   run_test test_failed_init_rolls_back_command_created_base_paths
   run_test test_failed_init_reports_git_clone_reason
   run_test test_full_git_flow
-  run_test test_merge_requires_stacked_workflow
-  run_test test_stacked_workflow_rebases_pushes_feature_and_merges_parent_feature
-  run_test test_push_requires_feature_workflow
-  run_test test_free_workflow_uses_git_directly_for_git_operations
+  run_test test_rebase_all_updates_every_task_workspace
+  run_test test_repo_scope_limits_git_commands_to_one_repo
+  run_test test_push_supports_task_and_base_branches_after_fast_forward_merge
   run_test test_branch_collision_fails_whole_add
+  run_test test_status_reports_base_and_task_dirty_state
   run_test test_dirty_worktree_safety
+  run_test test_config_writes_config_without_cloning
   run_test test_interactive_init_writes_config_and_clones
   run_test test_interactive_init_can_create_project_in_custom_target_directory
   run_test test_interactive_init_accepts_slash_default_main_branch
-  run_test test_interactive_init_writes_stacked_workflow
   run_test test_interactive_init_rejects_slash_in_main_worktrees_directory
   run_test test_installer_installs_executable
   run_test test_installer_uses_custom_target_directory
