@@ -35,8 +35,7 @@ A monotree project has one top-level project directory.
 
 ```text
 /fullstack
-  /.monotree
-    config
+  /.monotree.config
   /_base
     /frontend
     /backend
@@ -50,11 +49,11 @@ A monotree project has one top-level project directory.
 
 ### `_base`
 
-`_base` contains the base worktree for each configured repository.
+`_base` contains the main worktree for each configured repository.
 
 It is named `_base` instead of `base` so it sorts near the top in common file browsers and terminal listings while remaining visible.
 
-Base repositories are used as stable reference checkouts for each repo's base branch. They are not the primary place for feature development.
+Main worktrees are used as stable reference checkouts for each repo's workflow base branch. They are not the primary place for feature development.
 
 ### Task Directories
 
@@ -87,7 +86,7 @@ From there, the AI assistant sees a compact task-local workspace:
 Configuration is stored at:
 
 ```text
-/fullstack/.monotree/config
+/fullstack/.monotree.config
 ```
 
 The format is a small line-oriented declarative format. It is not shell code and must not be loaded with `source`.
@@ -95,12 +94,22 @@ The format is a small line-oriented declarative format. It is not shell code and
 Example:
 
 ```text
-project fullstack
-base_dir _base
-branch_prefix feature
+# Monotree config
+# You may edit this file manually.
+# This file is read by monotree. It is not a shell script.
 
-repo frontend git@github.com:example/frontend.git master
-repo backend git@github.com:example/backend.git master
+PROJECT_NAME fullstack
+MAIN_WORKTREES_DIR _base
+BRANCH_PREFIX feature
+
+# REPO <name> <git-url>
+# WORKFLOW <repo-name> free <base-branch>
+# WORKFLOW <repo-name> feature <main-branch>
+# WORKFLOW <repo-name> stacked <parent-feature-branch>
+REPO frontend git@github.com:example/frontend.git
+WORKFLOW frontend feature master
+REPO backend git@github.com:example/backend.git
+WORKFLOW backend stacked feature/cpq
 ```
 
 ### Config Directives
@@ -108,10 +117,13 @@ repo backend git@github.com:example/backend.git master
 Supported directives:
 
 ```text
-project <name>
-base_dir <dir>
-branch_prefix <prefix>
-repo <repo-name> <git-url> <base-branch>
+PROJECT_NAME <name>
+MAIN_WORKTREES_DIR <dir>
+BRANCH_PREFIX <prefix>
+REPO <repo-name> <git-url>
+WORKFLOW <repo-name> free <base-branch>
+WORKFLOW <repo-name> feature <main-branch>
+WORKFLOW <repo-name> stacked <parent-feature-branch>
 ```
 
 Parsing rules:
@@ -120,25 +132,27 @@ Parsing rules:
 - Lines beginning with `#` are comments.
 - Unknown directives fail with a clear error.
 - Duplicate singleton directives fail with a clear error.
-- Duplicate `repo` names fail with a clear error.
+- Duplicate `REPO` names fail with a clear error.
+- Every `REPO` must have exactly one `WORKFLOW`.
 - Values do not support shell expansion, command substitution, or general shell quoting.
-- `repo` lines are the only source of the configured repository list.
+- `REPO` lines are the only source of the configured repository list.
 
 Validation rules:
 
-- `project`, `base_dir`, repository names, and task names must match:
+- `PROJECT_NAME`, `MAIN_WORKTREES_DIR`, repository names, and task names must match:
 
   ```text
   [A-Za-z0-9._-]+
   ```
 
-- `branch_prefix` must be non-empty and must not contain whitespace.
+- `BRANCH_PREFIX` must be non-empty and must not contain whitespace.
 - `git-url` must be non-empty and must not contain whitespace.
-- `base-branch` must be non-empty and must not contain whitespace.
+- `WORKFLOW` must be `free`, `feature`, or `stacked`.
+- workflow branch values must be non-empty and must not contain whitespace.
 
-A repository may use the interactive setup's default base branch. The generated config still writes the resolved base branch explicitly on each `repo` line so later commands do not need inference.
+A repository may use the interactive setup's default main branch. The generated config still writes the resolved workflow branch explicitly on each `WORKFLOW` line so later commands do not need inference.
 
-The generated Git branch name may contain `/` because it is built from `branch_prefix/task-name`.
+The generated Git branch name may contain `/` because it is built from `BRANCH_PREFIX/task-name`.
 
 ## Commands
 
@@ -148,29 +162,33 @@ Initializes a monotree project.
 
 Execution location rules:
 
-- If the current directory already contains `.monotree/config`, treat the current directory as the project root and initialize from that config.
-- If no config exists, interactive setup creates a new project directory named from `project` under the current working directory.
-- The MVP does not initialize into an arbitrary non-empty current directory unless that directory already has `.monotree/config`.
+- If the current directory already contains `.monotree.config`, treat the current directory as the project root and initialize from that config.
+- If no config exists, interactive setup asks for a target directory, default `.`, then creates a new project directory named from `PROJECT_NAME` under that target directory.
+- The MVP does not initialize into an arbitrary non-empty current directory unless that directory already has `.monotree.config`.
 
 Behavior:
 
-1. Detect whether the current directory already has `.monotree/config`.
+1. Detect whether the current directory already has `.monotree.config`.
 2. If config exists, read it and initialize `_base` from it.
 3. If no config exists, run an interactive setup.
 4. Ask for:
+   - target directory, default `.`, where the project directory is created
    - project name
-   - base directory, default `_base`
-   - default base branch, default `main`
+   - main worktrees directory, default `_base`
+   - default main branch, default `main`
    - branch prefix, default `feature`
    - one or more repositories
 5. For each repository, ask for:
    - repo name
    - Git URL
-   - base branch, defaulting to the interactive default base branch
-6. Create the project root directory when running interactive setup without an existing config.
+   - workflow, default `free`
+   - for `free`: base branch, defaulting to the interactive default main branch
+   - for `feature`: main branch, defaulting to the interactive default main branch
+   - for `stacked`: parent feature branch
+6. Create the project root directory under the selected target directory when running interactive setup without an existing config.
 7. Create the project structure.
-8. Write `.monotree/config` using the declarative config format.
-9. Clone each configured repository into `base_dir/<repoName>`.
+8. Write `.monotree.config` using the declarative config format.
+9. Clone each configured repository into the configured main worktrees directory, `MAIN_WORKTREES_DIR/<repoName>`.
 
 MVP clone strategy:
 
@@ -178,7 +196,7 @@ MVP clone strategy:
 /fullstack/_base/<repoName>
 ```
 
-is a normal Git clone, not a bare repository hidden under `.monotree`.
+is a normal Git clone, not a bare repository hidden under the config file or another metadata directory.
 
 Rationale: normal clones are easier to understand, inspect, and debug for an early shell-based CLI.
 
@@ -199,19 +217,32 @@ Creates:
 /fullstack/login/backend
 ```
 
-Default branch naming:
+Default task branch naming:
 
 ```text
-<branch_prefix>/<task>
+feature/free workflow: <BRANCH_PREFIX>/<task>
+stacked workflow:      <parent-feature-branch>-<task>
 ```
 
-With the default config:
+With the default config and a stacked parent `feature/cpq`:
 
 ```text
 feature/login
+feature/cpq-ui
 ```
 
-For each repository, Monotree creates a worktree from that repository's remote base branch.
+For each repository, Monotree creates a worktree from that repository's workflow base branch.
+
+Workflow rules:
+
+```text
+feature flow : main -> feature -> PR -> main
+stacked flow : feature -> feature-1 -> feature
+```
+
+For `free`, the workflow base is used only to create and update worktrees; use Git directly for publishing.
+For `feature`, the workflow base is the configured main branch. Monotree does not merge feature workflow branches into main; use the Git hosting pull request flow.
+For `stacked`, the workflow base and merge target are the configured parent feature branch.
 
 Conceptual command:
 
@@ -234,12 +265,12 @@ Lists detected task directories and configured repositories.
 
 MVP output should distinguish:
 
-- base directory
+- main worktrees directory
 - task directories
 - repository names
 - current branch for each repo worktree when available
 
-### `monotree sync`
+### `monotree pull`
 
 Updates all base worktrees from their configured remotes using fast-forward-only pulls.
 
@@ -249,11 +280,11 @@ Conceptual command per repository:
 git -C _base/frontend pull --ff-only origin master
 ```
 
-`sync` is for base branches only. It should not modify task worktrees.
+`pull` is for workflow base branches only. It should not modify task worktrees. Free workflow repos are skipped because users manage Git directly there.
 
-### `monotree update <task>`
+### `monotree rebase <task>`
 
-Rebases each repository worktree inside a task onto that repository's latest remote base branch.
+Rebases each repository worktree inside a task onto that repository's latest remote workflow base branch.
 
 Conceptual command per repository:
 
@@ -262,13 +293,13 @@ git -C login/frontend fetch origin
 git -C login/frontend rebase origin/master
 ```
 
-This preserves the normal feature-branch workflow while keeping each task current with its base branch.
+This keeps each task current with its workflow base branch.
 
 If a rebase conflict occurs, Monotree stops and reports the repository path that needs manual resolution.
 
 ### `monotree push <task>`
 
-Pushes each repository worktree inside a task to its configured remote.
+Pushes feature workflow repository worktrees inside a task to their own remote task branches for pull requests.
 
 Conceptual command per repository:
 
@@ -277,6 +308,40 @@ git -C login/frontend push -u origin feature/login
 ```
 
 Push happens from feature/task worktrees, not from `_base`.
+
+`push` is feature-workflow only:
+
+- `feature`: pushes `feature/login` from `login/<repo>` to `origin/feature/login`.
+- `stacked`: skipped because local stacked child branches such as `feature/cpq-1` are not published directly.
+- If a task has no feature workflow repos, `push` fails with a clear error.
+
+### `monotree merge <task>`
+
+Merges each local stacked task branch into its parent feature branch from the main worktree, then pushes the parent feature branch.
+
+`merge` is stacked-only:
+
+- `feature` workflow repos are skipped because feature branches should go through the Git hosting pull request flow.
+- `free` workflow repos are skipped because users manage Git directly there.
+- If a task has no stacked workflow repos, `merge` fails with a clear error.
+- The parent feature branch push is run from `MAIN_WORKTREES_DIR/<repo>`, not from the task worktree.
+
+Conceptual command per repository:
+
+```bash
+git -C _base/frontend checkout feature/cpq
+git -C _base/frontend pull --ff-only origin feature/cpq
+git -C _base/frontend merge --ff-only feature/cpq-1
+git -C _base/frontend push origin feature/cpq
+```
+
+For stacked flow:
+
+```text
+feature/cpq -> feature/cpq-ui -> feature/cpq
+```
+
+`merge` is the command that updates `feature/cpq`. Local stacked child branches such as `feature/cpq-1` are not pushed directly.
 
 ### `monotree remove <task>`
 
@@ -304,8 +369,9 @@ Rules:
 
 Dirty worktree policy:
 
-- `sync` fails before pulling if any base repository is dirty.
-- `update <task>` fails before rebasing if any target task repository is dirty.
+- `pull` fails before pulling if any base repository is dirty.
+- `rebase <task>` fails before rebasing if any target task repository is dirty.
+- `merge <task>` fails if any stacked workflow base repository or stacked workflow task repository is dirty.
 - `remove <task>` does not remove dirty worktrees.
 - MVP has no `--force` option.
 
@@ -314,22 +380,39 @@ Dirty worktree policy:
 The intended flow is:
 
 ```text
+feature flow:
+
 origin/master
-   ↓ sync
+   ↓ pull
 _base/frontend       branch: master
-   ↓ add/update
+   ↓ add/rebase
 login/frontend       branch: feature/login
    ↓ push
 origin/feature/login
+   ↓ pull request outside monotree
+origin/master
+
+stacked flow:
+
+origin/feature/cpq
+   ↓ pull
+_base/frontend       branch: feature/cpq
+   ↓ add/rebase
+ui/frontend          branch: feature/cpq-ui
+   ↓ merge
+origin/feature/cpq
 ```
 
 Rules:
 
-- `_base/<repo>` tracks and updates the configured base branch.
+- `_base/<repo>` tracks and updates the configured workflow base branch.
 - Feature/task worktrees use their own branches.
 - Base updates use fast-forward-only pull.
-- Task updates use rebase onto the remote base branch.
-- Feature branches are pushed from task worktrees.
+- Task updates use rebase onto the remote workflow base branch.
+- Feature workflow branches are pushed from task worktrees.
+- Local stacked child branches are not pushed directly.
+- Stacked workflow target branches are updated only by `merge`, which pushes from main worktrees.
+- Feature workflow target branches are not updated by Monotree; use pull requests.
 
 This matches common Git worktree usage: the base worktree is a reference checkout, while task worktrees are where feature development and feature branch pushes happen.
 
@@ -340,7 +423,7 @@ Monotree commands should work from the project root or from inside a task/reposi
 A command locates the project root by walking upward until it finds:
 
 ```text
-.monotree/config
+.monotree.config
 ```
 
 If no config is found, the command fails with a clear message.
@@ -355,7 +438,13 @@ Example:
 curl -fsSL https://raw.githubusercontent.com/<owner>/monotree/main/install.sh | bash
 ```
 
-The installer places the executable at:
+The installer asks for a target directory and defaults to:
+
+```text
+~/.local/bin
+```
+
+With the default answer, the executable is installed at:
 
 ```text
 ~/.local/bin/monotree
@@ -363,11 +452,15 @@ The installer places the executable at:
 
 Installer PATH behavior:
 
-- The installer must not assume `~/.local/bin` is already on every user's `PATH`.
-- MVP installer behavior is to install the executable, then warn with shell-specific guidance when the install directory is not on `PATH`.
-- The installer must not automatically edit shell startup files in the MVP.
+- The installer must not assume the chosen target directory is already on every user's `PATH`.
+- MVP installer behavior is to install the executable, then check whether the chosen install directory is on `PATH`.
+- If the chosen directory is not on `PATH`, the installer asks before editing any shell startup file.
+- When the user answers yes, zsh writes to `~/.zshrc` and bash writes to `~/.bash_profile`.
+- Other shells do not receive automatic profile edits in the MVP.
+- PATH guidance must use the chosen target directory, not a hardcoded default.
+- If the user declines profile edits, the installer prints direct-run and manual PATH guidance.
 
-TODO: Revisit the default install directory and PATH onboarding before public distribution. Options include an explicit `--prefix`, Homebrew packaging, or an opt-in shell-profile update.
+TODO: Revisit install target and PATH onboarding before public distribution. Options include a non-interactive `--prefix`, Homebrew packaging, or broader shell-profile support.
 
 The CLI is invoked as:
 
@@ -375,6 +468,11 @@ The CLI is invoked as:
 monotree init
 monotree add login
 monotree list
+monotree pull
+monotree rebase login
+monotree push login
+monotree merge cpq-1   # stacked workflow only
+monotree remove login
 ```
 
 A Homebrew tap can be added after the CLI stabilizes.
@@ -391,13 +489,14 @@ brew install monotree
 The MVP is successful when a user can:
 
 1. Install `monotree` as a shell command.
-2. Run `monotree init` and create a compact `.monotree/config` interactively.
+2. Run `monotree init` and create a compact `.monotree.config` interactively.
 3. Initialize `_base` clones for an arbitrary set of repositories.
 4. Run `monotree add login` and get one task worktree per configured repository.
 5. Start an AI assistant from the task directory and access all repos through simple relative paths.
-6. Run `monotree sync` to update base repositories.
-7. Run `monotree update login` to rebase task branches onto their remote base branches.
-8. Run `monotree push login` to push feature branches.
-9. Run `monotree list` to inspect configured repos and task workspaces.
-10. Run `monotree remove login` to remove task worktrees without deleting branches by default.
-11. Run the local integration test suite without external network access.
+6. Run `monotree pull` to update base repositories.
+7. Run `monotree rebase login` to rebase task branches onto their remote workflow base branches.
+8. Run `monotree push login` to push feature workflow task branches for pull requests.
+9. Run `monotree merge cpq-1` to merge stacked task branches into parent feature branches and push the parents.
+10. Run `monotree list` to inspect configured repos and task workspaces.
+11. Run `monotree remove login` to remove task worktrees without deleting branches by default.
+12. Run the local integration test suite without external network access.
