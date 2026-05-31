@@ -16,7 +16,7 @@ Each repo has its own session, context, file search, and Git state. The agent ca
 
 ```text
 fullstack                     // monotree project
-├── .monotree.config          // repo list and workflow rules
+├── .monotree.config          // repo list and base branches
 ├── _base                     // main worktrees
 │   ├── frontend              // main: frontend
 │   └── backend               // main: backend
@@ -45,74 +45,68 @@ Now the agent can search and edit both repos in one session:
 Workspace commands work for every configured repo.
 
 ```text
-monotree init              create .monotree.config
+monotree config            create .monotree.config without cloning repos
+monotree init              clone main worktrees from .monotree.config
 monotree list              show repos and task workspaces
+monotree status            show modified/untracked files in base and tasks
 monotree add <task>        create linked worktrees for a task
 monotree remove <task>     remove task worktrees
 ```
 
-## Git workflow commands
+## Git commands
 
-`monotree` does not replace Git. It runs a small set of Git operations across the repos in `.monotree.config`.
+`monotree` runs familiar Git operations across every repo in `.monotree.config`.
 
 ```text
 git       = current repo only
 monotree  = all configured repos
 ```
 
-Each repo chooses one workflow.
-
-### Free workflow
-
-Use monotree only for workspace layout. Use `git` directly inside each repo.
-
 ```text
-local repo  -- git pull / git push / git rebase / git merge -->  remote
-```
+remote
+  base branch  <---------------- PR / merge outside monotree ----- task branch
+      |                                                      ^
+      | monotree pull                                       | monotree push <task>
+      v                                                      |
+local
+  base worktree  -- monotree add <task> -->  task worktree --+
+      ^                                      |
+      |                                      |
+      +--------- monotree rebase [<task>] ---+
 
-### Feature workflow
-
-Use a task branch and open a PR back to the base branch.
-
-```text
-remote    base  <-- PR --------  feature
-            |                       ^
-            | pull                  | push <task>
-            v                       |
-local     base  --add <task>-->  feature
-            \                       ^
-             \-- rebase <task> ----/
+optional local fast-forward:
+  task worktree  -- monotree merge <task> -->  base worktree  -- monotree push -->  remote base branch
+  (fast-forward only, no merge commit)
 ```
 
 Commands:
 
 ```text
 monotree pull             update local base branches from remote
-monotree rebase <task>    run git rebase <base> inside each task worktree
+monotree rebase           run git rebase <base> inside every task worktree
+monotree rebase <task>    run git rebase <base> inside one task worktree
+monotree push             push each base branch to origin
 monotree push <task>      push each task branch to origin
+monotree merge <task>     fast-forward merge each task branch into its base branch
 ```
 
-### Stacked workflow
-
-Use a local child branch on top of a parent feature branch, then merge it back into the parent feature branch.
+`merge <task>` is useful when a base branch is already a parent feature branch:
 
 ```text
-remote    base  <-- PR --------  parent feature
-                                ^
-                                | push parent feature
-                                |
-local     base              parent feature  --add <task>-->  feature local
-                              ^      ^                            |
-                              | pull |                            | merge <task>
-                              |      \----------------------------/
+base branch: feature/cpq
+task branch: feature/cpq-task1
 ```
 
-Commands:
+In that case, `monotree merge task1` fast-forwards local `feature/cpq` to include `feature/cpq-task1`. Run `monotree push` after that to push the base branch.
 
-```text
-monotree pull             update local parent feature branches from remote
-monotree rebase <task>    run git rebase <parent-feature> inside each task worktree
-monotree merge <task>     merge each task branch into its parent feature branch
+Add `--repo <name>` to supported Git commands when you want to run against one repo only:
+
+```bash
+monotree pull --repo frontend
+monotree rebase login --repo frontend
+monotree push login --repo frontend
+monotree merge login --repo backend
+monotree push --repo backend
 ```
 
 ## Install
@@ -133,29 +127,29 @@ If the target directory is not on `PATH`, the installer can add it to your shell
 
 ## Config
 
-Create `.monotree.config` in a project root, or run `monotree init`.
+Create `.monotree.config` in a project root, or run `monotree config`. Then run `monotree init` to clone main worktrees.
 
 ```text
 PROJECT_NAME fullstack
 MAIN_WORKTREES_DIR _base
 BRANCH_PREFIX feature
 
-REPO frontend git@github.com:example/frontend.git
-WORKFLOW frontend feature master
-
-REPO backend git@github.com:example/backend.git
-WORKFLOW backend stacked feature/cpq
-
-REPO scripts git@github.com:example/scripts.git
-WORKFLOW scripts free master
+REPO frontend git@github.com:example/frontend.git master
+REPO backend git@github.com:example/backend.git feature/cpq
+REPO scripts git@github.com:example/scripts.git master
 ```
 
-Workflow format:
+Config format:
 
 ```text
-WORKFLOW <repo-name> free <base-branch>
-WORKFLOW <repo-name> feature <main-branch>
-WORKFLOW <repo-name> stacked <parent-feature-branch>
+REPO <name> <git-url> <base-branch>
+```
+
+Task branch names:
+
+```text
+base branch master       + task login  -> feature/login
+base branch feature/cpq  + task task1  -> feature/cpq-task1
 ```
 
 ## Development
