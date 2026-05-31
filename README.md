@@ -1,8 +1,8 @@
-# monotree
+# tasktree
 
-Multi-repo workspaces for AI coding agents.
+Task-based Git worktree workspaces for one repo or many repos.
 
-`git` works in one repository at a time. AI agents also work best when they can see the whole task from one directory. That becomes painful when one feature spans multiple repos:
+`git worktree` is powerful, but task setup gets repetitive. AI agents also work best when they can see the whole task from one directory. That becomes especially painful when one feature spans multiple repos:
 
 ```text
 frontend/   -> run AI agent here
@@ -12,11 +12,11 @@ infra/      -> run AI agent again here
 
 Each repo has its own session, context, file search, and Git state. The agent cannot easily reason about the whole change.
 
-`monotree` keeps your repos separate, but places their worktrees under one task folder:
+`tasktree` keeps each repo as normal Git, but places task worktrees under one task folder:
 
 ```text
-fullstack                     // monotree project
-├── .monotree.config          // repo list and base branches
+fullstack                     // tasktree project
+├── .tasktree.config          // repo list and base branches
 ├── _base                     // main worktrees
 │   ├── frontend              // main: frontend
 │   └── backend               // main: backend
@@ -33,7 +33,20 @@ codex
 # or claude
 ```
 
-Now the agent can search and edit both repos in one session:
+For one repo, the same layout is used with one repo directory:
+
+```text
+my-app-workspace
+├── .tasktree.config
+├── _base
+│   └── my-app
+└── login
+    └── my-app
+```
+
+Run your AI agent from `login/my-app` for one repo, or from `login` when a task spans multiple repos.
+
+Now the agent can search and edit configured repos in one session:
 
 ```text
 @frontend/src/...
@@ -45,89 +58,110 @@ Now the agent can search and edit both repos in one session:
 Workspace commands work for every configured repo.
 
 ```text
-monotree config            create .monotree.config without cloning repos
-monotree init              clone main worktrees from .monotree.config
-monotree list              show repos and task workspaces
-monotree status            show modified/untracked files in base and tasks
-monotree add <task>        create linked worktrees for a task
-monotree remove <task>     remove task worktrees
+tasktree config            create or rewrite .tasktree.config without cloning repos
+tasktree init              clone main worktrees from .tasktree.config
+tasktree list              show repos and task workspaces
+tasktree status            show commits, diff, and dirty state
+tasktree add <task>        create linked worktrees for a task
+tasktree remove <task>     remove task worktrees
 ```
 
 ## Git commands
 
-`monotree` runs familiar Git operations across every repo in `.monotree.config`.
+`tasktree` runs familiar Git operations across every repo in `.tasktree.config`.
 
 ```text
 git       = current repo only
-monotree  = all configured repos
+tasktree  = all configured repos
 ```
 
 ```text
 remote
-  base branch  <---------------- PR / merge outside monotree ----- task branch
+  base branch  <---------------- PR / merge outside tasktree ----- task branch
       |                                                      ^
-      | monotree pull                                       | monotree push <task>
+      | tasktree pull                                       | tasktree push <task>
       v                                                      |
 local
-  base worktree  -- monotree add <task> -->  task worktree --+
+  base worktree  -- tasktree add <task> -->  task worktree --+
       ^                                      |
       |                                      |
-      +--------- monotree rebase [<task>] ---+
+      +--------- tasktree update [<task>] ---+
 
 optional local fast-forward:
-  task worktree  -- monotree merge <task> -->  base worktree  -- monotree push -->  remote base branch
+  task worktree  -- tasktree land <task> -->  base worktree  -- tasktree push -->  remote base branch
   (fast-forward only, no merge commit)
 ```
 
 Commands:
 
 ```text
-monotree pull             update local base branches from remote
-monotree rebase           run git rebase <base> inside every task worktree
-monotree rebase <task>    run git rebase <base> inside one task worktree
-monotree push             push each base branch to origin
-monotree push <task>      push each task branch to origin
-monotree merge <task>     fast-forward merge each task branch into its base branch
+tasktree pull             remote base -> local base
+tasktree update           local base -> every task worktree
+tasktree update <task>    local base -> one task worktree
+tasktree land <task>      task worktree -> local base
+tasktree push             local base -> remote base
+tasktree push <task>      task worktree -> remote task branch
 ```
 
-`merge <task>` is useful when a base branch is already a parent feature branch:
+`pull` is the command that reads remote base branches. `update` and `land` use only local worktrees:
+
+```text
+Vertical:
+  pull        origin/<base> -> _base/<repo>
+  push        _base/<repo>  -> origin/<base>
+
+Horizontal:
+  update      _base/<repo>  -> <task>/<repo>
+  land        <task>/<repo> -> _base/<repo>
+
+Optional:
+  push <task> <task>/<repo> -> origin/<task-branch>
+```
+
+For the exact Git commands used by each operation, see [`docs/git-operations.md`](docs/git-operations.md).
+
+`land <task>` is useful when a base branch is already a parent feature branch:
 
 ```text
 base branch: feature/cpq
 task branch: feature/cpq-task1
 ```
 
-In that case, `monotree merge task1` fast-forwards local `feature/cpq` to include `feature/cpq-task1`. Run `monotree push` after that to push the base branch.
+In that case, `tasktree land task1` fast-forwards local `feature/cpq` to include `feature/cpq-task1`. Run `tasktree push` after that to push the base branch.
 
 Add `--repo <name>` to supported Git commands when you want to run against one repo only:
 
 ```bash
-monotree pull --repo frontend
-monotree rebase login --repo frontend
-monotree push login --repo frontend
-monotree merge login --repo backend
-monotree push --repo backend
+tasktree pull --repo frontend
+tasktree update login --repo frontend
+tasktree push login --repo frontend
+tasktree land login --repo backend
+tasktree push --repo backend
 ```
 
 ## Install
 
-From this repo:
+For users:
 
 ```bash
-./install.sh
+curl -fsSL https://raw.githubusercontent.com/tkhwang/tasktree/main/install.sh | bash
 ```
 
-The installer asks where to install `monotree`. The default is:
+The installer downloads `tasktree`, asks where to install it, and defaults to:
 
 ```text
-~/.local/bin/monotree
+~/.local/bin/tasktree
 ```
 
 If the target directory is not on `PATH`, the installer can add it to your shell profile.
 
+Reviewing the script before running it is recommended.
+
 ## Config
 
-Create `.monotree.config` in a project root, or run `monotree config`. Then run `monotree init` to clone main worktrees.
+Create `.tasktree.config` in a project root, or run `tasktree config`. Then run `tasktree init` to clone main worktrees.
+
+If an existing config uses an older format or the old `.monotree.config` name, run `tasktree config` inside the project to rewrite it to `.tasktree.config` without cloning repos again.
 
 ```text
 PROJECT_NAME fullstack
@@ -154,6 +188,12 @@ base branch feature/cpq  + task task1  -> feature/cpq-task1
 
 ## Development
 
+Install from this repo checkout:
+
+```bash
+./install.sh
+```
+
 ```bash
 ./tests/run.sh
 ```
@@ -161,6 +201,6 @@ base branch feature/cpq  + task task1  -> feature/cpq-task1
 Spec and plan:
 
 ```text
-docs/specs/0001-monotree-mvp.md
-docs/plans/0001-monotree-mvp-implementation.md
+docs/specs/0001-tasktree-mvp.md
+docs/plans/0001-tasktree-mvp-implementation.md
 ```

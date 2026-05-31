@@ -36,5 +36,5 @@ release/
 *.tar.gz
 *.zip
 
-# Local monotree sandboxes created during manual testing
-.monotree-test/
+# Local tasktree sandboxes created during manual testing
+.tasktree-test/

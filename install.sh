@@ -2,7 +2,8 @@
 set -u
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd -P)
-SRC="$SCRIPT_DIR/bin/monotree"
+SRC="$SCRIPT_DIR/bin/tasktree"
+TASKTREE_RAW_BASE_URL="${TASKTREE_RAW_BASE_URL:-https://raw.githubusercontent.com/tkhwang/tasktree/main}"
 DEFAULT_DEST_DIR="${HOME}/.local/bin"
 
 expand_target_dir() {
@@ -19,9 +20,18 @@ prompt_read() {
   value=""
   if [ -t 0 ]; then
     IFS= read -r -e -p "$prompt" value || :
-  else
+  elif [ ! -f "$0" ] && [ -r /dev/tty ]; then
+    # When installed via `curl ... | bash`, stdin is the script body.
+    # Read interactive answers from the terminal instead of consuming script lines.
+    printf '%s' "$prompt" >/dev/tty
+    IFS= read -r value </dev/tty || :
+  elif [ -f "$0" ]; then
     printf '%s' "$prompt" >&2
     IFS= read -r value || :
+  else
+    # Non-interactive stdin-script execution has no safe prompt stream.
+    # Return empty so callers use their defaults.
+    printf '%s' "$prompt" >&2
   fi
   printf '%s' "$value"
 }
@@ -45,7 +55,7 @@ append_path_entry() {
     printf '[*] PATH entry already exists in %s\n' "$profile"
   else
     {
-      printf '\n# Added by monotree installer\n'
+      printf '\n# Added by tasktree installer\n'
       printf '%s\n' "$line"
     } >> "$profile" || { printf '[-] Error: failed to update %s\n' "$profile" >&2; exit 1; }
     printf '[+] Added PATH entry to %s\n' "$profile"
@@ -60,28 +70,44 @@ print_direct_usage() {
   printf '  export PATH="%s:$PATH"\n' "$DEST_DIR"
 }
 
-[ -f "$SRC" ] || { printf '[-] Error: source executable not found: %s\n' "$SRC" >&2; exit 1; }
+download_file() {
+  url=$1
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$url"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -qO- "$url"
+  else
+    printf '[-] Error: curl or wget is required for standalone install\n' >&2
+    exit 1
+  fi
+}
 
-printf '[*] Install monotree\n'
+printf '[*] Install tasktree\n'
 input_dir=$(prompt_read "[*] Target directory [$DEFAULT_DEST_DIR]: ")
 if [ -z "$input_dir" ]; then
   DEST_DIR="$DEFAULT_DEST_DIR"
 else
   DEST_DIR=$(expand_target_dir "$input_dir")
 fi
-DEST="$DEST_DIR/monotree"
+DEST="$DEST_DIR/tasktree"
 
 mkdir -p "$DEST_DIR" || { printf '[-] Error: failed to create %s\n' "$DEST_DIR" >&2; exit 1; }
-cp "$SRC" "$DEST" || { printf '[-] Error: failed to install monotree\n' >&2; exit 1; }
+if [ -f "$SRC" ]; then
+  cp "$SRC" "$DEST" || { printf '[-] Error: failed to install tasktree\n' >&2; exit 1; }
+else
+  download_file "$TASKTREE_RAW_BASE_URL/bin/tasktree" > "$DEST" || { rm -f "$DEST"; printf '[-] Error: failed to download tasktree\n' >&2; exit 1; }
+  printf '[+] Downloaded tasktree from %s\n' "$TASKTREE_RAW_BASE_URL"
+fi
+
 chmod +x "$DEST" || { printf '[-] Error: failed to mark executable: %s\n' "$DEST" >&2; exit 1; }
-printf '[+] Installed monotree to %s\n' "$DEST"
+printf '[+] Installed tasktree to %s\n' "$DEST"
 
 cat <<USAGE
 
 [*] Try it now:
 
-  monotree help     show all commands
-  monotree init     create your first monotree project
+  tasktree help     show all commands
+  tasktree init     create your first tasktree project
 
 USAGE
 case ":${PATH}:" in
