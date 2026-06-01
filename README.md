@@ -9,6 +9,8 @@ Simplify Git worktree workspaces and branch operations.
 
 ## 1. Worktree workspace
 
+`workbranch` organizes linked worktrees by task/feature. A task such as `login` or `payment` gets its own folder, and each configured repo gets a linked worktree inside that folder.
+
 ```text
 workbranch init              clone main worktrees from .workbranch.config
 workbranch add <task>        create linked worktrees for a task
@@ -16,6 +18,8 @@ workbranch remove <task>     remove task worktrees
 ```
 
 For a single repo:
+
+`workbranch` still uses `<task>/<repo>`. The extra repo directory keeps the layout consistent with multi-repo projects, but single-repo users usually work from `<task>/<repo>`.
 
 ```text
 my-app-workspace
