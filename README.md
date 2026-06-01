@@ -99,6 +99,7 @@ Commands:
 ```text
 workbranch pull             remote base -> local base
 workbranch update           local base -> every task worktree
+workbranch update --all     local base -> every task worktree
 workbranch update <task>    local base -> one task worktree
 workbranch land <task>      task worktree -> local base
 workbranch push             local base -> remote base
@@ -161,6 +162,33 @@ If the target directory is not on `PATH`, the installer can add it to your shell
 
 Reviewing the script before running it is recommended.
 
+### Direct single-file install
+
+```bash
+mkdir -p ~/.local/bin
+curl -fsSL https://raw.githubusercontent.com/tkhwang/workbranch/main/bin/workbranch -o ~/.local/bin/workbranch
+chmod +x ~/.local/bin/workbranch
+```
+
+```bash
+mkdir -p ~/.local/bin
+wget -qO ~/.local/bin/workbranch https://raw.githubusercontent.com/tkhwang/workbranch/main/bin/workbranch
+chmod +x ~/.local/bin/workbranch
+```
+
+The direct file, installer script, and Homebrew formula all install the same generated `bin/workbranch` artifact.
+
+### Homebrew
+
+Planned install shape:
+
+```bash
+brew tap tkhwang/workbranch
+brew install workbranch
+```
+
+The formula installs `bin/workbranch` from the release tarball, so Homebrew and direct download use the same generated executable.
+
 ## Config
 
 Create `.workbranch.config` in a project root, or run `workbranch config`. Then run `workbranch init` to clone main worktrees.
@@ -185,7 +213,7 @@ TASK_SETUP <command>
 REPO <name> <git-url> <base-repo-branch>
 ```
 
-`TASK_SETUP` is optional. `workbranch add <task>` runs it after all task worktrees are created. You can add or change it later:
+`TASK_SETUP` is optional. `workbranch add <task>` runs it after all task worktrees are created. It is trusted project configuration and is executed with `sh -c`, so review configs from untrusted projects before running setup commands. You can add or change it later:
 
 ```bash
 workbranch setup
@@ -218,13 +246,22 @@ Install from this repo checkout:
 ./install.sh
 ```
 
+`workbranch` is developed as modular Bash under `src/workbranch/**`, then bundled into the single-file executable `bin/workbranch`.
+
+```bash
+scripts/build-workbranch.sh
+```
+
 ```bash
 ./tests/run.sh
 ```
+
+Do not edit `bin/workbranch` directly. See [`docs/architecture.md`](docs/architecture.md).
 
 Spec and plan:
 
 ```text
 docs/specs/0001-workbranch-mvp.md
 docs/plans/0001-workbranch-mvp-implementation.md
+docs/plans/0002-workbranch-modular-source-single-file-distribution.md
 ```

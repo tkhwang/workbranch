@@ -4,7 +4,8 @@ This file defines the Git commands behind each `workbranch` Git operation.
 
 `workbranch` keeps the user-facing model small, but the implementation still uses ordinary Git commands. Use this file as the maintenance contract for Git behavior.
 
-The source-level definitions live in the `Git operation definitions` section at the end of `bin/workbranch`.
+The source-level definitions live in `src/workbranch/git-ops.sh`.
+`bin/workbranch` is the generated single-file install artifact.
 
 ## Direction model
 
@@ -104,7 +105,6 @@ For each repo in the task:
 
 ```bash
 cd _base/<repo>
-git fetch origin
 git checkout <base-branch>
 git pull --ff-only origin <base-branch>
 git merge --ff-only <task-branch>
