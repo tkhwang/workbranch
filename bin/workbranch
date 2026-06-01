@@ -937,9 +937,10 @@ cmd_init_interactive() {
     └── login                     // task workspace
         ├── frontend              // linked worktree: frontend
         ├── backend               // linked worktree: backend
-        └── <run AI agent here>   // cd login && run codex, claude code, ...
+        └── <work here>           // cd login for this feature
 
-    Result: one AI agent can use multiple repo contexts, one session, and shared file search.
+    Result: branch operations stay grouped by feature workspace.
+    Multi-repo bonus: use one directory for shared AI session context.
 AFTER
   printf '
 ' >&2

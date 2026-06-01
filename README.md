@@ -1,28 +1,83 @@
 # workbranch
 
-Task-based Git worktree workspaces for one repo or many repos.
+Simplify branch operations for Git worktree-based development.
 
-`git worktree` is powerful, but task setup gets repetitive. AI agents also work best when they can see the whole task from one directory. That becomes especially painful when one feature spans multiple repos:
+`workbranch` helps you manage multiple feature workspaces created with `git worktree`. It gives common branch operations clear commands, so you can move changes between base worktrees, task worktrees, and remotes without repeating the same Git steps by hand.
 
-```text
-frontend/   -> run AI agent here
-backend/    -> run AI agent again here
-infra/      -> run AI agent again here
+For multi-repo projects, `workbranch` can group several repositories under one task workspace. This lets you work across frontend, backend, infra, or scripts from one directory, which is especially useful for AI coding sessions that need one shared project context.
+
+## What workbranch does
+
+### 1. Create feature workspaces with Git worktree
+
+Use one command to create a task workspace backed by linked Git worktrees.
+
+```bash
+workbranch add login
+workbranch add payment
 ```
 
-Each repo has its own session, context, file search, and Git state. The agent cannot easily reason about the whole change.
-
-`workbranch` keeps each repo as normal Git, but places task worktrees under one task folder:
+For a single repo:
 
 ```text
-fullstack                     // workbranch project
-├── .workbranch.config          // repo list and base branches
-├── _base                     // main worktrees
-│   ├── frontend              // main: frontend
-│   └── backend               // main: backend
-└── login                     // task workspace
-    ├── frontend              // linked: frontend
-    └── backend               // linked: backend
+my-app-workspace
+├── .workbranch.config
+├── _base
+│   └── my-app              // base worktree
+├── login
+│   └── my-app              // feature worktree
+└── payment
+    └── my-app              // feature worktree
+```
+
+### 2. Simplify branch operations between worktrees
+
+`workbranch` makes the direction of each Git operation explicit.
+
+```bash
+workbranch pull          # remote base -> local base
+workbranch update login  # local base -> task worktree
+workbranch land login    # task worktree -> local base
+workbranch push          # local base -> remote base
+workbranch push login    # task branch -> remote task branch
+```
+
+This is useful when several features are in progress at the same time and each feature has its own worktree.
+
+### 3. Update every feature workspace at once
+
+When the local base worktree changes, update all task workspaces together.
+
+```bash
+workbranch update
+workbranch update --all
+```
+
+### 4. Run safer Git operations with preflight checks
+
+Before mutating worktrees, `workbranch` checks for common unsafe states:
+
+- dirty worktrees
+- wrong current branch
+- rebase in progress
+- missing repos or task worktrees
+- non-fast-forward pull, push, or land paths
+
+The goal is to fail before partial changes happen.
+
+### 5. Use one task workspace for multi-repo work
+
+For multi-repo projects, `workbranch` keeps each repo as normal Git, but places matching task worktrees under one task folder.
+
+```text
+fullstack
+├── .workbranch.config        // repo list and base branches
+├── _base
+│   ├── frontend              // base worktree: frontend
+│   └── backend               // base worktree: backend
+└── login
+    ├── frontend              // task worktree: frontend
+    └── backend               // task worktree: backend
 ```
 
 Run your AI agent from the task workspace:
@@ -32,19 +87,6 @@ cd fullstack/login
 codex
 # or claude
 ```
-
-For one repo, the same layout is used with one repo directory:
-
-```text
-my-app-workspace
-├── .workbranch.config
-├── _base
-│   └── my-app
-└── login
-    └── my-app
-```
-
-Run your AI agent from `login/my-app` for one repo, or from `login` when a task spans multiple repos.
 
 Now the agent can search and edit configured repos in one session:
 
