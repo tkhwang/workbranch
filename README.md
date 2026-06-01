@@ -1,8 +1,8 @@
-# monotree
+# workbranch
 
-Multi-repo workspaces for AI coding agents.
+Task-based Git worktree workspaces for one repo or many repos.
 
-`git` works in one repository at a time. AI agents also work best when they can see the whole task from one directory. That becomes painful when one feature spans multiple repos:
+`git worktree` is powerful, but task setup gets repetitive. AI agents also work best when they can see the whole task from one directory. That becomes especially painful when one feature spans multiple repos:
 
 ```text
 frontend/   -> run AI agent here
@@ -12,11 +12,11 @@ infra/      -> run AI agent again here
 
 Each repo has its own session, context, file search, and Git state. The agent cannot easily reason about the whole change.
 
-`monotree` keeps your repos separate, but places their worktrees under one task folder:
+`workbranch` keeps each repo as normal Git, but places task worktrees under one task folder:
 
 ```text
-fullstack                     // monotree project
-├── .monotree.config          // repo list and workflow rules
+fullstack                     // workbranch project
+├── .workbranch.config          // repo list and base branches
 ├── _base                     // main worktrees
 │   ├── frontend              // main: frontend
 │   └── backend               // main: backend
@@ -33,7 +33,20 @@ codex
 # or claude
 ```
 
-Now the agent can search and edit both repos in one session:
+For one repo, the same layout is used with one repo directory:
+
+```text
+my-app-workspace
+├── .workbranch.config
+├── _base
+│   └── my-app
+└── login
+    └── my-app
+```
+
+Run your AI agent from `login/my-app` for one repo, or from `login` when a task spans multiple repos.
+
+Now the agent can search and edit configured repos in one session:
 
 ```text
 @frontend/src/...
@@ -45,120 +58,165 @@ Now the agent can search and edit both repos in one session:
 Workspace commands work for every configured repo.
 
 ```text
-monotree init              create .monotree.config
-monotree list              show repos and task workspaces
-monotree add <task>        create linked worktrees for a task
-monotree remove <task>     remove task worktrees
+workbranch config            create or rewrite .workbranch.config without cloning repos
+workbranch setup             add or change task setup command
+workbranch init              clone main worktrees from .workbranch.config
+workbranch list              show repos and task workspaces
+workbranch status            show commits, diff, and dirty state
+workbranch add <task>        create linked worktrees for a task
+workbranch setup <task>      run task setup for an existing task
+workbranch remove <task>     remove task worktrees
 ```
 
-## Git workflow commands
+## Git commands
 
-`monotree` does not replace Git. It runs a small set of Git operations across the repos in `.monotree.config`.
+`workbranch` runs familiar Git operations across every repo in `.workbranch.config`.
 
 ```text
 git       = current repo only
-monotree  = all configured repos
+workbranch  = all configured repos
 ```
 
-Each repo chooses one workflow.
-
-### Free workflow
-
-Use monotree only for workspace layout. Use `git` directly inside each repo.
-
 ```text
-local repo  -- git pull / git push / git rebase / git merge -->  remote
-```
+remote
+  base branch  <---------------- PR / merge outside workbranch ----- task branch
+      |                                                      ^
+      | workbranch pull                                       | workbranch push <task>
+      v                                                      |
+local
+  base worktree  -- workbranch add <task> -->  task worktree --+
+      ^                                      |
+      |                                      |
+      +--------- workbranch update [<task>] ---+
 
-### Feature workflow
-
-Use a task branch and open a PR back to the base branch.
-
-```text
-remote    base  <-- PR --------  feature
-            |                       ^
-            | pull                  | push <task>
-            v                       |
-local     base  --add <task>-->  feature
-            \                       ^
-             \-- rebase <task> ----/
+optional local fast-forward:
+  task worktree  -- workbranch land <task> -->  base worktree  -- workbranch push -->  remote base branch
+  (fast-forward only, no merge commit)
 ```
 
 Commands:
 
 ```text
-monotree pull             update local base branches from remote
-monotree rebase <task>    run git rebase <base> inside each task worktree
-monotree push <task>      push each task branch to origin
+workbranch pull             remote base -> local base
+workbranch update           local base -> every task worktree
+workbranch update <task>    local base -> one task worktree
+workbranch land <task>      task worktree -> local base
+workbranch push             local base -> remote base
+workbranch push <task>      task worktree -> remote task branch
 ```
 
-### Stacked workflow
-
-Use a local child branch on top of a parent feature branch, then merge it back into the parent feature branch.
+`pull` is the command that reads remote base branches. `update` and `land` use only local worktrees:
 
 ```text
-remote    base  <-- PR --------  parent feature
-                                ^
-                                | push parent feature
-                                |
-local     base              parent feature  --add <task>-->  feature local
-                              ^      ^                            |
-                              | pull |                            | merge <task>
-                              |      \----------------------------/
+Vertical:
+  pull        origin/<base> -> _base/<repo>
+  push        _base/<repo>  -> origin/<base>
+
+Horizontal:
+  update      _base/<repo>  -> <task>/<repo>
+  land        <task>/<repo> -> _base/<repo>
+
+Optional:
+  push <task> <task>/<repo> -> origin/<task-branch>
 ```
 
-Commands:
+`update` uses the local `_base/<repo>` HEAD and requires that base worktree to be on its configured base branch.
+
+For the exact Git commands used by each operation, see [`docs/git-operations.md`](docs/git-operations.md).
+
+`land <task>` is useful when a base repo branch is already a parent feature branch:
 
 ```text
-monotree pull             update local parent feature branches from remote
-monotree rebase <task>    run git rebase <parent-feature> inside each task worktree
-monotree merge <task>     merge each task branch into its parent feature branch
+base repo branch: feature/cpq
+task branch: feature/cpq-task1
+```
+
+In that case, `workbranch land task1` fast-forwards local `feature/cpq` to include `feature/cpq-task1`. Run `workbranch push` after that to push the base repo branch.
+
+Add `--repo <name>` to supported Git commands when you want to run against one repo only:
+
+```bash
+workbranch pull --repo frontend
+workbranch update login --repo frontend
+workbranch push login --repo frontend
+workbranch land login --repo backend
+workbranch push --repo backend
 ```
 
 ## Install
 
-From this repo:
+For users:
 
 ```bash
-./install.sh
+curl -fsSL https://raw.githubusercontent.com/tkhwang/workbranch/main/install.sh | WORKBRANCH_RAW_BASE_URL=https://raw.githubusercontent.com/tkhwang/workbranch/main bash
 ```
 
-The installer asks where to install `monotree`. The default is:
+The installer downloads `workbranch`, asks where to install it, and defaults to:
 
 ```text
-~/.local/bin/monotree
+~/.local/bin/workbranch
 ```
 
 If the target directory is not on `PATH`, the installer can add it to your shell profile.
 
+Reviewing the script before running it is recommended.
+
 ## Config
 
-Create `.monotree.config` in a project root, or run `monotree init`.
+Create `.workbranch.config` in a project root, or run `workbranch config`. Then run `workbranch init` to clone main worktrees.
+
+If an existing config uses an older format or the old `.tasktree.config` / `.monotree.config` name, run `workbranch config` inside the project to rewrite it to `.workbranch.config` without cloning repos again.
 
 ```text
 PROJECT_NAME fullstack
 MAIN_WORKTREES_DIR _base
 BRANCH_PREFIX feature
+TASK_SETUP sh scripts/workbranch-setup.sh
 
-REPO frontend git@github.com:example/frontend.git
-WORKFLOW frontend feature master
-
-REPO backend git@github.com:example/backend.git
-WORKFLOW backend stacked feature/cpq
-
-REPO scripts git@github.com:example/scripts.git
-WORKFLOW scripts free master
+REPO frontend git@github.com:example/frontend.git master
+REPO backend git@github.com:example/backend.git feature/cpq
+REPO scripts git@github.com:example/scripts.git master
 ```
 
-Workflow format:
+Config format:
 
 ```text
-WORKFLOW <repo-name> free <base-branch>
-WORKFLOW <repo-name> feature <main-branch>
-WORKFLOW <repo-name> stacked <parent-feature-branch>
+TASK_SETUP <command>
+REPO <name> <git-url> <base-repo-branch>
+```
+
+`TASK_SETUP` is optional. `workbranch add <task>` runs it after all task worktrees are created. You can add or change it later:
+
+```bash
+workbranch setup
+workbranch setup --clear
+workbranch setup <task>
+```
+
+Task setup runs from the project root with:
+
+```text
+WORKBRANCH_PROJECT_ROOT
+WORKBRANCH_TASK
+WORKBRANCH_TASK_DIR
+WORKBRANCH_BASE_DIR
+WORKBRANCH_REPOS
+```
+
+Task branch names:
+
+```text
+[base repo] main        -> task1 -> [task repo] feature/task1
+[base repo] feature/XXX -> task1 -> [task repo] feature/XXX-task1
 ```
 
 ## Development
+
+Install from this repo checkout:
+
+```bash
+./install.sh
+```
 
 ```bash
 ./tests/run.sh
@@ -167,6 +225,6 @@ WORKFLOW <repo-name> stacked <parent-feature-branch>
 Spec and plan:
 
 ```text
-docs/specs/0001-monotree-mvp.md
-docs/plans/0001-monotree-mvp-implementation.md
+docs/specs/0001-workbranch-mvp.md
+docs/plans/0001-workbranch-mvp-implementation.md
 ```
