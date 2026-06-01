@@ -56,6 +56,7 @@ Rules:
 - Git URLs and branch names must be non-empty and contain no whitespace.
 - Config values are split on whitespace except `TASK_SETUP`, which preserves the command text after the directive.
 - The file is not a shell script.
+- Safety: `.workbranch.config` is trusted project configuration. Running `workbranch add <task>` or `workbranch setup <task>` executes `TASK_SETUP` with `sh -c`, so review configs from untrusted projects before running those commands.
 
 ## Branch names
 
@@ -160,6 +161,8 @@ WORKBRANCH_TASK_DIR
 WORKBRANCH_BASE_DIR
 WORKBRANCH_REPOS
 ```
+
+Safety: `.workbranch.config` is trusted project configuration. `TASK_SETUP` is executed with `sh -c`.
 
 ### `workbranch pull`
 

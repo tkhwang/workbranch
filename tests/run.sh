@@ -134,6 +134,13 @@ run_test() {
   cleanup_fixture
 }
 
+test_generated_workbranch_is_up_to_date() {
+  TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
+  generated="$TMP_ROOT/workbranch.generated"
+  "$REPO_ROOT/scripts/build-workbranch.sh" "$generated" >/dev/null
+  cmp "$generated" "$WORKBRANCH" >/dev/null || fail "bin/workbranch is stale; run scripts/build-workbranch.sh"
+}
+
 test_invalid_config_rejected_without_execution() {
   new_fixture
   project="$FIXTURE_PROJECT"
@@ -288,6 +295,16 @@ test_update_all_updates_every_task_workspace() {
   assert_file "$project/payment/frontend/upstream-all.txt"
   assert_file "$project/login/backend/local-base-only.txt"
   assert_file "$project/payment/backend/local-base-only.txt"
+
+  printf '%s\n' "local base alias" > "$project/_base/backend/local-base-alias.txt"
+  git -C "$project/_base/backend" add local-base-alias.txt
+  git -C "$project/_base/backend" commit -m "local base alias" >/dev/null
+  assert_not_exists "$project/login/backend/local-base-alias.txt"
+  assert_not_exists "$project/payment/backend/local-base-alias.txt"
+
+  run_expect_success "$WORKBRANCH" update --all >/dev/null
+  assert_file "$project/login/backend/local-base-alias.txt"
+  assert_file "$project/payment/backend/local-base-alias.txt"
 }
 
 test_update_preflight_blocks_batch_before_changes() {
@@ -567,6 +584,21 @@ test_dirty_worktree_safety() {
   assert_file "$project/login/frontend/.git"
 }
 
+test_remove_reports_kept_task_directory_with_extra_files() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  printf '%s\n' "task notes" > "$project/login/notes.txt"
+
+  out=$(run_expect_success "$WORKBRANCH" remove login)
+  assert_not_exists "$project/login/frontend"
+  assert_not_exists "$project/login/backend"
+  assert_file "$project/login/notes.txt"
+  assert_contains "$out" "Task directory kept because it is not empty: login"
+}
+
 test_pull_preflight_requires_base_worktree_on_configured_branch() {
   new_fixture
   project="$FIXTURE_PROJECT"
@@ -580,6 +612,22 @@ test_pull_preflight_requires_base_worktree_on_configured_branch() {
   assert_contains "$out" "Cannot pull: preflight failed"
   assert_contains "$out" "_base/frontend expected branch master, got unrelated"
   assert_not_exists "$project/_base/frontend/pull-should-not-touch-unrelated.txt"
+}
+
+test_add_preflight_requires_clean_base_on_configured_branch() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  git -C "$project/_base/frontend" checkout -b unrelated >/dev/null 2>&1
+  printf '%s\n' "dirty base" > "$project/_base/frontend/dirty.txt"
+
+  out=$(run_expect_fail "$WORKBRANCH" add login)
+  assert_contains "$out" "Cannot add: preflight failed"
+  assert_contains "$out" "_base/frontend expected branch master, got unrelated"
+  assert_contains "$out" "_base/frontend dirty worktree"
+  assert_not_exists "$project/login"
 }
 
 test_config_writes_config_without_cloning() {
@@ -638,6 +686,25 @@ CONFIG
   run_expect_success "$WORKBRANCH" init >/dev/null
   out=$(run_expect_success "$WORKBRANCH" status)
   assert_contains "$out" "[*] Base worktrees"
+}
+
+test_config_keeps_glob_characters_literal() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  : > "$project/maZZster"
+  cat > "$project/.workbranch.config" <<CONFIG
+PROJECT_NAME fullstack
+MAIN_WORKTREES_DIR _base
+BRANCH_PREFIX feature
+
+REPO frontend $TMP_ROOT/remotes/frontend.git ma*ster
+REPO backend $TMP_ROOT/remotes/backend.git master
+CONFIG
+
+  out=$(run_expect_success "$WORKBRANCH" list)
+  assert_contains "$out" "ma*ster"
+  assert_not_contains "$out" "maZZster"
 }
 
 test_init_accepts_legacy_config_without_rewrite() {
@@ -895,6 +962,9 @@ test_installer_supports_pipe_to_bash() {
   assert_contains "$out" "Installed workbranch"
   assert_file "$TMP_ROOT/home/.local/bin/workbranch"
   [ -x "$TMP_ROOT/home/.local/bin/workbranch" ] || fail "pipe-to-bash installed workbranch is not executable"
+  out=$(HOME="$TMP_ROOT/home" "$TMP_ROOT/home/.local/bin/workbranch" help 2>&1)
+  assert_contains "$out" "Usage:"
+  assert_contains "$out" "workbranch <command> [args]"
 }
 
 test_installer_pipe_to_bash_ignores_cwd_bin_workbranch() {
@@ -938,6 +1008,7 @@ test_installer_downloads_cli_when_run_standalone() {
   [ -x "$TMP_ROOT/home/.local/bin/workbranch" ] || fail "standalone installed workbranch is not executable"
   out=$(HOME="$TMP_ROOT/home" "$TMP_ROOT/home/.local/bin/workbranch" help 2>&1)
   assert_contains "$out" "Usage:"
+  assert_contains "$out" "workbranch <command> [args]"
 }
 
 test_installer_standalone_requires_raw_base_url() {
@@ -966,6 +1037,7 @@ test_installer_installs_executable() {
   [ -x "$TMP_ROOT/home/.local/bin/workbranch" ] || fail "installed workbranch is not executable"
   out=$(HOME="$TMP_ROOT/home" "$TMP_ROOT/home/.local/bin/workbranch" help 2>&1)
   assert_contains "$out" "Usage:"
+  assert_contains "$out" "workbranch <command> [args]"
 }
 
 test_installer_uses_custom_target_directory() {
@@ -1008,6 +1080,7 @@ test_help_groups_commands() {
   assert_contains "$out" "push <task>       Push task branches to origin"
   assert_contains "$out" "  // horizontal"
   assert_contains "$out" "update            Update every task workspace from local base worktrees"
+  assert_contains "$out" "update --all      Update every task workspace from local base worktrees"
   assert_contains "$out" "update <task>     Update one task workspace from local base worktrees"
   assert_contains "$out" "land <task>       Land task branches into base branches"
   assert_contains "$out" "  // common"
@@ -1025,6 +1098,7 @@ main() {
   [ -x "$WORKBRANCH" ] || fail "missing executable: $WORKBRANCH"
   git --version >/dev/null || fail "git is required"
 
+  run_test test_generated_workbranch_is_up_to_date
   run_test test_help_groups_commands
   run_test test_invalid_config_rejected_without_execution
   run_test test_init_existing_config_clones_base_repos
@@ -1042,9 +1116,12 @@ main() {
   run_test test_add_branches_from_local_base_after_land_before_push
   run_test test_status_reports_base_task_diff_and_worktree_state
   run_test test_dirty_worktree_safety
+  run_test test_remove_reports_kept_task_directory_with_extra_files
   run_test test_pull_preflight_requires_base_worktree_on_configured_branch
+  run_test test_add_preflight_requires_clean_base_on_configured_branch
   run_test test_config_writes_config_without_cloning
   run_test test_config_rewrites_legacy_config_without_cloning
+  run_test test_config_keeps_glob_characters_literal
   run_test test_init_accepts_legacy_config_without_rewrite
   run_test test_config_rewrites_legacy_tasktree_config_without_cloning
   run_test test_task_setup_can_be_configured_and_run
