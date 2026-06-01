@@ -1,9 +1,20 @@
 #!/usr/bin/env bash
 set -u
 
-SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd -P)
-SRC="$SCRIPT_DIR/bin/workbranch"
-WORKBRANCH_RAW_BASE_URL="${WORKBRANCH_RAW_BASE_URL:-https://raw.githubusercontent.com/tkhwang/workbranch/main}"
+script_dir_from_argv() {
+  case "${0##*/}" in
+    bash|sh|zsh|-) return 1 ;;
+  esac
+  [ -f "$0" ] || return 1
+  cd "$(dirname "$0")" && pwd -P
+}
+
+SCRIPT_DIR=$(script_dir_from_argv || printf '')
+SRC=""
+if [ -n "$SCRIPT_DIR" ]; then
+  SRC="$SCRIPT_DIR/bin/workbranch"
+fi
+WORKBRANCH_RAW_BASE_URL="${WORKBRANCH_RAW_BASE_URL:-}"
 DEFAULT_DEST_DIR="${HOME}/.local/bin"
 
 expand_target_dir() {
@@ -20,12 +31,12 @@ prompt_read() {
   value=""
   if [ -t 0 ]; then
     IFS= read -r -e -p "$prompt" value || :
-  elif [ ! -f "$0" ] && [ -r /dev/tty ]; then
+  elif [ -z "$SCRIPT_DIR" ] && [ -r /dev/tty ] && { : </dev/tty; } 2>/dev/null; then
     # When installed via `curl ... | bash`, stdin is the script body.
     # Read interactive answers from the terminal instead of consuming script lines.
     printf '%s' "$prompt" >/dev/tty
     IFS= read -r value </dev/tty || :
-  elif [ -f "$0" ]; then
+  elif [ -n "$SCRIPT_DIR" ]; then
     printf '%s' "$prompt" >&2
     IFS= read -r value || :
   else
@@ -82,6 +93,12 @@ download_file() {
   fi
 }
 
+is_checkout_install() {
+  [ -n "$SCRIPT_DIR" ] || return 1
+  [ -f "$SRC" ] || return 1
+  [ -d "$SCRIPT_DIR/.git" ] || [ -f "$SCRIPT_DIR/.git" ]
+}
+
 printf '[*] Install workbranch\n'
 input_dir=$(prompt_read "[*] Target directory [$DEFAULT_DEST_DIR]: ")
 if [ -z "$input_dir" ]; then
@@ -92,9 +109,14 @@ fi
 DEST="$DEST_DIR/workbranch"
 
 mkdir -p "$DEST_DIR" || { printf '[-] Error: failed to create %s\n' "$DEST_DIR" >&2; exit 1; }
-if [ -f "$SRC" ]; then
+if is_checkout_install; then
   cp "$SRC" "$DEST" || { printf '[-] Error: failed to install workbranch\n' >&2; exit 1; }
 else
+  if [ -z "$WORKBRANCH_RAW_BASE_URL" ]; then
+    printf '[-] Error: WORKBRANCH_RAW_BASE_URL is required for standalone installs\n' >&2
+    printf '[*] Example: curl -fsSL https://raw.githubusercontent.com/tkhwang/workbranch/main/install.sh | WORKBRANCH_RAW_BASE_URL=https://raw.githubusercontent.com/tkhwang/workbranch/main bash\n' >&2
+    exit 1
+  fi
   download_file "$WORKBRANCH_RAW_BASE_URL/bin/workbranch" > "$DEST" || { rm -f "$DEST"; printf '[-] Error: failed to download workbranch\n' >&2; exit 1; }
   printf '[+] Downloaded workbranch from %s\n' "$WORKBRANCH_RAW_BASE_URL"
 fi

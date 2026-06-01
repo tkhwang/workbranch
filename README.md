@@ -120,6 +120,8 @@ Optional:
   push <task> <task>/<repo> -> origin/<task-branch>
 ```
 
+`update` uses the local `_base/<repo>` HEAD and requires that base worktree to be on its configured base branch.
+
 For the exact Git commands used by each operation, see [`docs/git-operations.md`](docs/git-operations.md).
 
 `land <task>` is useful when a base repo branch is already a parent feature branch:
@@ -146,7 +148,7 @@ workbranch push --repo backend
 For users:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tkhwang/workbranch/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/tkhwang/workbranch/main/install.sh | WORKBRANCH_RAW_BASE_URL=https://raw.githubusercontent.com/tkhwang/workbranch/main bash
 ```
 
 The installer downloads `workbranch`, asks where to install it, and defaults to:

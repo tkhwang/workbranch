@@ -23,6 +23,31 @@ Optional:
 
 ## Commands
 
+### `workbranch add <task>`
+
+Direction: base -> task worktree.
+
+For each repo:
+
+```bash
+cd _base/<repo>
+git fetch origin
+git worktree add <task>/<repo> -b <task-branch> HEAD
+```
+
+If the task branch already exists locally, reuse it:
+
+```bash
+cd _base/<repo>
+git worktree add <task>/<repo> <task-branch>
+```
+
+Safety:
+
+- Rolls back worktrees and new branches created by the command if repo setup fails.
+- Uses the local base worktree HEAD, not `origin/<base-branch>`.
+- Reuses existing task branches so removed worktrees can be recreated.
+
 ### `workbranch pull`
 
 Direction: remote base -> local base.
@@ -54,6 +79,8 @@ Safety:
 
 - Fails before running if the task worktree is dirty.
 - Uses the local base worktree HEAD, not `origin/<base-branch>`.
+- Fails before running if `_base/<repo>` is not checked out to the configured base branch.
+- Fails before running if `_base/<repo>` has a rebase in progress.
 - Conflict resolution is left to Git and the user.
 
 ### `workbranch update <task>`
