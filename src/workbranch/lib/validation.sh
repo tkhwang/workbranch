@@ -1,5 +1,7 @@
 is_safe_name() {
   [ -n "$1" ] || return 1
+  [ "$1" = "." ] && return 1
+  [ "$1" = ".." ] && return 1
   case "$1" in
     *[!ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-]*) return 1 ;;
     *) return 0 ;;

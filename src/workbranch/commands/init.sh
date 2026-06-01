@@ -150,16 +150,12 @@ cmd_init() {
   CREATED_WORKTREE_BASES=()
   CREATED_BRANCH_REPOS=()
   CREATED_BRANCH_NAMES=()
-  if [ -f ".workbranch.config" ] || [ -f ".tasktree.config" ] || [ -f ".monotree.config" ]; then
-    PROJECT_ROOT=$(pwd -P)
-    if [ -f "$PROJECT_ROOT/.workbranch.config" ]; then
-      CONFIG_FILE="$PROJECT_ROOT/.workbranch.config"
+  if find_project_root; then
+    if [ "$(basename "$CONFIG_FILE")" = ".workbranch.config" ]; then
       parse_config "$CONFIG_FILE"
-    elif [ -f "$PROJECT_ROOT/.tasktree.config" ]; then
-      CONFIG_FILE="$PROJECT_ROOT/.tasktree.config"
+    elif [ "$(basename "$CONFIG_FILE")" = ".tasktree.config" ]; then
       parse_config_for_rewrite "$CONFIG_FILE"
     else
-      CONFIG_FILE="$PROJECT_ROOT/.monotree.config"
       parse_config_for_rewrite "$CONFIG_FILE"
     fi
     clone_base_repos

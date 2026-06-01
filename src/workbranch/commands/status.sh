@@ -19,10 +19,8 @@ cmd_status() {
   found=0
   for path in "$PROJECT_ROOT"/*; do
     is_task_workspace_path "$path" || continue
-    found=1
+    task_printed=0
     task=${path##*/}
-    info "$task"
-    print_task_status_header
     i=0
     while [ $i -lt ${#REPO_NAMES[@]} ]; do
       name=$(repo_name_at "$i")
@@ -32,9 +30,15 @@ cmd_status() {
       base_path=$(base_repo_path "$name")
       base_commit=$(head_commit_full "$base_path")
       diff_label=$(commit_diff_label "$repo_path" "$base_commit")
+      if [ $task_printed -eq 0 ]; then
+        info "$task"
+        print_task_status_header
+      fi
       print_task_status_item "$name" "$(head_commit_short "$base_path")" "$(head_commit_short "$repo_path")" "$diff_label" "$(worktree_status_label "$repo_path")" "$(next_action_for_diff "$diff_label")"
+      task_printed=1
       i=$((i + 1))
     done
+    [ $task_printed -eq 1 ] && found=1
   done
   if [ $found -eq 1 ]; then
     printf '\n'

@@ -4,16 +4,19 @@ find_project_root() {
     if [ -f "$dir/.workbranch.config" ]; then
       PROJECT_ROOT=$dir
       CONFIG_FILE="$dir/.workbranch.config"
+      CONFIG_TYPE=workbranch
       return 0
     fi
     if [ -f "$dir/.tasktree.config" ]; then
       PROJECT_ROOT=$dir
       CONFIG_FILE="$dir/.tasktree.config"
+      CONFIG_TYPE=legacy
       return 0
     fi
     if [ -f "$dir/.monotree.config" ]; then
       PROJECT_ROOT=$dir
       CONFIG_FILE="$dir/.monotree.config"
+      CONFIG_TYPE=legacy
       return 0
     fi
     [ "$dir" = "/" ] && return 1
@@ -21,9 +24,17 @@ find_project_root() {
   done
 }
 
+parse_project_config() {
+  case "$CONFIG_TYPE" in
+    workbranch) parse_config "$CONFIG_FILE" ;;
+    legacy) parse_config_for_rewrite "$CONFIG_FILE" ;;
+    *) die "unknown config type for: $CONFIG_FILE" ;;
+  esac
+}
+
 require_project() {
   find_project_root || die "not inside a workbranch project (missing .workbranch.config)"
-  parse_config "$CONFIG_FILE"
+  parse_project_config
 }
 
 base_repo_path() { printf '%s/%s/%s' "$PROJECT_ROOT" "$BASE_DIR" "$1"; }
@@ -63,6 +74,7 @@ clone_base_repos() {
     branch=$(repo_base_branch_at "$i")
     target=$(base_repo_path "$name")
     if [ -e "$target" ]; then
+      git -C "$target" rev-parse --git-dir >/dev/null 2>&1 || die "base repo path exists but is not a git repo: $BASE_DIR/$name"
       info "Base repo exists: $BASE_DIR/$name"
     else
       clone_output=$(git clone --branch "$branch" "$url" "$target" 2>&1)

@@ -37,8 +37,8 @@ update_task() {
     base=$(base_repo_path "$name")
     base_branch=$(repo_base_branch_at "$i")
     task_path=$(task_repo_path "$task" "$name")
-    [ -d "$base/.git" ] || die "base repo missing for '$name': $base"
-    [ -d "$task_path" ] || die "task repo missing for '$name': $task_path"
+    [ -d "$base/.git" ] || [ -f "$base/.git" ] || die "base repo missing for '$name': $base"
+    [ -d "$task_path/.git" ] || [ -f "$task_path/.git" ] || die "task repo missing for '$name': $task_path"
     ensure_current_branch "$base" "$base_branch"
     ensure_clean_worktree "$task_path"
     workbranch_git_update_task "$task_path" "$(head_commit_full "$base")"

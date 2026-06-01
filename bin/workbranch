@@ -8,6 +8,7 @@ set -u
 PROGRAM=${0##*/}
 PROJECT_ROOT=""
 CONFIG_FILE=""
+CONFIG_TYPE=""
 PROJECT_NAME=""
 BASE_DIR=""
 BRANCH_PREFIX=""
@@ -47,16 +48,16 @@ Workspace:
   remove <task>     Remove task worktrees without deleting branches
 Git:
   status            Show commits, diff, and dirty state
-  // vertical
+  vertical
   pull              Pull remote base branches into main worktrees
   push              Push base branches to origin
   push <task>       Push task branches to origin
-  // horizontal
+  horizontal
   update            Update every task workspace from local base worktrees
   update --all      Update every task workspace from local base worktrees
   update <task>     Update one task workspace from local base worktrees
   land <task>       Land task branches into base branches
-  // common
+  common
   --repo <repo>     Limit operation to one repo; otherwise all repos
 Other:
   help              Show this help
@@ -66,6 +67,8 @@ USAGE
 # ----- src/workbranch/lib/validation.sh -----
 is_safe_name() {
   [ -n "$1" ] || return 1
+  [ "$1" = "." ] && return 1
+  [ "$1" = ".." ] && return 1
   case "$1" in
     *[!ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-]*) return 1 ;;
     *) return 0 ;;
@@ -370,16 +373,19 @@ find_project_root() {
     if [ -f "$dir/.workbranch.config" ]; then
       PROJECT_ROOT=$dir
       CONFIG_FILE="$dir/.workbranch.config"
+      CONFIG_TYPE=workbranch
       return 0
     fi
     if [ -f "$dir/.tasktree.config" ]; then
       PROJECT_ROOT=$dir
       CONFIG_FILE="$dir/.tasktree.config"
+      CONFIG_TYPE=legacy
       return 0
     fi
     if [ -f "$dir/.monotree.config" ]; then
       PROJECT_ROOT=$dir
       CONFIG_FILE="$dir/.monotree.config"
+      CONFIG_TYPE=legacy
       return 0
     fi
     [ "$dir" = "/" ] && return 1
@@ -387,9 +393,17 @@ find_project_root() {
   done
 }
 
+parse_project_config() {
+  case "$CONFIG_TYPE" in
+    workbranch) parse_config "$CONFIG_FILE" ;;
+    legacy) parse_config_for_rewrite "$CONFIG_FILE" ;;
+    *) die "unknown config type for: $CONFIG_FILE" ;;
+  esac
+}
+
 require_project() {
   find_project_root || die "not inside a workbranch project (missing .workbranch.config)"
-  parse_config "$CONFIG_FILE"
+  parse_project_config
 }
 
 base_repo_path() { printf '%s/%s/%s' "$PROJECT_ROOT" "$BASE_DIR" "$1"; }
@@ -429,6 +443,7 @@ clone_base_repos() {
     branch=$(repo_base_branch_at "$i")
     target=$(base_repo_path "$name")
     if [ -e "$target" ]; then
+      git -C "$target" rev-parse --git-dir >/dev/null 2>&1 || die "base repo path exists but is not a git repo: $BASE_DIR/$name"
       info "Base repo exists: $BASE_DIR/$name"
     else
       clone_output=$(git clone --branch "$branch" "$url" "$target" 2>&1)
@@ -632,8 +647,9 @@ require_task_repos_clean() {
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     path=$(task_repo_path "$task" "$name")
-    [ -d "$path" ] || die "task repo missing for '$name': $path"
-    ensure_clean_worktree "$path"
+    if [ -d "$path" ]; then
+      ensure_clean_worktree "$path"
+    fi
     i=$((i + 1))
   done
 }
@@ -646,7 +662,7 @@ rollback_created() {
     wt=${CREATED_WORKTREES[$i]}
     if [ -e "$wt" ]; then
       base=${CREATED_WORKTREE_BASES[$i]}
-      git -C "$base" worktree remove "$wt" >/dev/null 2>&1 || rm -rf "$wt"
+      git -C "$base" worktree remove --force "$wt" >/dev/null 2>&1 || rm -rf "$wt"
     fi
     i=$((i - 1))
   done
@@ -693,10 +709,14 @@ prompt_read() {
   value=""
   if [ -t 0 ]; then
     # Use readline for interactive editing when a real terminal is attached.
-    IFS= read -r -e -p "$prompt" value || :
+    if ! IFS= read -r -e -p "$prompt" value; then
+      [ -n "$value" ] || return 1
+    fi
   else
     printf '%s' "$prompt" >&2
-    IFS= read -r value || :
+    if ! IFS= read -r value; then
+      [ -n "$value" ] || return 1
+    fi
   fi
   printf '%s' "$value"
 }
@@ -716,7 +736,7 @@ prompt_required() {
   prompt=$1
   value=""
   while [ -z "$value" ]; do
-    value=$(prompt_read "[*] $prompt: ")
+    value=$(prompt_read "[*] $prompt: ") || die "input aborted"
     [ -n "$value" ] || printf '[-] %s is required.
 ' "$prompt" >&2
   done
@@ -896,10 +916,10 @@ is_task_workspace_path() {
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
-    [ -d "$path/$name" ] && return 0
+    [ -d "$path/$name" ] || return 1
     i=$((i + 1))
   done
-  return 1
+  return 0
 }
 
 # ----- src/workbranch/commands/config.sh -----
@@ -1073,16 +1093,12 @@ cmd_init() {
   CREATED_WORKTREE_BASES=()
   CREATED_BRANCH_REPOS=()
   CREATED_BRANCH_NAMES=()
-  if [ -f ".workbranch.config" ] || [ -f ".tasktree.config" ] || [ -f ".monotree.config" ]; then
-    PROJECT_ROOT=$(pwd -P)
-    if [ -f "$PROJECT_ROOT/.workbranch.config" ]; then
-      CONFIG_FILE="$PROJECT_ROOT/.workbranch.config"
+  if find_project_root; then
+    if [ "$(basename "$CONFIG_FILE")" = ".workbranch.config" ]; then
       parse_config "$CONFIG_FILE"
-    elif [ -f "$PROJECT_ROOT/.tasktree.config" ]; then
-      CONFIG_FILE="$PROJECT_ROOT/.tasktree.config"
+    elif [ "$(basename "$CONFIG_FILE")" = ".tasktree.config" ]; then
       parse_config_for_rewrite "$CONFIG_FILE"
     else
-      CONFIG_FILE="$PROJECT_ROOT/.monotree.config"
       parse_config_for_rewrite "$CONFIG_FILE"
     fi
     clone_base_repos
@@ -1176,13 +1192,14 @@ cmd_add() {
     branch=$(repo_task_branch_at "$i" "$task")
     target=$(task_repo_path "$task" "$name")
     if branch_exists "$base" "$branch"; then
+      track_worktree "$target" "$base"
       workbranch_git_add_existing_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
     else
+      track_branch "$base" "$branch"
+      track_worktree "$target" "$base"
       workbranch_git_add_fetch_base "$base" || fail_with_rollback "failed to fetch repo '$name'"
       workbranch_git_add_new_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
-      track_branch "$base" "$branch"
     fi
-    track_worktree "$target" "$base"
     success "Created: $task/$name"
     success "  [base repo] $base_branch -> [task repo] $branch"
     i=$((i + 1))
@@ -1272,10 +1289,8 @@ cmd_status() {
   found=0
   for path in "$PROJECT_ROOT"/*; do
     is_task_workspace_path "$path" || continue
-    found=1
+    task_printed=0
     task=${path##*/}
-    info "$task"
-    print_task_status_header
     i=0
     while [ $i -lt ${#REPO_NAMES[@]} ]; do
       name=$(repo_name_at "$i")
@@ -1285,9 +1300,15 @@ cmd_status() {
       base_path=$(base_repo_path "$name")
       base_commit=$(head_commit_full "$base_path")
       diff_label=$(commit_diff_label "$repo_path" "$base_commit")
+      if [ $task_printed -eq 0 ]; then
+        info "$task"
+        print_task_status_header
+      fi
       print_task_status_item "$name" "$(head_commit_short "$base_path")" "$(head_commit_short "$repo_path")" "$diff_label" "$(worktree_status_label "$repo_path")" "$(next_action_for_diff "$diff_label")"
+      task_printed=1
       i=$((i + 1))
     done
+    [ $task_printed -eq 1 ] && found=1
   done
   if [ $found -eq 1 ]; then
     printf '\n'
@@ -1376,8 +1397,8 @@ update_task() {
     base=$(base_repo_path "$name")
     base_branch=$(repo_base_branch_at "$i")
     task_path=$(task_repo_path "$task" "$name")
-    [ -d "$base/.git" ] || die "base repo missing for '$name': $base"
-    [ -d "$task_path" ] || die "task repo missing for '$name': $task_path"
+    [ -d "$base/.git" ] || [ -f "$base/.git" ] || die "base repo missing for '$name': $base"
+    [ -d "$task_path/.git" ] || [ -f "$task_path/.git" ] || die "task repo missing for '$name': $task_path"
     ensure_current_branch "$base" "$base_branch"
     ensure_clean_worktree "$task_path"
     workbranch_git_update_task "$task_path" "$(head_commit_full "$base")"
@@ -1574,9 +1595,13 @@ cmd_remove() {
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     path=$(task_repo_path "$task" "$name")
-    [ -d "$path" ] || die "task repo missing for '$name': $path"
+    if [ ! -d "$path" ]; then
+      info "Worktree already removed: $task/$name"
+      i=$((i + 1))
+      continue
+    fi
     base=$(base_repo_path "$name")
-    git -C "$base" worktree remove "$path" || die "failed to remove worktree: $path"
+    git -C "$base" worktree remove "$path" || info "failed to remove worktree (continuing): $task/$name"
     i=$((i + 1))
   done
   if rmdir "$PROJECT_ROOT/$task" 2>/dev/null; then

@@ -41,13 +41,14 @@ cmd_add() {
     branch=$(repo_task_branch_at "$i" "$task")
     target=$(task_repo_path "$task" "$name")
     if branch_exists "$base" "$branch"; then
+      track_worktree "$target" "$base"
       workbranch_git_add_existing_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
     else
+      track_branch "$base" "$branch"
+      track_worktree "$target" "$base"
       workbranch_git_add_fetch_base "$base" || fail_with_rollback "failed to fetch repo '$name'"
       workbranch_git_add_new_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
-      track_branch "$base" "$branch"
     fi
-    track_worktree "$target" "$base"
     success "Created: $task/$name"
     success "  [base repo] $base_branch -> [task repo] $branch"
     i=$((i + 1))
