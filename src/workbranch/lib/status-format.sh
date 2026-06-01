@@ -126,8 +126,8 @@ is_task_workspace_path() {
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
-    [ -d "$path/$name" ] && return 0
+    [ -d "$path/$name" ] || return 1
     i=$((i + 1))
   done
-  return 1
+  return 0
 }

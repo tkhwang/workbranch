@@ -8,9 +8,13 @@ cmd_remove() {
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     path=$(task_repo_path "$task" "$name")
-    [ -d "$path" ] || die "task repo missing for '$name': $path"
+    if [ ! -d "$path" ]; then
+      info "Worktree already removed: $task/$name"
+      i=$((i + 1))
+      continue
+    fi
     base=$(base_repo_path "$name")
-    git -C "$base" worktree remove "$path" || die "failed to remove worktree: $path"
+    git -C "$base" worktree remove "$path" || info "failed to remove worktree (continuing): $task/$name"
     i=$((i + 1))
   done
   if rmdir "$PROJECT_ROOT/$task" 2>/dev/null; then

@@ -185,8 +185,9 @@ require_task_repos_clean() {
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     path=$(task_repo_path "$task" "$name")
-    [ -d "$path" ] || die "task repo missing for '$name': $path"
-    ensure_clean_worktree "$path"
+    if [ -d "$path" ]; then
+      ensure_clean_worktree "$path"
+    fi
     i=$((i + 1))
   done
 }

@@ -3,10 +3,14 @@ prompt_read() {
   value=""
   if [ -t 0 ]; then
     # Use readline for interactive editing when a real terminal is attached.
-    IFS= read -r -e -p "$prompt" value || :
+    if ! IFS= read -r -e -p "$prompt" value; then
+      [ -n "$value" ] || return 1
+    fi
   else
     printf '%s' "$prompt" >&2
-    IFS= read -r value || :
+    if ! IFS= read -r value; then
+      [ -n "$value" ] || return 1
+    fi
   fi
   printf '%s' "$value"
 }
@@ -26,7 +30,7 @@ prompt_required() {
   prompt=$1
   value=""
   while [ -z "$value" ]; do
-    value=$(prompt_read "[*] $prompt: ")
+    value=$(prompt_read "[*] $prompt: ") || die "input aborted"
     [ -n "$value" ] || printf '[-] %s is required.
 ' "$prompt" >&2
   done

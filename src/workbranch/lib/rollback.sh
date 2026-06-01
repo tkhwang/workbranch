@@ -5,7 +5,7 @@ rollback_created() {
     wt=${CREATED_WORKTREES[$i]}
     if [ -e "$wt" ]; then
       base=${CREATED_WORKTREE_BASES[$i]}
-      git -C "$base" worktree remove "$wt" >/dev/null 2>&1 || rm -rf "$wt"
+      git -C "$base" worktree remove --force "$wt" >/dev/null 2>&1 || rm -rf "$wt"
     fi
     i=$((i - 1))
   done
