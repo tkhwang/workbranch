@@ -1,5 +1,5 @@
 class Workbranch < Formula
-  desc "Task-based Git worktree workspaces for one repo or many repos"
+  desc "Simplify branch operations for Git worktree-based development"
   homepage "https://github.com/tkhwang/workbranch"
   url "https://github.com/tkhwang/workbranch/archive/refs/tags/v0.0.0.tar.gz"
   sha256 "REPLACE_WITH_RELEASE_TARBALL_SHA256"
