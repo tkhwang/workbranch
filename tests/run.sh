@@ -240,6 +240,23 @@ test_init_rejects_existing_non_git_base_target() {
   assert_not_exists "$project/_base/backend"
 }
 
+test_init_rejects_existing_non_directory_base_target() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  mkdir -p "$project/_base"
+  printf '%s\n' "not a directory" > "$project/_base/frontend"
+
+  out=$(cd "$project" && run_expect_fail "$WORKBRANCH" init)
+  assert_contains "$out" "base repo path exists but is not a directory: _base/frontend"
+  assert_not_exists "$project/_base/backend"
+
+  rm -f "$project/_base/frontend"
+  ln -s "$project/_base/missing-target" "$project/_base/frontend"
+  out=$(cd "$project" && run_expect_fail "$WORKBRANCH" init)
+  assert_contains "$out" "base repo path exists but is not a directory: _base/frontend"
+  assert_not_exists "$project/_base/backend"
+}
+
 test_failed_init_rolls_back_command_created_base_paths() {
   new_fixture
   project="$FIXTURE_PROJECT"
@@ -1420,6 +1437,7 @@ main() {
   run_test test_init_existing_config_clones_base_repos
   run_test test_init_from_project_subdir_uses_parent_config
   run_test test_init_rejects_existing_non_git_base_target
+  run_test test_init_rejects_existing_non_directory_base_target
   run_test test_failed_init_rolls_back_command_created_base_paths
   run_test test_failed_init_reports_git_clone_reason
   run_test test_full_git_flow

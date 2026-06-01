@@ -442,9 +442,11 @@ clone_base_repos() {
     url=$(repo_url_at "$i")
     branch=$(repo_base_branch_at "$i")
     target=$(base_repo_path "$name")
-    if [ -e "$target" ]; then
+    if [ -d "$target" ]; then
       git -C "$target" rev-parse --git-dir >/dev/null 2>&1 || die "base repo path exists but is not a git repo: $BASE_DIR/$name"
       info "Base repo exists: $BASE_DIR/$name"
+    elif [ -e "$target" ] || [ -L "$target" ]; then
+      die "base repo path exists but is not a directory: $BASE_DIR/$name"
     else
       clone_output=$(git clone --branch "$branch" "$url" "$target" 2>&1)
       clone_status=$?
