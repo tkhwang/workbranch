@@ -437,11 +437,10 @@ test_config_writes_config_without_cloning() {
 .
 fullstack
 _base
-master
 feature
 frontend
 $frontend_remote
-
+master
 n
 INPUT
 )
@@ -501,11 +500,10 @@ test_interactive_init_writes_config_and_clones() {
 .
 fullstack
 _base
-master
 feature
 frontend
 $frontend_remote
-
+master
 Y
 backend
 $backend_remote
@@ -515,21 +513,26 @@ INPUT
 )
   out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | run_expect_success "$TASKTREE" init)
   assert_contains "$out" "[*] Create a new tasktree project"
-  assert_contains "$out" "[*] Before tasktree"
-  assert_contains "$out" "frontend                    // repo"
-  assert_contains "$out" "└── AI agent                // separate session/context"
-  assert_contains "$out" "Problem: separate agents do not share context, session, or file search."
+  assert_not_contains "$out" "[*] Before tasktree"
+  assert_not_contains "$out" "Problem: separate agents do not share context, session, or file search."
   assert_contains "$out" "[*] After tasktree"
   assert_contains "$out" "[*] Setup guide"
   case "$out" in
-    *"[*] Before tasktree"*"[*] After tasktree"*"[*] Setup guide"*) ;;
-    *) fail "expected before, after, then setup guide; got: $out" ;;
+    *"[*] After tasktree"*"[*] Setup guide"*) ;;
+    *) fail "expected after, then setup guide; got: $out" ;;
   esac
   assert_contains "$out" "Project name      directory name for this tasktree workspace"
   assert_contains "$out" "Main worktrees    directory for each repo main worktree"
-  assert_contains "$out" "Default main      default branch for repo main worktrees"
-  assert_contains "$out" "[*] Default main branch [main]:"
-  assert_contains "$out" "[*] Base branch [master]:"
+  assert_not_contains "$out" "Default base repo checkout branch"
+  assert_not_contains "$out" "Base branch is checked out in _base/<repo>."
+  assert_not_contains "$out" "Task branch examples: master + login -> feature/login, feature/cpq + task1 -> feature/cpq-task1"
+  assert_contains "$out" "[*] Base repo branch [main]:"
+  assert_contains "$out" "[*] Base repo branch [master]:"
+  assert_contains "$out" "[*] Branch policy:"
+  assert_contains "$out" "[base repo] main        -> task1 -> [task repo] feature/task1"
+  assert_contains "$out" "[base repo] feature/XXX -> task1 -> [task repo] feature/XXX-task1"
+  assert_contains "$out" "frontend: base=master task=feature/<task>"
+  assert_contains "$out" "backend: base=master task=feature/<task>"
   assert_contains "$out" "[*] Main worktrees directory [_base]:"
   assert_contains "$out" "fullstack                     // tasktree project"
   assert_contains "$out" "├── .tasktree.config          // config"
@@ -540,12 +543,13 @@ INPUT
   assert_contains "$out" "├── frontend              // linked worktree: frontend"
   assert_contains "$out" "├── backend               // linked worktree: backend"
   assert_contains "$out" "└── <run AI agent here>   // cd login && run codex, claude code, ..."
-  assert_contains "$out" "Result: one task workspace, one AI session, repo-local paths."
+  assert_contains "$out" "Result: one AI agent can use multiple repo contexts, one session, and shared file search."
   assert_contains "$out" "Press Enter to continue"
   assert_contains "$out" "[*] Project"
   assert_contains "$out" "[*] Repo #1"
   assert_contains "$out" "[*] Repo #2"
   assert_contains "$out" "[*] Summary"
+  assert_contains "$out" "[*] Create project now? [Y/n]:"
   assert_contains "$out" "[+] Initialized"
   project="$TMP_ROOT/work/fullstack"
   assert_file "$project/.tasktree.config"
@@ -553,6 +557,32 @@ INPUT
   assert_contains "$(cat "$project/.tasktree.config")" "REPO backend $backend_remote master"
   assert_dir "$project/_base/frontend/.git"
   assert_dir "$project/_base/backend/.git"
+}
+
+test_interactive_init_can_cancel_before_creating_project() {
+  TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t tasktree-test)
+  mkdir -p "$TMP_ROOT/remotes" "$TMP_ROOT/seeds" "$TMP_ROOT/work"
+  frontend_remote=$(make_repo frontend)
+  input=$(cat <<INPUT
+
+.
+fullstack
+_base
+feature
+frontend
+$frontend_remote
+master
+n
+n
+INPUT
+)
+  out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | run_expect_success "$TASKTREE" init)
+  assert_contains "$out" "[*] Summary"
+  assert_contains "$out" "[*] Create project now? [Y/n]:"
+  assert_contains "$out" "[*] Cancelled."
+  assert_not_contains "$out" "[*] Creating project..."
+  assert_not_contains "$out" "[+] Cloned:"
+  assert_not_exists "$TMP_ROOT/work/fullstack"
 }
 
 test_interactive_init_can_create_project_in_custom_target_directory() {
@@ -564,11 +594,10 @@ test_interactive_init_can_create_project_in_custom_target_directory() {
 $TMP_ROOT/target
 fullstack
 _base
-master
 feature
 frontend
 $frontend_remote
-
+master
 n
 INPUT
 )
@@ -579,7 +608,7 @@ INPUT
   assert_not_exists "$TMP_ROOT/work/fullstack"
 }
 
-test_interactive_init_accepts_slash_default_main_branch() {
+test_interactive_init_accepts_slash_repo_base_branch() {
   TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t tasktree-test)
   mkdir -p "$TMP_ROOT/remotes" "$TMP_ROOT/seeds" "$TMP_ROOT/work"
   frontend_remote=$(make_repo frontend)
@@ -589,11 +618,10 @@ test_interactive_init_accepts_slash_default_main_branch() {
 .
 fullstack
 _base
-feature/cpq
 feature
 frontend
 $frontend_remote
-
+feature/cpq
 n
 INPUT
 )
@@ -701,13 +729,16 @@ test_help_groups_commands() {
   assert_contains "$out" "Git:"
   assert_contains "$out" "Other:"
   assert_contains "$out" "status            Show commits, diff, and dirty state"
+  assert_contains "$out" "  // vertical"
   assert_contains "$out" "pull              Pull remote base branches into main worktrees"
-  assert_contains "$out" "--repo <repo>     Limit supported commands to one repo"
-  assert_contains "$out" "update <task>     Update one task workspace from local base worktrees"
-  assert_contains "$out" "update            Update every task workspace from local base worktrees"
   assert_contains "$out" "push              Push base branches to origin"
   assert_contains "$out" "push <task>       Push task branches to origin"
+  assert_contains "$out" "  // horizontal"
+  assert_contains "$out" "update            Update every task workspace from local base worktrees"
+  assert_contains "$out" "update <task>     Update one task workspace from local base worktrees"
   assert_contains "$out" "land <task>       Land task branches into base branches"
+  assert_contains "$out" "  // common"
+  assert_contains "$out" "--repo <repo>     Limit operation to one repo; otherwise all repos"
   case "$out" in
     *"Workspace:"*"Git:"*"Other:"*) ;;
     *) fail "expected grouped help ordering; got: $out" ;;
@@ -733,8 +764,9 @@ main() {
   run_test test_config_writes_config_without_cloning
   run_test test_config_rewrites_legacy_config_without_cloning
   run_test test_interactive_init_writes_config_and_clones
+  run_test test_interactive_init_can_cancel_before_creating_project
   run_test test_interactive_init_can_create_project_in_custom_target_directory
-  run_test test_interactive_init_accepts_slash_default_main_branch
+  run_test test_interactive_init_accepts_slash_repo_base_branch
   run_test test_interactive_init_rejects_slash_in_main_worktrees_directory
   run_test test_installer_downloads_cli_when_run_standalone
   run_test test_installer_supports_pipe_to_bash

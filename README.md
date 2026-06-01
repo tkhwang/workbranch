@@ -120,14 +120,14 @@ Optional:
 
 For the exact Git commands used by each operation, see [`docs/git-operations.md`](docs/git-operations.md).
 
-`land <task>` is useful when a base branch is already a parent feature branch:
+`land <task>` is useful when a base repo branch is already a parent feature branch:
 
 ```text
-base branch: feature/cpq
+base repo branch: feature/cpq
 task branch: feature/cpq-task1
 ```
 
-In that case, `tasktree land task1` fast-forwards local `feature/cpq` to include `feature/cpq-task1`. Run `tasktree push` after that to push the base branch.
+In that case, `tasktree land task1` fast-forwards local `feature/cpq` to include `feature/cpq-task1`. Run `tasktree push` after that to push the base repo branch.
 
 Add `--repo <name>` to supported Git commands when you want to run against one repo only:
 
@@ -176,14 +176,14 @@ REPO scripts git@github.com:example/scripts.git master
 Config format:
 
 ```text
-REPO <name> <git-url> <base-branch>
+REPO <name> <git-url> <base-repo-branch>
 ```
 
 Task branch names:
 
 ```text
-base branch master       + task login  -> feature/login
-base branch feature/cpq  + task task1  -> feature/cpq-task1
+[base repo] main        -> task1 -> [task repo] feature/task1
+[base repo] feature/XXX -> task1 -> [task repo] feature/XXX-task1
 ```
 
 ## Development

@@ -40,7 +40,7 @@ REPO backend git@github.com:example/backend.git feature/cpq
 Format:
 
 ```text
-REPO <name> <git-url> <base-branch>
+REPO <name> <git-url> <base-repo-branch>
 ```
 
 Rules:
@@ -48,7 +48,7 @@ Rules:
 - `PROJECT_NAME` must be a safe directory name.
 - `MAIN_WORKTREES_DIR` must be a safe directory name.
 - `BRANCH_PREFIX` must be non-empty and contain no whitespace.
-- `REPO` requires name, URL, and base branch.
+- `REPO` requires name, URL, and base repo branch.
 - Repo names must be unique safe names.
 - Git URLs and branch names must be non-empty and contain no whitespace.
 - Config values are split on whitespace. Quoting is not supported.
@@ -56,16 +56,16 @@ Rules:
 
 ## Branch names
 
-Task branch names are derived from the configured base branch.
+Task branch names are derived from the configured base repo branch.
 
 ```text
-base branch master       + task login  -> feature/login
-base branch feature/cpq  + task task1  -> feature/cpq-task1
+base repo branch master       + task login  -> feature/login
+base repo branch feature/cpq  + task task1  -> feature/cpq-task1
 ```
 
 Rule:
 
-- If the base branch starts with `<BRANCH_PREFIX>/`, task branch is `<base-branch>-<task>`.
+- If the base repo branch starts with `<BRANCH_PREFIX>/`, task branch is `<base-branch>-<task>`.
 - Otherwise, task branch is `<BRANCH_PREFIX>/<task>`.
 
 Git operation internals are defined in [`docs/git-operations.md`](../git-operations.md).
@@ -83,16 +83,16 @@ If no config exists, run interactive config setup:
 1. Ask for target directory, default `.`.
 2. Ask for project name, default `fullstack`.
 3. Ask for main worktrees directory, default `_base`.
-4. Ask for default base branch, default `main`.
-5. Ask for branch prefix, default `feature`.
-6. Ask for one or more repos: name, Git URL, base branch.
+4. Ask for branch prefix, default `feature`.
+5. Explain that each repo base repo branch is checked out in `_base/<repo>` and task branches are derived from it.
+6. Ask for one or more repos: name, Git URL, base branch for this repo.
 7. Write `.tasktree.config`.
 
 ### `tasktree init`
 
 Initialize main worktrees from config.
 
-- If `.tasktree.config` exists in the current directory, read it and clone each repo into `_base/<repo>` on its base branch.
+- If `.tasktree.config` exists in the current directory, read it and clone each repo into `_base/<repo>` on its base repo branch.
 - If `.tasktree.config` does not exist, run the same interactive setup as `tasktree config`, then clone repos.
 - If cloning fails, remove paths created by the failed command.
 
@@ -199,11 +199,11 @@ git pull --ff-only origin <base-branch>
 git merge --ff-only <task-branch>
 ```
 
-This is useful when the base branch is already a parent feature branch, such as `feature/cpq`. Run `tasktree push` afterward to push the updated base branch.
+This is useful when the base repo branch is already a parent feature branch, such as `feature/cpq`. Run `tasktree push` afterward to push the updated base repo branch.
 
 ### `--repo <repo>`
 
-Supported Git commands default to every configured repo. Add `--repo <repo>` to run one repo only.
+Git operations default to every configured repo. Add `--repo <repo>` to limit the operation to one repo.
 
 Examples:
 
