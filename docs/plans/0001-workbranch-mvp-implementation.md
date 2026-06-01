@@ -1,4 +1,4 @@
-# 0001 Tasktree MVP Implementation Plan
+# 0001 Workbranch MVP Implementation Plan
 
 ## Objective
 
@@ -6,7 +6,7 @@ Build a dependency-free Bash CLI that creates one multi-repo task workspace and 
 
 ## Source contract
 
-Spec: `docs/specs/0001-tasktree-mvp.md`
+Spec: `docs/specs/0001-workbranch-mvp.md`
 
 ## Config
 
@@ -33,14 +33,14 @@ Parser rules:
 
 ### 1. Config and project discovery
 
-- Find `.tasktree.config` by walking upward from the current directory.
+- Find `.workbranch.config` by walking upward from the current directory.
 - Parse project name, main worktrees directory, branch prefix, and repos.
 - Validate safe names and required fields.
 
 ### 2. Config and init
 
-- `config`: if a project config exists, rewrite it to the current format without cloning; otherwise show the multi-repo AI problem and target folder structure, ask setup questions, then write `.tasktree.config` without cloning.
-- `init`: read `.tasktree.config` and clone base worktrees into `_base/<repo>`.
+- `config`: if a project config exists, rewrite it to the current format without cloning; otherwise show the multi-repo AI problem and target folder structure, ask setup questions, then write `.workbranch.config` without cloning.
+- `init`: read `.workbranch.config` and clone base worktrees into `_base/<repo>`.
 - If `init` runs without an existing config, use the same interactive setup as `config`, then clone.
 - Roll back command-created paths on clone failure.
 
@@ -95,7 +95,7 @@ Cover:
 Run:
 
 ```bash
-/bin/bash -n bin/tasktree install.sh tests/run.sh
+/bin/bash -n bin/workbranch install.sh tests/run.sh
 git diff --check
 /bin/bash ./tests/run.sh
 ```
