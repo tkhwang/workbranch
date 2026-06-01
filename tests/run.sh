@@ -134,6 +134,46 @@ run_test() {
   cleanup_fixture
 }
 
+test_generated_workbranch_is_up_to_date() {
+  TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
+  generated="$TMP_ROOT/workbranch.generated"
+  "$REPO_ROOT/scripts/build-workbranch.sh" "$generated" >/dev/null
+  cmp "$generated" "$WORKBRANCH" >/dev/null || fail "bin/workbranch is stale; run scripts/build-workbranch.sh"
+}
+
+test_safe_names_reject_dot_and_dotdot() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  cat > "$project/.workbranch.config" <<CONFIG
+PROJECT_NAME .
+MAIN_WORKTREES_DIR _base
+BRANCH_PREFIX feature
+REPO frontend $TMP_ROOT/remotes/frontend.git master
+CONFIG
+  out=$(run_expect_fail "$WORKBRANCH" list)
+  assert_contains "$out" "invalid PROJECT_NAME '.'"
+
+  cat > "$project/.workbranch.config" <<CONFIG
+PROJECT_NAME fullstack
+MAIN_WORKTREES_DIR ..
+BRANCH_PREFIX feature
+REPO frontend $TMP_ROOT/remotes/frontend.git master
+CONFIG
+  out=$(run_expect_fail "$WORKBRANCH" list)
+  assert_contains "$out" "invalid MAIN_WORKTREES_DIR '..'"
+
+  cat > "$project/.workbranch.config" <<CONFIG
+PROJECT_NAME fullstack
+MAIN_WORKTREES_DIR _base
+BRANCH_PREFIX feature
+REPO . $TMP_ROOT/remotes/frontend.git master
+CONFIG
+  out=$(run_expect_fail "$WORKBRANCH" list)
+  assert_contains "$out" "invalid repo name '.'"
+}
+
 test_invalid_config_rejected_without_execution() {
   new_fixture
   project="$FIXTURE_PROJECT"
@@ -159,6 +199,62 @@ test_init_existing_config_clones_base_repos() {
   assert_dir "$project/_base/backend/.git"
   assert_branch "$project/_base/frontend" "master"
   assert_branch "$project/_base/backend" "master"
+}
+
+test_init_from_project_subdir_uses_parent_config() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  mkdir -p "$project/docs"
+  input=$(cat <<INPUT
+
+.
+nested
+_base
+feature
+frontend
+$TMP_ROOT/remotes/frontend.git
+master
+n
+
+n
+INPUT
+)
+
+  project_real=$(cd "$project" && pwd -P)
+  out=$(cd "$project/docs" && printf '%s' "$input" | run_expect_success "$WORKBRANCH" init)
+  assert_contains "$out" "Initialized workbranch project: $project_real"
+  assert_not_contains "$out" "Create a new workbranch project"
+  assert_dir "$project/_base/frontend/.git"
+  assert_dir "$project/_base/backend/.git"
+  assert_not_exists "$project/docs/nested"
+}
+
+test_init_rejects_existing_non_git_base_target() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  mkdir -p "$project/_base/frontend"
+  printf '%s\n' "not a git repo" > "$project/_base/frontend/README.txt"
+
+  out=$(cd "$project" && run_expect_fail "$WORKBRANCH" init)
+  assert_contains "$out" "base repo path exists but is not a git repo: _base/frontend"
+  assert_not_exists "$project/_base/backend"
+}
+
+test_init_rejects_existing_non_directory_base_target() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  mkdir -p "$project/_base"
+  printf '%s\n' "not a directory" > "$project/_base/frontend"
+
+  out=$(cd "$project" && run_expect_fail "$WORKBRANCH" init)
+  assert_contains "$out" "base repo path exists but is not a directory: _base/frontend"
+  assert_not_exists "$project/_base/backend"
+
+  rm -f "$project/_base/frontend"
+  ln -s "$project/_base/missing-target" "$project/_base/frontend"
+  out=$(cd "$project" && run_expect_fail "$WORKBRANCH" init)
+  assert_contains "$out" "base repo path exists but is not a directory: _base/frontend"
+  assert_not_exists "$project/_base/backend"
 }
 
 test_failed_init_rolls_back_command_created_base_paths() {
@@ -288,6 +384,40 @@ test_update_all_updates_every_task_workspace() {
   assert_file "$project/payment/frontend/upstream-all.txt"
   assert_file "$project/login/backend/local-base-only.txt"
   assert_file "$project/payment/backend/local-base-only.txt"
+
+  printf '%s\n' "local base alias" > "$project/_base/backend/local-base-alias.txt"
+  git -C "$project/_base/backend" add local-base-alias.txt
+  git -C "$project/_base/backend" commit -m "local base alias" >/dev/null
+  assert_not_exists "$project/login/backend/local-base-alias.txt"
+  assert_not_exists "$project/payment/backend/local-base-alias.txt"
+
+  run_expect_success "$WORKBRANCH" update --all >/dev/null
+  assert_file "$project/login/backend/local-base-alias.txt"
+  assert_file "$project/payment/backend/local-base-alias.txt"
+}
+
+test_update_accepts_gitfile_base_worktree() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+
+  moved_git_dir="$TMP_ROOT/frontend-base.git"
+  mv "$project/_base/frontend/.git" "$moved_git_dir"
+  printf '%s\n' "gitdir: $moved_git_dir" > "$project/_base/frontend/.git"
+
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  git -C "$project/_base/frontend" config user.name "Workbranch Test"
+  git -C "$project/_base/frontend" config user.email "workbranch-test@example.com"
+  printf '%s\n' "base gitfile update" > "$project/_base/frontend/base-gitfile.txt"
+  git -C "$project/_base/frontend" add base-gitfile.txt
+  git -C "$project/_base/frontend" commit -m "base gitfile update" >/dev/null
+
+  out=$(run_expect_success "$WORKBRANCH" update login --repo frontend)
+  assert_contains "$out" "Updated: login/frontend"
+  assert_file "$project/login/frontend/base-gitfile.txt"
 }
 
 test_update_preflight_blocks_batch_before_changes() {
@@ -484,6 +614,78 @@ test_add_reuses_existing_task_branch() {
   assert_branch "$project/login/backend" "feature/login"
 }
 
+test_add_rolls_back_branch_when_new_worktree_helper_fails() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+
+  real_git=$(command -v git)
+  fakebin="$TMP_ROOT/fakebin"
+  mkdir -p "$fakebin"
+  cat > "$fakebin/git" <<'GIT'
+#!/usr/bin/env bash
+if [ "${1:-}" = "-C" ] && [ "${2:-}" = "$FAIL_WORKTREE_BASE" ] && [ "${3:-}" = "worktree" ] && [ "${4:-}" = "add" ]; then
+  target=$5
+  branch=$7
+  "$REAL_GIT" -C "$FAIL_WORKTREE_BASE" branch "$branch" HEAD >/dev/null 2>&1 || true
+  mkdir -p "$target"
+  exit 1
+fi
+exec "$REAL_GIT" "$@"
+GIT
+  chmod +x "$fakebin/git"
+
+  old_path=$PATH
+  export REAL_GIT=$real_git
+  export FAIL_WORKTREE_BASE=$(cd "$project/_base/backend" && pwd -P)
+  PATH="$fakebin:$PATH"
+  out=$(run_expect_fail "$WORKBRANCH" add login)
+  PATH=$old_path
+  unset REAL_GIT FAIL_WORKTREE_BASE
+
+  assert_contains "$out" "failed to create worktree for repo 'backend'"
+  assert_not_exists "$project/login"
+  if git -C "$project/_base/backend" show-ref --verify --quiet refs/heads/feature/login; then
+    fail "expected failed add to roll back backend feature/login branch"
+  fi
+}
+
+test_add_rolls_back_dirty_worktree_registration() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+
+  real_git=$(command -v git)
+  fakebin="$TMP_ROOT/fakebin"
+  mkdir -p "$fakebin"
+  cat > "$fakebin/git" <<'GIT'
+#!/usr/bin/env bash
+if [ "${1:-}" = "-C" ] && [ "${2:-}" = "$FAIL_WORKTREE_BASE" ] && [ "${3:-}" = "worktree" ] && [ "${4:-}" = "add" ]; then
+  printf '%s\n' "dirty rollback marker" > "$DIRTY_WORKTREE_PATH/rollback-dirty.txt"
+  exit 1
+fi
+exec "$REAL_GIT" "$@"
+GIT
+  chmod +x "$fakebin/git"
+
+  old_path=$PATH
+  export REAL_GIT=$real_git
+  export FAIL_WORKTREE_BASE=$(cd "$project/_base/backend" && pwd -P)
+  export DIRTY_WORKTREE_PATH="$project/login/frontend"
+  PATH="$fakebin:$PATH"
+  out=$(run_expect_fail "$WORKBRANCH" add login)
+  PATH=$old_path
+  unset REAL_GIT FAIL_WORKTREE_BASE DIRTY_WORKTREE_PATH
+
+  assert_contains "$out" "failed to create worktree for repo 'backend'"
+  assert_not_exists "$project/login"
+  if git -C "$project/_base/frontend" worktree list --porcelain | grep -F "$project/login/frontend" >/dev/null; then
+    fail "expected rollback to remove dirty frontend worktree registration"
+  fi
+}
+
 test_add_branches_from_local_base_after_land_before_push() {
   new_fixture
   project="$FIXTURE_PROJECT"
@@ -546,6 +748,37 @@ test_status_reports_base_task_diff_and_worktree_state() {
   assert_not_contains "$out" "Task summary"
 }
 
+test_status_repo_filter_skips_tasks_without_matching_rows() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  rm -rf "$project/login/frontend"
+
+  out=$(run_expect_success "$WORKBRANCH" status --repo frontend)
+  assert_contains "$out" "[*] Task workspaces"
+  assert_contains "$out" "[*] (none)"
+  assert_not_contains "$out" "[*] login"
+  assert_not_contains "$out" "    repo        base       task       diff  status    next"
+  assert_not_contains "$out" "[*] Next"
+}
+
+test_status_skips_partial_task_workspaces() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  rm -rf "$project/login/frontend"
+
+  out=$(run_expect_success "$WORKBRANCH" status)
+  assert_contains "$out" "[*] Task workspaces"
+  assert_contains "$out" "[*] (none)"
+  assert_not_contains "$out" "[*] login"
+  assert_not_contains "$out" "[*] Next"
+}
+
 test_dirty_worktree_safety() {
   new_fixture
   project="$FIXTURE_PROJECT"
@@ -567,6 +800,71 @@ test_dirty_worktree_safety() {
   assert_file "$project/login/frontend/.git"
 }
 
+test_remove_reports_kept_task_directory_with_extra_files() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  printf '%s\n' "task notes" > "$project/login/notes.txt"
+
+  out=$(run_expect_success "$WORKBRANCH" remove login)
+  assert_not_exists "$project/login/frontend"
+  assert_not_exists "$project/login/backend"
+  assert_file "$project/login/notes.txt"
+  assert_contains "$out" "Task directory kept because it is not empty: login"
+}
+
+test_remove_treats_missing_worktree_as_already_removed() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  rm -rf "$project/login/frontend"
+
+  out=$(run_expect_success "$WORKBRANCH" remove login)
+  assert_contains "$out" "Worktree already removed: login/frontend"
+  assert_not_exists "$project/login/backend"
+  assert_not_exists "$project/login"
+}
+
+test_remove_continues_after_worktree_remove_failure() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  project_real=$(pwd -P)
+
+  real_git=$(command -v git)
+  fakebin="$TMP_ROOT/fakebin"
+  mkdir -p "$fakebin"
+  cat > "$fakebin/git" <<'GIT'
+#!/usr/bin/env bash
+if [ "${1:-}" = "-C" ] && [ "${3:-}" = "worktree" ] && [ "${4:-}" = "remove" ] && [ "${5:-}" = "$FAIL_REMOVE_PATH" ]; then
+  printf '%s
+' "fake worktree remove failure" >&2
+  exit 1
+fi
+exec "$REAL_GIT" "$@"
+GIT
+  chmod +x "$fakebin/git"
+
+  old_path=$PATH
+  export REAL_GIT=$real_git
+  export FAIL_REMOVE_PATH="$project_real/login/frontend"
+  PATH="$fakebin:$PATH"
+  out=$(run_expect_success "$WORKBRANCH" remove login)
+  PATH=$old_path
+  unset REAL_GIT FAIL_REMOVE_PATH
+
+  assert_contains "$out" "failed to remove worktree (continuing): login/frontend"
+  assert_not_exists "$project/login/backend"
+  assert_dir "$project/login/frontend"
+  assert_contains "$out" "Task directory kept because it is not empty: login"
+}
+
 test_pull_preflight_requires_base_worktree_on_configured_branch() {
   new_fixture
   project="$FIXTURE_PROJECT"
@@ -580,6 +878,22 @@ test_pull_preflight_requires_base_worktree_on_configured_branch() {
   assert_contains "$out" "Cannot pull: preflight failed"
   assert_contains "$out" "_base/frontend expected branch master, got unrelated"
   assert_not_exists "$project/_base/frontend/pull-should-not-touch-unrelated.txt"
+}
+
+test_add_preflight_requires_clean_base_on_configured_branch() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  git -C "$project/_base/frontend" checkout -b unrelated >/dev/null 2>&1
+  printf '%s\n' "dirty base" > "$project/_base/frontend/dirty.txt"
+
+  out=$(run_expect_fail "$WORKBRANCH" add login)
+  assert_contains "$out" "Cannot add: preflight failed"
+  assert_contains "$out" "_base/frontend expected branch master, got unrelated"
+  assert_contains "$out" "_base/frontend dirty worktree"
+  assert_not_exists "$project/login"
 }
 
 test_config_writes_config_without_cloning() {
@@ -621,8 +935,9 @@ base_branch frontend master
 repo backend $TMP_ROOT/remotes/backend.git master
 CONFIG
 
-  out=$(run_expect_fail "$WORKBRANCH" status)
-  assert_contains "$out" "Error:"
+  out=$(run_expect_success "$WORKBRANCH" status)
+  assert_contains "$out" "[*] Base worktrees"
+  assert_contains "$out" "frontend    missing"
 
   out=$(run_expect_success "$WORKBRANCH" config)
   assert_contains "$out" "[+] Config rewritten:"
@@ -638,6 +953,25 @@ CONFIG
   run_expect_success "$WORKBRANCH" init >/dev/null
   out=$(run_expect_success "$WORKBRANCH" status)
   assert_contains "$out" "[*] Base worktrees"
+}
+
+test_config_keeps_glob_characters_literal() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  : > "$project/maZZster"
+  cat > "$project/.workbranch.config" <<CONFIG
+PROJECT_NAME fullstack
+MAIN_WORKTREES_DIR _base
+BRANCH_PREFIX feature
+
+REPO frontend $TMP_ROOT/remotes/frontend.git ma*ster
+REPO backend $TMP_ROOT/remotes/backend.git master
+CONFIG
+
+  out=$(run_expect_success "$WORKBRANCH" list)
+  assert_contains "$out" "ma*ster"
+  assert_not_contains "$out" "maZZster"
 }
 
 test_init_accepts_legacy_config_without_rewrite() {
@@ -661,6 +995,29 @@ CONFIG
   assert_dir "$project/_base/backend/.git"
   assert_branch "$project/_base/frontend" "master"
   assert_branch "$project/_base/backend" "master"
+  assert_not_exists "$project/.workbranch.config"
+}
+
+test_legacy_config_supports_project_commands_without_rewrite() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  rm "$project/.workbranch.config"
+  cat > "$project/.monotree.config" <<CONFIG
+project fullstack
+base_dir _base
+branch_prefix feature
+
+repo frontend $TMP_ROOT/remotes/frontend.git
+base_branch frontend master
+repo backend $TMP_ROOT/remotes/backend.git master
+CONFIG
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  out=$(run_expect_success "$WORKBRANCH" list)
+  assert_contains "$out" "Project: fullstack"
+  assert_contains "$out" "frontend    master"
+  assert_contains "$out" "backend     master"
   assert_not_exists "$project/.workbranch.config"
 }
 
@@ -769,8 +1126,9 @@ INPUT
   assert_contains "$out" "└── login                     // task workspace"
   assert_contains "$out" "├── frontend              // linked worktree: frontend"
   assert_contains "$out" "├── backend               // linked worktree: backend"
-  assert_contains "$out" "└── <run AI agent here>   // cd login && run codex, claude code, ..."
-  assert_contains "$out" "Result: one AI agent can use multiple repo contexts, one session, and shared file search."
+  assert_contains "$out" "└── <work here>           // cd login for this feature"
+  assert_contains "$out" "Result: branch operations stay grouped by feature workspace."
+  assert_contains "$out" "Multi-repo bonus: use one directory for shared AI session context."
   assert_contains "$out" "Press Enter to continue"
   assert_contains "$out" "[*] Project"
   assert_contains "$out" "[*] Repo #1"
@@ -878,6 +1236,44 @@ INPUT
   assert_contains "$out" "invalid MAIN_WORKTREES_DIR 'feature/cpq'"
 }
 
+test_interactive_init_eof_aborts_required_prompt() {
+  TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
+  mkdir -p "$TMP_ROOT/work"
+  out_file="$TMP_ROOT/eof.out"
+  status_file="$TMP_ROOT/eof.status"
+  input=$(cat <<INPUT
+
+.
+fullstack
+_base
+feature
+INPUT
+)
+
+  (
+    cd "$TMP_ROOT/work" || exit 1
+    printf '%s' "$input" | "$WORKBRANCH" init >"$out_file" 2>&1
+    printf '%s' "$?" >"$status_file"
+  ) &
+  pid=$!
+  waited=0
+  while kill -0 "$pid" 2>/dev/null && [ "$waited" -lt 30 ]; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  if kill -0 "$pid" 2>/dev/null; then
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    fail "expected init to abort on EOF instead of hanging"
+  fi
+  wait "$pid" 2>/dev/null || true
+
+  status=$(cat "$status_file")
+  [ "$status" -ne 0 ] || fail "expected EOF during required prompt to exit non-zero"
+  out=$(cat "$out_file")
+  assert_contains "$out" "input aborted"
+}
+
 
 test_installer_supports_pipe_to_bash() {
   TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
@@ -895,6 +1291,9 @@ test_installer_supports_pipe_to_bash() {
   assert_contains "$out" "Installed workbranch"
   assert_file "$TMP_ROOT/home/.local/bin/workbranch"
   [ -x "$TMP_ROOT/home/.local/bin/workbranch" ] || fail "pipe-to-bash installed workbranch is not executable"
+  out=$(HOME="$TMP_ROOT/home" "$TMP_ROOT/home/.local/bin/workbranch" help 2>&1)
+  assert_contains "$out" "Usage:"
+  assert_contains "$out" "workbranch <command> [args]"
 }
 
 test_installer_pipe_to_bash_ignores_cwd_bin_workbranch() {
@@ -938,6 +1337,7 @@ test_installer_downloads_cli_when_run_standalone() {
   [ -x "$TMP_ROOT/home/.local/bin/workbranch" ] || fail "standalone installed workbranch is not executable"
   out=$(HOME="$TMP_ROOT/home" "$TMP_ROOT/home/.local/bin/workbranch" help 2>&1)
   assert_contains "$out" "Usage:"
+  assert_contains "$out" "workbranch <command> [args]"
 }
 
 test_installer_standalone_requires_raw_base_url() {
@@ -966,6 +1366,7 @@ test_installer_installs_executable() {
   [ -x "$TMP_ROOT/home/.local/bin/workbranch" ] || fail "installed workbranch is not executable"
   out=$(HOME="$TMP_ROOT/home" "$TMP_ROOT/home/.local/bin/workbranch" help 2>&1)
   assert_contains "$out" "Usage:"
+  assert_contains "$out" "workbranch <command> [args]"
 }
 
 test_installer_uses_custom_target_directory() {
@@ -1002,21 +1403,25 @@ test_help_groups_commands() {
   assert_contains "$out" "Git:"
   assert_contains "$out" "Other:"
   assert_contains "$out" "status            Show commits, diff, and dirty state"
-  assert_contains "$out" "  // vertical"
+  assert_contains "$out" "  vertical"
   assert_contains "$out" "pull              Pull remote base branches into main worktrees"
   assert_contains "$out" "push              Push base branches to origin"
   assert_contains "$out" "push <task>       Push task branches to origin"
-  assert_contains "$out" "  // horizontal"
+  assert_contains "$out" "  horizontal"
   assert_contains "$out" "update            Update every task workspace from local base worktrees"
+  assert_contains "$out" "update --all      Update every task workspace from local base worktrees"
   assert_contains "$out" "update <task>     Update one task workspace from local base worktrees"
   assert_contains "$out" "land <task>       Land task branches into base branches"
-  assert_contains "$out" "  // common"
+  assert_contains "$out" "  common"
   assert_contains "$out" "--repo <repo>     Limit operation to one repo; otherwise all repos"
+  assert_not_contains "$out" "// vertical"
+  assert_not_contains "$out" "// horizontal"
+  assert_not_contains "$out" "// common"
   case "$out" in
     *$'\n\n'*) fail "expected compact help without blank lines; got: $out" ;;
   esac
   case "$out" in
-    *"Workspace:"*"init              Initialize a workbranch project"*"list              List configured repos and task workspaces"*"config            Create or rewrite .workbranch.config without cloning repos"*"setup             Add or change task setup command"*"add <task>        Create a task workspace"*"setup <task>      Run task setup for existing task workspace"*"remove <task>     Remove task worktrees without deleting branches"*"Git:"*"status            Show commits, diff, and dirty state"*"  // vertical"*"Other:"*) ;;
+    *"Workspace:"*"init              Initialize a workbranch project"*"list              List configured repos and task workspaces"*"config            Create or rewrite .workbranch.config without cloning repos"*"setup             Add or change task setup command"*"add <task>        Create a task workspace"*"setup <task>      Run task setup for existing task workspace"*"remove <task>     Remove task worktrees without deleting branches"*"Git:"*"status            Show commits, diff, and dirty state"*"  vertical"*"Other:"*) ;;
     *) fail "expected workspace and group ordering; got: $out" ;;
   esac
 }
@@ -1025,13 +1430,19 @@ main() {
   [ -x "$WORKBRANCH" ] || fail "missing executable: $WORKBRANCH"
   git --version >/dev/null || fail "git is required"
 
+  run_test test_generated_workbranch_is_up_to_date
   run_test test_help_groups_commands
+  run_test test_safe_names_reject_dot_and_dotdot
   run_test test_invalid_config_rejected_without_execution
   run_test test_init_existing_config_clones_base_repos
+  run_test test_init_from_project_subdir_uses_parent_config
+  run_test test_init_rejects_existing_non_git_base_target
+  run_test test_init_rejects_existing_non_directory_base_target
   run_test test_failed_init_rolls_back_command_created_base_paths
   run_test test_failed_init_reports_git_clone_reason
   run_test test_full_git_flow
   run_test test_update_all_updates_every_task_workspace
+  run_test test_update_accepts_gitfile_base_worktree
   run_test test_update_preflight_blocks_batch_before_changes
   run_test test_update_preflight_requires_base_worktree_on_configured_branch
   run_test test_update_preflight_blocks_base_rebase_in_progress
@@ -1039,13 +1450,23 @@ main() {
   run_test test_land_preflight_blocks_all_repos_before_partial_land
   run_test test_push_supports_task_and_base_branches_after_fast_forward_merge
   run_test test_add_reuses_existing_task_branch
+  run_test test_add_rolls_back_branch_when_new_worktree_helper_fails
+  run_test test_add_rolls_back_dirty_worktree_registration
   run_test test_add_branches_from_local_base_after_land_before_push
   run_test test_status_reports_base_task_diff_and_worktree_state
+  run_test test_status_repo_filter_skips_tasks_without_matching_rows
+  run_test test_status_skips_partial_task_workspaces
   run_test test_dirty_worktree_safety
+  run_test test_remove_reports_kept_task_directory_with_extra_files
+  run_test test_remove_treats_missing_worktree_as_already_removed
+  run_test test_remove_continues_after_worktree_remove_failure
   run_test test_pull_preflight_requires_base_worktree_on_configured_branch
+  run_test test_add_preflight_requires_clean_base_on_configured_branch
   run_test test_config_writes_config_without_cloning
   run_test test_config_rewrites_legacy_config_without_cloning
+  run_test test_config_keeps_glob_characters_literal
   run_test test_init_accepts_legacy_config_without_rewrite
+  run_test test_legacy_config_supports_project_commands_without_rewrite
   run_test test_config_rewrites_legacy_tasktree_config_without_cloning
   run_test test_task_setup_can_be_configured_and_run
   run_test test_interactive_init_writes_config_and_clones
@@ -1053,6 +1474,7 @@ main() {
   run_test test_interactive_init_can_create_project_in_custom_target_directory
   run_test test_interactive_init_accepts_slash_repo_base_branch
   run_test test_interactive_init_rejects_slash_in_main_worktrees_directory
+  run_test test_interactive_init_eof_aborts_required_prompt
   run_test test_installer_downloads_cli_when_run_standalone
   run_test test_installer_standalone_requires_raw_base_url
   run_test test_installer_supports_pipe_to_bash
