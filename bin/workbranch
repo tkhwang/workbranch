@@ -224,9 +224,6 @@ parse_config() {
         [ $# -eq 4 ] || die "invalid config line $line_no: REPO expects 3 values: <name> <git-url> <base-branch>; run 'workbranch config' to rewrite an older config format"
         add_repo_config "$2" "$3" "$4"
         ;;
-      WORKFLOW|workflow)
-        die "legacy WORKFLOW directive in config line $line_no; run 'workbranch config' to rewrite .workbranch.config"
-        ;;
       *)
         die "unknown directive '$directive' in config line $line_no"
         ;;
@@ -295,10 +292,6 @@ parse_config_for_rewrite() {
         [ $# -eq 3 ] || die "invalid config line $line_no: BASE_BRANCH expects 2 values: <repo> <base-branch>"
         set_repo_base_branch "$2" "$3"
         ;;
-      WORKFLOW|workflow)
-        # Legacy directive removed from the workbranch mental model.
-        # `workbranch config` rewrites config without it.
-        ;;
       *)
         die "unknown directive '$directive' in config line $line_no"
         ;;
@@ -364,6 +357,7 @@ repo_task_branch_at() {
 }
 
 is_git_dirty() {
+  local path status
   path=$1
   [ -d "$path" ] || return 1
   status=$(git -C "$path" status --porcelain 2>/dev/null) || return 1
@@ -371,6 +365,7 @@ is_git_dirty() {
 }
 
 ensure_clean_worktree() {
+  local path
   path=$1
   if is_git_dirty "$path"; then
     die "dirty worktree: $path"
@@ -386,6 +381,7 @@ preflight_error() {
 }
 
 preflight_die_if_errors() {
+  local operation i
   operation=$1
   if [ ${#PREFLIGHT_ERRORS[@]} -eq 0 ]; then
     return 0
@@ -402,6 +398,7 @@ preflight_die_if_errors() {
 }
 
 git_dir_for_path() {
+  local path git_dir
   path=$1
   git_dir=$(git -C "$path" rev-parse --git-dir 2>/dev/null) || return 1
   case "$git_dir" in
@@ -411,12 +408,14 @@ git_dir_for_path() {
 }
 
 is_rebase_in_progress() {
+  local path git_dir
   path=$1
   git_dir=$(git_dir_for_path "$path") || return 1
   [ -d "$git_dir/rebase-merge" ] || [ -d "$git_dir/rebase-apply" ]
 }
 
 preflight_require_clean() {
+  local label path
   label=$1
   path=$2
   if is_git_dirty "$path"; then
@@ -425,6 +424,7 @@ preflight_require_clean() {
 }
 
 preflight_require_no_rebase() {
+  local label path
   label=$1
   path=$2
   if is_rebase_in_progress "$path"; then
@@ -433,6 +433,7 @@ preflight_require_no_rebase() {
 }
 
 preflight_require_current_branch() {
+  local label path expected actual
   label=$1
   path=$2
   expected=$3
@@ -443,12 +444,14 @@ preflight_require_current_branch() {
 }
 
 git_ref_exists() {
+  local path ref
   path=$1
   ref=$2
   git -C "$path" rev-parse --verify --quiet "$ref^{commit}" >/dev/null 2>&1
 }
 
 git_is_ancestor() {
+  local path ancestor descendant
   path=$1
   ancestor=$2
   descendant=$3
@@ -456,12 +459,14 @@ git_is_ancestor() {
 }
 
 preflight_fetch_origin() {
+  local label path
   label=$1
   path=$2
   git -C "$path" fetch origin >/dev/null 2>&1 || preflight_error "$label failed to fetch origin"
 }
 
 preflight_remote_branch_exists() {
+  local label path branch
   label=$1
   path=$2
   branch=$3
@@ -469,6 +474,7 @@ preflight_remote_branch_exists() {
 }
 
 preflight_pull_fast_forwardable() {
+  local label path branch remote
   label=$1
   path=$2
   branch=$3
@@ -481,6 +487,7 @@ preflight_pull_fast_forwardable() {
 }
 
 preflight_push_fast_forwardable() {
+  local label path branch remote
   label=$1
   path=$2
   branch=$3
@@ -493,6 +500,7 @@ preflight_push_fast_forwardable() {
 }
 
 preflight_land_fast_forwardable() {
+  local label path base_branch task_branch remote base_ref
   label=$1
   path=$2
   base_branch=$3
@@ -515,6 +523,7 @@ preflight_land_fast_forwardable() {
 }
 
 branch_exists() {
+  local repo_path branch
   repo_path=$1
   branch=$2
   git -C "$repo_path" show-ref --verify --quiet "refs/heads/$branch"
@@ -844,12 +853,14 @@ cmd_init() {
     PROJECT_ROOT=$(pwd -P)
     if [ -f "$PROJECT_ROOT/.workbranch.config" ]; then
       CONFIG_FILE="$PROJECT_ROOT/.workbranch.config"
+      parse_config "$CONFIG_FILE"
     elif [ -f "$PROJECT_ROOT/.tasktree.config" ]; then
       CONFIG_FILE="$PROJECT_ROOT/.tasktree.config"
+      parse_config_for_rewrite "$CONFIG_FILE"
     else
       CONFIG_FILE="$PROJECT_ROOT/.monotree.config"
+      parse_config_for_rewrite "$CONFIG_FILE"
     fi
-    parse_config "$CONFIG_FILE"
     clone_base_repos
     success "Initialized workbranch project: $PROJECT_ROOT"
   else
@@ -961,10 +972,10 @@ cmd_add() {
     branch=$(repo_task_branch_at "$i" "$task")
     target=$(task_repo_path "$task" "$name")
     if branch_exists "$base" "$branch"; then
-      git -C "$base" worktree add "$target" "$branch" >/dev/null 2>&1 || fail_with_rollback "failed to create worktree for repo '$name'"
+      workbranch_git_add_existing_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
     else
-      git -C "$base" fetch origin >/dev/null 2>&1 || fail_with_rollback "failed to fetch repo '$name'"
-      git -C "$base" worktree add "$target" -b "$branch" "origin/$base_branch" >/dev/null 2>&1 || fail_with_rollback "failed to create worktree for repo '$name'"
+      workbranch_git_add_fetch_base "$base" || fail_with_rollback "failed to fetch repo '$name'"
+      workbranch_git_add_new_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
       track_branch "$base" "$branch"
     fi
     track_worktree "$target" "$base"
@@ -1104,6 +1115,7 @@ LEGEND
 }
 
 ensure_current_branch() {
+  local path expected actual
   path=$1
   expected=$2
   actual=$(branch_or_unknown "$path")
@@ -1230,15 +1242,16 @@ cmd_pull() {
     name=$(repo_name_at "$i")
     repo_matches_filter "$name" || { i=$((i + 1)); continue; }
     base=$(base_repo_path "$name")
+    branch=$(repo_base_branch_at "$i")
     label="$BASE_DIR/$name"
     if [ ! -d "$base/.git" ] && [ ! -f "$base/.git" ]; then
       preflight_error "$label missing git repo"
       i=$((i + 1))
       continue
     fi
+    preflight_require_current_branch "$label" "$base" "$branch"
     preflight_require_clean "$label" "$base"
     preflight_require_no_rebase "$label" "$base"
-    branch=$(repo_base_branch_at "$i")
     preflight_fetch_origin "$label" "$base"
     preflight_remote_branch_exists "$label" "$base" "$branch"
     preflight_pull_fast_forwardable "$label" "$base" "$branch"
@@ -1252,6 +1265,7 @@ cmd_pull() {
     repo_matches_filter "$name" || { i=$((i + 1)); continue; }
     branch=$(repo_base_branch_at "$i")
     base=$(base_repo_path "$name")
+    ensure_current_branch "$base" "$branch"
     workbranch_git_pull_base "$name" "$base" "$branch"
     i=$((i + 1))
   done
@@ -1276,20 +1290,25 @@ preflight_update_task() {
     name=$(repo_name_at "$i")
     repo_matches_filter "$name" || { i=$((i + 1)); continue; }
     base=$(base_repo_path "$name")
-    path=$(task_repo_path "$task" "$name")
+    task_path=$(task_repo_path "$task" "$name")
+    base_branch=$(repo_base_branch_at "$i")
     branch=$(repo_task_branch_at "$i" "$task")
     label="$task/$name"
+    base_label="$BASE_DIR/$name"
     if [ ! -d "$base/.git" ] && [ ! -f "$base/.git" ]; then
-      preflight_error "$BASE_DIR/$name missing git repo"
+      preflight_error "$base_label missing git repo"
+    else
+      preflight_require_current_branch "$base_label" "$base" "$base_branch"
+      preflight_require_no_rebase "$base_label" "$base"
     fi
-    if [ ! -d "$path/.git" ] && [ ! -f "$path/.git" ]; then
+    if [ ! -d "$task_path/.git" ] && [ ! -f "$task_path/.git" ]; then
       preflight_error "$label missing git repo"
       i=$((i + 1))
       continue
     fi
-    preflight_require_current_branch "$label" "$path" "$branch"
-    preflight_require_clean "$label" "$path"
-    preflight_require_no_rebase "$label" "$path"
+    preflight_require_current_branch "$label" "$task_path" "$branch"
+    preflight_require_clean "$label" "$task_path"
+    preflight_require_no_rebase "$label" "$task_path"
     i=$((i + 1))
   done
 }
@@ -1301,11 +1320,13 @@ update_task() {
     name=$(repo_name_at "$i")
     repo_matches_filter "$name" || { i=$((i + 1)); continue; }
     base=$(base_repo_path "$name")
-    path=$(task_repo_path "$task" "$name")
+    base_branch=$(repo_base_branch_at "$i")
+    task_path=$(task_repo_path "$task" "$name")
     [ -d "$base/.git" ] || die "base repo missing for '$name': $base"
-    [ -d "$path" ] || die "task repo missing for '$name': $path"
-    ensure_clean_worktree "$path"
-    workbranch_git_update_task "$path" "$(head_commit_full "$base")"
+    [ -d "$task_path" ] || die "task repo missing for '$name': $task_path"
+    ensure_current_branch "$base" "$base_branch"
+    ensure_clean_worktree "$task_path"
+    workbranch_git_update_task "$task_path" "$(head_commit_full "$base")"
     success "Updated: $task/$name"
     i=$((i + 1))
   done
@@ -1508,6 +1529,25 @@ cmd_remove() {
 # Git operation definitions
 # -----------------------------------------------------------------------------
 # These helpers define the Git commands documented in docs/git-operations.md.
+
+workbranch_git_add_fetch_base() {
+  base_path=$1
+  git -C "$base_path" fetch origin >/dev/null 2>&1
+}
+
+workbranch_git_add_existing_task_worktree() {
+  base_path=$1
+  target_path=$2
+  task_branch=$3
+  git -C "$base_path" worktree add "$target_path" "$task_branch" >/dev/null 2>&1
+}
+
+workbranch_git_add_new_task_worktree() {
+  base_path=$1
+  target_path=$2
+  task_branch=$3
+  git -C "$base_path" worktree add "$target_path" -b "$task_branch" HEAD >/dev/null 2>&1
+}
 
 workbranch_git_pull_base() {
   repo_name=$1

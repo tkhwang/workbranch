@@ -79,7 +79,7 @@ Git operation internals are defined in [`docs/git-operations.md`](../git-operati
 
 Create or rewrite config without cloning repos.
 
-If `.workbranch.config` or legacy `.tasktree.config` / `.monotree.config` already exists in the current project, rewrite it to `.workbranch.config` using the existing values. Legacy `WORKFLOW` directives are removed.
+If `.workbranch.config` or legacy `.tasktree.config` / `.monotree.config` already exists in the current project, rewrite it to `.workbranch.config` using the existing values.
 
 If no config exists, run interactive config setup:
 
@@ -95,7 +95,7 @@ If no config exists, run interactive config setup:
 
 Initialize main worktrees from config.
 
-- If `.workbranch.config` exists in the current directory, read it and clone each repo into `_base/<repo>` on its base repo branch. Legacy `.tasktree.config` / `.monotree.config` are also accepted and can be rewritten with `workbranch config`.
+- If `.workbranch.config` exists in the current directory, read it and clone each repo into `_base/<repo>` on its base repo branch. Legacy `.tasktree.config` / `.monotree.config` are also accepted by `workbranch init` and can be rewritten with `workbranch config`.
 - If `.workbranch.config` does not exist, run the same interactive setup as `workbranch config`, then clone repos.
 - If cloning fails, remove paths created by the failed command.
 
@@ -186,6 +186,8 @@ git rebase <_base/repo HEAD>
 ```
 
 Fails if any target task worktree is dirty.
+Fails if any matching base worktree is not checked out to the configured base branch.
+Fails if any matching base worktree has a rebase in progress.
 
 ### `workbranch update <task>`
 
@@ -260,7 +262,7 @@ Fails if any task worktree is dirty.
 
 ## Installer
 
-`install.sh` copies `bin/workbranch` to a target directory. The default is `~/.local/bin`.
+`install.sh` copies `bin/workbranch` to a target directory. The default is `~/.local/bin`. Standalone installs must pass `WORKBRANCH_RAW_BASE_URL` so the downloaded executable uses the same ref as the installer script.
 
 If the target directory is not on `PATH`, the installer asks whether to add it to the user's shell profile.
 

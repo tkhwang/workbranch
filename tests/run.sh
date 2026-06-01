@@ -310,6 +310,47 @@ test_update_preflight_blocks_batch_before_changes() {
   assert_not_exists "$project/payment/frontend/upstream-blocked.txt"
 }
 
+test_update_preflight_requires_base_worktree_on_configured_branch() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  git -C "$project/_base/frontend" config user.name "Workbranch Test"
+  git -C "$project/_base/frontend" config user.email "workbranch-test@example.com"
+  git -C "$project/_base/frontend" checkout -b unrelated >/dev/null 2>&1
+  printf '%s\n' "wrong base" > "$project/_base/frontend/wrong-base.txt"
+  git -C "$project/_base/frontend" add wrong-base.txt
+  git -C "$project/_base/frontend" commit -m "wrong base" >/dev/null
+
+  out=$(run_expect_fail "$WORKBRANCH" update login --repo frontend)
+  assert_contains "$out" "Cannot update: preflight failed"
+  assert_contains "$out" "_base/frontend expected branch master, got unrelated"
+  assert_not_exists "$project/login/frontend/wrong-base.txt"
+}
+
+test_update_preflight_blocks_base_rebase_in_progress() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  git_dir=$(git -C "$project/_base/frontend" rev-parse --git-dir)
+  case "$git_dir" in
+    /*) git_dir_path=$git_dir ;;
+    *) git_dir_path="$project/_base/frontend/$git_dir" ;;
+  esac
+  mkdir -p "$git_dir_path/rebase-merge"
+
+  out=$(run_expect_fail "$WORKBRANCH" update login --repo frontend)
+  assert_contains "$out" "Cannot update: preflight failed"
+  assert_contains "$out" "_base/frontend rebase in progress"
+}
+
 test_repo_scope_limits_git_commands_to_one_repo() {
   new_fixture
   project="$FIXTURE_PROJECT"
@@ -443,6 +484,27 @@ test_add_reuses_existing_task_branch() {
   assert_branch "$project/login/backend" "feature/login"
 }
 
+test_add_branches_from_local_base_after_land_before_push() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add first >/dev/null
+
+  git -C "$project/first/frontend" config user.name "Workbranch Test"
+  git -C "$project/first/frontend" config user.email "workbranch-test@example.com"
+  printf '%s\n' "landed locally" > "$project/first/frontend/landed-local.txt"
+  git -C "$project/first/frontend" add landed-local.txt
+  git -C "$project/first/frontend" commit -m "landed locally" >/dev/null
+
+  run_expect_success "$WORKBRANCH" land first --repo frontend >/dev/null
+  assert_file "$project/_base/frontend/landed-local.txt"
+  assert_remote_missing_file "$TMP_ROOT/remotes/frontend.git" master landed-local.txt
+
+  run_expect_success "$WORKBRANCH" add second >/dev/null
+  assert_file "$project/second/frontend/landed-local.txt"
+}
+
 test_status_reports_base_task_diff_and_worktree_state() {
   new_fixture
   project="$FIXTURE_PROJECT"
@@ -505,6 +567,21 @@ test_dirty_worktree_safety() {
   assert_file "$project/login/frontend/.git"
 }
 
+test_pull_preflight_requires_base_worktree_on_configured_branch() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+
+  git -C "$project/_base/frontend" checkout -b unrelated >/dev/null 2>&1
+  commit_to_remote_master frontend pull-should-not-touch-unrelated
+
+  out=$(run_expect_fail "$WORKBRANCH" pull --repo frontend)
+  assert_contains "$out" "Cannot pull: preflight failed"
+  assert_contains "$out" "_base/frontend expected branch master, got unrelated"
+  assert_not_exists "$project/_base/frontend/pull-should-not-touch-unrelated.txt"
+}
+
 test_config_writes_config_without_cloning() {
   TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
   mkdir -p "$TMP_ROOT/remotes" "$TMP_ROOT/seeds" "$TMP_ROOT/work"
@@ -541,9 +618,7 @@ branch_prefix feature
 
 repo frontend $TMP_ROOT/remotes/frontend.git
 base_branch frontend master
-workflow frontend feature
 repo backend $TMP_ROOT/remotes/backend.git master
-workflow backend feature
 CONFIG
 
   out=$(run_expect_fail "$WORKBRANCH" status)
@@ -558,13 +633,35 @@ CONFIG
   assert_contains "$config" "BRANCH_PREFIX feature"
   assert_contains "$config" "REPO frontend $TMP_ROOT/remotes/frontend.git master"
   assert_contains "$config" "REPO backend $TMP_ROOT/remotes/backend.git master"
-  assert_not_contains "$config" "workflow"
-  assert_not_contains "$config" "WORKFLOW"
   assert_not_exists "$project/_base"
 
   run_expect_success "$WORKBRANCH" init >/dev/null
   out=$(run_expect_success "$WORKBRANCH" status)
   assert_contains "$out" "[*] Base worktrees"
+}
+
+test_init_accepts_legacy_config_without_rewrite() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  rm "$project/.workbranch.config"
+  cat > "$project/.monotree.config" <<CONFIG
+project fullstack
+base_dir _base
+branch_prefix feature
+
+repo frontend $TMP_ROOT/remotes/frontend.git
+base_branch frontend master
+repo backend $TMP_ROOT/remotes/backend.git master
+CONFIG
+
+  out=$(run_expect_success "$WORKBRANCH" init)
+  assert_contains "$out" "Initialized workbranch project"
+  assert_dir "$project/_base/frontend/.git"
+  assert_dir "$project/_base/backend/.git"
+  assert_branch "$project/_base/frontend" "master"
+  assert_branch "$project/_base/backend" "master"
+  assert_not_exists "$project/.workbranch.config"
 }
 
 test_config_rewrites_legacy_tasktree_config_without_cloning() {
@@ -800,6 +897,30 @@ test_installer_supports_pipe_to_bash() {
   [ -x "$TMP_ROOT/home/.local/bin/workbranch" ] || fail "pipe-to-bash installed workbranch is not executable"
 }
 
+test_installer_pipe_to_bash_ignores_cwd_bin_workbranch() {
+  TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
+  mkdir -p "$TMP_ROOT/standalone/bin" "$TMP_ROOT/server/bin"
+  cp "$REPO_ROOT/install.sh" "$TMP_ROOT/standalone/install.sh"
+  cat > "$TMP_ROOT/standalone/bin/workbranch" <<'STALE'
+#!/usr/bin/env sh
+printf '%s\n' STALE
+STALE
+  chmod +x "$TMP_ROOT/standalone/bin/workbranch"
+  mkdir -p "$TMP_ROOT/standalone/.git"
+  : > "$TMP_ROOT/standalone/bash"
+  cat > "$TMP_ROOT/server/bin/workbranch" <<'REMOTE'
+#!/usr/bin/env sh
+printf '%s\n' REMOTE
+REMOTE
+  chmod +x "$TMP_ROOT/server/bin/workbranch"
+
+  cd "$TMP_ROOT/standalone" || return 1
+  out=$(HOME="$TMP_ROOT/home" PATH="/usr/bin:/bin" SHELL="/bin/zsh" WORKBRANCH_RAW_BASE_URL="file://$TMP_ROOT/server" bash < "$TMP_ROOT/standalone/install.sh" 2>&1)
+  assert_contains "$out" "Downloaded workbranch"
+  installed_out=$("$TMP_ROOT/home/.local/bin/workbranch")
+  [ "$installed_out" = "REMOTE" ] || fail "expected pipe install to download REMOTE, got: $installed_out"
+}
+
 test_installer_downloads_cli_when_run_standalone() {
   TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
   mkdir -p "$TMP_ROOT/standalone/bin" "$TMP_ROOT/server/bin"
@@ -817,6 +938,17 @@ test_installer_downloads_cli_when_run_standalone() {
   [ -x "$TMP_ROOT/home/.local/bin/workbranch" ] || fail "standalone installed workbranch is not executable"
   out=$(HOME="$TMP_ROOT/home" "$TMP_ROOT/home/.local/bin/workbranch" help 2>&1)
   assert_contains "$out" "Usage:"
+}
+
+test_installer_standalone_requires_raw_base_url() {
+  TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
+  mkdir -p "$TMP_ROOT/standalone"
+  cp "$REPO_ROOT/install.sh" "$TMP_ROOT/standalone/install.sh"
+
+  out=$(printf '\n' | HOME="$TMP_ROOT/home" PATH="/usr/bin:/bin" SHELL="/bin/zsh" run_expect_fail "$TMP_ROOT/standalone/install.sh")
+  assert_contains "$out" "WORKBRANCH_RAW_BASE_URL is required for standalone installs"
+  assert_contains "$out" "WORKBRANCH_RAW_BASE_URL=https://raw.githubusercontent.com/tkhwang/workbranch/main"
+  assert_not_exists "$TMP_ROOT/home/.local/bin/workbranch"
 }
 
 test_installer_installs_executable() {
@@ -901,14 +1033,19 @@ main() {
   run_test test_full_git_flow
   run_test test_update_all_updates_every_task_workspace
   run_test test_update_preflight_blocks_batch_before_changes
+  run_test test_update_preflight_requires_base_worktree_on_configured_branch
+  run_test test_update_preflight_blocks_base_rebase_in_progress
   run_test test_repo_scope_limits_git_commands_to_one_repo
   run_test test_land_preflight_blocks_all_repos_before_partial_land
   run_test test_push_supports_task_and_base_branches_after_fast_forward_merge
   run_test test_add_reuses_existing_task_branch
+  run_test test_add_branches_from_local_base_after_land_before_push
   run_test test_status_reports_base_task_diff_and_worktree_state
   run_test test_dirty_worktree_safety
+  run_test test_pull_preflight_requires_base_worktree_on_configured_branch
   run_test test_config_writes_config_without_cloning
   run_test test_config_rewrites_legacy_config_without_cloning
+  run_test test_init_accepts_legacy_config_without_rewrite
   run_test test_config_rewrites_legacy_tasktree_config_without_cloning
   run_test test_task_setup_can_be_configured_and_run
   run_test test_interactive_init_writes_config_and_clones
@@ -917,7 +1054,9 @@ main() {
   run_test test_interactive_init_accepts_slash_repo_base_branch
   run_test test_interactive_init_rejects_slash_in_main_worktrees_directory
   run_test test_installer_downloads_cli_when_run_standalone
+  run_test test_installer_standalone_requires_raw_base_url
   run_test test_installer_supports_pipe_to_bash
+  run_test test_installer_pipe_to_bash_ignores_cwd_bin_workbranch
   run_test test_installer_installs_executable
   run_test test_installer_uses_custom_target_directory
   run_test test_installer_can_add_target_directory_to_zshrc
