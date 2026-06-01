@@ -1,10 +1,10 @@
 # Git operations
 
-This file defines the Git commands behind each `tasktree` Git operation.
+This file defines the Git commands behind each `workbranch` Git operation.
 
-`tasktree` keeps the user-facing model small, but the implementation still uses ordinary Git commands. Use this file as the maintenance contract for Git behavior.
+`workbranch` keeps the user-facing model small, but the implementation still uses ordinary Git commands. Use this file as the maintenance contract for Git behavior.
 
-The source-level definitions live in the `Git operation definitions` section at the end of `bin/tasktree`.
+The source-level definitions live in the `Git operation definitions` section at the end of `bin/workbranch`.
 
 ## Direction model
 
@@ -23,7 +23,7 @@ Optional:
 
 ## Commands
 
-### `tasktree pull`
+### `workbranch pull`
 
 Direction: remote base -> local base.
 
@@ -39,7 +39,7 @@ Safety:
 - Fails before running if the local base worktree is dirty.
 - Uses `--ff-only`; no merge commit is created.
 
-### `tasktree update`
+### `workbranch update`
 
 Direction: local base -> every task.
 
@@ -56,7 +56,7 @@ Safety:
 - Uses the local base worktree HEAD, not `origin/<base-branch>`.
 - Conflict resolution is left to Git and the user.
 
-### `tasktree update <task>`
+### `workbranch update <task>`
 
 Direction: local base -> one task.
 
@@ -67,9 +67,9 @@ cd <task>/<repo>
 git rebase <_base/<repo> HEAD>
 ```
 
-Safety is the same as `tasktree update`.
+Safety is the same as `workbranch update`.
 
-### `tasktree land <task>`
+### `workbranch land <task>`
 
 Direction: task -> local base.
 
@@ -89,7 +89,7 @@ Safety:
 - Uses `--ff-only`; no merge commit is created.
 - Updates the local base from remote before landing the task.
 
-### `tasktree push`
+### `workbranch push`
 
 Direction: local base -> remote base.
 
@@ -100,7 +100,7 @@ cd _base/<repo>
 git push origin <base-branch>
 ```
 
-### `tasktree push <task>`
+### `workbranch push <task>`
 
 Direction: task -> remote task branch.
 

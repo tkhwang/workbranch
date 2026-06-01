@@ -2,8 +2,8 @@
 set -u
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd -P)
-SRC="$SCRIPT_DIR/bin/tasktree"
-TASKTREE_RAW_BASE_URL="${TASKTREE_RAW_BASE_URL:-https://raw.githubusercontent.com/tkhwang/tasktree/main}"
+SRC="$SCRIPT_DIR/bin/workbranch"
+WORKBRANCH_RAW_BASE_URL="${WORKBRANCH_RAW_BASE_URL:-https://raw.githubusercontent.com/tkhwang/workbranch/main}"
 DEFAULT_DEST_DIR="${HOME}/.local/bin"
 
 expand_target_dir() {
@@ -55,7 +55,7 @@ append_path_entry() {
     printf '[*] PATH entry already exists in %s\n' "$profile"
   else
     {
-      printf '\n# Added by tasktree installer\n'
+      printf '\n# Added by workbranch installer\n'
       printf '%s\n' "$line"
     } >> "$profile" || { printf '[-] Error: failed to update %s\n' "$profile" >&2; exit 1; }
     printf '[+] Added PATH entry to %s\n' "$profile"
@@ -82,32 +82,32 @@ download_file() {
   fi
 }
 
-printf '[*] Install tasktree\n'
+printf '[*] Install workbranch\n'
 input_dir=$(prompt_read "[*] Target directory [$DEFAULT_DEST_DIR]: ")
 if [ -z "$input_dir" ]; then
   DEST_DIR="$DEFAULT_DEST_DIR"
 else
   DEST_DIR=$(expand_target_dir "$input_dir")
 fi
-DEST="$DEST_DIR/tasktree"
+DEST="$DEST_DIR/workbranch"
 
 mkdir -p "$DEST_DIR" || { printf '[-] Error: failed to create %s\n' "$DEST_DIR" >&2; exit 1; }
 if [ -f "$SRC" ]; then
-  cp "$SRC" "$DEST" || { printf '[-] Error: failed to install tasktree\n' >&2; exit 1; }
+  cp "$SRC" "$DEST" || { printf '[-] Error: failed to install workbranch\n' >&2; exit 1; }
 else
-  download_file "$TASKTREE_RAW_BASE_URL/bin/tasktree" > "$DEST" || { rm -f "$DEST"; printf '[-] Error: failed to download tasktree\n' >&2; exit 1; }
-  printf '[+] Downloaded tasktree from %s\n' "$TASKTREE_RAW_BASE_URL"
+  download_file "$WORKBRANCH_RAW_BASE_URL/bin/workbranch" > "$DEST" || { rm -f "$DEST"; printf '[-] Error: failed to download workbranch\n' >&2; exit 1; }
+  printf '[+] Downloaded workbranch from %s\n' "$WORKBRANCH_RAW_BASE_URL"
 fi
 
 chmod +x "$DEST" || { printf '[-] Error: failed to mark executable: %s\n' "$DEST" >&2; exit 1; }
-printf '[+] Installed tasktree to %s\n' "$DEST"
+printf '[+] Installed workbranch to %s\n' "$DEST"
 
 cat <<USAGE
 
 [*] Try it now:
 
-  tasktree help     show all commands
-  tasktree init     create your first tasktree project
+  workbranch help     show all commands
+  workbranch init     create your first workbranch project
 
 USAGE
 case ":${PATH}:" in

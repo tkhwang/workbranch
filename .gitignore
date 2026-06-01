@@ -36,5 +36,6 @@ release/
 *.tar.gz
 *.zip
 
-# Local tasktree sandboxes created during manual testing
+# Local workbranch sandboxes created during manual testing
+.workbranch-test/
 .tasktree-test/
