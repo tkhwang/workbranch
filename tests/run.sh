@@ -199,7 +199,11 @@ test_full_git_flow() {
   cd "$project" || return 1
 
   run_expect_success "$TASKTREE" init >/dev/null
-  run_expect_success "$TASKTREE" add login >/dev/null
+  out=$(run_expect_success "$TASKTREE" add login)
+  assert_contains "$out" "[+] Created: login/frontend"
+  assert_contains "$out" "[+]   [base repo] master -> [task repo] feature/login"
+  assert_contains "$out" "[+] Created: login/backend"
+  assert_contains "$out" "[+]   [base repo] master -> [task repo] feature/login"
   assert_file "$project/login/frontend/.git"
   assert_file "$project/login/backend/.git"
   assert_branch "$project/login/frontend" "feature/login"
@@ -210,9 +214,14 @@ test_full_git_flow() {
 
   out=$(run_expect_success "$TASKTREE" list)
   assert_contains "$out" "Base: _base"
-  assert_contains "$out" "Repo: frontend"
-  assert_contains "$out" "Task: login"
-  assert_contains "$out" "feature/login"
+  assert_contains "$out" "    repo        base             current"
+  assert_contains "$out" "$(printf '    %-11s %-16s %s' frontend master master)"
+  assert_contains "$out" "$(printf '    %-11s %-16s %s' backend master master)"
+  assert_contains "$out" "[*] login"
+  assert_not_contains "$out" "Task: login"
+  assert_contains "$out" "    repo        branch"
+  assert_contains "$out" "$(printf '    %-11s %s' frontend feature/login)"
+  assert_contains "$out" "$(printf '    %-11s %s' backend feature/login)"
 
   commit_to_remote_master frontend upstream-change
   run_expect_success "$TASKTREE" pull >/dev/null
@@ -240,6 +249,16 @@ test_full_git_flow() {
   run_expect_success "$TASKTREE" remove login >/dev/null
   assert_not_exists "$project/login"
   git -C "$project/_base/frontend" rev-parse --verify feature/login >/dev/null
+
+  out=$(run_expect_success "$TASKTREE" add login)
+  assert_contains "$out" "[+] Created: login/frontend"
+  assert_contains "$out" "[+]   [base repo] master -> [task repo] feature/login"
+  assert_contains "$out" "[+] Created: login/backend"
+  assert_contains "$out" "[+]   [base repo] master -> [task repo] feature/login"
+  assert_file "$project/login/frontend/.git"
+  assert_file "$project/login/backend/.git"
+  assert_file "$project/login/frontend/task.txt"
+  assert_file "$project/login/backend/task.txt"
 }
 
 test_update_all_updates_every_task_workspace() {
@@ -355,15 +374,19 @@ CONFIG
   assert_remote_file "$TMP_ROOT/remotes/backend.git" master normal.txt "feature backend"
 }
 
-test_branch_collision_fails_whole_add() {
+test_add_reuses_existing_task_branch() {
   new_fixture
   project="$FIXTURE_PROJECT"
   cd "$project" || return 1
   run_expect_success "$TASKTREE" init >/dev/null
   git -C "$project/_base/frontend" branch feature/login
-  out=$(run_expect_fail "$TASKTREE" add login)
-  assert_contains "$out" "branch already exists"
-  assert_not_exists "$project/login"
+  out=$(run_expect_success "$TASKTREE" add login)
+  assert_contains "$out" "[+] Created: login/frontend"
+  assert_contains "$out" "[+]   [base repo] master -> [task repo] feature/login"
+  assert_file "$project/login/frontend/.git"
+  assert_file "$project/login/backend/.git"
+  assert_branch "$project/login/frontend" "feature/login"
+  assert_branch "$project/login/backend" "feature/login"
 }
 
 test_status_reports_base_task_diff_and_worktree_state() {
@@ -725,6 +748,8 @@ test_installer_can_add_target_directory_to_zshrc() {
 test_help_groups_commands() {
   out=$(run_expect_success "$TASKTREE" help)
   assert_contains "$out" "Workspace:"
+  assert_contains "$out" "init              Initialize a tasktree project"
+  assert_contains "$out" "list              List configured repos and task workspaces"
   assert_contains "$out" "config            Create or rewrite .tasktree.config without cloning repos"
   assert_contains "$out" "Git:"
   assert_contains "$out" "Other:"
@@ -740,8 +765,12 @@ test_help_groups_commands() {
   assert_contains "$out" "  // common"
   assert_contains "$out" "--repo <repo>     Limit operation to one repo; otherwise all repos"
   case "$out" in
-    *"Workspace:"*"Git:"*"Other:"*) ;;
-    *) fail "expected grouped help ordering; got: $out" ;;
+    *"Workspace:"*"init              Initialize a tasktree project"*"list              List configured repos and task workspaces"*"config            Create or rewrite .tasktree.config without cloning repos"*"
+
+  add <task>        Create a task workspace"*"remove <task>     Remove task worktrees without deleting branches"*"Git:"*"status            Show commits, diff, and dirty state"*"
+
+  // vertical"*"Other:"*) ;;
+    *) fail "expected workspace and group ordering; got: $out" ;;
   esac
 }
 
@@ -758,7 +787,7 @@ main() {
   run_test test_update_all_updates_every_task_workspace
   run_test test_repo_scope_limits_git_commands_to_one_repo
   run_test test_push_supports_task_and_base_branches_after_fast_forward_merge
-  run_test test_branch_collision_fails_whole_add
+  run_test test_add_reuses_existing_task_branch
   run_test test_status_reports_base_task_diff_and_worktree_state
   run_test test_dirty_worktree_safety
   run_test test_config_writes_config_without_cloning

@@ -29,14 +29,16 @@ Usage:
   tasktree <command> [args]
 
 Workspace:
-  config            Create or rewrite .tasktree.config without cloning repos
   init              Initialize a tasktree project
   list              List configured repos and task workspaces
-  status            Show commits, diff, and dirty state
+  config            Create or rewrite .tasktree.config without cloning repos
+
   add <task>        Create a task workspace
   remove <task>     Remove task worktrees without deleting branches
 
 Git:
+  status            Show commits, diff, and dirty state
+
   // vertical
   pull              Pull remote base branches into main worktrees
   push              Push base branches to origin
@@ -702,9 +704,6 @@ cmd_add() {
     base=$(base_repo_path "$name")
     branch=$(repo_task_branch_at "$i" "$task")
     [ -d "$base/.git" ] || die "base repo missing for '$name': $base"
-    if branch_exists "$base" "$branch"; then
-      die "branch already exists for repo '$name': $branch"
-    fi
     i=$((i + 1))
   done
 
@@ -718,11 +717,16 @@ cmd_add() {
     base_branch=$(repo_base_branch_at "$i")
     branch=$(repo_task_branch_at "$i" "$task")
     target=$(task_repo_path "$task" "$name")
-    git -C "$base" fetch origin >/dev/null 2>&1 || fail_with_rollback "failed to fetch repo '$name'"
-    git -C "$base" worktree add "$target" -b "$branch" "origin/$base_branch" >/dev/null 2>&1 || fail_with_rollback "failed to create worktree for repo '$name'"
+    if branch_exists "$base" "$branch"; then
+      git -C "$base" worktree add "$target" "$branch" >/dev/null 2>&1 || fail_with_rollback "failed to create worktree for repo '$name'"
+    else
+      git -C "$base" fetch origin >/dev/null 2>&1 || fail_with_rollback "failed to fetch repo '$name'"
+      git -C "$base" worktree add "$target" -b "$branch" "origin/$base_branch" >/dev/null 2>&1 || fail_with_rollback "failed to create worktree for repo '$name'"
+      track_branch "$base" "$branch"
+    fi
     track_worktree "$target" "$base"
-    track_branch "$base" "$branch"
     success "Created: $task/$name"
+    success "  [base repo] $base_branch -> [task repo] $branch"
     i=$((i + 1))
   done
 }
@@ -857,12 +861,13 @@ cmd_list() {
   info "Project: $PROJECT_NAME"
   info "Base: $BASE_DIR"
   info "Repos:"
+  printf '    %-11s %-16s %s\n' "repo" "base" "current"
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     branch=$(repo_base_branch_at "$i")
     current=$(branch_or_unknown "$(base_repo_path "$name")")
-    info "  Repo: $name base=$branch current=$current"
+    printf '    %-11s %-16s %s\n' "$name" "$branch" "$current"
     i=$((i + 1))
   done
   info "Tasks:"
@@ -881,12 +886,13 @@ cmd_list() {
     done
     [ $task_has_repo -eq 1 ] || continue
     found=1
-    info "  Task: $dir_name"
+    info "$dir_name"
+    printf '    %-11s %s\n' "repo" "branch"
     i=0
     while [ $i -lt ${#REPO_NAMES[@]} ]; do
       name=$(repo_name_at "$i")
       current=$(branch_or_unknown "$path/$name")
-      info "    Repo: $name current=$current"
+      printf '    %-11s %s\n' "$name" "$current"
       i=$((i + 1))
     done
   done
