@@ -1,8 +1,20 @@
 #!/usr/bin/env bash
 set -u
 
-SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd -P)
-SRC="$SCRIPT_DIR/bin/monotree"
+script_dir_from_argv() {
+  case "${0##*/}" in
+    bash|sh|zsh|-) return 1 ;;
+  esac
+  [ -f "$0" ] || return 1
+  cd "$(dirname "$0")" && pwd -P
+}
+
+SCRIPT_DIR=$(script_dir_from_argv || printf '')
+SRC=""
+if [ -n "$SCRIPT_DIR" ]; then
+  SRC="$SCRIPT_DIR/bin/workbranch"
+fi
+WORKBRANCH_RAW_BASE_URL="${WORKBRANCH_RAW_BASE_URL:-}"
 DEFAULT_DEST_DIR="${HOME}/.local/bin"
 
 expand_target_dir() {
@@ -19,9 +31,18 @@ prompt_read() {
   value=""
   if [ -t 0 ]; then
     IFS= read -r -e -p "$prompt" value || :
-  else
+  elif [ -z "$SCRIPT_DIR" ] && [ -r /dev/tty ] && { : </dev/tty; } 2>/dev/null; then
+    # When installed via `curl ... | bash`, stdin is the script body.
+    # Read interactive answers from the terminal instead of consuming script lines.
+    printf '%s' "$prompt" >/dev/tty
+    IFS= read -r value </dev/tty || :
+  elif [ -n "$SCRIPT_DIR" ]; then
     printf '%s' "$prompt" >&2
     IFS= read -r value || :
+  else
+    # Non-interactive stdin-script execution has no safe prompt stream.
+    # Return empty so callers use their defaults.
+    printf '%s' "$prompt" >&2
   fi
   printf '%s' "$value"
 }
@@ -45,7 +66,7 @@ append_path_entry() {
     printf '[*] PATH entry already exists in %s\n' "$profile"
   else
     {
-      printf '\n# Added by monotree installer\n'
+      printf '\n# Added by workbranch installer\n'
       printf '%s\n' "$line"
     } >> "$profile" || { printf '[-] Error: failed to update %s\n' "$profile" >&2; exit 1; }
     printf '[+] Added PATH entry to %s\n' "$profile"
@@ -60,28 +81,55 @@ print_direct_usage() {
   printf '  export PATH="%s:$PATH"\n' "$DEST_DIR"
 }
 
-[ -f "$SRC" ] || { printf '[-] Error: source executable not found: %s\n' "$SRC" >&2; exit 1; }
+download_file() {
+  url=$1
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$url"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -qO- "$url"
+  else
+    printf '[-] Error: curl or wget is required for standalone install\n' >&2
+    exit 1
+  fi
+}
 
-printf '[*] Install monotree\n'
+is_checkout_install() {
+  [ -n "$SCRIPT_DIR" ] || return 1
+  [ -f "$SRC" ] || return 1
+  [ -d "$SCRIPT_DIR/.git" ] || [ -f "$SCRIPT_DIR/.git" ]
+}
+
+printf '[*] Install workbranch\n'
 input_dir=$(prompt_read "[*] Target directory [$DEFAULT_DEST_DIR]: ")
 if [ -z "$input_dir" ]; then
   DEST_DIR="$DEFAULT_DEST_DIR"
 else
   DEST_DIR=$(expand_target_dir "$input_dir")
 fi
-DEST="$DEST_DIR/monotree"
+DEST="$DEST_DIR/workbranch"
 
 mkdir -p "$DEST_DIR" || { printf '[-] Error: failed to create %s\n' "$DEST_DIR" >&2; exit 1; }
-cp "$SRC" "$DEST" || { printf '[-] Error: failed to install monotree\n' >&2; exit 1; }
+if is_checkout_install; then
+  cp "$SRC" "$DEST" || { printf '[-] Error: failed to install workbranch\n' >&2; exit 1; }
+else
+  if [ -z "$WORKBRANCH_RAW_BASE_URL" ]; then
+    printf '[-] Error: WORKBRANCH_RAW_BASE_URL is required for standalone installs\n' >&2
+    printf '[*] Example: curl -fsSL https://raw.githubusercontent.com/tkhwang/workbranch/main/install.sh | WORKBRANCH_RAW_BASE_URL=https://raw.githubusercontent.com/tkhwang/workbranch/main bash\n' >&2
+    exit 1
+  fi
+  download_file "$WORKBRANCH_RAW_BASE_URL/bin/workbranch" > "$DEST" || { rm -f "$DEST"; printf '[-] Error: failed to download workbranch\n' >&2; exit 1; }
+  printf '[+] Downloaded workbranch from %s\n' "$WORKBRANCH_RAW_BASE_URL"
+fi
+
 chmod +x "$DEST" || { printf '[-] Error: failed to mark executable: %s\n' "$DEST" >&2; exit 1; }
-printf '[+] Installed monotree to %s\n' "$DEST"
+printf '[+] Installed workbranch to %s\n' "$DEST"
 
 cat <<USAGE
 
 [*] Try it now:
 
-  monotree help     show all commands
-  monotree init     create your first monotree project
+  workbranch help     show all commands
+  workbranch init     create your first workbranch project
 
 USAGE
 case ":${PATH}:" in
