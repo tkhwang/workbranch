@@ -21,7 +21,7 @@ Add integration coverage in `tests/run.sh` for CLI behavior, Git safety checks, 
 
 ## Commit & Pull Request Guidelines
 
-Recent history uses emoji-prefixed Conventional Commit style with scopes, for example `feat(config): add repo-level setup commands` and `fix(validation): improve name validation`. Keep commit subjects short and action-oriented. Pull requests should state the user-visible behavior, list touched commands or files, and include verification output from `./tests/run.sh` plus any syntax or diff checks.
+Use plain Conventional Commit style with scopes, without emoji prefixes, for example `feat(config): add repo-level setup commands` and `fix(validation): improve name validation`. Keep commit subjects short and action-oriented. Pull requests should state the user-visible behavior, list touched commands or files, and include verification output from `./tests/run.sh` plus any syntax or diff checks.
 
 ## Agent-Specific Instructions
 

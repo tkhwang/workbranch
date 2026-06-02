@@ -21,8 +21,8 @@ DEFAULT_DEST_DIR="${HOME}/.local/bin"
 expand_target_dir() {
   value=$1
   case "$value" in
-    "~") printf '%s' "$HOME" ;;
-    "~/"*) printf '%s/%s' "$HOME" "${value#~/}" ;;
+    \~) printf '%s' "$HOME" ;;
+    \~/*) printf '%s/%s' "$HOME" "${value#~/}" ;;
     *) printf '%s' "$value" ;;
   esac
 }
@@ -79,7 +79,7 @@ print_direct_usage() {
   printf '[*] Run directly:\n\n'
   printf '  %s help\n\n' "$DEST"
   printf '[*] Or add this manually to your shell config:\n\n'
-  printf '  export PATH="%s:$PATH"\n' "$DEST_DIR"
+  printf '  export PATH="%s:$%s"\n' "$DEST_DIR" PATH
 }
 
 download_file() {

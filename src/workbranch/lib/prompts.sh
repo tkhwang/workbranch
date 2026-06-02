@@ -42,8 +42,8 @@ expand_path() {
   value=$1
   case "$value" in
     ".") pwd -P ;;
-    "~") printf '%s' "$HOME" ;;
-    "~/"*) printf '%s/%s' "$HOME" "${value#~/}" ;;
+    \~) printf '%s' "$HOME" ;;
+    \~/*) printf '%s/%s' "$HOME" "${value#~/}" ;;
     /*) printf '%s' "$value" ;;
     *) printf '%s/%s' "$(pwd -P)" "$value" ;;
   esac
