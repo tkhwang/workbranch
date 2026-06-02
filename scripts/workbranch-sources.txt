@@ -11,7 +11,6 @@ src/workbranch/lib/task-setup.sh
 src/workbranch/lib/status-format.sh
 src/workbranch/commands/config.sh
 src/workbranch/commands/init.sh
-src/workbranch/commands/setup.sh
 src/workbranch/commands/add.sh
 src/workbranch/commands/list.sh
 src/workbranch/commands/status.sh

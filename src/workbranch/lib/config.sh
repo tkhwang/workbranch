@@ -6,6 +6,8 @@ repo_url_at() { printf '%s' "${REPO_URLS[$1]}"; }
 
 repo_base_branch_at() { printf '%s' "${REPO_BASE_BRANCHES[$1]}"; }
 
+repo_setup_at() { printf '%s' "${REPO_SETUP_COMMANDS[$1]}"; }
+
 repo_index_by_name() {
   needle=$1
   i=0
@@ -66,6 +68,7 @@ add_repo_config() {
   REPO_NAMES[${#REPO_NAMES[@]}]=$name
   REPO_URLS[${#REPO_URLS[@]}]=$url
   REPO_BASE_BRANCHES[${#REPO_BASE_BRANCHES[@]}]=$base_branch
+  REPO_SETUP_COMMANDS[${#REPO_SETUP_COMMANDS[@]}]=""
 }
 
 set_repo_base_branch() {
@@ -81,6 +84,14 @@ set_repo_base_branch() {
   REPO_BASE_BRANCHES[$idx]=$base_branch
 }
 
+update_repo_base_branch() {
+  name=$1
+  base_branch=$2
+  validate_nonempty_no_space "base-branch" "$base_branch"
+  idx=$(repo_index_by_name "$name") || die "base branch references unknown repo '$name'"
+  REPO_BASE_BRANCHES[$idx]=$base_branch
+}
+
 reset_config() {
   PROJECT_NAME=""
   BASE_DIR=""
@@ -89,6 +100,7 @@ reset_config() {
   REPO_NAMES=()
   REPO_URLS=()
   REPO_BASE_BRANCHES=()
+  REPO_SETUP_COMMANDS=()
 }
 
 task_setup_from_line() {
@@ -97,8 +109,46 @@ task_setup_from_line() {
   printf '%s' "$command"
 }
 
+repo_setup_command_from_line() {
+  line=$1
+  rest=$(printf '%s' "$line" | sed 's/^[^[:space:]]*[[:space:]]*//; s/[[:space:]]*$//')
+  repo=${rest%%[[:space:]]*}
+  command=${rest#"$repo"}
+  command=$(printf '%s' "$command" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+  printf '%s' "$command"
+}
+
+set_repo_setup() {
+  name=$1
+  command=$2
+  [ -n "$command" ] || die "repo setup command is empty: $name"
+  idx=$(repo_index_by_name "$name") || die "repo setup references unknown repo '$name'"
+  REPO_SETUP_COMMANDS[$idx]=$command
+}
+
+clear_repo_setup() {
+  name=$1
+  idx=$(repo_index_by_name "$name") || die "unknown repo: $name"
+  REPO_SETUP_COMMANDS[$idx]=""
+}
+
+has_repo_setups() {
+  i=0
+  while [ $i -lt ${#REPO_SETUP_COMMANDS[@]} ]; do
+    [ -n "$(repo_setup_at "$i")" ] && return 0
+    i=$((i + 1))
+  done
+  return 1
+}
+
+has_task_setups() {
+  [ -n "$TASK_SETUP" ] && return 0
+  has_repo_setups
+}
+
 config_line_split_tokens() {
-  # shell word splitting is intentional: config values cannot contain whitespace.
+  # shell word splitting is intentional for directive headers. TASK_SETUP and
+  # REPO_SETUP preserve the command tail separately so command whitespace works.
   # Pathname expansion is not part of the config format, so keep glob characters literal.
   line=$1
   case $- in
@@ -166,6 +216,10 @@ parse_config() {
         [ $# -eq 4 ] || die "invalid config line $line_no: REPO expects 3 values: <name> <git-url> <base-branch>; run 'workbranch config' to rewrite an older config format"
         add_repo_config "$2" "$3" "$4"
         ;;
+      REPO_SETUP)
+        [ $# -ge 3 ] || die "invalid config line $line_no: REPO_SETUP expects <repo> <command>"
+        set_repo_setup "$2" "$(repo_setup_command_from_line "$line")"
+        ;;
       *)
         die "unknown directive '$directive' in config line $line_no"
         ;;
@@ -222,6 +276,10 @@ parse_config_for_rewrite() {
           die "invalid config line $line_no: REPO expects <name> <git-url> [base-branch]"
         fi
         ;;
+      REPO_SETUP|repo_setup)
+        [ $# -ge 3 ] || die "invalid config line $line_no: REPO_SETUP expects <repo> <command>"
+        set_repo_setup "$2" "$(repo_setup_command_from_line "$line")"
+        ;;
       BASE_BRANCH|base_branch|REPO_BASE_BRANCH|repo_base_branch)
         [ $# -eq 3 ] || die "invalid config line $line_no: BASE_BRANCH expects 2 values: <repo> <base-branch>"
         set_repo_base_branch "$2" "$3"
@@ -263,5 +321,17 @@ write_config() {
       printf 'REPO %s %s %s\n' "$(repo_name_at "$i")" "$(repo_url_at "$i")" "$(repo_base_branch_at "$i")"
       i=$((i + 1))
     done
+    if has_repo_setups; then
+      printf '\n'
+      printf '# REPO_SETUP <repo> <command>\n'
+      i=0
+      while [ $i -lt ${#REPO_NAMES[@]} ]; do
+        command=$(repo_setup_at "$i")
+        if [ -n "$command" ]; then
+          printf 'REPO_SETUP %s %s\n' "$(repo_name_at "$i")" "$command"
+        fi
+        i=$((i + 1))
+      done
+    fi
   } > "$file" || die "failed to write config: $file"
 }
