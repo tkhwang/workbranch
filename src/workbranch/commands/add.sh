@@ -53,15 +53,11 @@ cmd_add() {
     success "  [base repo] $base_branch -> [task repo] $branch"
     i=$((i + 1))
   done
-  if has_task_setups; then
-    if run_task_setups "$task"; then
-      :
-    else
-      printf '[-] Error: task setup failed\n' >&2
-      printf '[*] Worktrees were created. Fix setup with:\n' >&2
-      printf '    workbranch config\n' >&2
-      printf '[*] Then rerun the setup command shown above, or remove and add the task again.\n' >&2
-      return 1
-    fi
+  if has_task_setups && ! run_task_setups "$task"; then
+    printf '[-] Error: task setup failed\n' >&2
+    printf '[*] Worktrees were created. Fix setup with:\n' >&2
+    printf '    workbranch config\n' >&2
+    printf '[*] Then rerun the setup command shown above, or remove and add the task again.\n' >&2
+    return 1
   fi
 }

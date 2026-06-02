@@ -85,7 +85,9 @@ Git operation internals are defined in [`docs/git-operations.md`](../git-operati
 
 Create or update config without cloning repos.
 
-If `.workbranch.config` or legacy `.tasktree.config` / `.monotree.config` already exists in the current project, load it, then prompt for each repo's base branch and repo-level setup command plus the project-level task setup command. Press Enter to keep the current value. Type `--clear` at a setup prompt to remove that setup command.
+If `.workbranch.config` or legacy `.tasktree.config` / `.monotree.config` already exists in the current project, load it, then prompt for each repo's base branch and repo-level setup command. Press Enter to keep the current value. Type `--clear` at a repo setup prompt to remove that setup command.
+
+Existing project-level `TASK_SETUP` values remain supported for `workbranch add` and are preserved by `workbranch config` unless another explicit flow clears or migrates them.
 
 When a base branch changes after repos are cloned, `workbranch config` only updates `.workbranch.config`. It then prints the checkout/fetch/pull procedure needed for the existing `_base/<repo>` worktree.
 
@@ -146,10 +148,10 @@ For each repo:
 2. Derive the task branch name.
 3. Reuse an existing task branch when present, or create it from the base branch.
 4. Create a linked worktree at `<task>/<repo>`.
-5. Run configured repo-level setup commands, then project-level `TASK_SETUP` when configured.
+5. Run configured repo-level setup commands. If no repo setup ran and the operation is not repo-filtered, run project-level `TASK_SETUP` when configured.
 
 If any repo fails, roll back paths and branches created by the command.
-If any setup command fails, keep created worktrees and tell the user to fix setup with `workbranch config`, then run the setup command manually in the task workspace or remove and add the task again.
+If any setup command fails, keep created worktrees and tell the user the exact failed setup context, setup directory, and setup command. The user can fix setup with `workbranch config`, then rerun the command shown in the failure output or remove and add the task again.
 
 The project-level setup command runs from the project root with these environment variables:
 
