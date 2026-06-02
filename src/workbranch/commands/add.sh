@@ -60,7 +60,7 @@ cmd_add() {
       printf '[-] Error: task setup failed\n' >&2
       printf '[*] Worktrees were created. Fix setup with:\n' >&2
       printf '    workbranch config\n' >&2
-      printf '[*] Then run the setup command manually in the task workspace, or remove and add the task again.\n' >&2
+      printf '[*] Then rerun the setup command shown above, or remove and add the task again.\n' >&2
       return 1
     fi
   fi

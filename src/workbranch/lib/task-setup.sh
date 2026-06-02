@@ -27,6 +27,13 @@ run_task_setup() {
     WORKBRANCH_REPOS=$(repo_names_joined)
     export WORKBRANCH_PROJECT_ROOT WORKBRANCH_TASK WORKBRANCH_TASK_DIR WORKBRANCH_BASE_DIR WORKBRANCH_REPOS
     sh -c "$TASK_SETUP"
+    setup_status=$?
+    if [ $setup_status -ne 0 ]; then
+      printf '[-] Error: task setup failed: %s\n' "$task" >&2
+      printf '[*] Setup directory: %s\n' "$PROJECT_ROOT" >&2
+      printf '[*] Setup command: %s\n' "$TASK_SETUP" >&2
+      exit "$setup_status"
+    fi
   )
 }
 
@@ -53,6 +60,13 @@ run_repo_task_setup() {
     export WORKBRANCH_PROJECT_ROOT WORKBRANCH_TASK WORKBRANCH_TASK_DIR WORKBRANCH_BASE_DIR WORKBRANCH_REPOS
     export WORKBRANCH_REPO WORKBRANCH_REPO_DIR WORKBRANCH_BASE_REPO_DIR
     sh -c "$command"
+    setup_status=$?
+    if [ $setup_status -ne 0 ]; then
+      printf '[-] Error: repo setup failed: %s/%s\n' "$task" "$repo" >&2
+      printf '[*] Setup directory: %s\n' "$repo_dir" >&2
+      printf '[*] Setup command: %s\n' "$command" >&2
+      exit "$setup_status"
+    fi
   )
 }
 
@@ -73,12 +87,14 @@ run_task_setups() {
     _setup_i=$((_setup_i + 1))
   done
 
-  if [ -z "$FILTER_REPO" ] && [ -n "$TASK_SETUP" ]; then
+  if [ "$ran_setup" -eq 0 ] && [ -z "$FILTER_REPO" ] && [ -n "$TASK_SETUP" ]; then
     info "Running task setup: $TASK_SETUP"
     run_task_setup "$task" || return 1
     success "Task setup completed: $task"
     ran_setup=1
   fi
 
-  [ $ran_setup -eq 1 ] || die "task setup command is not configured"
+  if [ "$ran_setup" -ne 1 ] && [ -z "$FILTER_REPO" ]; then
+    die "task setup command is not configured"
+  fi
 }
