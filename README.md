@@ -143,5 +143,5 @@ brew install workbranch
 ### Installer:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tkhwang/workbranch/main/install.sh | WORKBRANCH_RAW_BASE_URL=https://raw.githubusercontent.com/tkhwang/workbranch/main bash
+curl -fsSL https://raw.githubusercontent.com/tkhwang/workbranch/main/install.sh | bash
 ```
