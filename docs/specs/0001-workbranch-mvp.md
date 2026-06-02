@@ -36,6 +36,9 @@ TASK_SETUP sh scripts/workbranch-setup.sh
 
 REPO frontend git@github.com:example/frontend.git master
 REPO backend git@github.com:example/backend.git feature/cpq
+
+REPO_SETUP frontend pnpm install
+REPO_SETUP backend ./gradlew dependencies
 ```
 
 Format:
@@ -43,6 +46,7 @@ Format:
 ```text
 TASK_SETUP <command>
 REPO <name> <git-url> <base-repo-branch>
+REPO_SETUP <repo> <command>
 ```
 
 Rules:
@@ -50,13 +54,14 @@ Rules:
 - `PROJECT_NAME` must be a safe directory name.
 - `MAIN_WORKTREES_DIR` must be a safe directory name.
 - `BRANCH_PREFIX` must be non-empty and contain no whitespace.
-- `TASK_SETUP` is optional. It stores the command text after the directive.
+- `TASK_SETUP` is optional. It stores one project-level command text after the directive.
 - `REPO` requires name, URL, and base repo branch.
+- `REPO_SETUP` is optional. It references an existing repo name and stores one repo-level command text after the repo name.
 - Repo names must be unique safe names.
 - Git URLs and branch names must be non-empty and contain no whitespace.
-- Config values are split on whitespace except `TASK_SETUP`, which preserves the command text after the directive.
+- Config values are split on whitespace except `TASK_SETUP` and `REPO_SETUP`, which preserve command text.
 - The file is not a shell script.
-- Safety: `.workbranch.config` is trusted project configuration. Running `workbranch add <task>` or `workbranch setup <task>` executes `TASK_SETUP` with `sh -c`, so review configs from untrusted projects before running those commands.
+- Safety: `.workbranch.config` is trusted project configuration. Running `workbranch add <task>` executes configured setup commands with `sh -c`, so review configs from untrusted projects before running that command.
 
 ## Branch names
 
@@ -78,9 +83,15 @@ Git operation internals are defined in [`docs/git-operations.md`](../git-operati
 
 ### `workbranch config`
 
-Create or rewrite config without cloning repos.
+Create or update config without cloning repos.
 
-If `.workbranch.config` or legacy `.tasktree.config` / `.monotree.config` already exists in the current project, rewrite it to `.workbranch.config` using the existing values.
+If `.workbranch.config` or legacy `.tasktree.config` / `.monotree.config` already exists in the current project, load it, then prompt for each repo's base branch and repo-level setup command plus the project-level task setup command. Press Enter to keep the current value. Type `--clear` at a setup prompt to remove that setup command.
+
+When a base branch changes after repos are cloned, `workbranch config` only updates `.workbranch.config`. It then prints the checkout/fetch/pull procedure needed for the existing `_base/<repo>` worktree.
+
+### `workbranch config --rewrite`
+
+Rewrite `.workbranch.config` or legacy `.tasktree.config` / `.monotree.config` to the current `.workbranch.config` format without prompts and without cloning repos.
 
 If no config exists, run interactive config setup:
 
@@ -89,7 +100,7 @@ If no config exists, run interactive config setup:
 3. Ask for main worktrees directory, default `_base`.
 4. Ask for branch prefix, default `feature`.
 5. Explain that each repo base repo branch is checked out in `_base/<repo>` and task branches are derived from it.
-6. Ask for one or more repos: name, Git URL, base branch for this repo.
+6. Ask for one or more repos: name, Git URL, base branch for this repo, and optional repo-level setup command.
 7. Write `.workbranch.config`.
 
 ### `workbranch init`
@@ -135,24 +146,12 @@ For each repo:
 2. Derive the task branch name.
 3. Reuse an existing task branch when present, or create it from the base branch.
 4. Create a linked worktree at `<task>/<repo>`.
-5. Run `TASK_SETUP` when configured.
+5. Run configured repo-level setup commands, then project-level `TASK_SETUP` when configured.
 
 If any repo fails, roll back paths and branches created by the command.
-If `TASK_SETUP` fails, keep created worktrees and tell the user to rerun `workbranch setup <task>`.
+If any setup command fails, keep created worktrees and tell the user to fix setup with `workbranch config`, then run the setup command manually in the task workspace or remove and add the task again.
 
-### `workbranch setup`
-
-Add or change the optional task setup command in `.workbranch.config`.
-
-### `workbranch setup --clear`
-
-Remove the task setup command from `.workbranch.config`.
-
-### `workbranch setup <task>`
-
-Run the configured task setup command for an existing task workspace.
-
-The setup command runs from the project root with these environment variables:
+The project-level setup command runs from the project root with these environment variables:
 
 ```text
 WORKBRANCH_PROJECT_ROOT
@@ -162,7 +161,15 @@ WORKBRANCH_BASE_DIR
 WORKBRANCH_REPOS
 ```
 
-Safety: `.workbranch.config` is trusted project configuration. `TASK_SETUP` is executed with `sh -c`.
+Repo-level setup commands run from `<task>/<repo>` with the same variables plus:
+
+```text
+WORKBRANCH_REPO
+WORKBRANCH_REPO_DIR
+WORKBRANCH_BASE_REPO_DIR
+```
+
+Safety: `.workbranch.config` is trusted project configuration. Setup commands are executed with `sh -c`.
 
 ### `workbranch pull`
 
@@ -257,7 +264,7 @@ Fails if any task worktree is dirty.
 ## Safety
 
 - Do not overwrite existing worktrees or branches.
-- `workbranch config` may rewrite an existing `.workbranch.config` to the current format without cloning repos.
+- `workbranch config --rewrite` may rewrite an existing `.workbranch.config` to the current format without cloning repos.
 - Fail before destructive operations if a target worktree is dirty.
 - Use `--ff-only` for pull and merge operations.
 - On command-local creation failure, roll back paths and branches created by that command.

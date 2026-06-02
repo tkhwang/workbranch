@@ -16,6 +16,7 @@ TASK_SETUP=""
 REPO_NAMES=()
 REPO_URLS=()
 REPO_BASE_BRANCHES=()
+REPO_SETUP_COMMANDS=()
 CREATED_PATHS=()
 CREATED_WORKTREES=()
 CREATED_WORKTREE_BASES=()
@@ -40,11 +41,9 @@ Usage:
 Workspace:
   init              Initialize a workbranch project
   list              List configured repos and task workspaces
-  config            Create or rewrite .workbranch.config without cloning repos
-  setup             Add or change task setup command
-  setup --clear     Remove task setup command
+  config            Create or update .workbranch.config without cloning repos
+  config --rewrite  Rewrite config to current format without prompts
   add <task>        Create a task workspace
-  setup <task>      Run task setup for existing task workspace
   remove <task>     Remove task worktrees without deleting branches
 Git:
   status            Show commits, diff, and dirty state
@@ -106,6 +105,8 @@ repo_url_at() { printf '%s' "${REPO_URLS[$1]}"; }
 
 repo_base_branch_at() { printf '%s' "${REPO_BASE_BRANCHES[$1]}"; }
 
+repo_setup_at() { printf '%s' "${REPO_SETUP_COMMANDS[$1]}"; }
+
 repo_index_by_name() {
   needle=$1
   i=0
@@ -166,6 +167,7 @@ add_repo_config() {
   REPO_NAMES[${#REPO_NAMES[@]}]=$name
   REPO_URLS[${#REPO_URLS[@]}]=$url
   REPO_BASE_BRANCHES[${#REPO_BASE_BRANCHES[@]}]=$base_branch
+  REPO_SETUP_COMMANDS[${#REPO_SETUP_COMMANDS[@]}]=""
 }
 
 set_repo_base_branch() {
@@ -181,6 +183,14 @@ set_repo_base_branch() {
   REPO_BASE_BRANCHES[$idx]=$base_branch
 }
 
+update_repo_base_branch() {
+  name=$1
+  base_branch=$2
+  validate_nonempty_no_space "base-branch" "$base_branch"
+  idx=$(repo_index_by_name "$name") || die "base branch references unknown repo '$name'"
+  REPO_BASE_BRANCHES[$idx]=$base_branch
+}
+
 reset_config() {
   PROJECT_NAME=""
   BASE_DIR=""
@@ -189,6 +199,7 @@ reset_config() {
   REPO_NAMES=()
   REPO_URLS=()
   REPO_BASE_BRANCHES=()
+  REPO_SETUP_COMMANDS=()
 }
 
 task_setup_from_line() {
@@ -197,8 +208,46 @@ task_setup_from_line() {
   printf '%s' "$command"
 }
 
+repo_setup_command_from_line() {
+  line=$1
+  rest=$(printf '%s' "$line" | sed 's/^[^[:space:]]*[[:space:]]*//; s/[[:space:]]*$//')
+  repo=${rest%%[[:space:]]*}
+  command=${rest#"$repo"}
+  command=$(printf '%s' "$command" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+  printf '%s' "$command"
+}
+
+set_repo_setup() {
+  name=$1
+  command=$2
+  [ -n "$command" ] || die "repo setup command is empty: $name"
+  idx=$(repo_index_by_name "$name") || die "repo setup references unknown repo '$name'"
+  REPO_SETUP_COMMANDS[$idx]=$command
+}
+
+clear_repo_setup() {
+  name=$1
+  idx=$(repo_index_by_name "$name") || die "unknown repo: $name"
+  REPO_SETUP_COMMANDS[$idx]=""
+}
+
+has_repo_setups() {
+  i=0
+  while [ $i -lt ${#REPO_SETUP_COMMANDS[@]} ]; do
+    [ -n "$(repo_setup_at "$i")" ] && return 0
+    i=$((i + 1))
+  done
+  return 1
+}
+
+has_task_setups() {
+  [ -n "$TASK_SETUP" ] && return 0
+  has_repo_setups
+}
+
 config_line_split_tokens() {
-  # shell word splitting is intentional: config values cannot contain whitespace.
+  # shell word splitting is intentional for directive headers. TASK_SETUP and
+  # REPO_SETUP preserve the command tail separately so command whitespace works.
   # Pathname expansion is not part of the config format, so keep glob characters literal.
   line=$1
   case $- in
@@ -266,6 +315,10 @@ parse_config() {
         [ $# -eq 4 ] || die "invalid config line $line_no: REPO expects 3 values: <name> <git-url> <base-branch>; run 'workbranch config' to rewrite an older config format"
         add_repo_config "$2" "$3" "$4"
         ;;
+      REPO_SETUP)
+        [ $# -ge 3 ] || die "invalid config line $line_no: REPO_SETUP expects <repo> <command>"
+        set_repo_setup "$2" "$(repo_setup_command_from_line "$line")"
+        ;;
       *)
         die "unknown directive '$directive' in config line $line_no"
         ;;
@@ -322,6 +375,10 @@ parse_config_for_rewrite() {
           die "invalid config line $line_no: REPO expects <name> <git-url> [base-branch]"
         fi
         ;;
+      REPO_SETUP|repo_setup)
+        [ $# -ge 3 ] || die "invalid config line $line_no: REPO_SETUP expects <repo> <command>"
+        set_repo_setup "$2" "$(repo_setup_command_from_line "$line")"
+        ;;
       BASE_BRANCH|base_branch|REPO_BASE_BRANCH|repo_base_branch)
         [ $# -eq 3 ] || die "invalid config line $line_no: BASE_BRANCH expects 2 values: <repo> <base-branch>"
         set_repo_base_branch "$2" "$3"
@@ -363,6 +420,18 @@ write_config() {
       printf 'REPO %s %s %s\n' "$(repo_name_at "$i")" "$(repo_url_at "$i")" "$(repo_base_branch_at "$i")"
       i=$((i + 1))
     done
+    if has_repo_setups; then
+      printf '\n'
+      printf '# REPO_SETUP <repo> <command>\n'
+      i=0
+      while [ $i -lt ${#REPO_NAMES[@]} ]; do
+        command=$(repo_setup_at "$i")
+        if [ -n "$command" ]; then
+          printf 'REPO_SETUP %s %s\n' "$(repo_name_at "$i")" "$command"
+        fi
+        i=$((i + 1))
+      done
+    fi
   } > "$file" || die "failed to write config: $file"
 }
 
@@ -719,6 +788,7 @@ prompt_read() {
     if ! IFS= read -r value; then
       [ -n "$value" ] || return 1
     fi
+    printf '\n' >&2
   fi
   printf '%s' "$value"
 }
@@ -758,18 +828,18 @@ expand_path() {
 
 # ----- src/workbranch/lib/task-setup.sh -----
 repo_names_joined() {
-  out=""
-  i=0
-  while [ $i -lt ${#REPO_NAMES[@]} ]; do
-    name=$(repo_name_at "$i")
-    if [ -z "$out" ]; then
-      out=$name
+  _repo_names_out=""
+  _repo_names_i=0
+  while [ $_repo_names_i -lt ${#REPO_NAMES[@]} ]; do
+    _repo_names_name=$(repo_name_at "$_repo_names_i")
+    if [ -z "$_repo_names_out" ]; then
+      _repo_names_out=$_repo_names_name
     else
-      out="$out $name"
+      _repo_names_out="$_repo_names_out $_repo_names_name"
     fi
-    i=$((i + 1))
+    _repo_names_i=$((_repo_names_i + 1))
   done
-  printf '%s' "$out"
+  printf '%s' "$_repo_names_out"
 }
 
 run_task_setup() {
@@ -786,7 +856,76 @@ run_task_setup() {
     WORKBRANCH_REPOS=$(repo_names_joined)
     export WORKBRANCH_PROJECT_ROOT WORKBRANCH_TASK WORKBRANCH_TASK_DIR WORKBRANCH_BASE_DIR WORKBRANCH_REPOS
     sh -c "$TASK_SETUP"
+    setup_status=$?
+    if [ $setup_status -ne 0 ]; then
+      printf '[-] Error: task setup failed: %s\n' "$task" >&2
+      printf '[*] Setup directory: %s\n' "$PROJECT_ROOT" >&2
+      printf '[*] Setup command: %s\n' "$TASK_SETUP" >&2
+      exit "$setup_status"
+    fi
   )
+}
+
+run_repo_task_setup() {
+  task=$1
+  repo=$2
+  command=$3
+  [ -n "$command" ] || die "repo setup command is not configured: $repo"
+  task_dir="$PROJECT_ROOT/$task"
+  repo_dir=$(task_repo_path "$task" "$repo")
+  base_repo_dir=$(base_repo_path "$repo")
+  is_task_workspace_path "$task_dir" || die "task workspace not found: $task"
+  [ -d "$repo_dir" ] || die "task repo not found: $task/$repo"
+  (
+    cd "$repo_dir" || exit 1
+    WORKBRANCH_PROJECT_ROOT=$PROJECT_ROOT
+    WORKBRANCH_TASK=$task
+    WORKBRANCH_TASK_DIR=$task_dir
+    WORKBRANCH_BASE_DIR="$PROJECT_ROOT/$BASE_DIR"
+    WORKBRANCH_REPOS=$(repo_names_joined)
+    WORKBRANCH_REPO=$repo
+    WORKBRANCH_REPO_DIR=$repo_dir
+    WORKBRANCH_BASE_REPO_DIR=$base_repo_dir
+    export WORKBRANCH_PROJECT_ROOT WORKBRANCH_TASK WORKBRANCH_TASK_DIR WORKBRANCH_BASE_DIR WORKBRANCH_REPOS
+    export WORKBRANCH_REPO WORKBRANCH_REPO_DIR WORKBRANCH_BASE_REPO_DIR
+    sh -c "$command"
+    setup_status=$?
+    if [ $setup_status -ne 0 ]; then
+      printf '[-] Error: repo setup failed: %s/%s\n' "$task" "$repo" >&2
+      printf '[*] Setup directory: %s\n' "$repo_dir" >&2
+      printf '[*] Setup command: %s\n' "$command" >&2
+      exit "$setup_status"
+    fi
+  )
+}
+
+run_task_setups() {
+  task=$1
+  ran_setup=0
+
+  _setup_i=0
+  while [ $_setup_i -lt ${#REPO_NAMES[@]} ]; do
+    _setup_name=$(repo_name_at "$_setup_i")
+    _setup_command=$(repo_setup_at "$_setup_i")
+    if [ -n "$_setup_command" ] && repo_matches_filter "$_setup_name"; then
+      info "Running repo setup: $task/$_setup_name"
+      run_repo_task_setup "$task" "$_setup_name" "$_setup_command" || return 1
+      success "Repo setup completed: $task/$_setup_name"
+      ran_setup=1
+    fi
+    _setup_i=$((_setup_i + 1))
+  done
+
+  if [ "$ran_setup" -eq 0 ] && [ -z "$FILTER_REPO" ] && [ -n "$TASK_SETUP" ]; then
+    info "Running task setup: $TASK_SETUP"
+    run_task_setup "$task" || return 1
+    success "Task setup completed: $task"
+    ran_setup=1
+  fi
+
+  if [ "$ran_setup" -ne 1 ] && [ -z "$FILTER_REPO" ]; then
+    die "task setup command is not configured"
+  fi
 }
 
 # ----- src/workbranch/lib/status-format.sh -----
@@ -926,7 +1065,15 @@ is_task_workspace_path() {
 
 # ----- src/workbranch/commands/config.sh -----
 cmd_config() {
-  [ $# -eq 0 ] || die "usage: workbranch config"
+  rewrite_only=0
+  case $# in
+    0) ;;
+    1)
+      [ "$1" = "--rewrite" ] || die "usage: workbranch config [--rewrite]"
+      rewrite_only=1
+      ;;
+    *) die "usage: workbranch config [--rewrite]" ;;
+  esac
   CREATED_PATHS=()
   CREATED_WORKTREES=()
   CREATED_WORKTREE_BASES=()
@@ -935,11 +1082,113 @@ cmd_config() {
   if find_project_root; then
     parse_config_for_rewrite "$CONFIG_FILE"
     CONFIG_FILE="$PROJECT_ROOT/.workbranch.config"
+    if [ "$rewrite_only" -eq 0 ]; then
+      configure_existing_project
+    fi
     write_config "$CONFIG_FILE"
-    success "Config rewritten: $CONFIG_FILE"
+    if [ "$rewrite_only" -eq 1 ]; then
+      success "Config rewritten: $CONFIG_FILE"
+    else
+      success "Config updated: $CONFIG_FILE"
+      print_config_next_steps
+    fi
   else
+    [ "$rewrite_only" -eq 0 ] || die "no enclosing workbranch project found"
     cmd_init_interactive no
   fi
+}
+
+CONFIG_BRANCH_CHANGE_REPOS=()
+CONFIG_BRANCH_CHANGE_OLD=()
+CONFIG_BRANCH_CHANGE_NEW=()
+
+record_config_branch_change() {
+  name=$1
+  old=$2
+  new=$3
+  CONFIG_BRANCH_CHANGE_REPOS[${#CONFIG_BRANCH_CHANGE_REPOS[@]}]=$name
+  CONFIG_BRANCH_CHANGE_OLD[${#CONFIG_BRANCH_CHANGE_OLD[@]}]=$old
+  CONFIG_BRANCH_CHANGE_NEW[${#CONFIG_BRANCH_CHANGE_NEW[@]}]=$new
+}
+
+print_config_next_steps() {
+  [ ${#CONFIG_BRANCH_CHANGE_REPOS[@]} -gt 0 ] || return 0
+
+  info "Base branch changes were saved in config only."
+  info "Existing cloned base worktrees are not checked out automatically."
+  info "Update each changed base worktree before running git operations:"
+
+  i=0
+  while [ $i -lt ${#CONFIG_BRANCH_CHANGE_REPOS[@]} ]; do
+    name=${CONFIG_BRANCH_CHANGE_REPOS[$i]}
+    old=${CONFIG_BRANCH_CHANGE_OLD[$i]}
+    new=${CONFIG_BRANCH_CHANGE_NEW[$i]}
+    path=$(base_repo_path "$name")
+    printf '    # %s: %s -> %s\n' "$name" "$old" "$new" >&2
+    printf '    cd %s\n' "$path" >&2
+    printf '    git fetch origin\n' >&2
+    printf '    git checkout %s\n' "$new" >&2
+    printf '    git pull --ff-only origin %s\n' "$new" >&2
+    i=$((i + 1))
+  done
+}
+
+configure_task_setup_prompt() {
+  value=$(prompt_read "[*] Task setup command [$TASK_SETUP]: ") || die "input aborted"
+  case "$value" in
+    "") ;;
+    --clear) TASK_SETUP="" ;;
+    *) TASK_SETUP=$value ;;
+  esac
+}
+
+configure_repo_setup_prompt() {
+  name=$1
+  idx=$(repo_index_by_name "$name") || die "unknown repo: $name"
+  current=$(repo_setup_at "$idx")
+  value=$(prompt_read "[*] Repo setup command for $name [$current]: ") || die "input aborted"
+  case "$value" in
+    "") ;;
+    --clear) clear_repo_setup "$name" ;;
+    *) set_repo_setup "$name" "$value" ;;
+  esac
+}
+
+configure_existing_project() {
+  info "Config"
+  info "Project: $PROJECT_NAME"
+  info "Main worktrees dir: $BASE_DIR"
+  info "Branch prefix: $BRANCH_PREFIX"
+  info "Press Enter to keep a current value. Type --clear at a setup prompt to remove it."
+  printf '\n'
+  info "Repositories"
+
+  CONFIG_BRANCH_CHANGE_REPOS=()
+  CONFIG_BRANCH_CHANGE_OLD=()
+  CONFIG_BRANCH_CHANGE_NEW=()
+
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    current_branch=$(repo_base_branch_at "$i")
+    base_path=$(base_repo_path "$name")
+    if [ -d "$base_path/.git" ] || [ -f "$base_path/.git" ]; then
+      checked_out=$(git -C "$base_path" branch --show-current 2>/dev/null || printf '?')
+      info "$BASE_DIR/$name current branch: $checked_out"
+    fi
+    branch=$(prompt_with_default "Base repo branch for $name" "$current_branch")
+    if [ "$branch" != "$current_branch" ]; then
+      record_config_branch_change "$name" "$current_branch" "$branch"
+    fi
+    update_repo_base_branch "$name" "$branch"
+    configure_repo_setup_prompt "$name"
+    printf '\n'
+    i=$((i + 1))
+  done
+
+  # `workbranch config` is repo-scoped for new setup prompts, but existing
+  # project-level TASK_SETUP remains a supported add-time hook. Preserve it
+  # unless a flow explicitly clears or migrates it.
 }
 
 # ----- src/workbranch/commands/init.sh -----
@@ -1007,6 +1256,7 @@ AFTER
     validate_nonempty_no_space "git-url" "$repo_url"
     repo_branch=$(prompt_with_default "Base repo branch" "$repo_branch_default")
     add_repo_config "$repo_name" "$repo_url" "$repo_branch"
+    configure_repo_setup_prompt "$repo_name"
     repo_branch_default=$repo_branch
     printf '[*] Add another repo? [y/N]: ' >&2
     IFS= read -r answer || answer=""
@@ -1018,7 +1268,7 @@ AFTER
 
   printf '
 ' >&2
-  TASK_SETUP=$(prompt_read "[*] Task setup command []: ")
+  configure_task_setup_prompt
 
   printf '
 ' >&2
@@ -1110,46 +1360,6 @@ cmd_init() {
   fi
 }
 
-# ----- src/workbranch/commands/setup.sh -----
-cmd_setup() {
-  require_project
-  case $# in
-    0)
-      value=$(prompt_read "[*] Task setup command [$TASK_SETUP]: ")
-      if [ -n "$value" ]; then
-        TASK_SETUP=$value
-      fi
-      CONFIG_FILE="$PROJECT_ROOT/.workbranch.config"
-      write_config "$CONFIG_FILE"
-      if [ -n "$TASK_SETUP" ]; then
-        success "Task setup command: $TASK_SETUP"
-      else
-        success "Task setup command: (none)"
-      fi
-      ;;
-    1)
-      case "$1" in
-        --clear)
-          TASK_SETUP=""
-          CONFIG_FILE="$PROJECT_ROOT/.workbranch.config"
-          write_config "$CONFIG_FILE"
-          success "Task setup command removed"
-          ;;
-        *)
-          task=$1
-          validate_safe_name "task" "$task"
-          info "Running task setup: $TASK_SETUP"
-          run_task_setup "$task" || die "task setup failed: $TASK_SETUP"
-          success "Task setup completed: $task"
-          ;;
-      esac
-      ;;
-    *)
-      die "usage: workbranch setup [task|--clear]"
-      ;;
-  esac
-}
-
 # ----- src/workbranch/commands/add.sh -----
 cmd_add() {
   [ $# -eq 1 ] || die "usage: workbranch add <task>"
@@ -1206,14 +1416,14 @@ cmd_add() {
     success "  [base repo] $base_branch -> [task repo] $branch"
     i=$((i + 1))
   done
-  if [ -n "$TASK_SETUP" ]; then
-    info "Running task setup: $TASK_SETUP"
-    if run_task_setup "$task"; then
-      success "Task setup completed: $task"
+  if has_task_setups; then
+    if run_task_setups "$task"; then
+      :
     else
-      printf '[-] Error: task setup failed: %s\n' "$TASK_SETUP" >&2
-      printf '[*] Worktrees were created. Fix the command and rerun:\n' >&2
-      printf '    workbranch setup %s\n' "$task" >&2
+      printf '[-] Error: task setup failed\n' >&2
+      printf '[*] Worktrees were created. Fix setup with:\n' >&2
+      printf '    workbranch config\n' >&2
+      printf '[*] Then rerun the setup command shown above, or remove and add the task again.\n' >&2
       return 1
     fi
   fi
@@ -1229,6 +1439,17 @@ cmd_list() {
     printf '    %s\n' "$TASK_SETUP"
   else
     printf '    (none)\n'
+  fi
+  if has_repo_setups; then
+    info "Repo setup:"
+    i=0
+    while [ $i -lt ${#REPO_NAMES[@]} ]; do
+      command=$(repo_setup_at "$i")
+      if [ -n "$command" ]; then
+        printf '    %s: %s\n' "$(repo_name_at "$i")" "$command"
+      fi
+      i=$((i + 1))
+    done
   fi
   info "Repos:"
   printf '    %-11s %-16s %s\n' "repo" "base" "current"
@@ -1694,7 +1915,6 @@ main() {
   case "$cmd" in
     config) cmd_config "$@" ;;
     init) cmd_init "$@" ;;
-    setup) cmd_setup "$@" ;;
     add) cmd_add "$@" ;;
     list) cmd_list "$@" ;;
     status) cmd_status "$@" ;;

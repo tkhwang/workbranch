@@ -62,6 +62,7 @@ AFTER
     validate_nonempty_no_space "git-url" "$repo_url"
     repo_branch=$(prompt_with_default "Base repo branch" "$repo_branch_default")
     add_repo_config "$repo_name" "$repo_url" "$repo_branch"
+    configure_repo_setup_prompt "$repo_name"
     repo_branch_default=$repo_branch
     printf '[*] Add another repo? [y/N]: ' >&2
     IFS= read -r answer || answer=""
@@ -73,7 +74,7 @@ AFTER
 
   printf '
 ' >&2
-  TASK_SETUP=$(prompt_read "[*] Task setup command []: ")
+  configure_task_setup_prompt
 
   printf '
 ' >&2
