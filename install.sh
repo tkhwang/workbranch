@@ -14,7 +14,8 @@ SRC=""
 if [ -n "$SCRIPT_DIR" ]; then
   SRC="$SCRIPT_DIR/bin/workbranch"
 fi
-WORKBRANCH_RAW_BASE_URL="${WORKBRANCH_RAW_BASE_URL:-}"
+WORKBRANCH_DEFAULT_RAW_BASE_URL="https://raw.githubusercontent.com/tkhwang/workbranch/main"
+WORKBRANCH_RAW_BASE_URL="${WORKBRANCH_RAW_BASE_URL:-$WORKBRANCH_DEFAULT_RAW_BASE_URL}"
 DEFAULT_DEST_DIR="${HOME}/.local/bin"
 
 expand_target_dir() {
@@ -112,11 +113,6 @@ mkdir -p "$DEST_DIR" || { printf '[-] Error: failed to create %s\n' "$DEST_DIR" 
 if is_checkout_install; then
   cp "$SRC" "$DEST" || { printf '[-] Error: failed to install workbranch\n' >&2; exit 1; }
 else
-  if [ -z "$WORKBRANCH_RAW_BASE_URL" ]; then
-    printf '[-] Error: WORKBRANCH_RAW_BASE_URL is required for standalone installs\n' >&2
-    printf '[*] Example: curl -fsSL https://raw.githubusercontent.com/tkhwang/workbranch/main/install.sh | WORKBRANCH_RAW_BASE_URL=https://raw.githubusercontent.com/tkhwang/workbranch/main bash\n' >&2
-    exit 1
-  fi
   download_file "$WORKBRANCH_RAW_BASE_URL/bin/workbranch" > "$DEST" || { rm -f "$DEST"; printf '[-] Error: failed to download workbranch\n' >&2; exit 1; }
   printf '[+] Downloaded workbranch from %s\n' "$WORKBRANCH_RAW_BASE_URL"
 fi

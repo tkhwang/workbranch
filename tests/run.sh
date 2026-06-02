@@ -1487,15 +1487,22 @@ test_installer_downloads_cli_when_run_standalone() {
   assert_contains "$out" "workbranch <command> [args]"
 }
 
-test_installer_standalone_requires_raw_base_url() {
+test_installer_standalone_uses_embedded_raw_base_url() {
   TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
-  mkdir -p "$TMP_ROOT/standalone"
-  cp "$REPO_ROOT/install.sh" "$TMP_ROOT/standalone/install.sh"
+  mkdir -p "$TMP_ROOT/standalone" "$TMP_ROOT/server/bin"
+  sed "s#https://raw.githubusercontent.com/tkhwang/workbranch/main#file://$TMP_ROOT/server#g" "$REPO_ROOT/install.sh" > "$TMP_ROOT/standalone/install.sh"
+  chmod +x "$TMP_ROOT/standalone/install.sh"
+  cat > "$TMP_ROOT/server/bin/workbranch" <<'REMOTE'
+#!/usr/bin/env sh
+printf '%s\n' EMBEDDED
+REMOTE
+  chmod +x "$TMP_ROOT/server/bin/workbranch"
 
-  out=$(printf '\n' | HOME="$TMP_ROOT/home" PATH="/usr/bin:/bin" SHELL="/bin/zsh" run_expect_fail "$TMP_ROOT/standalone/install.sh")
-  assert_contains "$out" "WORKBRANCH_RAW_BASE_URL is required for standalone installs"
-  assert_contains "$out" "WORKBRANCH_RAW_BASE_URL=https://raw.githubusercontent.com/tkhwang/workbranch/main"
-  assert_not_exists "$TMP_ROOT/home/.local/bin/workbranch"
+  out=$(printf '\nn\n' | HOME="$TMP_ROOT/home" PATH="/usr/bin:/bin" SHELL="/bin/zsh" "$TMP_ROOT/standalone/install.sh" 2>&1)
+  assert_contains "$out" "Downloaded workbranch from file://$TMP_ROOT/server"
+  assert_contains "$out" "Installed workbranch"
+  installed_out=$("$TMP_ROOT/home/.local/bin/workbranch")
+  [ "$installed_out" = "EMBEDDED" ] || fail "expected embedded default install to download EMBEDDED, got: $installed_out"
 }
 
 test_installer_installs_executable() {
@@ -1633,7 +1640,7 @@ main() {
   run_test test_interactive_init_rejects_slash_in_main_worktrees_directory
   run_test test_interactive_init_eof_aborts_required_prompt
   run_test test_installer_downloads_cli_when_run_standalone
-  run_test test_installer_standalone_requires_raw_base_url
+  run_test test_installer_standalone_uses_embedded_raw_base_url
   run_test test_installer_supports_pipe_to_bash
   run_test test_installer_pipe_to_bash_ignores_cwd_bin_workbranch
   run_test test_installer_installs_executable

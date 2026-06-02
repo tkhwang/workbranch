@@ -274,7 +274,7 @@ Fails if any task worktree is dirty.
 
 ## Installer
 
-`install.sh` copies `bin/workbranch` to a target directory. The default is `~/.local/bin`. Standalone installs must pass `WORKBRANCH_RAW_BASE_URL` so the downloaded executable uses the same ref as the installer script.
+`install.sh` copies `bin/workbranch` to a target directory. The default is `~/.local/bin`. Standalone installs default to the `main` raw GitHub URL, so the common pasteable install command is `curl -fsSL https://raw.githubusercontent.com/tkhwang/workbranch/main/install.sh | bash`. Pinned tag or SHA installs may pass `WORKBRANCH_RAW_BASE_URL` so the downloaded executable uses the same ref as the installer script.
 
 If the target directory is not on `PATH`, the installer asks whether to add it to the user's shell profile.
 
