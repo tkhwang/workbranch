@@ -8,6 +8,17 @@ cmd_list() {
   else
     printf '    (none)\n'
   fi
+  if has_repo_setups; then
+    info "Repo setup:"
+    i=0
+    while [ $i -lt ${#REPO_NAMES[@]} ]; do
+      command=$(repo_setup_at "$i")
+      if [ -n "$command" ]; then
+        printf '    %s: %s\n' "$(repo_name_at "$i")" "$command"
+      fi
+      i=$((i + 1))
+    done
+  fi
   info "Repos:"
   printf '    %-11s %-16s %s\n' "repo" "base" "current"
   i=0

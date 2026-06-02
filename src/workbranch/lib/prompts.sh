@@ -11,6 +11,7 @@ prompt_read() {
     if ! IFS= read -r value; then
       [ -n "$value" ] || return 1
     fi
+    printf '\n' >&2
   fi
   printf '%s' "$value"
 }
