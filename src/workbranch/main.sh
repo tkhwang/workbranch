@@ -4,7 +4,6 @@ main() {
   case "$cmd" in
     config) cmd_config "$@" ;;
     init) cmd_init "$@" ;;
-    setup) cmd_setup "$@" ;;
     add) cmd_add "$@" ;;
     list) cmd_list "$@" ;;
     status) cmd_status "$@" ;;

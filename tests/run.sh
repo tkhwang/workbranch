@@ -909,7 +909,10 @@ feature
 frontend
 $frontend_remote
 master
+
 n
+
+Y
 INPUT
 )
   out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | run_expect_success "$WORKBRANCH" config)
@@ -939,7 +942,7 @@ CONFIG
   assert_contains "$out" "[*] Base worktrees"
   assert_contains "$out" "frontend    missing"
 
-  out=$(run_expect_success "$WORKBRANCH" config)
+  out=$(run_expect_success "$WORKBRANCH" config --rewrite)
   assert_contains "$out" "[+] Config rewritten:"
   assert_file "$project/.workbranch.config"
   config=$(cat "$project/.workbranch.config")
@@ -1027,7 +1030,7 @@ test_config_rewrites_legacy_tasktree_config_without_cloning() {
   cd "$project" || return 1
   mv "$project/.workbranch.config" "$project/.tasktree.config"
 
-  out=$(run_expect_success "$WORKBRANCH" config)
+  out=$(run_expect_success "$WORKBRANCH" config --rewrite)
   assert_contains "$out" "[+] Config rewritten:"
   assert_file "$project/.workbranch.config"
   assert_contains "$(cat "$project/.workbranch.config")" "PROJECT_NAME fullstack"
@@ -1048,10 +1051,9 @@ printf '%s\n' "$WORKBRANCH_TASK" > "$WORKBRANCH_TASK_DIR/setup-task.txt"
 printf '%s\n' "$WORKBRANCH_REPOS" > "$WORKBRANCH_TASK_DIR/setup-repos.txt"
 SCRIPT
 
-  run_expect_success "$WORKBRANCH" init >/dev/null
-  out=$(printf '%s\n' "sh scripts/workbranch-setup.sh" | run_expect_success "$WORKBRANCH" setup)
-  assert_contains "$out" "[+] Task setup command: sh scripts/workbranch-setup.sh"
+  printf '\nTASK_SETUP sh scripts/workbranch-setup.sh\n' >> "$project/.workbranch.config"
   assert_contains "$(cat "$project/.workbranch.config")" "TASK_SETUP sh scripts/workbranch-setup.sh"
+  run_expect_success "$WORKBRANCH" init >/dev/null
 
   out=$(run_expect_success "$WORKBRANCH" list)
   assert_contains "$out" "[*] Task setup:"
@@ -1062,15 +1064,99 @@ SCRIPT
   assert_contains "$out" "[+] Task setup completed: login"
   assert_contains "$(cat "$project/login/setup-task.txt")" "login"
   assert_contains "$(cat "$project/login/setup-repos.txt")" "frontend backend"
+}
 
-  rm "$project/login/setup-task.txt"
-  out=$(run_expect_success "$WORKBRANCH" setup login)
-  assert_contains "$out" "[+] Task setup completed: login"
-  assert_contains "$(cat "$project/login/setup-task.txt")" "login"
+test_setup_command_is_removed() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
 
-  out=$(run_expect_success "$WORKBRANCH" setup --clear)
-  assert_contains "$out" "[+] Task setup command removed"
-  assert_not_contains "$(cat "$project/.workbranch.config")" "TASK_SETUP"
+  out=$(run_expect_fail "$WORKBRANCH" setup login)
+  assert_contains "$out" "unknown command: setup"
+}
+
+test_config_prompts_for_repo_branch_and_setup() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  printf '\nTASK_SETUP pnpm install\n' >> "$project/.workbranch.config"
+
+  out=$(printf '%s\n%s\n%s\n%s\n' "" 'printf frontend > repo.txt' "" "" | run_expect_success "$WORKBRANCH" config)
+  assert_contains "$out" "[*] Base repo branch for frontend [master]:"
+  assert_contains "$out" "[*] Repo setup command for frontend []:"
+  assert_contains "$out" "[*] Base repo branch for backend [master]:"
+  assert_contains "$out" "[*] Repo setup command for backend []:"
+  assert_not_contains "$out" "Task setup command"
+  assert_contains "$out" "$(printf '%s\n\n%s' "[*] Press Enter to keep a current value. Type --clear at a setup prompt to remove it." "[*] Repositories")"
+  assert_contains "$out" "$(printf '%s \n\n%s' "[*] Repo setup command for frontend []:" "[*] Base repo branch for backend [master]:")"
+  assert_contains "$out" "$(printf '%s \n\n%s' "[*] Repo setup command for backend []:" "[+] Config updated:")"
+  case "$out" in
+    *"Base repo branch for frontend"*"Repo setup command for frontend"*"Base repo branch for backend"*"Repo setup command for backend"*) ;;
+    *) fail "expected config to ask branch and setup per repo only; got: $out" ;;
+  esac
+  assert_contains "$out" "[+] Config updated:"
+  config=$(cat "$project/.workbranch.config")
+  assert_contains "$config" "REPO_SETUP frontend printf frontend > repo.txt"
+  assert_not_contains "$config" "TASK_SETUP"
+}
+
+test_config_guides_base_branch_change_for_cloned_repo() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+
+  out=$(printf '%s\n%s\n%s\n%s\n%s\n' "develop" "" "" "" "" | run_expect_success "$WORKBRANCH" config)
+  assert_contains "$out" "[*] _base/frontend current branch: master"
+  assert_contains "$out" "[+] Config updated:"
+  assert_contains "$out" "[*] Base branch changes were saved in config only."
+  assert_contains "$out" "_base/frontend"
+  assert_contains "$out" "git checkout develop"
+  assert_contains "$(cat "$project/.workbranch.config")" "REPO frontend $TMP_ROOT/remotes/frontend.git develop"
+}
+
+test_repo_setup_can_be_configured_and_run_per_repo() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  frontend_cmd='printf "%s:%s:%s\n" "$WORKBRANCH_REPO" "$WORKBRANCH_TASK" "$(basename "$PWD")" >> "$WORKBRANCH_TASK_DIR/setup.log"; printf "%s\n" "$WORKBRANCH_REPO_DIR" > repo-setup-dir.txt'
+  backend_cmd='printf "%s:%s:%s\n" "$WORKBRANCH_REPO" "$WORKBRANCH_TASK" "$(basename "$PWD")" >> "$WORKBRANCH_TASK_DIR/setup.log"; printf "%s\n" "$WORKBRANCH_BASE_REPO_DIR" > repo-base-dir.txt'
+
+  out=$(printf '%s\n%s\n%s\n%s\n%s\n' "" "$frontend_cmd" "" "$backend_cmd" "" | run_expect_success "$WORKBRANCH" config)
+  assert_contains "$out" "[+] Config updated:"
+  config=$(cat "$project/.workbranch.config")
+  assert_contains "$config" "REPO_SETUP frontend $frontend_cmd"
+  assert_contains "$config" "REPO_SETUP backend $backend_cmd"
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  out=$(run_expect_success "$WORKBRANCH" add login)
+  assert_contains "$out" "[*] Running repo setup: login/frontend"
+  assert_contains "$out" "[*] Running repo setup: login/backend"
+  assert_contains "$out" "[+] Repo setup completed: login/frontend"
+  assert_contains "$out" "[+] Repo setup completed: login/backend"
+  assert_contains "$(cat "$project/login/setup.log")" "frontend:login:frontend"
+  assert_contains "$(cat "$project/login/setup.log")" "backend:login:backend"
+  assert_contains "$(cat "$project/login/frontend/repo-setup-dir.txt")" "$project/login/frontend"
+  assert_contains "$(cat "$project/login/backend/repo-base-dir.txt")" "$project/_base/backend"
+
+}
+
+test_repo_setup_can_be_cleared_without_removing_other_repo_setup() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  cat >> "$project/.workbranch.config" <<'CONFIG'
+REPO_SETUP frontend printf frontend > repo.txt
+REPO_SETUP backend printf backend > repo.txt
+CONFIG
+
+  out=$(printf '%s\n%s\n%s\n%s\n%s\n' "" "--clear" "" "" "" | run_expect_success "$WORKBRANCH" config)
+  assert_contains "$out" "[+] Config updated:"
+  config=$(cat "$project/.workbranch.config")
+  assert_not_contains "$config" "REPO_SETUP frontend"
+  assert_contains "$config" "REPO_SETUP backend printf backend > repo.txt"
 }
 
 test_interactive_init_writes_config_and_clones() {
@@ -1087,12 +1173,15 @@ feature
 frontend
 $frontend_remote
 master
+
 Y
 backend
 $backend_remote
 
+
 n
 
+Y
 INPUT
 )
   out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | run_expect_success "$WORKBRANCH" init)
@@ -1112,6 +1201,8 @@ INPUT
   assert_not_contains "$out" "Task branch examples: master + login -> feature/login, feature/cpq + task1 -> feature/cpq-task1"
   assert_contains "$out" "[*] Base repo branch [main]:"
   assert_contains "$out" "[*] Base repo branch [master]:"
+  assert_contains "$out" "[*] Repo setup command for frontend []:"
+  assert_contains "$out" "[*] Repo setup command for backend []:"
   assert_contains "$out" "[*] Branch policy:"
   assert_contains "$out" "[base repo] main        -> task1 -> [task repo] feature/task1"
   assert_contains "$out" "[base repo] feature/XXX -> task1 -> [task repo] feature/XXX-task1"
@@ -1160,6 +1251,7 @@ feature
 frontend
 $frontend_remote
 master
+
 n
 
 n
@@ -1187,8 +1279,10 @@ feature
 frontend
 $frontend_remote
 master
+
 n
 
+Y
 INPUT
 )
   out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | run_expect_success "$WORKBRANCH" init)
@@ -1212,8 +1306,10 @@ feature
 frontend
 $frontend_remote
 feature/cpq
+
 n
 
+Y
 INPUT
 )
   out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | run_expect_success "$WORKBRANCH" init)
@@ -1396,10 +1492,12 @@ test_help_groups_commands() {
   assert_contains "$out" "Workspace:"
   assert_contains "$out" "init              Initialize a workbranch project"
   assert_contains "$out" "list              List configured repos and task workspaces"
-  assert_contains "$out" "config            Create or rewrite .workbranch.config without cloning repos"
-  assert_contains "$out" "setup             Add or change task setup command"
-  assert_contains "$out" "setup --clear     Remove task setup command"
-  assert_contains "$out" "setup <task>      Run task setup for existing task workspace"
+  assert_contains "$out" "config            Create or update .workbranch.config without cloning repos"
+  assert_contains "$out" "config --rewrite  Rewrite config to current format without prompts"
+  assert_not_contains "$out" "setup             Add or change"
+  assert_not_contains "$out" "setup --clear"
+  assert_not_contains "$out" "setup repo <repo>"
+  assert_not_contains "$out" "setup <task>"
   assert_contains "$out" "Git:"
   assert_contains "$out" "Other:"
   assert_contains "$out" "status            Show commits, diff, and dirty state"
@@ -1421,7 +1519,7 @@ test_help_groups_commands() {
     *$'\n\n'*) fail "expected compact help without blank lines; got: $out" ;;
   esac
   case "$out" in
-    *"Workspace:"*"init              Initialize a workbranch project"*"list              List configured repos and task workspaces"*"config            Create or rewrite .workbranch.config without cloning repos"*"setup             Add or change task setup command"*"add <task>        Create a task workspace"*"setup <task>      Run task setup for existing task workspace"*"remove <task>     Remove task worktrees without deleting branches"*"Git:"*"status            Show commits, diff, and dirty state"*"  vertical"*"Other:"*) ;;
+    *"Workspace:"*"init              Initialize a workbranch project"*"list              List configured repos and task workspaces"*"config            Create or update .workbranch.config without cloning repos"*"config --rewrite  Rewrite config to current format without prompts"*"add <task>        Create a task workspace"*"remove <task>     Remove task worktrees without deleting branches"*"Git:"*"status            Show commits, diff, and dirty state"*"  vertical"*"Other:"*) ;;
     *) fail "expected workspace and group ordering; got: $out" ;;
   esac
 }
@@ -1469,6 +1567,11 @@ main() {
   run_test test_legacy_config_supports_project_commands_without_rewrite
   run_test test_config_rewrites_legacy_tasktree_config_without_cloning
   run_test test_task_setup_can_be_configured_and_run
+  run_test test_setup_command_is_removed
+  run_test test_config_prompts_for_repo_branch_and_setup
+  run_test test_config_guides_base_branch_change_for_cloned_repo
+  run_test test_repo_setup_can_be_configured_and_run_per_repo
+  run_test test_repo_setup_can_be_cleared_without_removing_other_repo_setup
   run_test test_interactive_init_writes_config_and_clones
   run_test test_interactive_init_can_cancel_before_creating_project
   run_test test_interactive_init_can_create_project_in_custom_target_directory

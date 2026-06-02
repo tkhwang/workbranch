@@ -45,7 +45,8 @@ git worktree add <task>/<repo> <task-branch>
 
 Safety:
 
-- Rolls back worktrees and new branches created by the command if repo setup fails.
+- Rolls back worktrees and new branches created by the command if worktree creation fails.
+- Keeps created worktrees if a configured setup command fails, so the user can fix setup with `workbranch config` and then run the setup command manually or remove and add the task again.
 - Uses the local base worktree HEAD, not `origin/<base-branch>`.
 - Reuses existing task branches so removed worktrees can be recreated.
 

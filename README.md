@@ -13,6 +13,7 @@ Simplify Git worktree workspaces and branch operations.
 
 ```text
 workbranch init              clone main worktrees from .workbranch.config
+workbranch config            update base branches and per-repo setup commands
 workbranch add <task>        create linked worktrees for a task
 workbranch remove <task>     remove task worktrees
 ```
@@ -103,6 +104,30 @@ Before mutating worktrees, `workbranch` checks for common unsafe states:
 - rebase in progress
 - missing repos or task worktrees
 - non-fast-forward pull, push, or land paths
+
+## Per-repo setup
+
+Use `workbranch config` to update each repo's base branch and setup command in one pass:
+
+```bash
+workbranch config
+workbranch add login
+```
+
+At each repo prompt, press Enter to keep the current value or type `--clear` at the setup prompt to remove that repo's setup command. If you change a base branch after repos are cloned, `workbranch config` prints the checkout commands needed for the existing `_base/<repo>` worktree.
+
+Repo setup commands run from `<task>/<repo>` and receive:
+
+```text
+WORKBRANCH_PROJECT_ROOT
+WORKBRANCH_TASK
+WORKBRANCH_TASK_DIR
+WORKBRANCH_BASE_DIR
+WORKBRANCH_REPOS
+WORKBRANCH_REPO
+WORKBRANCH_REPO_DIR
+WORKBRANCH_BASE_REPO_DIR
+```
 
 ## Install
 
