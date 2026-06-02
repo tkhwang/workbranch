@@ -18,23 +18,7 @@ run_task_setup() {
   [ -n "$TASK_SETUP" ] || die "task setup command is not configured"
   task_dir="$PROJECT_ROOT/$task"
   is_task_workspace_path "$task_dir" || die "task workspace not found: $task"
-  (
-    cd "$PROJECT_ROOT" || exit 1
-    WORKBRANCH_PROJECT_ROOT=$PROJECT_ROOT
-    WORKBRANCH_TASK=$task
-    WORKBRANCH_TASK_DIR=$task_dir
-    WORKBRANCH_BASE_DIR="$PROJECT_ROOT/$BASE_DIR"
-    WORKBRANCH_REPOS=$(repo_names_joined)
-    export WORKBRANCH_PROJECT_ROOT WORKBRANCH_TASK WORKBRANCH_TASK_DIR WORKBRANCH_BASE_DIR WORKBRANCH_REPOS
-    sh -c "$TASK_SETUP"
-    setup_status=$?
-    if [ $setup_status -ne 0 ]; then
-      printf '[-] Error: task setup failed: %s\n' "$task" >&2
-      printf '[*] Setup directory: %s\n' "$PROJECT_ROOT" >&2
-      printf '[*] Setup command: %s\n' "$TASK_SETUP" >&2
-      exit "$setup_status"
-    fi
-  )
+  _run_setup_command task "$PROJECT_ROOT" "$TASK_SETUP" "$task"
 }
 
 run_repo_task_setup() {
@@ -47,24 +31,37 @@ run_repo_task_setup() {
   base_repo_dir=$(base_repo_path "$repo")
   is_task_workspace_path "$task_dir" || die "task workspace not found: $task"
   [ -d "$repo_dir" ] || die "task repo not found: $task/$repo"
+  _run_setup_command repo "$repo_dir" "$command" "$task/$repo" "$repo" "$repo_dir" "$base_repo_dir"
+}
+
+_run_setup_command() {
+  _rs_kind=$1
+  _rs_dir=$2
+  _rs_command=$3
+  _rs_label=$4
+  _rs_repo=${5:-}
+  _rs_repo_dir=${6:-}
+  _rs_base_repo_dir=${7:-}
   (
-    cd "$repo_dir" || exit 1
+    cd "$_rs_dir" || exit 1
     WORKBRANCH_PROJECT_ROOT=$PROJECT_ROOT
     WORKBRANCH_TASK=$task
     WORKBRANCH_TASK_DIR=$task_dir
     WORKBRANCH_BASE_DIR="$PROJECT_ROOT/$BASE_DIR"
     WORKBRANCH_REPOS=$(repo_names_joined)
-    WORKBRANCH_REPO=$repo
-    WORKBRANCH_REPO_DIR=$repo_dir
-    WORKBRANCH_BASE_REPO_DIR=$base_repo_dir
     export WORKBRANCH_PROJECT_ROOT WORKBRANCH_TASK WORKBRANCH_TASK_DIR WORKBRANCH_BASE_DIR WORKBRANCH_REPOS
-    export WORKBRANCH_REPO WORKBRANCH_REPO_DIR WORKBRANCH_BASE_REPO_DIR
-    sh -c "$command"
+    if [ -n "$_rs_repo" ]; then
+      WORKBRANCH_REPO=$_rs_repo
+      WORKBRANCH_REPO_DIR=$_rs_repo_dir
+      WORKBRANCH_BASE_REPO_DIR=$_rs_base_repo_dir
+      export WORKBRANCH_REPO WORKBRANCH_REPO_DIR WORKBRANCH_BASE_REPO_DIR
+    fi
+    sh -c "$_rs_command"
     setup_status=$?
     if [ $setup_status -ne 0 ]; then
-      printf '[-] Error: repo setup failed: %s/%s\n' "$task" "$repo" >&2
-      printf '[*] Setup directory: %s\n' "$repo_dir" >&2
-      printf '[*] Setup command: %s\n' "$command" >&2
+      printf '[-] Error: %s setup failed: %s\n' "$_rs_kind" "$_rs_label" >&2
+      printf '[*] Setup directory: %s\n' "$_rs_dir" >&2
+      printf '[*] Setup command: %s\n' "$_rs_command" >&2
       exit "$setup_status"
     fi
   )
