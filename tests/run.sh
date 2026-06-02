@@ -1075,7 +1075,7 @@ test_setup_command_is_removed() {
   assert_contains "$out" "unknown command: setup"
 }
 
-test_config_prompts_for_repo_branch_and_setup() {
+test_config_preserves_task_setup_while_prompting_repo_setup() {
   new_fixture
   project="$FIXTURE_PROJECT"
   cd "$project" || return 1
@@ -1097,7 +1097,7 @@ test_config_prompts_for_repo_branch_and_setup() {
   assert_contains "$out" "[+] Config updated:"
   config=$(cat "$project/.workbranch.config")
   assert_contains "$config" "REPO_SETUP frontend printf frontend > repo.txt"
-  assert_not_contains "$config" "TASK_SETUP"
+  assert_contains "$config" "TASK_SETUP pnpm install"
 }
 
 test_config_guides_base_branch_change_for_cloned_repo() {
@@ -1140,6 +1140,57 @@ test_repo_setup_can_be_configured_and_run_per_repo() {
   assert_contains "$(cat "$project/login/frontend/repo-setup-dir.txt")" "$project/login/frontend"
   assert_contains "$(cat "$project/login/backend/repo-base-dir.txt")" "$project/_base/backend"
 
+}
+
+test_repo_setup_suppresses_legacy_task_setup_fallback() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  cat >> "$project/.workbranch.config" <<'CONFIG'
+TASK_SETUP printf project >> "$WORKBRANCH_TASK_DIR/setup.log"
+REPO_SETUP frontend printf frontend >> "$WORKBRANCH_TASK_DIR/setup.log"
+REPO_SETUP backend printf backend >> "$WORKBRANCH_TASK_DIR/setup.log"
+CONFIG
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  out=$(run_expect_success "$WORKBRANCH" add login)
+  assert_contains "$out" "[*] Running repo setup: login/frontend"
+  assert_contains "$out" "[*] Running repo setup: login/backend"
+  assert_not_contains "$out" "[*] Running task setup:"
+  assert_contains "$(cat "$project/login/setup.log")" "frontend"
+  assert_contains "$(cat "$project/login/setup.log")" "backend"
+  assert_not_contains "$(cat "$project/login/setup.log")" "project"
+}
+
+test_task_setup_failure_reports_directory_and_command() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  canonical_project=$(pwd -P)
+  printf '\nTASK_SETUP false\n' >> "$project/.workbranch.config"
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  out=$(run_expect_fail "$WORKBRANCH" add login)
+  assert_contains "$out" "task setup failed: login"
+  assert_contains "$out" "Setup directory: $canonical_project"
+  assert_contains "$out" "Setup command: false"
+  assert_not_contains "$out" "in the task workspace"
+}
+
+test_repo_setup_failure_reports_directory_and_command() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  canonical_project=$(pwd -P)
+  printf '\nREPO_SETUP frontend false\n' >> "$project/.workbranch.config"
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  out=$(run_expect_fail "$WORKBRANCH" add login)
+  assert_contains "$out" "repo setup failed: login/frontend"
+  assert_contains "$out" "Setup directory: $canonical_project/login/frontend"
+  assert_contains "$out" "Setup command: false"
+  assert_not_contains "$out" "in the task workspace"
 }
 
 test_repo_setup_can_be_cleared_without_removing_other_repo_setup() {
@@ -1568,9 +1619,12 @@ main() {
   run_test test_config_rewrites_legacy_tasktree_config_without_cloning
   run_test test_task_setup_can_be_configured_and_run
   run_test test_setup_command_is_removed
-  run_test test_config_prompts_for_repo_branch_and_setup
+  run_test test_config_preserves_task_setup_while_prompting_repo_setup
   run_test test_config_guides_base_branch_change_for_cloned_repo
   run_test test_repo_setup_can_be_configured_and_run_per_repo
+  run_test test_repo_setup_suppresses_legacy_task_setup_fallback
+  run_test test_task_setup_failure_reports_directory_and_command
+  run_test test_repo_setup_failure_reports_directory_and_command
   run_test test_repo_setup_can_be_cleared_without_removing_other_repo_setup
   run_test test_interactive_init_writes_config_and_clones
   run_test test_interactive_init_can_cancel_before_creating_project

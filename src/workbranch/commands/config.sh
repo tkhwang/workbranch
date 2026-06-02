@@ -120,8 +120,7 @@ configure_existing_project() {
     i=$((i + 1))
   done
 
-  # `workbranch config` is repo-scoped: setup commands are configured per repo.
-  # Clear older project-level TASK_SETUP values so the rewritten config matches
-  # the repo-only prompt flow.
-  TASK_SETUP=""
+  # `workbranch config` is repo-scoped for new setup prompts, but existing
+  # project-level TASK_SETUP remains a supported add-time hook. Preserve it
+  # unless a flow explicitly clears or migrates it.
 }
