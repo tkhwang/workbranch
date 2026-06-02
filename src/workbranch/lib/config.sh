@@ -111,10 +111,7 @@ task_setup_from_line() {
 
 repo_setup_command_from_line() {
   line=$1
-  rest=$(printf '%s' "$line" | sed 's/^[^[:space:]]*[[:space:]]*//; s/[[:space:]]*$//')
-  repo=${rest%%[[:space:]]*}
-  command=${rest#"$repo"}
-  command=$(printf '%s' "$command" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+  command=$(printf '%s' "$line" | sed 's/^[^[:space:]]*[[:space:]]*[^[:space:]]*[[:space:]]*//; s/[[:space:]]*$//')
   printf '%s' "$command"
 }
 
