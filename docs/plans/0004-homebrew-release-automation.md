@@ -21,7 +21,7 @@ When meaningful changes merge to `main`, a new version is released automatically
 
 ## Repositories
 
-```
+```text
 tkhwang/workbranch        (this repo — source of truth)
   ├── src/workbranch/**          source modules
   ├── bin/workbranch             generated single-file (committed, kept fresh by CI)
@@ -39,7 +39,7 @@ The repo's `packaging/homebrew/workbranch.rb` is the **authoring/staging** copy.
 
 ## Automation flow
 
-```
+```text
 feat/fix commits ── PR ──> main
                             │
                             ├─ CI (on PR & push): build, freshness, tests, shellcheck

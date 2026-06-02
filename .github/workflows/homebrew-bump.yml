@@ -15,11 +15,12 @@ jobs:
 
     steps:
       - name: Checkout Homebrew tap
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           repository: tkhwang/homebrew-tap
           token: ${{ secrets.TAP_GITHUB_TOKEN }}
           path: homebrew-tap
+          persist-credentials: false
 
       - name: Update formula URL and sha256
         env:
@@ -73,6 +74,7 @@ jobs:
         working-directory: homebrew-tap
         env:
           TAG_NAME: ${{ github.event.release.tag_name }}
+          TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           if git diff --quiet -- Formula/workbranch.rb; then
@@ -84,4 +86,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Formula/workbranch.rb
           git commit -m "chore(workbranch): update formula for ${TAG_NAME}"
-          git push
+          auth_header=$(printf 'x-access-token:%s' "$TAP_GITHUB_TOKEN" | base64 -w0)
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth_header}" \
+            push https://github.com/tkhwang/homebrew-tap.git HEAD:main
