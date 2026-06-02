@@ -6,6 +6,7 @@ class Workbranch < Formula
   license "MIT"
 
   def install
+    system "scripts/build-workbranch.sh"
     bin.install "bin/workbranch"
   end
 

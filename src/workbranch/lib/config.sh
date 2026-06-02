@@ -144,17 +144,11 @@ has_task_setups() {
 }
 
 config_line_split_tokens() {
-  # shell word splitting is intentional for directive headers. TASK_SETUP and
-  # REPO_SETUP preserve the command tail separately so command whitespace works.
-  # Pathname expansion is not part of the config format, so keep glob characters literal.
+  # Word splitting is intentional for directive headers. TASK_SETUP and REPO_SETUP
+  # preserve the command tail separately so command whitespace works. Pathname
+  # expansion is not part of the config format, so keep glob characters literal.
   line=$1
-  case $- in
-    *f*) glob_was_disabled=1 ;;
-    *) glob_was_disabled=0 ;;
-  esac
-  set -f
-  CONFIG_FIELDS=($line)
-  [ "$glob_was_disabled" -eq 1 ] || set +f
+  read -r -a CONFIG_FIELDS <<< "$line"
 }
 
 validate_config_complete() {

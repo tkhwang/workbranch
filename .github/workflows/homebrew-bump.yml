@@ -1,0 +1,87 @@
+name: Bump Homebrew Formula
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: read
+
+jobs:
+  bump-homebrew-formula:
+    name: Update tkhwang/homebrew-tap
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Homebrew tap
+        uses: actions/checkout@v4
+        with:
+          repository: tkhwang/homebrew-tap
+          token: ${{ secrets.TAP_GITHUB_TOKEN }}
+          path: homebrew-tap
+
+      - name: Update formula URL and sha256
+        env:
+          TAG_NAME: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+
+          case "$TAG_NAME" in
+            v*) ;;
+            *)
+              echo "release tag must start with v: $TAG_NAME" >&2
+              exit 1
+              ;;
+          esac
+
+          tarball_url="https://github.com/tkhwang/workbranch/archive/refs/tags/${TAG_NAME}.tar.gz"
+          tarball_path=$(mktemp)
+          curl -fsSL "$tarball_url" -o "$tarball_path"
+          tarball_sha=$(sha256sum "$tarball_path" | awk '{print $1}')
+
+          FORMULA_PATH="homebrew-tap/Formula/workbranch.rb" \
+          TARBALL_URL="$tarball_url" \
+          TARBALL_SHA="$tarball_sha" \
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          formula = Path(os.environ["FORMULA_PATH"])
+          text = formula.read_text()
+          text, url_count = re.subn(
+              r'^  url ".*"$',
+              f'  url "{os.environ["TARBALL_URL"]}"',
+              text,
+              count=1,
+              flags=re.MULTILINE,
+          )
+          text, sha_count = re.subn(
+              r'^  sha256 ".*"$',
+              f'  sha256 "{os.environ["TARBALL_SHA"]}"',
+              text,
+              count=1,
+              flags=re.MULTILINE,
+          )
+          if url_count != 1 or sha_count != 1:
+              raise SystemExit("expected exactly one url and one sha256 line in Formula/workbranch.rb")
+          formula.write_text(text)
+          PY
+
+      - name: Commit and push formula update
+        working-directory: homebrew-tap
+        env:
+          TAG_NAME: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- Formula/workbranch.rb; then
+            echo "Formula/workbranch.rb is already up to date for ${TAG_NAME}"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/workbranch.rb
+          git commit -m "chore(workbranch): update formula for ${TAG_NAME}"
+          git push

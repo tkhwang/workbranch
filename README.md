@@ -131,17 +131,22 @@ WORKBRANCH_BASE_REPO_DIR
 
 ## Install
 
-### Homebrew 
+### Homebrew
 
-planned install shape:
+Install the latest versioned release from the Homebrew tap:
 
 ```bash
-brew tap tkhwang/workbranch
-brew install workbranch
+brew install tkhwang/tap/workbranch
 ```
 
-### Installer:
+The formula builds the generated `bin/workbranch` from the tagged source archive before installing it.
+
+### curl installer
+
+Install the latest `main` build directly:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/tkhwang/workbranch/main/install.sh | bash
 ```
+
+The curl installer tracks `main`, while Homebrew tracks published GitHub Releases.
