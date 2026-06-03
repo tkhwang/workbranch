@@ -1,13 +1,32 @@
 # workbranch
 
+**English** | [한국어](README.ko.md)
+
 Simplify Git worktree workspaces and branch operations.
 
-`workbranch` has two main features:
+## TL;DR
 
-1. create task-oriented Git worktree workspaces
-2. simplify branch operations between remote, base worktree, and feature worktrees
+* You want to use Git worktrees, but the `git worktree` commands are hard to remember.
+* You keep several feature worktrees open, so updating each workspace from the base branch takes too many manual steps.
+* Your frontend and backend live in separate repos, which makes it harder to give AI tools one shared task context.
 
-## 1. Worktree workspace
+### Workbranch solution
+
+`workbranch` is for developers who like the idea of Git worktrees, but do not want to manage every task workspace, branch sync, and multi-repo context by hand.
+
+* Run `workbranch init` once, then manage task workspaces with `workbranch add` and `workbranch remove`.
+* Use `workbranch update` to bring base branch changes into one task workspace or all task workspaces.
+* Push a task branch for PR review, or use `workbranch land` when you want to bring feature work back into the local base worktree.
+* Put frontend, backend, and other repos under one task directory so AI tools can work from the same context.
+
+![img](./docs/figs/workbranch-git-flow.png)
+
+`workbranch` has two core features:
+
+1. Task workspaces: create and remove task-oriented Git worktree folders.
+2. Branch sync: move changes between the base worktree and task worktrees.
+
+## 1. Task workspaces
 
 `workbranch` organizes linked worktrees by task/feature. A task such as `login` or `payment` gets its own folder, and each configured repo gets a linked worktree inside that folder.
 
@@ -25,13 +44,15 @@ For a single repo:
 ```text
 my-app-workspace
 ├── .workbranch.config
-├── _base
-│   └── my-app              // base worktree
-├── login
-│   └── my-app              // feature worktree
-└── payment
-    └── my-app              // feature worktree
+├── _base                   // base worktree
+│   └── my-app                 - repo: base
+├── login                   // feature worktree              <-- AI agent
+│   └── my-app                 - repo: login task
+└── payment                 // feature worktree              <-- AI agent
+    └── my-app                 - repo: payment task
 ```
+
+![img](./docs/figs/workbranch-multi-repo.png)
 
 For multi-repo:
 In multi-repo work, the feature folder gives one shared workspace/session context for all repos in that task.
@@ -39,22 +60,22 @@ In multi-repo work, the feature folder gives one shared workspace/session contex
 ```text
 my-app-workspace
 ├── .workbranch.config
-├── _base
-│   ├── frontend            // base worktree: frontend
-│   └── backend             // base worktree: backend
-├── login                   // run one AI agent here
-│   ├── frontend            // feature worktree: frontend
-│   └── backend             // feature worktree: backend
-└── payment
-    ├── frontend            // feature worktree: frontend
-    └── backend             // feature worktree: backend
+├── _base                   // base worktree
+│   ├── frontend               - frontend repo: base
+│   └── backend                - backend repo: base
+├── login                   // feature worktree              <-- AI agent
+│   ├── frontend               - frontend repo: login task
+│   └── backend                - backend repo: login task
+└── payment                 // feature worktree              <-- AI agent
+    ├── frontend               - frontend repo: payment task
+    └── backend                - backend repo: payment task
 ```
 
+## 2. Branch sync
 
+![img](./docs/figs/workbranch_feature_diagram.png)
 
-## 2. Worktree branch operations
-
-`workbranch` keeps Git operations in two directions:
+`workbranch` syncs Git branches in two directions:
 
 - vertical: remote base branch `<->` local base worktree
 - horizontal: local base worktree `<->` feature worktrees
@@ -75,6 +96,17 @@ local:      _base/<repo>      task1/<repo>      task2/<repo>      task3/<repo>
                  |----------------->|                |                |
           update |---------------------------------->|                |
                  |--------------------------------------------------->|
+```
+
+Common flow:
+
+```text
+workbranch init or config
+workbranch add <task>
+workbranch update <task>      # bring base changes into the task workspace
+workbranch push <task>        # push task branches for PR review
+workbranch land <task>        # optional: bring task work back into local base
+workbranch remove <task>
 ```
 
 Commands:
