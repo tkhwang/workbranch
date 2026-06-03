@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.0](https://github.com/tkhwang/workbranch/compare/v0.2.0...v0.3.0) (2026-06-03)
+
+
+### Features
+
+* **config:** reject changing main worktrees dir or branch prefix ([47dff7d](https://github.com/tkhwang/workbranch/commit/47dff7d8f5d43c2cbab3afe9433ca3b8b61c1310))
+* **config:** update config command ([52f516f](https://github.com/tkhwang/workbranch/commit/52f516f79d443d40d755c2bc9c259cf08d5f00fd))
+
 ## [0.2.0](https://github.com/tkhwang/workbranch/compare/v0.1.0...v0.2.0) (2026-06-02)
 
 
