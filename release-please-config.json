@@ -4,7 +4,13 @@
   "include-component-in-tag": false,
   "packages": {
     ".": {
-      "package-name": "workbranch"
+      "package-name": "workbranch",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "bin/workbranch"
+        }
+      ]
     }
   }
 }
