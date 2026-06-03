@@ -6,6 +6,8 @@ Manage Git worktree task spaces without memorizing `git worktree` commands.
 
 `workbranch` creates one task folder per feature, works with one repo or many repos, and keeps branch sync commands short and safe.
 
+![img](./docs/figs/workbranch-git-flow.png)
+
 ## Install
 
 ### Homebrew
@@ -87,8 +89,6 @@ See the [MVP spec](docs/specs/0001-workbranch-mvp.md) for the config format and 
 ## Safety
 
 Before changing worktrees, `workbranch` checks for dirty worktrees, wrong branches, rebase state, missing repos, and non-fast-forward Git paths.
-
-![img](./docs/figs/workbranch-git-flow.png)
 
 ## More docs
 

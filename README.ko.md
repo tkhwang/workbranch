@@ -6,6 +6,8 @@
 
 `workbranch`는 feature마다 하나의 task 폴더를 만들고, single repo와 multi-repo 프로젝트 모두에서 짧고 안전한 branch sync 명령을 제공합니다.
 
+![img](./docs/figs/workbranch-git-flow.png)
+
 ## Install
 
 ### Homebrew
@@ -87,8 +89,6 @@ config format과 setup 환경변수는 [MVP spec](docs/specs/0001-workbranch-mvp
 ## Safety
 
 `workbranch`는 worktree를 변경하기 전에 dirty worktree, 잘못된 branch, rebase 상태, 누락된 repo, fast-forward가 아닌 Git 경로를 확인합니다.
-
-![img](./docs/figs/workbranch-git-flow.png)
 
 ## More docs
 
