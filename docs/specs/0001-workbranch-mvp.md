@@ -87,7 +87,7 @@ Create or update config without cloning repos.
 
 If `.workbranch.config` or legacy `.tasktree.config` / `.monotree.config` already exists in the current project, load it, then prompt for the project name, main worktrees directory, branch prefix, each repo's base branch, and each repo-level setup command. Press Enter to keep the current value. Type `--clear` at a repo setup prompt to remove that setup command.
 
-Changing `MAIN_WORKTREES_DIR`, `BRANCH_PREFIX`, or a repo base branch updates config only. `workbranch config` does not clone, move, rename, or check out existing worktrees.
+Changing a repo base branch updates config only. `workbranch config` does not clone, move, rename, or check out existing worktrees. Changing `BRANCH_PREFIX` is allowed only before task workspaces exist. Changing `MAIN_WORKTREES_DIR` is allowed only before base worktrees exist. Once matching worktrees exist, `workbranch config` rejects those changes.
 
 Existing project-level `TASK_SETUP` values remain supported for `workbranch add` and are preserved by `workbranch config` unless another explicit flow clears or migrates them.
 

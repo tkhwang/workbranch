@@ -1127,6 +1127,42 @@ test_config_can_change_branch_prefix_without_cloning() {
   assert_branch "$project/login/backend" "ticket/login"
 }
 
+test_config_rejects_branch_prefix_change_when_task_workspaces_exist() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "" "" "ticket" "" "" "" "" | run_expect_fail "$WORKBRANCH" config)
+  assert_contains "$out" "cannot change BRANCH_PREFIX while task workspaces exist"
+  assert_contains "$out" "remove or migrate existing task workspaces before changing it"
+  assert_contains "$(cat "$project/.workbranch.config")" "BRANCH_PREFIX feature"
+  assert_not_contains "$(cat "$project/.workbranch.config")" "BRANCH_PREFIX ticket"
+
+  out=$(run_expect_success "$WORKBRANCH" update login)
+  assert_contains "$out" "[+] Updated: login/frontend"
+  assert_contains "$out" "[+] Updated: login/backend"
+}
+
+test_config_rejects_main_worktrees_dir_change_when_base_worktrees_exist() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+
+  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "" "_main" "" "" "" "" "" | run_expect_fail "$WORKBRANCH" config)
+  assert_contains "$out" "cannot change MAIN_WORKTREES_DIR while base worktrees exist: _base"
+  assert_contains "$out" "remove or move existing base worktrees before changing it"
+  assert_contains "$(cat "$project/.workbranch.config")" "MAIN_WORKTREES_DIR _base"
+  assert_not_contains "$(cat "$project/.workbranch.config")" "MAIN_WORKTREES_DIR _main"
+
+  out=$(run_expect_success "$WORKBRANCH" status)
+  assert_contains "$out" "[*] Task workspaces"
+  assert_contains "$out" "[*] (none)"
+  assert_not_contains "$out" "[*] _base"
+}
+
 test_config_guides_base_branch_change_for_cloned_repo() {
   new_fixture
   project="$FIXTURE_PROJECT"
@@ -1672,6 +1708,8 @@ main() {
   run_test test_setup_command_is_removed
   run_test test_config_preserves_task_setup_while_prompting_repo_setup
   run_test test_config_can_change_branch_prefix_without_cloning
+  run_test test_config_rejects_branch_prefix_change_when_task_workspaces_exist
+  run_test test_config_rejects_main_worktrees_dir_change_when_base_worktrees_exist
   run_test test_config_guides_base_branch_change_for_cloned_repo
   run_test test_repo_setup_can_be_configured_and_run_per_repo
   run_test test_repo_setup_suppresses_legacy_task_setup_fallback

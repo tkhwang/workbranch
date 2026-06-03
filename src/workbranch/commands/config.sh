@@ -107,6 +107,27 @@ configure_repo_setup_prompt() {
   esac
 }
 
+base_worktrees_exist_in_dir() {
+  dir=$1
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    path="$PROJECT_ROOT/$dir/$name"
+    if [ -d "$path/.git" ] || [ -f "$path/.git" ]; then
+      return 0
+    fi
+    i=$((i + 1))
+  done
+  return 1
+}
+
+task_workspaces_exist() {
+  for path in "$PROJECT_ROOT"/*; do
+    is_task_workspace_path "$path" && return 0
+  done
+  return 1
+}
+
 configure_project_settings() {
   current_project=$PROJECT_NAME
   current_base_dir=$BASE_DIR
@@ -119,6 +140,10 @@ configure_project_settings() {
   value=$(prompt_with_default "Main worktrees dir" "$current_base_dir")
   validate_safe_name "MAIN_WORKTREES_DIR" "$value"
   if [ "$value" != "$current_base_dir" ]; then
+    if base_worktrees_exist_in_dir "$current_base_dir"; then
+      die "cannot change MAIN_WORKTREES_DIR while base worktrees exist: $current_base_dir
+remove or move existing base worktrees before changing it"
+    fi
     CONFIG_BASE_DIR_OLD=$current_base_dir
     CONFIG_BASE_DIR_NEW=$value
   fi
@@ -127,6 +152,10 @@ configure_project_settings() {
   value=$(prompt_with_default "Branch prefix" "$current_branch_prefix")
   validate_nonempty_no_space "BRANCH_PREFIX" "$value"
   if [ "$value" != "$current_branch_prefix" ]; then
+    if task_workspaces_exist; then
+      die "cannot change BRANCH_PREFIX while task workspaces exist
+remove or migrate existing task workspaces before changing it"
+    fi
     CONFIG_BRANCH_PREFIX_OLD=$current_branch_prefix
     CONFIG_BRANCH_PREFIX_NEW=$value
   fi
