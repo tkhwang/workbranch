@@ -24,5 +24,7 @@ Git:
   --repo <repo>     Limit operation to one repo; otherwise all repos
 Other:
   help              Show this help
+  -v, --version     Show the installed workbranch version
+  version           Show the installed workbranch version
 USAGE
 }

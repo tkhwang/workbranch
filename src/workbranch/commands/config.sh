@@ -35,6 +35,10 @@ cmd_config() {
 CONFIG_BRANCH_CHANGE_REPOS=()
 CONFIG_BRANCH_CHANGE_OLD=()
 CONFIG_BRANCH_CHANGE_NEW=()
+CONFIG_BASE_DIR_OLD=""
+CONFIG_BASE_DIR_NEW=""
+CONFIG_BRANCH_PREFIX_OLD=""
+CONFIG_BRANCH_PREFIX_NEW=""
 
 record_config_branch_change() {
   name=$1
@@ -46,6 +50,17 @@ record_config_branch_change() {
 }
 
 print_config_next_steps() {
+  if [ -n "$CONFIG_BASE_DIR_OLD" ]; then
+    info "Main worktrees dir change was saved in config only."
+    info "Existing cloned base worktrees were not moved automatically."
+    printf '    %s -> %s\n' "$CONFIG_BASE_DIR_OLD" "$CONFIG_BASE_DIR_NEW" >&2
+  fi
+
+  if [ -n "$CONFIG_BRANCH_PREFIX_OLD" ]; then
+    info "Branch prefix change was saved in config only."
+    info "New task workspaces will use: ${CONFIG_BRANCH_PREFIX_NEW}/<task>"
+  fi
+
   [ ${#CONFIG_BRANCH_CHANGE_REPOS[@]} -gt 0 ] || return 0
 
   info "Base branch changes were saved in config only."
@@ -57,7 +72,11 @@ print_config_next_steps() {
     name=${CONFIG_BRANCH_CHANGE_REPOS[$i]}
     old=${CONFIG_BRANCH_CHANGE_OLD[$i]}
     new=${CONFIG_BRANCH_CHANGE_NEW[$i]}
-    path=$(base_repo_path "$name")
+    if [ -n "$CONFIG_BASE_DIR_OLD" ]; then
+      path="$PROJECT_ROOT/$CONFIG_BASE_DIR_OLD/$name"
+    else
+      path=$(base_repo_path "$name")
+    fi
     printf '    # %s: %s -> %s\n' "$name" "$old" "$new" >&2
     printf '    cd %s\n' "$path" >&2
     printf '    git fetch origin\n' >&2
@@ -88,6 +107,61 @@ configure_repo_setup_prompt() {
   esac
 }
 
+base_worktrees_exist_in_dir() {
+  dir=$1
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    path="$PROJECT_ROOT/$dir/$name"
+    if [ -d "$path/.git" ] || [ -f "$path/.git" ]; then
+      return 0
+    fi
+    i=$((i + 1))
+  done
+  return 1
+}
+
+task_workspaces_exist() {
+  for path in "$PROJECT_ROOT"/*; do
+    is_task_workspace_path "$path" && return 0
+  done
+  return 1
+}
+
+configure_project_settings() {
+  current_project=$PROJECT_NAME
+  current_base_dir=$BASE_DIR
+  current_branch_prefix=$BRANCH_PREFIX
+
+  value=$(prompt_with_default "Project name" "$current_project")
+  validate_safe_name "PROJECT_NAME" "$value"
+  PROJECT_NAME=$value
+
+  value=$(prompt_with_default "Main worktrees dir" "$current_base_dir")
+  validate_safe_name "MAIN_WORKTREES_DIR" "$value"
+  if [ "$value" != "$current_base_dir" ]; then
+    if base_worktrees_exist_in_dir "$current_base_dir"; then
+      die "cannot change MAIN_WORKTREES_DIR while base worktrees exist: $current_base_dir
+remove or move existing base worktrees before changing it"
+    fi
+    CONFIG_BASE_DIR_OLD=$current_base_dir
+    CONFIG_BASE_DIR_NEW=$value
+  fi
+  BASE_DIR=$value
+
+  value=$(prompt_with_default "Branch prefix" "$current_branch_prefix")
+  validate_nonempty_no_space "BRANCH_PREFIX" "$value"
+  if [ "$value" != "$current_branch_prefix" ]; then
+    if task_workspaces_exist; then
+      die "cannot change BRANCH_PREFIX while task workspaces exist
+remove or migrate existing task workspaces before changing it"
+    fi
+    CONFIG_BRANCH_PREFIX_OLD=$current_branch_prefix
+    CONFIG_BRANCH_PREFIX_NEW=$value
+  fi
+  BRANCH_PREFIX=$value
+}
+
 configure_existing_project() {
   info "Config"
   info "Project: $PROJECT_NAME"
@@ -95,20 +169,35 @@ configure_existing_project() {
   info "Branch prefix: $BRANCH_PREFIX"
   info "Press Enter to keep a current value. Type --clear at a setup prompt to remove it."
   printf '\n'
-  info "Repositories"
 
   CONFIG_BRANCH_CHANGE_REPOS=()
   CONFIG_BRANCH_CHANGE_OLD=()
   CONFIG_BRANCH_CHANGE_NEW=()
+  CONFIG_BASE_DIR_OLD=""
+  CONFIG_BASE_DIR_NEW=""
+  CONFIG_BRANCH_PREFIX_OLD=""
+  CONFIG_BRANCH_PREFIX_NEW=""
+
+  old_base_dir=$BASE_DIR
+  configure_project_settings
+
+  printf '\n'
+  info "Repositories"
 
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     current_branch=$(repo_base_branch_at "$i")
-    base_path=$(base_repo_path "$name")
+    if [ -n "$CONFIG_BASE_DIR_OLD" ]; then
+      base_path="$PROJECT_ROOT/$old_base_dir/$name"
+      display_base_dir=$old_base_dir
+    else
+      base_path=$(base_repo_path "$name")
+      display_base_dir=$BASE_DIR
+    fi
     if [ -d "$base_path/.git" ] || [ -f "$base_path/.git" ]; then
       checked_out=$(git -C "$base_path" branch --show-current 2>/dev/null || printf '?')
-      info "$BASE_DIR/$name current branch: $checked_out"
+      info "$display_base_dir/$name current branch: $checked_out"
     fi
     branch=$(prompt_with_default "Base repo branch for $name" "$current_branch")
     if [ "$branch" != "$current_branch" ]; then
