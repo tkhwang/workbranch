@@ -85,7 +85,9 @@ Git operation internals are defined in [`docs/git-operations.md`](../git-operati
 
 Create or update config without cloning repos.
 
-If `.workbranch.config` or legacy `.tasktree.config` / `.monotree.config` already exists in the current project, load it, then prompt for each repo's base branch and repo-level setup command. Press Enter to keep the current value. Type `--clear` at a repo setup prompt to remove that setup command.
+If `.workbranch.config` or legacy `.tasktree.config` / `.monotree.config` already exists in the current project, load it, then prompt for the project name, main worktrees directory, branch prefix, each repo's base branch, and each repo-level setup command. Press Enter to keep the current value. Type `--clear` at a repo setup prompt to remove that setup command.
+
+Changing `MAIN_WORKTREES_DIR`, `BRANCH_PREFIX`, or a repo base branch updates config only. `workbranch config` does not clone, move, rename, or check out existing worktrees.
 
 Existing project-level `TASK_SETUP` values remain supported for `workbranch add` and are preserved by `workbranch config` unless another explicit flow clears or migrates them.
 
@@ -263,6 +265,10 @@ Remove linked worktrees for a task without deleting branches.
 
 Fails if any task worktree is dirty.
 
+### `workbranch version`
+
+Print the installed CLI version as `workbranch <version>`. `workbranch -v` and `workbranch --version` are aliases. The generated single-file executable embeds the version from `.release-please-manifest.json` at build time and falls back to `0.0.0-dev` when no manifest version is available.
+
 ## Safety
 
 - Do not overwrite existing worktrees or branches.
@@ -297,5 +303,6 @@ If the user declines, print direct-run and manual PATH guidance.
 - `land <task>` lands task branches into local base branches without merge commits.
 - `--repo <repo>` limits supported Git commands to one repo.
 - `remove <task>` removes linked worktrees only.
+- `-v`, `--version`, and `version` print the manifest-backed installed CLI version.
 - Dirty worktree checks prevent unsafe operations.
 - Integration tests use temporary local bare remotes.

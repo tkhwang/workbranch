@@ -46,6 +46,10 @@ assert_remote_missing_file() {
   fi
 }
 
+manifest_version() {
+  sed -n 's/.*"[.]": *"\([^"]*\)".*/\1/p' "$REPO_ROOT/.release-please-manifest.json"
+}
+
 run_expect_success() {
   out=$("$@" 2>&1)
   status=$?
@@ -1081,13 +1085,16 @@ test_config_preserves_task_setup_while_prompting_repo_setup() {
   cd "$project" || return 1
   printf '\nTASK_SETUP pnpm install\n' >> "$project/.workbranch.config"
 
-  out=$(printf '%s\n%s\n%s\n%s\n' "" 'printf frontend > repo.txt' "" "" | run_expect_success "$WORKBRANCH" config)
+  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "" "" "" "" 'printf frontend > repo.txt' "" "" | run_expect_success "$WORKBRANCH" config)
+  assert_contains "$out" "[*] Project name [fullstack]:"
+  assert_contains "$out" "[*] Main worktrees dir [_base]:"
+  assert_contains "$out" "[*] Branch prefix [feature]:"
   assert_contains "$out" "[*] Base repo branch for frontend [master]:"
   assert_contains "$out" "[*] Repo setup command for frontend []:"
   assert_contains "$out" "[*] Base repo branch for backend [master]:"
   assert_contains "$out" "[*] Repo setup command for backend []:"
   assert_not_contains "$out" "Task setup command"
-  assert_contains "$out" "$(printf '%s\n\n%s' "[*] Press Enter to keep a current value. Type --clear at a setup prompt to remove it." "[*] Repositories")"
+  assert_contains "$out" "$(printf '%s \n\n%s' "[*] Branch prefix [feature]:" "[*] Repositories")"
   assert_contains "$out" "$(printf '%s \n\n%s' "[*] Repo setup command for frontend []:" "[*] Base repo branch for backend [master]:")"
   assert_contains "$out" "$(printf '%s \n\n%s' "[*] Repo setup command for backend []:" "[+] Config updated:")"
   case "$out" in
@@ -1100,13 +1107,33 @@ test_config_preserves_task_setup_while_prompting_repo_setup() {
   assert_contains "$config" "TASK_SETUP pnpm install"
 }
 
+test_config_can_change_branch_prefix_without_cloning() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+
+  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "" "" "ticket" "" "" "" "" | run_expect_success "$WORKBRANCH" config)
+  assert_contains "$out" "[*] Branch prefix [feature]:"
+  assert_contains "$out" "[+] Config updated:"
+  config=$(cat "$project/.workbranch.config")
+  assert_contains "$config" "BRANCH_PREFIX ticket"
+  assert_dir "$project/_base/frontend/.git"
+
+  out=$(run_expect_success "$WORKBRANCH" add login)
+  assert_contains "$out" "[+] Created: login/frontend"
+  assert_contains "$out" "[+] Created: login/backend"
+  assert_branch "$project/login/frontend" "ticket/login"
+  assert_branch "$project/login/backend" "ticket/login"
+}
+
 test_config_guides_base_branch_change_for_cloned_repo() {
   new_fixture
   project="$FIXTURE_PROJECT"
   cd "$project" || return 1
   run_expect_success "$WORKBRANCH" init >/dev/null
 
-  out=$(printf '%s\n%s\n%s\n%s\n%s\n' "develop" "" "" "" "" | run_expect_success "$WORKBRANCH" config)
+  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "" "" "" "develop" "" "" "" "" | run_expect_success "$WORKBRANCH" config)
   assert_contains "$out" "[*] _base/frontend current branch: master"
   assert_contains "$out" "[+] Config updated:"
   assert_contains "$out" "[*] Base branch changes were saved in config only."
@@ -1123,7 +1150,7 @@ test_repo_setup_can_be_configured_and_run_per_repo() {
   frontend_cmd='printf "%s:%s:%s\n" "$WORKBRANCH_REPO" "$WORKBRANCH_TASK" "$(basename "$PWD")" >> "$WORKBRANCH_TASK_DIR/setup.log"; printf "%s\n" "$WORKBRANCH_REPO_DIR" > repo-setup-dir.txt'
   backend_cmd='printf "%s:%s:%s\n" "$WORKBRANCH_REPO" "$WORKBRANCH_TASK" "$(basename "$PWD")" >> "$WORKBRANCH_TASK_DIR/setup.log"; printf "%s\n" "$WORKBRANCH_BASE_REPO_DIR" > repo-base-dir.txt'
 
-  out=$(printf '%s\n%s\n%s\n%s\n%s\n' "" "$frontend_cmd" "" "$backend_cmd" "" | run_expect_success "$WORKBRANCH" config)
+  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "" "" "" "" "$frontend_cmd" "" "$backend_cmd" | run_expect_success "$WORKBRANCH" config)
   assert_contains "$out" "[+] Config updated:"
   config=$(cat "$project/.workbranch.config")
   assert_contains "$config" "REPO_SETUP frontend $frontend_cmd"
@@ -1203,7 +1230,7 @@ REPO_SETUP frontend printf frontend > repo.txt
 REPO_SETUP backend printf backend > repo.txt
 CONFIG
 
-  out=$(printf '%s\n%s\n%s\n%s\n%s\n' "" "--clear" "" "" "" | run_expect_success "$WORKBRANCH" config)
+  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "" "" "" "" "--clear" "" "" | run_expect_success "$WORKBRANCH" config)
   assert_contains "$out" "[+] Config updated:"
   config=$(cat "$project/.workbranch.config")
   assert_not_contains "$config" "REPO_SETUP frontend"
@@ -1558,6 +1585,8 @@ test_help_groups_commands() {
   assert_not_contains "$out" "setup <task>"
   assert_contains "$out" "Git:"
   assert_contains "$out" "Other:"
+  assert_contains "$out" "-v, --version     Show the installed workbranch version"
+  assert_contains "$out" "version           Show the installed workbranch version"
   assert_contains "$out" "status            Show commits, diff, and dirty state"
   assert_contains "$out" "  vertical"
   assert_contains "$out" "pull              Pull remote base branches into main worktrees"
@@ -1582,12 +1611,27 @@ test_help_groups_commands() {
   esac
 }
 
+test_version_reports_release_manifest_version() {
+  expected=$(manifest_version)
+  [ -n "$expected" ] || fail "could not read release manifest version"
+
+  out=$(run_expect_success "$WORKBRANCH" version)
+  [ "$out" = "workbranch $expected" ] || fail "expected version output 'workbranch $expected', got: $out"
+
+  out=$(run_expect_success "$WORKBRANCH" --version)
+  [ "$out" = "workbranch $expected" ] || fail "expected --version output 'workbranch $expected', got: $out"
+
+  out=$(run_expect_success "$WORKBRANCH" -v)
+  [ "$out" = "workbranch $expected" ] || fail "expected -v output 'workbranch $expected', got: $out"
+}
+
 main() {
   [ -x "$WORKBRANCH" ] || fail "missing executable: $WORKBRANCH"
   git --version >/dev/null || fail "git is required"
 
   run_test test_generated_workbranch_is_up_to_date
   run_test test_help_groups_commands
+  run_test test_version_reports_release_manifest_version
   run_test test_safe_names_reject_dot_and_dotdot
   run_test test_invalid_config_rejected_without_execution
   run_test test_init_existing_config_clones_base_repos
@@ -1627,6 +1671,7 @@ main() {
   run_test test_task_setup_can_be_configured_and_run
   run_test test_setup_command_is_removed
   run_test test_config_preserves_task_setup_while_prompting_repo_setup
+  run_test test_config_can_change_branch_prefix_without_cloning
   run_test test_config_guides_base_branch_change_for_cloned_repo
   run_test test_repo_setup_can_be_configured_and_run_per_repo
   run_test test_repo_setup_suppresses_legacy_task_setup_fallback

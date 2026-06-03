@@ -19,5 +19,6 @@ src/workbranch/commands/update.sh
 src/workbranch/commands/push.sh
 src/workbranch/commands/land.sh
 src/workbranch/commands/remove.sh
+src/workbranch/commands/version.sh
 src/workbranch/git-ops.sh
 src/workbranch/main.sh

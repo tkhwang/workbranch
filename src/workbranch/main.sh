@@ -12,6 +12,7 @@ main() {
     push) cmd_push "$@" ;;
     land) cmd_land "$@" ;;
     remove) cmd_remove "$@" ;;
+    version|-v|--version) cmd_version "$@" ;;
     help|-h|--help) usage ;;
     *) usage >&2; die "unknown command: $cmd" ;;
   esac
