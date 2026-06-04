@@ -46,7 +46,8 @@ Workspace:
   config            Create or update .workbranch.config without cloning repos
   config --rewrite  Rewrite config to current format without prompts
   add <task>        Create a task workspace
-  remove <task>     Remove task worktrees without deleting branches
+  resume <task>     Restore existing local or remote task branches
+  remove <task>     Remove task worktrees and local task branches
 Git:
   status            Show commits, diff, and dirty state
   vertical
@@ -1040,6 +1041,21 @@ LEGEND
 }
 
 is_task_workspace_path() {
+  local path i name
+  path=$1
+  is_task_shaped_directory_path "$path" || return 1
+
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    is_registered_worktree_path "$path/$name" || return 1
+    i=$((i + 1))
+  done
+  return 0
+}
+
+is_task_shaped_directory_path() {
+  local path dir_name i name
   path=$1
   [ -d "$path" ] || return 1
   dir_name=${path##*/}
@@ -1052,6 +1068,39 @@ is_task_workspace_path() {
     [ -d "$path/$name" ] || return 1
     i=$((i + 1))
   done
+  return 0
+}
+
+is_registered_worktree_path() {
+  local path path_real worktree_paths old_ifs worktree_path worktree_real
+  path=$1
+  [ -d "$path" ] || return 1
+  git -C "$path" rev-parse --git-dir >/dev/null 2>&1 || return 1
+  path_real=$(cd "$path" && pwd -P) || return 1
+  worktree_paths=$(git -C "$path" worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p') || return 1
+  old_ifs=$IFS
+  IFS='
+'
+  for worktree_path in $worktree_paths; do
+    if [ -d "$worktree_path" ]; then
+      worktree_real=$(cd "$worktree_path" && pwd -P) || worktree_real=$worktree_path
+    else
+      worktree_real=$worktree_path
+    fi
+    if [ "$worktree_real" = "$path_real" ]; then
+      IFS=$old_ifs
+      return 0
+    fi
+  done
+  IFS=$old_ifs
+  return 1
+}
+
+is_stale_task_directory_path() {
+  local path
+  path=$1
+  is_task_shaped_directory_path "$path" || return 1
+  is_task_workspace_path "$path" && return 1
   return 0
 }
 
@@ -1474,6 +1523,21 @@ cmd_add() {
   done
   preflight_die_if_errors "add"
 
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    base=$(base_repo_path "$name")
+    branch=$(repo_task_branch_at "$i" "$task")
+    workbranch_git_add_fetch_base "$base" || die "failed to fetch repo '$name'"
+    if branch_exists "$base" "$branch" || git_ref_exists "$base" "origin/$branch"; then
+      printf "[-] Error: task branch already exists for repo '%s': %s\n" "$name" "$branch" >&2
+      printf '[*] To resume it: workbranch resume %s\n' "$task" >&2
+      printf '[*] To delete it first: workbranch remove %s\n' "$task" >&2
+      exit 1
+    fi
+    i=$((i + 1))
+  done
+
   mkdir -p "$task_dir" || die "failed to create task directory: $task_dir"
   track_path "$task_dir"
 
@@ -1484,15 +1548,9 @@ cmd_add() {
     base_branch=$(repo_base_branch_at "$i")
     branch=$(repo_task_branch_at "$i" "$task")
     target=$(task_repo_path "$task" "$name")
-    if branch_exists "$base" "$branch"; then
-      track_worktree "$target" "$base"
-      workbranch_git_add_existing_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
-    else
-      track_branch "$base" "$branch"
-      track_worktree "$target" "$base"
-      workbranch_git_add_fetch_base "$base" || fail_with_rollback "failed to fetch repo '$name'"
-      workbranch_git_add_new_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
-    fi
+    track_branch "$base" "$branch"
+    track_worktree "$target" "$base"
+    workbranch_git_add_new_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
     success "Created: $task/$name"
     success "  [base repo] $base_branch -> [task repo] $branch"
     i=$((i + 1))
@@ -1502,6 +1560,73 @@ cmd_add() {
     printf '[*] Worktrees were created. Fix setup with:\n' >&2
     printf '    workbranch config\n' >&2
     printf '[*] Then rerun the setup command shown above, or remove and add the task again.\n' >&2
+    return 1
+  fi
+}
+
+# ----- src/workbranch/commands/resume.sh -----
+cmd_resume() {
+  [ $# -eq 1 ] || die "usage: workbranch resume <task>"
+  task=$1
+  validate_safe_name "task" "$task"
+  require_project
+  CREATED_PATHS=()
+  CREATED_WORKTREES=()
+  CREATED_WORKTREE_BASES=()
+  CREATED_BRANCH_REPOS=()
+  CREATED_BRANCH_NAMES=()
+  task_dir="$PROJECT_ROOT/$task"
+  [ ! -e "$task_dir" ] || die "task directory already exists: $task_dir"
+
+  reset_preflight
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    base=$(base_repo_path "$name")
+    base_branch=$(repo_base_branch_at "$i")
+    branch=$(repo_task_branch_at "$i" "$task")
+    base_label="$BASE_DIR/$name"
+    if [ ! -d "$base/.git" ] && [ ! -f "$base/.git" ]; then
+      preflight_error "$base_label missing git repo"
+      i=$((i + 1))
+      continue
+    fi
+    preflight_require_current_branch "$base_label" "$base" "$base_branch"
+    preflight_require_clean "$base_label" "$base"
+    preflight_require_no_rebase "$base_label" "$base"
+    preflight_fetch_origin "$base_label" "$base"
+    if ! branch_exists "$base" "$branch" && ! git_ref_exists "$base" "origin/$branch"; then
+      preflight_error "$base_label missing task branch $branch"
+    fi
+    i=$((i + 1))
+  done
+  preflight_die_if_errors "resume"
+
+  mkdir -p "$task_dir" || die "failed to create task directory: $task_dir"
+  track_path "$task_dir"
+
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    base=$(base_repo_path "$name")
+    base_branch=$(repo_base_branch_at "$i")
+    branch=$(repo_task_branch_at "$i" "$task")
+    target=$(task_repo_path "$task" "$name")
+    if ! branch_exists "$base" "$branch"; then
+      track_branch "$base" "$branch"
+      workbranch_git_create_task_branch_from_remote "$base" "$branch" || fail_with_rollback "failed to create task branch for repo '$name'"
+    fi
+    track_worktree "$target" "$base"
+    workbranch_git_add_existing_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
+    success "Resumed: $task/$name"
+    success "  [base repo] $base_branch -> [task repo] $branch"
+    i=$((i + 1))
+  done
+  if has_task_setups && ! run_task_setups "$task"; then
+    printf '[-] Error: task setup failed\n' >&2
+    printf '[*] Worktrees were created. Fix setup with:\n' >&2
+    printf '    workbranch config\n' >&2
+    printf '[*] Then rerun the setup command shown above, or remove and resume the task again.\n' >&2
     return 1
   fi
 }
@@ -1615,6 +1740,17 @@ cmd_status() {
     print_next_legend
   fi
   [ $found -eq 1 ] || info "(none)"
+
+  stale_found=0
+  for path in "$PROJECT_ROOT"/*; do
+    is_stale_task_directory_path "$path" || continue
+    if [ $stale_found -eq 0 ]; then
+      printf '\n'
+      info "Stale directories"
+    fi
+    printf '    %-8s %s\n' "${path##*/}" "directory exists but no registered worktrees"
+    stale_found=1
+  done
 }
 
 # ----- src/workbranch/commands/pull.sh -----
@@ -1886,22 +2022,41 @@ cmd_land() {
 
 # ----- src/workbranch/commands/remove.sh -----
 cmd_remove() {
-  [ $# -eq 1 ] || die "usage: workbranch remove <task>"
+  [ $# -eq 1 ] || [ $# -eq 2 ] || die "usage: workbranch remove <task> [--force]"
   task=$1
+  force=0
+  if [ $# -eq 2 ]; then
+    [ "$2" = "--force" ] || die "usage: workbranch remove <task> [--force]"
+    force=1
+  fi
   validate_safe_name "task" "$task"
   require_project
-  require_task_repos_clean "$task"
+  [ "$force" -eq 1 ] || require_task_repos_clean "$task"
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     path=$(task_repo_path "$task" "$name")
+    branch=$(repo_task_branch_at "$i" "$task")
+    base=$(base_repo_path "$name")
     if [ ! -d "$path" ]; then
       info "Worktree already removed: $task/$name"
-      i=$((i + 1))
-      continue
+      workbranch_git_delete_task_branch "$base" "$branch" || die "failed to delete task branch for repo '$name': $branch"
+      success "Removed: $task/$name"
+    else
+      if [ "$force" -eq 1 ]; then
+        git -C "$base" worktree remove --force "$path"
+        remove_status=$?
+      else
+        git -C "$base" worktree remove "$path"
+        remove_status=$?
+      fi
+      if [ "$remove_status" -eq 0 ]; then
+        workbranch_git_delete_task_branch "$base" "$branch" || die "failed to delete task branch for repo '$name': $branch"
+        success "Removed: $task/$name"
+      else
+        info "failed to remove worktree (continuing): $task/$name"
+      fi
     fi
-    base=$(base_repo_path "$name")
-    git -C "$base" worktree remove "$path" || info "failed to remove worktree (continuing): $task/$name"
     i=$((i + 1))
   done
   if rmdir "$PROJECT_ROOT/$task" 2>/dev/null; then
@@ -1928,10 +2083,16 @@ workbranch_git_add_fetch_base() {
   git -C "$base_path" fetch origin >/dev/null 2>&1
 }
 
+workbranch_git_prune_stale_worktrees() {
+  base_path=$1
+  git -C "$base_path" worktree prune >/dev/null 2>&1
+}
+
 workbranch_git_add_existing_task_worktree() {
   base_path=$1
   target_path=$2
   task_branch=$3
+  workbranch_git_prune_stale_worktrees "$base_path" || return 1
   git -C "$base_path" worktree add "$target_path" "$task_branch" >/dev/null 2>&1
 }
 
@@ -1939,7 +2100,23 @@ workbranch_git_add_new_task_worktree() {
   base_path=$1
   target_path=$2
   task_branch=$3
+  workbranch_git_prune_stale_worktrees "$base_path" || return 1
   git -C "$base_path" worktree add "$target_path" -b "$task_branch" HEAD >/dev/null 2>&1
+}
+
+workbranch_git_delete_task_branch() {
+  base_path=$1
+  task_branch=$2
+  workbranch_git_prune_stale_worktrees "$base_path" || return 1
+  branch_exists "$base_path" "$task_branch" || return 0
+  git -C "$base_path" branch -D "$task_branch" >/dev/null 2>&1
+}
+
+workbranch_git_create_task_branch_from_remote() {
+  base_path=$1
+  task_branch=$2
+  git -C "$base_path" branch --track "$task_branch" "origin/$task_branch" >/dev/null 2>&1 ||
+    git -C "$base_path" branch "$task_branch" "origin/$task_branch" >/dev/null 2>&1
 }
 
 workbranch_git_pull_base() {
@@ -1999,6 +2176,7 @@ main() {
     config) cmd_config "$@" ;;
     init) cmd_init "$@" ;;
     add) cmd_add "$@" ;;
+    resume) cmd_resume "$@" ;;
     list) cmd_list "$@" ;;
     status) cmd_status "$@" ;;
     pull) cmd_pull "$@" ;;

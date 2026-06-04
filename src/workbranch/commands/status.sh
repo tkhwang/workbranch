@@ -45,4 +45,15 @@ cmd_status() {
     print_next_legend
   fi
   [ $found -eq 1 ] || info "(none)"
+
+  stale_found=0
+  for path in "$PROJECT_ROOT"/*; do
+    is_stale_task_directory_path "$path" || continue
+    if [ $stale_found -eq 0 ]; then
+      printf '\n'
+      info "Stale directories"
+    fi
+    printf '    %-8s %s\n' "${path##*/}" "directory exists but no registered worktrees"
+    stale_found=1
+  done
 }

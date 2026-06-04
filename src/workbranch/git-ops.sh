@@ -8,10 +8,16 @@ workbranch_git_add_fetch_base() {
   git -C "$base_path" fetch origin >/dev/null 2>&1
 }
 
+workbranch_git_prune_stale_worktrees() {
+  base_path=$1
+  git -C "$base_path" worktree prune >/dev/null 2>&1
+}
+
 workbranch_git_add_existing_task_worktree() {
   base_path=$1
   target_path=$2
   task_branch=$3
+  workbranch_git_prune_stale_worktrees "$base_path" || return 1
   git -C "$base_path" worktree add "$target_path" "$task_branch" >/dev/null 2>&1
 }
 
@@ -19,7 +25,23 @@ workbranch_git_add_new_task_worktree() {
   base_path=$1
   target_path=$2
   task_branch=$3
+  workbranch_git_prune_stale_worktrees "$base_path" || return 1
   git -C "$base_path" worktree add "$target_path" -b "$task_branch" HEAD >/dev/null 2>&1
+}
+
+workbranch_git_delete_task_branch() {
+  base_path=$1
+  task_branch=$2
+  workbranch_git_prune_stale_worktrees "$base_path" || return 1
+  branch_exists "$base_path" "$task_branch" || return 0
+  git -C "$base_path" branch -D "$task_branch" >/dev/null 2>&1
+}
+
+workbranch_git_create_task_branch_from_remote() {
+  base_path=$1
+  task_branch=$2
+  git -C "$base_path" branch --track "$task_branch" "origin/$task_branch" >/dev/null 2>&1 ||
+    git -C "$base_path" branch "$task_branch" "origin/$task_branch" >/dev/null 2>&1
 }
 
 workbranch_git_pull_base() {

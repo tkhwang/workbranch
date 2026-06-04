@@ -148,9 +148,10 @@ For each repo:
 
 1. Ensure `_base/<repo>` exists and is clean.
 2. Derive the task branch name.
-3. Reuse an existing task branch when present, or create it from the base branch.
-4. Create a linked worktree at `<task>/<repo>`.
-5. Run configured repo-level setup commands. If no repo setup ran and the operation is not repo-filtered, run project-level `TASK_SETUP` when configured.
+3. Fail if the local or remote task branch already exists; use `workbranch resume <task>` to restore existing task branches.
+4. Create a new local task branch from the base branch.
+5. Create a linked worktree at `<task>/<repo>`.
+6. Run configured repo-level setup commands. If no repo setup ran and the operation is not repo-filtered, run project-level `TASK_SETUP` when configured.
 
 If any repo fails, roll back paths and branches created by the command.
 If any setup command fails, keep created worktrees and tell the user the exact failed setup context, setup directory, and setup command. The user can fix setup with `workbranch config`, then rerun the command shown in the failure output or remove and add the task again.
@@ -259,11 +260,19 @@ workbranch push login --repo frontend
 workbranch land login --repo frontend
 ```
 
+### `workbranch resume <task>`
+
+Restore linked worktrees from existing local task branches, or from matching remote `origin/<task-branch>` branches when no local task branch exists.
+
+Fails if any repo has no local or remote task branch for the task.
+
 ### `workbranch remove <task>`
 
-Remove linked worktrees for a task without deleting branches.
+Remove linked worktrees and local task branches for a task.
+Remote task branches are not deleted.
 
 Fails if any task worktree is dirty.
+Use `workbranch remove <task> --force` to discard dirty local task worktrees and local task branches.
 
 ### `workbranch version`
 
@@ -294,6 +303,7 @@ If the user declines, print direct-run and manual PATH guidance.
 - `config` writes config without cloning base worktrees.
 - `init` clones base worktrees from config, or writes config then clones when no config exists.
 - `add` creates task worktrees with expected branch names.
+- `resume` restores existing local or remote task branches.
 - `status` shows base/task commits, diff, and dirty state.
 - `pull` fast-forwards base worktrees.
 - `update` updates all task worktrees.
@@ -302,7 +312,7 @@ If the user declines, print direct-run and manual PATH guidance.
 - `push <task>` pushes task branches.
 - `land <task>` lands task branches into local base branches without merge commits.
 - `--repo <repo>` limits supported Git commands to one repo.
-- `remove <task>` removes linked worktrees only.
+- `remove <task>` removes linked worktrees and local task branches.
 - `-v`, `--version`, and `version` print the manifest-backed installed CLI version.
 - Dirty worktree checks prevent unsafe operations.
 - Integration tests use temporary local bare remotes.

@@ -348,12 +348,23 @@ test_full_git_flow() {
 
   run_expect_success "$WORKBRANCH" remove login >/dev/null
   assert_not_exists "$project/login"
-  git -C "$project/_base/frontend" rev-parse --verify feature/login >/dev/null
+  if git -C "$project/_base/frontend" show-ref --verify --quiet refs/heads/feature/login; then
+    fail "expected remove to delete local frontend feature/login branch"
+  fi
+  if git -C "$project/_base/backend" show-ref --verify --quiet refs/heads/feature/login; then
+    fail "expected remove to delete local backend feature/login branch"
+  fi
+  git --git-dir="$TMP_ROOT/remotes/frontend.git" rev-parse --verify refs/heads/feature/login >/dev/null
+  git --git-dir="$TMP_ROOT/remotes/backend.git" rev-parse --verify refs/heads/feature/login >/dev/null
 
-  out=$(run_expect_success "$WORKBRANCH" add login)
-  assert_contains "$out" "[+] Created: login/frontend"
+  out=$(run_expect_fail "$WORKBRANCH" add login)
+  assert_contains "$out" "task branch already exists for repo 'frontend': feature/login"
+  assert_contains "$out" "To resume it: workbranch resume login"
+
+  out=$(run_expect_success "$WORKBRANCH" resume login)
+  assert_contains "$out" "[+] Resumed: login/frontend"
   assert_contains "$out" "[+]   [base repo] master -> [task repo] feature/login"
-  assert_contains "$out" "[+] Created: login/backend"
+  assert_contains "$out" "[+] Resumed: login/backend"
   assert_contains "$out" "[+]   [base repo] master -> [task repo] feature/login"
   assert_file "$project/login/frontend/.git"
   assert_file "$project/login/backend/.git"
@@ -603,19 +614,111 @@ CONFIG
   assert_remote_file "$TMP_ROOT/remotes/backend.git" master normal.txt "feature backend"
 }
 
-test_add_reuses_existing_task_branch() {
+test_add_rejects_existing_task_branch() {
   new_fixture
   project="$FIXTURE_PROJECT"
   cd "$project" || return 1
   run_expect_success "$WORKBRANCH" init >/dev/null
   git -C "$project/_base/frontend" branch feature/login
-  out=$(run_expect_success "$WORKBRANCH" add login)
-  assert_contains "$out" "[+] Created: login/frontend"
-  assert_contains "$out" "[+]   [base repo] master -> [task repo] feature/login"
+
+  out=$(run_expect_fail "$WORKBRANCH" add login)
+  assert_contains "$out" "task branch already exists for repo 'frontend': feature/login"
+  assert_contains "$out" "To resume it: workbranch resume login"
+  assert_contains "$out" "To delete it first: workbranch remove login"
+  assert_not_exists "$project/login"
+}
+
+test_resume_recovers_manually_deleted_task_workspace() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  git -C "$project/login/frontend" config user.name "Workbranch Test"
+  git -C "$project/login/frontend" config user.email "workbranch-test@example.com"
+  git -C "$project/login/backend" config user.name "Workbranch Test"
+  git -C "$project/login/backend" config user.email "workbranch-test@example.com"
+  printf '%s\n' "manual delete frontend" > "$project/login/frontend/manual-delete.txt"
+  git -C "$project/login/frontend" add manual-delete.txt
+  git -C "$project/login/frontend" commit -m "manual delete frontend" >/dev/null
+  printf '%s\n' "manual delete backend" > "$project/login/backend/manual-delete.txt"
+  git -C "$project/login/backend" add manual-delete.txt
+  git -C "$project/login/backend" commit -m "manual delete backend" >/dev/null
+
+  rm -rf "$project/login"
+  git -C "$project/_base/frontend" worktree list --porcelain | grep -F "$project/login/frontend" >/dev/null ||
+    fail "expected manually deleted frontend worktree registration to remain stale"
+
+  out=$(run_expect_success "$WORKBRANCH" resume login)
+  assert_contains "$out" "[+] Resumed: login/frontend"
+  assert_contains "$out" "[+] Resumed: login/backend"
   assert_file "$project/login/frontend/.git"
   assert_file "$project/login/backend/.git"
+  assert_file "$project/login/frontend/manual-delete.txt"
+  assert_file "$project/login/backend/manual-delete.txt"
   assert_branch "$project/login/frontend" "feature/login"
   assert_branch "$project/login/backend" "feature/login"
+}
+
+test_resume_fetches_remote_task_branch() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  commit_to_remote_branch frontend feature/login remote-frontend
+  commit_to_remote_branch backend feature/login remote-backend
+
+  out=$(run_expect_success "$WORKBRANCH" resume login)
+  assert_contains "$out" "[+] Resumed: login/frontend"
+  assert_contains "$out" "[+] Resumed: login/backend"
+  assert_file "$project/login/frontend/remote-frontend.txt"
+  assert_file "$project/login/backend/remote-backend.txt"
+  assert_branch "$project/login/frontend" "feature/login"
+  assert_branch "$project/login/backend" "feature/login"
+}
+
+test_remove_deletes_task_branch_when_worktree_missing() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  rm -rf "$project/login"
+  out=$(run_expect_success "$WORKBRANCH" remove login)
+  assert_contains "$out" "Worktree already removed: login/frontend"
+  assert_contains "$out" "Worktree already removed: login/backend"
+  if git -C "$project/_base/frontend" show-ref --verify --quiet refs/heads/feature/login; then
+    fail "expected remove to delete stale frontend feature/login branch"
+  fi
+  if git -C "$project/_base/backend" show-ref --verify --quiet refs/heads/feature/login; then
+    fail "expected remove to delete stale backend feature/login branch"
+  fi
+
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  assert_branch "$project/login/frontend" "feature/login"
+  assert_branch "$project/login/backend" "feature/login"
+}
+
+test_remove_force_discards_dirty_task() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  printf '%s\n' "dirty task" > "$project/login/frontend/dirty.txt"
+
+  out=$(run_expect_success "$WORKBRANCH" remove login --force)
+  assert_contains "$out" "Removed: login/frontend"
+  assert_contains "$out" "Removed: login/backend"
+  assert_not_exists "$project/login"
+  if git -C "$project/_base/frontend" show-ref --verify --quiet refs/heads/feature/login; then
+    fail "expected force remove to delete frontend feature/login branch"
+  fi
+  if git -C "$project/_base/backend" show-ref --verify --quiet refs/heads/feature/login; then
+    fail "expected force remove to delete backend feature/login branch"
+  fi
 }
 
 test_add_rolls_back_branch_when_new_worktree_helper_fails() {
@@ -766,6 +869,21 @@ test_status_repo_filter_skips_tasks_without_matching_rows() {
   assert_not_contains "$out" "[*] login"
   assert_not_contains "$out" "    repo        base       task       diff  status    next"
   assert_not_contains "$out" "[*] Next"
+}
+
+test_status_reports_stale_task_shaped_directories_separately() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  mkdir -p "$project/login/frontend" "$project/login/backend"
+
+  out=$(run_expect_success "$WORKBRANCH" status)
+  assert_contains "$out" "[*] Task workspaces"
+  assert_contains "$out" "[*] (none)"
+  assert_contains "$out" "[*] Stale directories"
+  assert_contains "$out" "login    directory exists but no registered worktrees"
+  assert_not_contains "$out" "    repo        base       task       diff  status    next"
 }
 
 test_status_skips_partial_task_workspaces() {
@@ -1615,6 +1733,7 @@ test_help_groups_commands() {
   assert_contains "$out" "list              List configured repos and task workspaces"
   assert_contains "$out" "config            Create or update .workbranch.config without cloning repos"
   assert_contains "$out" "config --rewrite  Rewrite config to current format without prompts"
+  assert_contains "$out" "resume <task>     Restore existing local or remote task branches"
   assert_not_contains "$out" "setup             Add or change"
   assert_not_contains "$out" "setup --clear"
   assert_not_contains "$out" "setup repo <repo>"
@@ -1642,7 +1761,7 @@ test_help_groups_commands() {
     *$'\n\n'*) fail "expected compact help without blank lines; got: $out" ;;
   esac
   case "$out" in
-    *"Workspace:"*"init              Initialize a workbranch project"*"list              List configured repos and task workspaces"*"config            Create or update .workbranch.config without cloning repos"*"config --rewrite  Rewrite config to current format without prompts"*"add <task>        Create a task workspace"*"remove <task>     Remove task worktrees without deleting branches"*"Git:"*"status            Show commits, diff, and dirty state"*"  vertical"*"Other:"*) ;;
+    *"Workspace:"*"init              Initialize a workbranch project"*"list              List configured repos and task workspaces"*"config            Create or update .workbranch.config without cloning repos"*"config --rewrite  Rewrite config to current format without prompts"*"add <task>        Create a task workspace"*"resume <task>     Restore existing local or remote task branches"*"remove <task>     Remove task worktrees and local task branches"*"Git:"*"status            Show commits, diff, and dirty state"*"  vertical"*"Other:"*) ;;
     *) fail "expected workspace and group ordering; got: $out" ;;
   esac
 }
@@ -1685,12 +1804,17 @@ main() {
   run_test test_repo_scope_limits_git_commands_to_one_repo
   run_test test_land_preflight_blocks_all_repos_before_partial_land
   run_test test_push_supports_task_and_base_branches_after_fast_forward_merge
-  run_test test_add_reuses_existing_task_branch
+  run_test test_add_rejects_existing_task_branch
+  run_test test_resume_recovers_manually_deleted_task_workspace
+  run_test test_resume_fetches_remote_task_branch
+  run_test test_remove_deletes_task_branch_when_worktree_missing
+  run_test test_remove_force_discards_dirty_task
   run_test test_add_rolls_back_branch_when_new_worktree_helper_fails
   run_test test_add_rolls_back_dirty_worktree_registration
   run_test test_add_branches_from_local_base_after_land_before_push
   run_test test_status_reports_base_task_diff_and_worktree_state
   run_test test_status_repo_filter_skips_tasks_without_matching_rows
+  run_test test_status_reports_stale_task_shaped_directories_separately
   run_test test_status_skips_partial_task_workspaces
   run_test test_dirty_worktree_safety
   run_test test_remove_reports_kept_task_directory_with_extra_files

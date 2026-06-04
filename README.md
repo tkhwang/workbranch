@@ -43,6 +43,13 @@ workbranch push login
 workbranch remove login
 ```
 
+`workbranch add <task>` creates task branches from the current HEAD of your local `_base/<repo>` worktrees. It does not pull remote base branches automatically. To start from the latest remote base, run:
+
+```bash
+workbranch pull
+workbranch add <task>
+```
+
 Use `workbranch config` when you want to update project settings, branch prefix, base branches, or per-repo setup commands without cloning repos again.
 
 ## What it creates
@@ -69,13 +76,14 @@ Single-repo projects use the same shape with one repo directory inside each task
 | `workbranch init` | Create or clone base worktrees from config |
 | `workbranch config` | Edit project settings, branch prefix, base branches, and repo setup commands |
 | `workbranch add <task>` | Create a task workspace |
+| `workbranch resume <task>` | Restore existing local or remote task branches |
 | `workbranch list` | Show repos and task workspaces |
 | `workbranch status` | Show branch, diff, and dirty state |
 | `workbranch update [task]` | Merge local base changes into task worktrees |
 | `workbranch pull` | Pull remote base branches into `_base/<repo>` |
 | `workbranch push [task]` | Push base branches or task branches |
 | `workbranch land <task>` | Fast-forward task work back into local base branches |
-| `workbranch remove <task>` | Remove linked worktrees without deleting branches |
+| `workbranch remove <task>` | Remove task worktrees and local task branches |
 | `workbranch -v` | Show the installed version |
 
 Add `--repo <repo>` to supported Git commands when you want to operate on one repo only.

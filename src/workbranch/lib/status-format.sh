@@ -117,6 +117,21 @@ LEGEND
 }
 
 is_task_workspace_path() {
+  local path i name
+  path=$1
+  is_task_shaped_directory_path "$path" || return 1
+
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    is_registered_worktree_path "$path/$name" || return 1
+    i=$((i + 1))
+  done
+  return 0
+}
+
+is_task_shaped_directory_path() {
+  local path dir_name i name
   path=$1
   [ -d "$path" ] || return 1
   dir_name=${path##*/}
@@ -129,5 +144,38 @@ is_task_workspace_path() {
     [ -d "$path/$name" ] || return 1
     i=$((i + 1))
   done
+  return 0
+}
+
+is_registered_worktree_path() {
+  local path path_real worktree_paths old_ifs worktree_path worktree_real
+  path=$1
+  [ -d "$path" ] || return 1
+  git -C "$path" rev-parse --git-dir >/dev/null 2>&1 || return 1
+  path_real=$(cd "$path" && pwd -P) || return 1
+  worktree_paths=$(git -C "$path" worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p') || return 1
+  old_ifs=$IFS
+  IFS='
+'
+  for worktree_path in $worktree_paths; do
+    if [ -d "$worktree_path" ]; then
+      worktree_real=$(cd "$worktree_path" && pwd -P) || worktree_real=$worktree_path
+    else
+      worktree_real=$worktree_path
+    fi
+    if [ "$worktree_real" = "$path_real" ]; then
+      IFS=$old_ifs
+      return 0
+    fi
+  done
+  IFS=$old_ifs
+  return 1
+}
+
+is_stale_task_directory_path() {
+  local path
+  path=$1
+  is_task_shaped_directory_path "$path" || return 1
+  is_task_workspace_path "$path" && return 1
   return 0
 }
