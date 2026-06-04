@@ -124,6 +124,7 @@ base_worktrees_exist_in_dir() {
 task_workspaces_exist() {
   for path in "$PROJECT_ROOT"/*; do
     is_task_workspace_path "$path" && return 0
+    is_stale_task_directory_path "$path" && return 0
   done
   return 1
 }

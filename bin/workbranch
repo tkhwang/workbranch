@@ -614,6 +614,29 @@ preflight_require_current_branch() {
   fi
 }
 
+branch_safe_to_delete() {
+  local path branch upstream
+  path=$1
+  branch=$2
+  branch_exists "$path" "$branch" || return 0
+  upstream=$(git -C "$path" rev-parse --verify --quiet "$branch@{upstream}^{commit}" 2>/dev/null) || upstream=""
+  if [ -n "$upstream" ]; then
+    git_is_ancestor "$path" "$branch" "$upstream"
+    return $?
+  fi
+  git_is_ancestor "$path" "$branch" HEAD
+}
+
+preflight_require_task_branch_safe_to_delete() {
+  local label path branch task
+  label=$1
+  path=$2
+  branch=$3
+  task=$4
+  branch_safe_to_delete "$path" "$branch" ||
+    preflight_error "$label task branch $branch is not fully merged; use workbranch remove $task --force to discard it"
+}
+
 git_ref_exists() {
   local path ref
   path=$1
@@ -706,19 +729,6 @@ ensure_current_branch() {
   expected=$2
   actual=$(branch_or_unknown "$path")
   [ "$actual" = "$expected" ] || die "unexpected branch in $path: expected $expected, got $actual"
-}
-
-require_task_repos_clean() {
-  task=$1
-  i=0
-  while [ $i -lt ${#REPO_NAMES[@]} ]; do
-    name=$(repo_name_at "$i")
-    path=$(task_repo_path "$task" "$name")
-    if [ -d "$path" ]; then
-      ensure_clean_worktree "$path"
-    fi
-    i=$((i + 1))
-  done
 }
 
 # ----- src/workbranch/lib/rollback.sh -----
@@ -1048,7 +1058,7 @@ is_task_workspace_path() {
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
-    is_registered_worktree_path "$path/$name" || return 1
+    is_registered_worktree_path "$path/$name" "$(base_repo_path "$name")" || return 1
     i=$((i + 1))
   done
   return 0
@@ -1072,12 +1082,14 @@ is_task_shaped_directory_path() {
 }
 
 is_registered_worktree_path() {
-  local path path_real worktree_paths old_ifs worktree_path worktree_real
+  local path base_path path_real worktree_paths old_ifs worktree_path worktree_real
   path=$1
+  base_path=$2
   [ -d "$path" ] || return 1
   git -C "$path" rev-parse --git-dir >/dev/null 2>&1 || return 1
+  [ -d "$base_path/.git" ] || [ -f "$base_path/.git" ] || return 1
   path_real=$(cd "$path" && pwd -P) || return 1
-  worktree_paths=$(git -C "$path" worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p') || return 1
+  worktree_paths=$(git -C "$base_path" worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p') || return 1
   old_ifs=$IFS
   IFS='
 '
@@ -1102,6 +1114,50 @@ is_stale_task_directory_path() {
   is_task_shaped_directory_path "$path" || return 1
   is_task_workspace_path "$path" && return 1
   return 0
+}
+
+preflight_stale_task_directory_removal() {
+  local task force i name base branch label
+  task=$1
+  force=${2:-0}
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    base=$(base_repo_path "$name")
+    branch=$(repo_task_branch_at "$i" "$task")
+    label="$task/$name"
+    if [ ! -d "$base/.git" ] && [ ! -f "$base/.git" ]; then
+      preflight_error "$BASE_DIR/$name missing git repo"
+    elif [ "$force" -ne 1 ]; then
+      preflight_require_task_branch_safe_to_delete "$label" "$base" "$branch" "$task"
+    fi
+    i=$((i + 1))
+  done
+}
+
+remove_stale_task_directory_path() {
+  local task_dir force task i name path base branch
+  task_dir=$1
+  force=${2:-0}
+  task=${task_dir##*/}
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    path="$task_dir/$name"
+    base=$(base_repo_path "$name")
+    branch=$(repo_task_branch_at "$i" "$task")
+    if [ -d "$path" ]; then
+      if [ "$force" -eq 1 ]; then
+        git -C "$base" worktree remove --force "$path" >/dev/null 2>&1 || true
+      else
+        git -C "$base" worktree remove "$path" >/dev/null 2>&1 || true
+      fi
+    fi
+    workbranch_git_delete_task_branch "$base" "$branch" "$force" || return 1
+    i=$((i + 1))
+  done
+  rm -rf "$task_dir" || return 1
+  success "Removed stale task directory: $task"
 }
 
 # ----- src/workbranch/commands/config.sh -----
@@ -1231,6 +1287,7 @@ base_worktrees_exist_in_dir() {
 task_workspaces_exist() {
   for path in "$PROJECT_ROOT"/*; do
     is_task_workspace_path "$path" && return 0
+    is_stale_task_directory_path "$path" && return 0
   done
   return 1
 }
@@ -1529,10 +1586,18 @@ cmd_add() {
     base=$(base_repo_path "$name")
     branch=$(repo_task_branch_at "$i" "$task")
     workbranch_git_add_fetch_base "$base" || die "failed to fetch repo '$name'"
-    if branch_exists "$base" "$branch" || git_ref_exists "$base" "origin/$branch"; then
+    local_branch_exists=0
+    remote_branch_exists=0
+    branch_exists "$base" "$branch" && local_branch_exists=1
+    git_ref_exists "$base" "origin/$branch" && remote_branch_exists=1
+    if [ "$local_branch_exists" -eq 1 ] || [ "$remote_branch_exists" -eq 1 ]; then
       printf "[-] Error: task branch already exists for repo '%s': %s\n" "$name" "$branch" >&2
       printf '[*] To resume it: workbranch resume %s\n' "$task" >&2
-      printf '[*] To delete it first: workbranch remove %s\n' "$task" >&2
+      if [ "$remote_branch_exists" -eq 1 ]; then
+        printf '[*] Remote origin/%s exists; delete it outside workbranch before adding again.\n' "$branch" >&2
+      else
+        printf '[*] To delete it first: workbranch remove %s\n' "$task" >&2
+      fi
       exit 1
     fi
     i=$((i + 1))
@@ -1576,9 +1641,19 @@ cmd_resume() {
   CREATED_BRANCH_REPOS=()
   CREATED_BRANCH_NAMES=()
   task_dir="$PROJECT_ROOT/$task"
-  [ ! -e "$task_dir" ] || die "task directory already exists: $task_dir"
+  task_dir_exists=0
+  if [ -e "$task_dir" ] || [ -L "$task_dir" ]; then
+    [ -d "$task_dir" ] || die "task path exists but is not a directory: $task_dir"
+    task_dir_exists=1
+  fi
 
   reset_preflight
+  stale_task_dir=0
+  if is_stale_task_directory_path "$task_dir"; then
+    stale_task_dir=1
+    preflight_stale_task_directory_removal "$task" 0
+  fi
+  found_task_branch=0
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
@@ -1586,24 +1661,48 @@ cmd_resume() {
     base_branch=$(repo_base_branch_at "$i")
     branch=$(repo_task_branch_at "$i" "$task")
     base_label="$BASE_DIR/$name"
+    target=$(task_repo_path "$task" "$name")
+    label="$task/$name"
     if [ ! -d "$base/.git" ] && [ ! -f "$base/.git" ]; then
       preflight_error "$base_label missing git repo"
       i=$((i + 1))
       continue
     fi
+    if [ "$stale_task_dir" -eq 0 ] && { [ -e "$target" ] || [ -L "$target" ]; }; then
+      if [ -d "$target/.git" ] || [ -f "$target/.git" ]; then
+        preflight_require_current_branch "$label" "$target" "$branch"
+        preflight_require_no_rebase "$label" "$target"
+      else
+        preflight_error "$label path exists but is not a git repo"
+      fi
+    fi
     preflight_require_current_branch "$base_label" "$base" "$base_branch"
     preflight_require_clean "$base_label" "$base"
     preflight_require_no_rebase "$base_label" "$base"
-    preflight_fetch_origin "$base_label" "$base"
-    if ! branch_exists "$base" "$branch" && ! git_ref_exists "$base" "origin/$branch"; then
-      preflight_error "$base_label missing task branch $branch"
+    if branch_exists "$base" "$branch"; then
+      found_task_branch=1
+    else
+      git -C "$base" fetch origin >/dev/null 2>&1 || true
+      if git_ref_exists "$base" "origin/$branch"; then
+        found_task_branch=1
+      fi
     fi
     i=$((i + 1))
   done
+  if [ "$found_task_branch" -ne 1 ] && [ "$stale_task_dir" -ne 1 ]; then
+    preflight_error "no local or remote task branch found for $task"
+  fi
   preflight_die_if_errors "resume"
 
-  mkdir -p "$task_dir" || die "failed to create task directory: $task_dir"
-  track_path "$task_dir"
+  if [ "$stale_task_dir" -eq 1 ]; then
+    remove_stale_task_directory_path "$task_dir" 0 || fail_with_rollback "failed to remove stale task directory: $task"
+    task_dir_exists=0
+  fi
+
+  if [ "$task_dir_exists" -eq 0 ]; then
+    mkdir -p "$task_dir" || die "failed to create task directory: $task_dir"
+    track_path "$task_dir"
+  fi
 
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
@@ -1612,12 +1711,21 @@ cmd_resume() {
     base_branch=$(repo_base_branch_at "$i")
     branch=$(repo_task_branch_at "$i" "$task")
     target=$(task_repo_path "$task" "$name")
-    if ! branch_exists "$base" "$branch"; then
+    if [ -d "$target/.git" ] || [ -f "$target/.git" ]; then
+      info "Worktree already exists: $task/$name"
+    elif branch_exists "$base" "$branch"; then
+      track_worktree "$target" "$base"
+      workbranch_git_add_existing_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
+    elif git_ref_exists "$base" "origin/$branch"; then
       track_branch "$base" "$branch"
       workbranch_git_create_task_branch_from_remote "$base" "$branch" || fail_with_rollback "failed to create task branch for repo '$name'"
+      track_worktree "$target" "$base"
+      workbranch_git_add_existing_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
+    else
+      track_branch "$base" "$branch"
+      track_worktree "$target" "$base"
+      workbranch_git_add_new_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
     fi
-    track_worktree "$target" "$base"
-    workbranch_git_add_existing_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
     success "Resumed: $task/$name"
     success "  [base repo] $base_branch -> [task repo] $branch"
     i=$((i + 1))
@@ -2031,7 +2139,35 @@ cmd_remove() {
   fi
   validate_safe_name "task" "$task"
   require_project
-  [ "$force" -eq 1 ] || require_task_repos_clean "$task"
+  reset_preflight
+  task_dir="$PROJECT_ROOT/$task"
+  if is_stale_task_directory_path "$task_dir"; then
+    preflight_stale_task_directory_removal "$task" "$force"
+    preflight_die_if_errors "remove"
+    remove_stale_task_directory_path "$task_dir" "$force" || die "failed to remove stale task directory: $task"
+    return 0
+  fi
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    path=$(task_repo_path "$task" "$name")
+    branch=$(repo_task_branch_at "$i" "$task")
+    base=$(base_repo_path "$name")
+    label="$task/$name"
+    if [ -d "$path/.git" ] || [ -f "$path/.git" ]; then
+      preflight_require_current_branch "$label" "$path" "$branch"
+      if [ "$force" -ne 1 ]; then
+        preflight_require_clean "$label" "$path"
+      fi
+    fi
+    if [ "$force" -ne 1 ]; then
+      preflight_require_task_branch_safe_to_delete "$label" "$base" "$branch" "$task"
+    fi
+    i=$((i + 1))
+  done
+  preflight_die_if_errors "remove"
+
+  had_failure=0
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
@@ -2040,8 +2176,12 @@ cmd_remove() {
     base=$(base_repo_path "$name")
     if [ ! -d "$path" ]; then
       info "Worktree already removed: $task/$name"
-      workbranch_git_delete_task_branch "$base" "$branch" || die "failed to delete task branch for repo '$name': $branch"
-      success "Removed: $task/$name"
+      if workbranch_git_delete_task_branch "$base" "$branch" "$force"; then
+        success "Removed: $task/$name"
+      else
+        printf '[-] Error: failed to delete task branch (continuing): %s/%s %s\n' "$task" "$name" "$branch" >&2
+        had_failure=1
+      fi
     else
       if [ "$force" -eq 1 ]; then
         git -C "$base" worktree remove --force "$path"
@@ -2051,10 +2191,15 @@ cmd_remove() {
         remove_status=$?
       fi
       if [ "$remove_status" -eq 0 ]; then
-        workbranch_git_delete_task_branch "$base" "$branch" || die "failed to delete task branch for repo '$name': $branch"
-        success "Removed: $task/$name"
+        if workbranch_git_delete_task_branch "$base" "$branch" "$force"; then
+          success "Removed: $task/$name"
+        else
+          printf '[-] Error: failed to delete task branch (continuing): %s/%s %s\n' "$task" "$name" "$branch" >&2
+          had_failure=1
+        fi
       else
-        info "failed to remove worktree (continuing): $task/$name"
+        printf '[-] Error: failed to remove worktree (continuing): %s/%s\n' "$task" "$name" >&2
+        had_failure=1
       fi
     fi
     i=$((i + 1))
@@ -2064,6 +2209,7 @@ cmd_remove() {
   elif [ -d "$PROJECT_ROOT/$task" ]; then
     info "Task directory kept because it is not empty: $task"
   fi
+  [ "$had_failure" -eq 0 ] || return 1
 }
 
 # ----- src/workbranch/commands/version.sh -----
@@ -2107,14 +2253,20 @@ workbranch_git_add_new_task_worktree() {
 workbranch_git_delete_task_branch() {
   base_path=$1
   task_branch=$2
+  force=${3:-0}
   workbranch_git_prune_stale_worktrees "$base_path" || return 1
   branch_exists "$base_path" "$task_branch" || return 0
-  git -C "$base_path" branch -D "$task_branch" >/dev/null 2>&1
+  if [ "$force" -eq 1 ]; then
+    git -C "$base_path" branch -D "$task_branch" >/dev/null 2>&1
+  else
+    git -C "$base_path" branch -d "$task_branch" >/dev/null 2>&1
+  fi
 }
 
 workbranch_git_create_task_branch_from_remote() {
   base_path=$1
   task_branch=$2
+  workbranch_git_prune_stale_worktrees "$base_path" || return 1
   git -C "$base_path" branch --track "$task_branch" "origin/$task_branch" >/dev/null 2>&1 ||
     git -C "$base_path" branch "$task_branch" "origin/$task_branch" >/dev/null 2>&1
 }

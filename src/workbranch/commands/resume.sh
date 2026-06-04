@@ -9,9 +9,19 @@ cmd_resume() {
   CREATED_BRANCH_REPOS=()
   CREATED_BRANCH_NAMES=()
   task_dir="$PROJECT_ROOT/$task"
-  [ ! -e "$task_dir" ] || die "task directory already exists: $task_dir"
+  task_dir_exists=0
+  if [ -e "$task_dir" ] || [ -L "$task_dir" ]; then
+    [ -d "$task_dir" ] || die "task path exists but is not a directory: $task_dir"
+    task_dir_exists=1
+  fi
 
   reset_preflight
+  stale_task_dir=0
+  if is_stale_task_directory_path "$task_dir"; then
+    stale_task_dir=1
+    preflight_stale_task_directory_removal "$task" 0
+  fi
+  found_task_branch=0
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
@@ -19,24 +29,48 @@ cmd_resume() {
     base_branch=$(repo_base_branch_at "$i")
     branch=$(repo_task_branch_at "$i" "$task")
     base_label="$BASE_DIR/$name"
+    target=$(task_repo_path "$task" "$name")
+    label="$task/$name"
     if [ ! -d "$base/.git" ] && [ ! -f "$base/.git" ]; then
       preflight_error "$base_label missing git repo"
       i=$((i + 1))
       continue
     fi
+    if [ "$stale_task_dir" -eq 0 ] && { [ -e "$target" ] || [ -L "$target" ]; }; then
+      if [ -d "$target/.git" ] || [ -f "$target/.git" ]; then
+        preflight_require_current_branch "$label" "$target" "$branch"
+        preflight_require_no_rebase "$label" "$target"
+      else
+        preflight_error "$label path exists but is not a git repo"
+      fi
+    fi
     preflight_require_current_branch "$base_label" "$base" "$base_branch"
     preflight_require_clean "$base_label" "$base"
     preflight_require_no_rebase "$base_label" "$base"
-    preflight_fetch_origin "$base_label" "$base"
-    if ! branch_exists "$base" "$branch" && ! git_ref_exists "$base" "origin/$branch"; then
-      preflight_error "$base_label missing task branch $branch"
+    if branch_exists "$base" "$branch"; then
+      found_task_branch=1
+    else
+      git -C "$base" fetch origin >/dev/null 2>&1 || true
+      if git_ref_exists "$base" "origin/$branch"; then
+        found_task_branch=1
+      fi
     fi
     i=$((i + 1))
   done
+  if [ "$found_task_branch" -ne 1 ] && [ "$stale_task_dir" -ne 1 ]; then
+    preflight_error "no local or remote task branch found for $task"
+  fi
   preflight_die_if_errors "resume"
 
-  mkdir -p "$task_dir" || die "failed to create task directory: $task_dir"
-  track_path "$task_dir"
+  if [ "$stale_task_dir" -eq 1 ]; then
+    remove_stale_task_directory_path "$task_dir" 0 || fail_with_rollback "failed to remove stale task directory: $task"
+    task_dir_exists=0
+  fi
+
+  if [ "$task_dir_exists" -eq 0 ]; then
+    mkdir -p "$task_dir" || die "failed to create task directory: $task_dir"
+    track_path "$task_dir"
+  fi
 
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
@@ -45,12 +79,21 @@ cmd_resume() {
     base_branch=$(repo_base_branch_at "$i")
     branch=$(repo_task_branch_at "$i" "$task")
     target=$(task_repo_path "$task" "$name")
-    if ! branch_exists "$base" "$branch"; then
+    if [ -d "$target/.git" ] || [ -f "$target/.git" ]; then
+      info "Worktree already exists: $task/$name"
+    elif branch_exists "$base" "$branch"; then
+      track_worktree "$target" "$base"
+      workbranch_git_add_existing_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
+    elif git_ref_exists "$base" "origin/$branch"; then
       track_branch "$base" "$branch"
       workbranch_git_create_task_branch_from_remote "$base" "$branch" || fail_with_rollback "failed to create task branch for repo '$name'"
+      track_worktree "$target" "$base"
+      workbranch_git_add_existing_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
+    else
+      track_branch "$base" "$branch"
+      track_worktree "$target" "$base"
+      workbranch_git_add_new_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
     fi
-    track_worktree "$target" "$base"
-    workbranch_git_add_existing_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
     success "Resumed: $task/$name"
     success "  [base repo] $base_branch -> [task repo] $branch"
     i=$((i + 1))

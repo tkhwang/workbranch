@@ -32,14 +32,20 @@ workbranch_git_add_new_task_worktree() {
 workbranch_git_delete_task_branch() {
   base_path=$1
   task_branch=$2
+  force=${3:-0}
   workbranch_git_prune_stale_worktrees "$base_path" || return 1
   branch_exists "$base_path" "$task_branch" || return 0
-  git -C "$base_path" branch -D "$task_branch" >/dev/null 2>&1
+  if [ "$force" -eq 1 ]; then
+    git -C "$base_path" branch -D "$task_branch" >/dev/null 2>&1
+  else
+    git -C "$base_path" branch -d "$task_branch" >/dev/null 2>&1
+  fi
 }
 
 workbranch_git_create_task_branch_from_remote() {
   base_path=$1
   task_branch=$2
+  workbranch_git_prune_stale_worktrees "$base_path" || return 1
   git -C "$base_path" branch --track "$task_branch" "origin/$task_branch" >/dev/null 2>&1 ||
     git -C "$base_path" branch "$task_branch" "origin/$task_branch" >/dev/null 2>&1
 }
