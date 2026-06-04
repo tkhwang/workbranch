@@ -28,6 +28,8 @@ Optional:
 
 Direction: base -> task worktree.
 
+Before creating worktrees, `workbranch add <task>` prompts for each repo's task branch. Press Enter to accept the default branch name. The chosen branches are saved in `<task>/.workbranch.task`.
+
 For each repo:
 
 ```bash
@@ -41,6 +43,8 @@ If the task branch already exists locally or remotely, `workbranch add <task>` f
 ### `workbranch resume <task>`
 
 Direction: existing local or remote task branch -> task worktree.
+
+When `resume` must create or restore missing task worktrees, it prompts for each repo's task branch before preflight branch-existence checks. Existing `<task>/.workbranch.task` entries are used as prompt defaults; otherwise the normal default branch rule is used.
 
 If the task branch already exists locally, restore it:
 
@@ -156,9 +160,16 @@ git push -u origin <task-branch>
 
 ## Branch naming
 
-For each repo, task branch names are derived from the configured base branch:
+For each repo, task branch names are explicit values chosen at `workbranch add` or restore-time `workbranch resume` prompts. Defaults are derived from the configured base branch:
 
 ```text
-base branch master       + task login -> feature/login
-base branch feature/cpq  + task task1 -> feature/cpq-task1
+base branch master       + task login + default prompt -> feature/login
+base branch feature/cpq  + task task1 + default prompt -> feature/cpq-task1
+base branch master       + task login + override tk/login -> tk/login
 ```
+
+Chosen branches are persisted in `<task>/.workbranch.task`. Later commands resolve task branches in this order:
+
+1. `REPO_BRANCH <repo> <branch>` in `<task>/.workbranch.task`
+2. The existing task repo's current branch
+3. The default branch rule above

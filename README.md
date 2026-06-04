@@ -43,14 +43,16 @@ workbranch push login
 workbranch remove login
 ```
 
-`workbranch add <task>` creates task branches from the current HEAD of your local `_base/<repo>` worktrees. It does not pull remote base branches automatically. To start from the latest remote base, run:
+`workbranch add <task>` uses `<task>` as the folder name, then prompts for each repo's task branch. Press Enter to accept the default branch name. Defaults are `feature/<task>` from main-style base branches and `<base-branch>-<task>` from `feature/*`, `feat/*`, or the configured legacy prefix.
+
+Task branches are created from the current HEAD of your local `_base/<repo>` worktrees. `workbranch add` does not pull remote base branches automatically. To start from the latest remote base, run:
 
 ```bash
 workbranch pull
 workbranch add <task>
 ```
 
-Use `workbranch config` when you want to update project settings, branch prefix, base branches, or per-repo setup commands without cloning repos again.
+Use `workbranch config` when you want to update project settings, base branches, or per-repo setup commands without cloning repos again.
 
 ## What it creates
 
@@ -74,7 +76,7 @@ Single-repo projects use the same shape with one repo directory inside each task
 | Command | Use it to |
 | --- | --- |
 | `workbranch init` | Create or clone base worktrees from config |
-| `workbranch config` | Edit project settings, branch prefix, base branches, and repo setup commands |
+| `workbranch config` | Edit project settings, base branches, and repo setup commands |
 | `workbranch add <task>` | Create a task workspace |
 | `workbranch resume <task>` | Restore existing local or remote task branches |
 | `workbranch list` | Show repos and task workspaces |

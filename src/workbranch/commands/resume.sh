@@ -1,3 +1,38 @@
+resume_needs_branch_prompt() {
+  task=$1
+  stale=$2
+  task_dir_exists=$3
+  [ "$stale" -eq 1 ] && return 0
+  [ "$task_dir_exists" -eq 0 ] && return 0
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    target=$(task_repo_path "$task" "$name")
+    if [ ! -d "$target/.git" ] && [ ! -f "$target/.git" ]; then
+      return 0
+    fi
+    i=$((i + 1))
+  done
+  return 1
+}
+
+prompt_task_branches_for_resume() {
+  task=$1
+  load_task_metadata "$task"
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    current=$(metadata_task_branch_for_repo "$name" || true)
+    if [ -z "$current" ]; then
+      current=$(default_repo_task_branch_at "$i" "$task")
+    fi
+    branch=$(prompt_with_default "Task branch for $name" "$current")
+    validate_branch_name "task branch" "$branch"
+    set_task_metadata_branch "$name" "$branch"
+    i=$((i + 1))
+  done
+}
+
 cmd_resume() {
   [ $# -eq 1 ] || die "usage: workbranch resume <task>"
   task=$1
@@ -19,6 +54,15 @@ cmd_resume() {
   stale_task_dir=0
   if is_stale_task_directory_path "$task_dir"; then
     stale_task_dir=1
+  fi
+  prompted_task_branches=0
+  if resume_needs_branch_prompt "$task" "$stale_task_dir" "$task_dir_exists"; then
+    prompt_task_branches_for_resume "$task"
+    prompted_task_branches=1
+  else
+    load_task_metadata "$task"
+  fi
+  if [ "$stale_task_dir" -eq 1 ]; then
     preflight_stale_task_directory_removal "$task" 0
   fi
   found_task_branch=0
@@ -27,7 +71,7 @@ cmd_resume() {
     name=$(repo_name_at "$i")
     base=$(base_repo_path "$name")
     base_branch=$(repo_base_branch_at "$i")
-    branch=$(repo_task_branch_at "$i" "$task")
+    branch=$(metadata_task_branch_for_repo "$name") || branch=$(repo_task_branch_at "$i" "$task")
     base_label="$BASE_DIR/$name"
     target=$(task_repo_path "$task" "$name")
     label="$task/$name"
@@ -71,13 +115,16 @@ cmd_resume() {
     mkdir -p "$task_dir" || die "failed to create task directory: $task_dir"
     track_path "$task_dir"
   fi
+  if [ "$prompted_task_branches" -eq 1 ]; then
+    write_task_metadata "$task"
+  fi
 
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     base=$(base_repo_path "$name")
     base_branch=$(repo_base_branch_at "$i")
-    branch=$(repo_task_branch_at "$i" "$task")
+    branch=$(metadata_task_branch_for_repo "$name") || branch=$(repo_task_branch_at "$i" "$task")
     target=$(task_repo_path "$task" "$name")
     if [ -d "$target/.git" ] || [ -f "$target/.git" ]; then
       info "Worktree already exists: $task/$name"

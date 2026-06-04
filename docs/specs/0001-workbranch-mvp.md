@@ -53,7 +53,7 @@ Rules:
 
 - `PROJECT_NAME` must be a safe directory name.
 - `MAIN_WORKTREES_DIR` must be a safe directory name.
-- `BRANCH_PREFIX` must be non-empty and contain no whitespace.
+- `BRANCH_PREFIX` is retained for compatibility and as the default branch prompt prefix. New interactive setup writes `BRANCH_PREFIX feature`.
 - `TASK_SETUP` is optional. It stores one project-level command text after the directive.
 - `REPO` requires name, URL, and base repo branch.
 - `REPO_SETUP` is optional. It references an existing repo name and stores one repo-level command text after the repo name.
@@ -65,17 +65,24 @@ Rules:
 
 ## Branch names
 
-Task branch names are derived from the configured base repo branch.
+Task folder names and Git branch names are separate values.
+
+`workbranch add <task>` uses `<task>` as the workspace folder name, then prompts for each repo's task branch. Press Enter to accept the default branch name.
 
 ```text
-base repo branch master       + task login  -> feature/login
-base repo branch feature/cpq  + task task1  -> feature/cpq-task1
+base repo branch master       + task login + default prompt      -> feature/login
+base repo branch feature/cpq  + task task1 + default prompt      -> feature/cpq-task1
+base repo branch feat/cpq     + task task1 + default prompt      -> feat/cpq-task1
+base repo branch master       + task login + override tk/login   -> tk/login
 ```
 
 Rule:
 
-- If the base repo branch starts with `<BRANCH_PREFIX>/`, task branch is `<base-branch>-<task>`.
-- Otherwise, task branch is `<BRANCH_PREFIX>/<task>`.
+- If the base repo branch starts with `feature/`, `feat/`, or the configured legacy `<BRANCH_PREFIX>/`, the default task branch is `<base-branch>-<task>`.
+- Otherwise, the default task branch is `<BRANCH_PREFIX>/<task>`, with `feature` used when no prefix is configured.
+- Chosen branches are validated with `git check-ref-format --branch`; whitespace is not supported.
+- Chosen branches are persisted in `<task>/.workbranch.task` as `REPO_BRANCH <repo> <branch>` lines so later commands use the real branch.
+- Existing task workspaces without metadata keep working by falling back to the current task worktree branch, then the default rule.
 
 Git operation internals are defined in [`docs/git-operations.md`](../git-operations.md).
 
@@ -85,9 +92,9 @@ Git operation internals are defined in [`docs/git-operations.md`](../git-operati
 
 Create or update config without cloning repos.
 
-If `.workbranch.config` or legacy `.tasktree.config` / `.monotree.config` already exists in the current project, load it, then prompt for the project name, main worktrees directory, branch prefix, each repo's base branch, and each repo-level setup command. Press Enter to keep the current value. Type `--clear` at a repo setup prompt to remove that setup command.
+If `.workbranch.config` or legacy `.tasktree.config` / `.monotree.config` already exists in the current project, load it, then prompt for the project name, main worktrees directory, each repo's base branch, and each repo-level setup command. Press Enter to keep the current value. Type `--clear` at a repo setup prompt to remove that setup command.
 
-Changing a repo base branch updates config only. `workbranch config` does not clone, move, rename, or check out existing worktrees. Changing `BRANCH_PREFIX` is allowed only before task workspaces exist. Changing `MAIN_WORKTREES_DIR` is allowed only before base worktrees exist. Once matching worktrees exist, `workbranch config` rejects those changes.
+Changing a repo base branch updates config only. `workbranch config` does not clone, move, rename, or check out existing worktrees. Existing `BRANCH_PREFIX` values are preserved silently; it is no longer an interactive setting. Changing `MAIN_WORKTREES_DIR` is allowed only before base worktrees exist. Once matching base worktrees exist, `workbranch config` rejects that change.
 
 Existing project-level `TASK_SETUP` values remain supported for `workbranch add` and are preserved by `workbranch config` unless another explicit flow clears or migrates them.
 
@@ -102,8 +109,8 @@ If no config exists, run interactive config setup:
 1. Ask for target directory, default `.`.
 2. Ask for project name, default `fullstack`.
 3. Ask for main worktrees directory, default `_base`.
-4. Ask for branch prefix, default `feature`.
-5. Explain that each repo base repo branch is checked out in `_base/<repo>` and task branches are derived from it.
+4. Set `BRANCH_PREFIX feature` for compatibility.
+5. Explain that each repo base repo branch is checked out in `_base/<repo>` and task branch names are prompted by `workbranch add`.
 6. Ask for one or more repos: name, Git URL, base branch for this repo, and optional repo-level setup command.
 7. Write `.workbranch.config`.
 
@@ -147,11 +154,12 @@ Create one task workspace with one linked worktree per repo.
 For each repo:
 
 1. Ensure `_base/<repo>` exists and is clean.
-2. Derive the task branch name.
-3. Fail if the local or remote task branch already exists; use `workbranch resume <task>` to restore existing task branches.
-4. Create a new local task branch from the base branch.
-5. Create a linked worktree at `<task>/<repo>`.
-6. Run configured repo-level setup commands. If no repo setup ran and the operation is not repo-filtered, run project-level `TASK_SETUP` when configured.
+2. Prompt for the task branch name, defaulting from the branch naming rule above.
+3. Fail if the chosen local or remote task branch already exists; use `workbranch resume <task>` to restore existing task branches.
+4. Create the task directory and write `<task>/.workbranch.task`.
+5. Create a new local task branch from the base branch.
+6. Create a linked worktree at `<task>/<repo>`.
+7. Run configured repo-level setup commands. If no repo setup ran and the operation is not repo-filtered, run project-level `TASK_SETUP` when configured.
 
 If any repo fails, roll back paths and branches created by the command.
 If any setup command fails, keep created worktrees and tell the user the exact failed setup context, setup directory, and setup command. The user can fix setup with `workbranch config`, then rerun the command shown in the failure output or remove and add the task again.
@@ -264,7 +272,9 @@ workbranch land login --repo frontend
 
 Restore linked worktrees from existing local task branches, or from matching remote `origin/<task-branch>` branches when no local task branch exists.
 
-Fails if any repo has no local or remote task branch for the task.
+When the command must create or restore missing task worktrees, it prompts for each repo's task branch. If `<task>/.workbranch.task` exists, saved branches are used as prompt defaults; otherwise the branch naming rule supplies defaults. The chosen branches are persisted before creating worktrees.
+
+Fails if any repo has no local or remote task branch for the chosen task branch and the task directory is not stale.
 
 ### `workbranch remove <task>`
 

@@ -26,8 +26,6 @@ AFTER
 ' >&2
   printf '    Main worktrees    directory for each repo main worktree
 ' >&2
-  printf '    Branch prefix     task branch prefix, e.g. feature/login
-' >&2
   printf '    Repositories      Git repos included in each task workspace
 ' >&2
   printf '
@@ -43,8 +41,7 @@ AFTER
   validate_safe_name "project" "$PROJECT_NAME"
   BASE_DIR=$(prompt_with_default "Main worktrees directory" "_base")
   validate_safe_name "MAIN_WORKTREES_DIR" "$BASE_DIR"
-  BRANCH_PREFIX=$(prompt_with_default "Branch prefix" "feature")
-  validate_nonempty_no_space "branch_prefix" "$BRANCH_PREFIX"
+  BRANCH_PREFIX="feature"
 
   printf '
 ' >&2
@@ -81,7 +78,7 @@ AFTER
   info "Summary"
   info "Project: $PROJECT_NAME"
   info "Main worktrees dir: $BASE_DIR"
-  info "Branch prefix: $BRANCH_PREFIX"
+  info "Default task branch prefix: $BRANCH_PREFIX"
   info "Task setup:"
   if [ -n "$TASK_SETUP" ]; then
     info "  $TASK_SETUP"
@@ -94,9 +91,10 @@ AFTER
     info "  - $(repo_name_at "$i") $(repo_url_at "$i") base repo branch=$(repo_base_branch_at "$i")"
     i=$((i + 1))
   done
-  info "Branch policy:"
-  info "  - [base repo] main        -> task1 -> [task repo] ${BRANCH_PREFIX}/task1"
-  info "  - [base repo] ${BRANCH_PREFIX}/XXX -> task1 -> [task repo] ${BRANCH_PREFIX}/XXX-task1"
+  info "Task branch defaults:"
+  info "  - [base repo] main        -> task1 -> [task repo] feature/task1"
+  info "  - [base repo] feature/XXX -> task1 -> [task repo] feature/XXX-task1"
+  info "  - You can override each task branch when running workbranch add."
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")

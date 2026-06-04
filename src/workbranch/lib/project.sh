@@ -41,22 +41,64 @@ base_repo_path() { printf '%s/%s/%s' "$PROJECT_ROOT" "$BASE_DIR" "$1"; }
 
 task_repo_path() { printf '%s/%s/%s' "$PROJECT_ROOT" "$1" "$2"; }
 
-feature_branch_for_task() { printf '%s/%s' "$BRANCH_PREFIX" "$1"; }
+default_branch_prefix() {
+  if [ -n "$BRANCH_PREFIX" ]; then
+    printf '%s' "$BRANCH_PREFIX"
+  else
+    printf 'feature'
+  fi
+}
+
+default_feature_branch_for_task() { printf '%s/%s' "$(default_branch_prefix)" "$1"; }
 
 base_prefixed_branch_for_task() {
+  local parent task
   parent=$1
   task=$2
   printf '%s-%s' "$parent" "$task"
 }
 
-repo_task_branch_at() {
+base_branch_looks_like_parent_task_branch() {
+  local base_branch prefix
+  base_branch=$1
+  prefix=$(default_branch_prefix)
+  case "$base_branch" in
+    feature/*|feat/*) return 0 ;;
+    "$prefix"/*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+default_repo_task_branch_at() {
+  local index task base_branch
   index=$1
   task=$2
   base_branch=$(repo_base_branch_at "$index")
-  case "$base_branch" in
-    "$BRANCH_PREFIX"/*) base_prefixed_branch_for_task "$base_branch" "$task" ;;
-    *) feature_branch_for_task "$task" ;;
-  esac
+  if base_branch_looks_like_parent_task_branch "$base_branch"; then
+    base_prefixed_branch_for_task "$base_branch" "$task"
+  else
+    default_feature_branch_for_task "$task"
+  fi
+}
+
+repo_task_branch_at() {
+  local index task name path current
+  index=$1
+  task=$2
+  name=$(repo_name_at "$index")
+  load_task_metadata "$task"
+  if metadata_task_branch_for_repo "$name"; then
+    return 0
+  fi
+  path=$(task_repo_path "$task" "$name")
+  if [ -d "$path/.git" ] || [ -f "$path/.git" ]; then
+    current=$(git -C "$path" branch --show-current 2>/dev/null || printf '')
+    if [ -n "$current" ]; then
+      printf '%s' "$current"
+      return 0
+    fi
+  fi
+  default_repo_task_branch_at "$index" "$task"
 }
 
 clone_base_repos() {
