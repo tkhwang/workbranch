@@ -1533,7 +1533,7 @@ cmd_init() {
   if find_project_root; then
     if [ "$(basename "$CONFIG_FILE")" = ".workbranch.config" ]; then
       parse_config "$CONFIG_FILE"
-      if configured_base_git_repo_exists; then
+      if all_configured_base_git_repos_exist; then
         printf '[-] Error: workbranch project already initialized: %s\n' "$PROJECT_ROOT" >&2
         printf '[*] To edit project settings: workbranch config\n' >&2
         exit 1
@@ -1550,17 +1550,17 @@ cmd_init() {
   fi
 }
 
-configured_base_git_repo_exists() {
+all_configured_base_git_repos_exist() {
   _init_i=0
   while [ $_init_i -lt ${#REPO_NAMES[@]} ]; do
     _init_name=$(repo_name_at "$_init_i")
     _init_target=$(base_repo_path "$_init_name")
-    if [ -d "$_init_target/.git" ] || [ -f "$_init_target/.git" ]; then
-      return 0
+    if [ ! -d "$_init_target/.git" ] && [ ! -f "$_init_target/.git" ]; then
+      return 1
     fi
     _init_i=$((_init_i + 1))
   done
-  return 1
+  return 0
 }
 
 # ----- src/workbranch/commands/add.sh -----

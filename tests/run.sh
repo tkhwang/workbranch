@@ -205,6 +205,23 @@ test_init_existing_config_clones_base_repos() {
   assert_branch "$project/_base/backend" "master"
 }
 
+test_init_completes_partial_base_clones() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  (cd "$project" && run_expect_success "$WORKBRANCH" init >/dev/null)
+  printf '%s\n' "keep existing frontend clone" > "$project/_base/frontend/untouched.txt"
+  rm -rf "$project/_base/backend"
+
+  out=$(cd "$project" && run_expect_success "$WORKBRANCH" init)
+  assert_contains "$out" "Base repo exists: _base/frontend"
+  assert_contains "$out" "Cloned: _base/backend"
+  assert_file "$project/_base/frontend/untouched.txt"
+  assert_dir "$project/_base/frontend/.git"
+  assert_dir "$project/_base/backend/.git"
+  assert_branch "$project/_base/frontend" "master"
+  assert_branch "$project/_base/backend" "master"
+}
+
 test_init_rejects_already_initialized_workbranch_project() {
   new_fixture
   project="$FIXTURE_PROJECT"
@@ -2063,6 +2080,7 @@ main() {
   run_test test_safe_names_reject_dot_and_dotdot
   run_test test_invalid_config_rejected_without_execution
   run_test test_init_existing_config_clones_base_repos
+  run_test test_init_completes_partial_base_clones
   run_test test_init_rejects_already_initialized_workbranch_project
   run_test test_init_from_project_subdir_uses_parent_config
   run_test test_init_rejects_existing_non_git_base_target
