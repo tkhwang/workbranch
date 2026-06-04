@@ -7,14 +7,14 @@ cmd_init_interactive() {
   info "After workbranch"
   cat >&2 <<'AFTER'
     fullstack                     // workbranch project
-    ├── .workbranch.config          // config
-    ├── _base                     // main worktrees
-    │   ├── frontend              // main worktree: frontend
-    │   └── backend               // main worktree: backend
+    ├── .workbranch.config        // config
+    ├── _base                     // main worktrees: _base
+    │   ├── frontend              // - base frontend repo
+    │   └── backend               // - base backend repo
     └── login                     // task workspace
-        ├── frontend              // linked worktree: frontend
-        ├── backend               // linked worktree: backend
-        └── <work here>           // cd login for this feature
+        ├── frontend              // - task frontend repo
+        ├── backend               // - task backend repo
+        └── <work here>           // use AI Agents in here
 
     Result: branch operations stay grouped by feature workspace.
     Multi-repo bonus: use one directory for shared AI session context.
@@ -154,6 +154,11 @@ cmd_init() {
   if find_project_root; then
     if [ "$(basename "$CONFIG_FILE")" = ".workbranch.config" ]; then
       parse_config "$CONFIG_FILE"
+      if all_configured_base_git_repos_exist; then
+        printf '[-] Error: workbranch project already initialized: %s\n' "$PROJECT_ROOT" >&2
+        printf '[*] To edit project settings: workbranch config\n' >&2
+        exit 1
+      fi
     elif [ "$(basename "$CONFIG_FILE")" = ".tasktree.config" ]; then
       parse_config_for_rewrite "$CONFIG_FILE"
     else
@@ -164,4 +169,17 @@ cmd_init() {
   else
     cmd_init_interactive yes
   fi
+}
+
+all_configured_base_git_repos_exist() {
+  _init_i=0
+  while [ $_init_i -lt ${#REPO_NAMES[@]} ]; do
+    _init_name=$(repo_name_at "$_init_i")
+    _init_target=$(base_repo_path "$_init_name")
+    if [ ! -d "$_init_target/.git" ] && [ ! -f "$_init_target/.git" ]; then
+      return 1
+    fi
+    _init_i=$((_init_i + 1))
+  done
+  return 0
 }
