@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.0](https://github.com/tkhwang/workbranch/compare/v0.3.0...v0.4.0) (2026-06-04)
+
+
+### Features
+
+* **commands:** add `resume` command and update `add`/`remove` ([91628fd](https://github.com/tkhwang/workbranch/commit/91628fd6426b9fde012b47dd06bff25806cacc0b))
+* **commands:** add `resume` command and update `add`/`remove` ([d9b5225](https://github.com/tkhwang/workbranch/commit/d9b522597d341eaa1c660d0ac1d67ce7aca30ff3))
+* **workbranch:** improve stale task directory handling ([f4945fc](https://github.com/tkhwang/workbranch/commit/f4945fc7619f21950661075dd778e74c8766f4f4))
+
 ## [0.3.0](https://github.com/tkhwang/workbranch/compare/v0.2.0...v0.3.0) (2026-06-03)
 
 
