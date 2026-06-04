@@ -85,6 +85,29 @@ preflight_require_current_branch() {
   fi
 }
 
+branch_safe_to_delete() {
+  local path branch upstream
+  path=$1
+  branch=$2
+  branch_exists "$path" "$branch" || return 0
+  upstream=$(git -C "$path" rev-parse --verify --quiet "$branch@{upstream}^{commit}" 2>/dev/null) || upstream=""
+  if [ -n "$upstream" ]; then
+    git_is_ancestor "$path" "$branch" "$upstream"
+    return $?
+  fi
+  git_is_ancestor "$path" "$branch" HEAD
+}
+
+preflight_require_task_branch_safe_to_delete() {
+  local label path branch task
+  label=$1
+  path=$2
+  branch=$3
+  task=$4
+  branch_safe_to_delete "$path" "$branch" ||
+    preflight_error "$label task branch $branch is not fully merged; use workbranch remove $task --force to discard it"
+}
+
 git_ref_exists() {
   local path ref
   path=$1
@@ -177,17 +200,4 @@ ensure_current_branch() {
   expected=$2
   actual=$(branch_or_unknown "$path")
   [ "$actual" = "$expected" ] || die "unexpected branch in $path: expected $expected, got $actual"
-}
-
-require_task_repos_clean() {
-  task=$1
-  i=0
-  while [ $i -lt ${#REPO_NAMES[@]} ]; do
-    name=$(repo_name_at "$i")
-    path=$(task_repo_path "$task" "$name")
-    if [ -d "$path" ]; then
-      ensure_clean_worktree "$path"
-    fi
-    i=$((i + 1))
-  done
 }

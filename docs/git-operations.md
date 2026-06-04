@@ -36,10 +36,25 @@ git fetch origin
 git worktree add <task>/<repo> -b <task-branch> HEAD
 ```
 
-If the task branch already exists locally, reuse it:
+If the task branch already exists locally or remotely, `workbranch add <task>` fails and tells the user to use `workbranch resume <task>`.
+
+### `workbranch resume <task>`
+
+Direction: existing local or remote task branch -> task worktree.
+
+If the task branch already exists locally, restore it:
 
 ```bash
 cd _base/<repo>
+git worktree add <task>/<repo> <task-branch>
+```
+
+If only the remote task branch exists, create the local task branch from it before adding the worktree:
+
+```bash
+cd _base/<repo>
+git fetch origin
+git branch --track <task-branch> origin/<task-branch>
 git worktree add <task>/<repo> <task-branch>
 ```
 
@@ -48,7 +63,7 @@ Safety:
 - Rolls back worktrees and new branches created by the command if worktree creation fails.
 - Keeps created worktrees if a configured setup command fails, prints the failed setup directory and command, and tells the user to fix setup with `workbranch config`, then rerun the shown command or remove and add the task again.
 - Uses the local base worktree HEAD, not `origin/<base-branch>`.
-- Reuses existing task branches so removed worktrees can be recreated.
+- `workbranch remove <task>` deletes local task branches, so adding the same task after remove starts from the current local base again.
 
 ### `workbranch pull`
 
