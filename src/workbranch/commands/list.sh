@@ -2,20 +2,20 @@ cmd_list() {
   require_project
   info "Project: $PROJECT_NAME"
   info "Base: $BASE_DIR"
-  info "Editor:"
+  section "Editor"
   if [ -n "$EDITOR_COMMAND" ]; then
     printf '    %s\n' "$EDITOR_COMMAND"
   else
     printf '    (none)\n'
   fi
-  info "Terminal:"
+  section "Terminal"
   if [ -n "$TERMINAL_COMMAND" ]; then
     printf '    %s\n' "$TERMINAL_COMMAND"
   else
     printf '    (none)\n'
   fi
   if has_repo_setups; then
-    info "Repo setup:"
+    section "Repo setup"
     i=0
     while [ $i -lt ${#REPO_NAMES[@]} ]; do
       command=$(repo_setup_at "$i")
@@ -25,7 +25,7 @@ cmd_list() {
       i=$((i + 1))
     done
   fi
-  info "Repos:"
+  section "Repos"
   printf '    %-11s %-16s %s\n' "repo" "base" "current"
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
@@ -35,7 +35,7 @@ cmd_list() {
     printf '    %-11s %-16s %s\n' "$name" "$branch" "$current"
     i=$((i + 1))
   done
-  info "Tasks:"
+  section "Tasks"
   found=0
   for path in "$PROJECT_ROOT"/*; do
     [ -d "$path" ] || continue
@@ -51,7 +51,7 @@ cmd_list() {
     done
     [ $task_has_repo -eq 1 ] || continue
     found=1
-    info "$dir_name"
+    section "$dir_name"
     printf '    %-11s %s\n' "repo" "branch"
     i=0
     while [ $i -lt ${#REPO_NAMES[@]} ]; do

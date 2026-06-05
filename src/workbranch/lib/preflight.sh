@@ -29,11 +29,11 @@ preflight_die_if_errors() {
     return 0
   fi
 
-  printf '[-] Error: Cannot %s: preflight failed\n' "$operation" >&2
-  printf '[*] Fix these worktrees, then retry:\n' >&2
+  printf '%s[-] Error:%s Cannot %s: preflight failed\n' "$WB_ERR_RED" "$WB_ERR_RESET" "$operation" >&2
+  printf '%s[*]%s Fix these worktrees, then retry:\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" >&2
   i=0
   while [ $i -lt ${#PREFLIGHT_ERRORS[@]} ]; do
-    printf '    %s\n' "${PREFLIGHT_ERRORS[$i]}" >&2
+    printf '    %s%s%s\n' "$WB_ERR_GRAY" "${PREFLIGHT_ERRORS[$i]}" "$WB_ERR_RESET" >&2
     i=$((i + 1))
   done
   exit 1

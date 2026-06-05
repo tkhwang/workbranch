@@ -90,10 +90,10 @@ cmd_add() {
     i=$((i + 1))
   done
   if has_task_setups && ! run_task_setups "$task"; then
-    printf '[-] Error: task setup failed\n' >&2
-    printf '[*] Worktrees were created. Fix setup with:\n' >&2
-    printf '    workbranch config\n' >&2
-    printf '[*] Then rerun the setup command shown above, or remove and add the task again.\n' >&2
+    printf '%s[-] Error:%s task setup failed\n' "$WB_ERR_RED" "$WB_ERR_RESET" >&2
+    printf '%s[*]%s Worktrees were created. Fix setup with:\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" >&2
+    printf '    %sworkbranch config%s\n' "$WB_ERR_GRAY" "$WB_ERR_RESET" >&2
+    printf '%s[*]%s Then rerun the setup command shown above, or remove and add the task again.\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" >&2
     return 1
   fi
 }
