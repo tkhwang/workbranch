@@ -892,7 +892,7 @@ Print full paths for scripting:
 workbranch path login
 workbranch path login --repo frontend
 ```
-```
+```markdown
 
 - [x] **Step 4: Update Korean README command docs**
 
@@ -930,7 +930,7 @@ Launcher 명령은 repo별로 순서대로 실행됩니다. foreground에 계속
 workbranch path login
 workbranch path login --repo frontend
 ```
-```
+```markdown
 
 - [x] **Step 5: Update spec config contract**
 

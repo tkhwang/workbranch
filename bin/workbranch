@@ -1119,8 +1119,13 @@ resolve_task_path() {
 resolve_task_repo_path() {
   task=$1
   repo=$2
+  task_dir="$PROJECT_ROOT/$task"
+  [ -d "$task_dir" ] || die "task workspace not found: $task"
   repo_path=$(task_repo_path "$task" "$repo")
   [ -d "$repo_path" ] || die "task repo not found: $task/$repo"
+  is_registered_worktree_path "$repo_path" "$(base_repo_path "$repo")" \
+    || die "task repo not found or not a registered worktree: $task/$repo"
+  is_task_workspace_path "$task_dir" || die "task workspace not found: $task"
   RESOLVED_PATH=$(canonical_path "$repo_path") || die "task repo not found: $task/$repo"
 }
 
