@@ -83,7 +83,11 @@ next_action_for_diff() {
 }
 
 print_base_status_header() {
-  printf '    %-11s %-16s %-10s %s\n' "repo" "branch" "commit" "status"
+  printf '    %s %s %s %s\n' \
+    "$(table_header 11 repo)" \
+    "$(table_header 16 branch)" \
+    "$(table_header 10 commit)" \
+    "$(color_text "$WB_GRAY" status)"
 }
 
 print_base_status_item() {
@@ -91,11 +95,21 @@ print_base_status_item() {
   branch=$2
   commit=$3
   state=$4
-  printf '    %-11s %-16s %-10s %s\n' "$name" "$branch" "$commit" "$state"
+  printf '    %-11s %-16s %-10s %s\n' \
+    "$name" \
+    "$branch" \
+    "$commit" \
+    "$(color_text "$(color_status "$state")" "$state")"
 }
 
 print_task_status_header() {
-  printf '    %-11s %-10s %-10s %-5s %-9s %s\n' "repo" "base" "task" "diff" "status" "next"
+  printf '    %s %s %s %s %s %s\n' \
+    "$(table_header 11 repo)" \
+    "$(table_header 10 base)" \
+    "$(table_header 10 task)" \
+    "$(table_header 5 diff)" \
+    "$(table_header 9 status)" \
+    "$(color_text "$WB_GRAY" next)"
 }
 
 print_task_status_item() {
@@ -105,15 +119,19 @@ print_task_status_item() {
   diff_label=$4
   state=$5
   next_action=$6
-  printf '    %-11s %-10s %-10s %-5s %-9s %s\n' "$name" "$base_commit" "$task_commit" "$diff_label" "$state" "$next_action"
+  printf '    %-11s %-10s %-10s %s %s %s\n' \
+    "$name" \
+    "$base_commit" \
+    "$task_commit" \
+    "$(color_cell "$(color_diff "$diff_label")" 5 "$diff_label")" \
+    "$(color_cell "$(color_status "$state")" 9 "$state")" \
+    "$(color_text "$(color_next_action "$next_action")" "$next_action")"
 }
 
 print_next_legend() {
-  cat <<'LEGEND'
-[*] Next
-    land    task has commits not in base: workbranch land <task>
-    update  task is behind base: workbranch update <task>
-LEGEND
+  section "Next"
+  item_detail "land    task has commits not in base: workbranch land <task>"
+  item_detail "update  task is behind base: workbranch update <task>"
 }
 
 is_task_workspace_path() {

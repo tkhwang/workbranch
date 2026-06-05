@@ -33,14 +33,181 @@ FILTER_REPO=""
 ARGS=()
 
 # ----- src/workbranch/lib/output.sh -----
-info() { printf '[*] %s\n' "$*"; }
+color_enabled() {
+  [ -z "${NO_COLOR:-}" ] || return 1
+  case "${WORKBRANCH_COLOR:-auto}" in
+    always) return 0 ;;
+    never) return 1 ;;
+    auto|'') [ -t 1 ] && [ "${TERM:-}" != "dumb" ] ;;
+    *) [ -t 1 ] && [ "${TERM:-}" != "dumb" ] ;;
+  esac
+}
 
-success() { printf '[+] %s\n' "$*"; }
+if color_enabled; then
+  WB_ESC=$'\033'
+  WB_GREEN="${WB_ESC}[0;32m"
+  WB_BLUE="${WB_ESC}[0;34m"
+  WB_CYAN="${WB_ESC}[0;36m"
+  WB_YELLOW="${WB_ESC}[0;33m"
+  WB_PURPLE="${WB_ESC}[0;35m"
+  WB_PURPLE_BOLD="${WB_ESC}[1;35m"
+  WB_RED="${WB_ESC}[0;31m"
+  WB_GRAY="${WB_ESC}[0;90m"
+  WB_BOLD="${WB_ESC}[1m"
+  WB_RESET="${WB_ESC}[0m"
+else
+  WB_ESC=""
+  WB_GREEN=""
+  WB_BLUE=""
+  WB_CYAN=""
+  WB_YELLOW=""
+  WB_PURPLE=""
+  WB_PURPLE_BOLD=""
+  WB_RED=""
+  WB_GRAY=""
+  WB_BOLD=""
+  WB_RESET=""
+fi
 
-die() { printf '[-] Error: %s\n' "$*" >&2; exit 1; }
+WB_ICON_CONFIRM="◎"
+WB_ICON_SUCCESS="✓"
+WB_ICON_WARNING="◎"
+WB_ICON_LIST="•"
+WB_ICON_SUBLIST="↳"
+WB_ICON_ARROW="➤"
+WB_ICON_REVIEW="☞"
+
+color_text() {
+  _wb_color=$1
+  shift
+  if color_enabled && [ -n "$_wb_color" ]; then
+    printf '%s%s%s' "$_wb_color" "$*" "$WB_RESET"
+  else
+    printf '%s' "$*"
+  fi
+}
+
+color_cell() {
+  _wb_color=$1
+  _wb_width=$2
+  _wb_value=$3
+  _wb_padded=$(printf "%-${_wb_width}s" "$_wb_value")
+  color_text "$_wb_color" "$_wb_padded"
+}
+
+status_color() {
+  case "$1" in
+    clean) printf '%s' "$WB_GREEN" ;;
+    modified*|untracked) printf '%s' "$WB_YELLOW" ;;
+    missing|\?) printf '%s' "$WB_RED" ;;
+    *) printf '%s' "$WB_GRAY" ;;
+  esac
+}
+
+diff_color() {
+  case "$1" in
+    0) printf '%s' "$WB_GREEN" ;;
+    +*) printf '%s' "$WB_GREEN" ;;
+    -*|±*) printf '%s' "$WB_YELLOW" ;;
+    *) printf '%s' "$WB_GRAY" ;;
+  esac
+}
+
+next_action_color() {
+  case "$1" in
+    land) printf '%s' "$WB_GREEN" ;;
+    update|check) printf '%s' "$WB_YELLOW" ;;
+    -) printf '%s' "$WB_GRAY" ;;
+    *) printf '%s' "$WB_GRAY" ;;
+  esac
+}
+
+table_header() {
+  color_cell "$WB_GRAY" "$1" "$2"
+}
+
+color_status() {
+  status_color "$1"
+}
+
+color_diff() {
+  diff_color "$1"
+}
+
+color_next_action() {
+  next_action_color "$1"
+}
+
+section() {
+  if color_enabled; then
+    printf '\n%s%s %s%s\n' "$WB_PURPLE_BOLD" "$WB_ICON_ARROW" "$1" "$WB_RESET"
+  else
+    info "$1"
+  fi
+}
+
+item_ok() {
+  if color_enabled; then
+    printf '  %s%s%s %s\n' "$WB_GREEN" "$WB_ICON_SUCCESS" "$WB_RESET" "$*"
+  else
+    success "$*"
+  fi
+}
+
+item_warn() {
+  if color_enabled; then
+    printf '  %s%s%s %s\n' "$WB_YELLOW" "$WB_ICON_WARNING" "$WB_RESET" "$*"
+  else
+    info "$*"
+  fi
+}
+
+item_info() {
+  if color_enabled; then
+    printf '  %s%s%s %s\n' "$WB_GREEN" "$WB_ICON_LIST" "$WB_RESET" "$*"
+  else
+    info "$*"
+  fi
+}
+
+item_detail() {
+  if color_enabled; then
+    printf '  %s%s %s%s\n' "$WB_GRAY" "$WB_ICON_SUBLIST" "$*" "$WB_RESET"
+  else
+    printf '    %s\n' "$*"
+  fi
+}
+
+item_review() {
+  if color_enabled; then
+    printf '  %s%s %s%s\n' "$WB_GRAY" "$WB_ICON_REVIEW" "$*" "$WB_RESET"
+  else
+    printf '    %s\n' "$*"
+  fi
+}
+
+info() { printf '%s[*]%s %s\n' "$WB_BLUE" "$WB_RESET" "$*"; }
+
+success() { printf '%s[+]%s %s\n' "$WB_GREEN" "$WB_RESET" "$*"; }
+
+die() { printf '%s[-] Error:%s %s\n' "$WB_RED" "$WB_RESET" "$*" >&2; exit 1; }
 
 # ----- src/workbranch/usage.sh -----
-usage() {
+print_banner() {
+  printf '%s' "$WB_PURPLE_BOLD"
+  cat <<'BANNER'
+__        __         _    _                         _
+\ \      / /__  _ __| | _| |__  _ __ __ _ _ __   ___| |__
+ \ \ /\ / / _ \| '__| |/ / '_ \| '__/ _` | '_ \ / __| '_ \
+  \ V  V / (_) | |  |   <| |_) | | | (_| | | | | (__| | | |
+   \_/\_/ \___/|_|  |_|\_\_.__/|_|  \__,_|_| |_|\___|_| |_|
+BANNER
+  printf '%s' "$WB_RESET"
+  printf '\n'
+  printf '%s                       Task-based Git worktrees, made easy.%s\n' "$WB_GRAY" "$WB_RESET"
+}
+
+usage_plain() {
   cat <<USAGE
 Usage:
   workbranch <command> [args]
@@ -76,6 +243,51 @@ Other:
   -v, --version     Show the installed workbranch version
   version           Show the installed workbranch version
 USAGE
+}
+
+usage_enhanced() {
+  print_banner
+  printf '\n%sUsage:%s\n' "$WB_BOLD" "$WB_RESET"
+  printf '  workbranch <command> [args]\n'
+  section "Workspace"
+  printf '  init              Initialize a workbranch project\n'
+  printf '  list              List configured repos and task workspaces\n'
+  printf '  add <task>        Create a task workspace\n'
+  printf '  remove <task>     Remove task worktrees and local task branches\n'
+  section "Git"
+  printf '  status            Show commits, diff, and dirty state\n'
+  printf '  vertical\n'
+  printf '  pull              Pull remote base branches into main worktrees\n'
+  printf '  push              Push base branches to origin\n'
+  printf '  push <task>       Push task branches to origin\n'
+  printf '  horizontal\n'
+  printf '  update            Update every task workspace from local base worktrees\n'
+  printf '  update --all      Update every task workspace from local base worktrees\n'
+  printf '  update <task>     Update one task workspace from local base worktrees\n'
+  printf '  land <task>       Land task branches into base branches\n'
+  printf '  common\n'
+  printf '  --repo <repo>     Limit operation to one repo; otherwise all repos\n'
+  section "Tool"
+  printf '  path <task>       Print a task workspace path\n'
+  printf '  editor <task>     Open task repo worktrees in the configured editor\n'
+  printf '  terminal <task>   Open task repo worktrees in the configured terminal\n'
+  section "Config"
+  printf '  config            Create or update .workbranch.config without cloning repos\n'
+  printf '  config editor     Update only the configured editor command\n'
+  printf '  config terminal   Update only the configured terminal command\n'
+  printf '  config --rewrite  Rewrite config to current format without prompts\n'
+  section "Other"
+  printf '  help              Show this help\n'
+  printf '  -v, --version     Show the installed workbranch version\n'
+  printf '  version           Show the installed workbranch version\n'
+}
+
+usage() {
+  if color_enabled; then
+    usage_enhanced
+  else
+    usage_plain
+  fi
 }
 
 # ----- src/workbranch/lib/validation.sh -----
@@ -789,11 +1001,11 @@ preflight_die_if_errors() {
     return 0
   fi
 
-  printf '[-] Error: Cannot %s: preflight failed\n' "$operation" >&2
-  printf '[*] Fix these worktrees, then retry:\n' >&2
+  printf '%s[-] Error:%s Cannot %s: preflight failed\n' "$WB_RED" "$WB_RESET" "$operation" >&2
+  printf '%s[*]%s Fix these worktrees, then retry:\n' "$WB_BLUE" "$WB_RESET" >&2
   i=0
   while [ $i -lt ${#PREFLIGHT_ERRORS[@]} ]; do
-    printf '    %s\n' "${PREFLIGHT_ERRORS[$i]}" >&2
+    printf '    %s%s%s\n' "$WB_GRAY" "${PREFLIGHT_ERRORS[$i]}" "$WB_RESET" >&2
     i=$((i + 1))
   done
   exit 1
@@ -1015,6 +1227,11 @@ track_branch() {
 prompt_read() {
   prompt=$1
   value=""
+  case "$prompt" in
+    "[*] "*)
+      prompt="${WB_BLUE}[*]${WB_RESET} ${prompt#\[\*\] }"
+      ;;
+  esac
   if [ -t 0 ]; then
     # Use readline for interactive editing when a real terminal is attached.
     if ! IFS= read -r -e -p "$prompt" value; then
@@ -1204,9 +1421,9 @@ _run_setup_command() {
     sh -c "$_rs_command"
     setup_status=$?
     if [ $setup_status -ne 0 ]; then
-      printf '[-] Error: %s setup failed: %s\n' "$_rs_kind" "$_rs_label" >&2
-      printf '[*] Setup directory: %s\n' "$_rs_dir" >&2
-      printf '[*] Setup command: %s\n' "$_rs_command" >&2
+      printf '%s[-] Error:%s %s setup failed: %s\n' "$WB_RED" "$WB_RESET" "$_rs_kind" "$_rs_label" >&2
+      printf '%s[*]%s Setup directory: %s\n' "$WB_BLUE" "$WB_RESET" "$_rs_dir" >&2
+      printf '%s[*]%s Setup command: %s\n' "$WB_BLUE" "$WB_RESET" "$_rs_command" >&2
       exit "$setup_status"
     fi
   )
@@ -1327,7 +1544,11 @@ next_action_for_diff() {
 }
 
 print_base_status_header() {
-  printf '    %-11s %-16s %-10s %s\n' "repo" "branch" "commit" "status"
+  printf '    %s %s %s %s\n' \
+    "$(table_header 11 repo)" \
+    "$(table_header 16 branch)" \
+    "$(table_header 10 commit)" \
+    "$(color_text "$WB_GRAY" status)"
 }
 
 print_base_status_item() {
@@ -1335,11 +1556,21 @@ print_base_status_item() {
   branch=$2
   commit=$3
   state=$4
-  printf '    %-11s %-16s %-10s %s\n' "$name" "$branch" "$commit" "$state"
+  printf '    %-11s %-16s %-10s %s\n' \
+    "$name" \
+    "$branch" \
+    "$commit" \
+    "$(color_text "$(color_status "$state")" "$state")"
 }
 
 print_task_status_header() {
-  printf '    %-11s %-10s %-10s %-5s %-9s %s\n' "repo" "base" "task" "diff" "status" "next"
+  printf '    %s %s %s %s %s %s\n' \
+    "$(table_header 11 repo)" \
+    "$(table_header 10 base)" \
+    "$(table_header 10 task)" \
+    "$(table_header 5 diff)" \
+    "$(table_header 9 status)" \
+    "$(color_text "$WB_GRAY" next)"
 }
 
 print_task_status_item() {
@@ -1349,15 +1580,19 @@ print_task_status_item() {
   diff_label=$4
   state=$5
   next_action=$6
-  printf '    %-11s %-10s %-10s %-5s %-9s %s\n' "$name" "$base_commit" "$task_commit" "$diff_label" "$state" "$next_action"
+  printf '    %-11s %-10s %-10s %s %s %s\n' \
+    "$name" \
+    "$base_commit" \
+    "$task_commit" \
+    "$(color_cell "$(color_diff "$diff_label")" 5 "$diff_label")" \
+    "$(color_cell "$(color_status "$state")" 9 "$state")" \
+    "$(color_text "$(color_next_action "$next_action")" "$next_action")"
 }
 
 print_next_legend() {
-  cat <<'LEGEND'
-[*] Next
-    land    task has commits not in base: workbranch land <task>
-    update  task is behind base: workbranch update <task>
-LEGEND
+  section "Next"
+  item_detail "land    task has commits not in base: workbranch land <task>"
+  item_detail "update  task is behind base: workbranch update <task>"
 }
 
 is_task_workspace_path() {
@@ -1707,10 +1942,13 @@ configure_existing_project() {
 cmd_init_interactive() {
   clone_after=${1:-yes}
   reset_config
-  info "Create a new workbranch project"
+  if color_enabled; then
+    print_banner
+  fi
+  section "Create a new workbranch project"
   printf '
 ' >&2
-  info "After workbranch"
+  section "After workbranch"
   cat >&2 <<'AFTER'
     fullstack                     // workbranch project
     ├── .workbranch.config        // config
@@ -1727,20 +1965,17 @@ cmd_init_interactive() {
 AFTER
   printf '
 ' >&2
-  info "Setup guide"
-  printf '    Project name      directory name for this workbranch workspace
-' >&2
-  printf '    Main worktrees    directory for each repo main worktree
-' >&2
-  printf '    Repositories      Git repos included in each task workspace
-' >&2
+  section "Setup guide"
+  item_detail "Project name      directory name for this workbranch workspace"
+  item_detail "Main worktrees    directory for each repo main worktree"
+  item_detail "Repositories      Git repos included in each task workspace"
   printf '
-[*] Press Enter to continue...' >&2
-  IFS= read -r _continue || _continue=""
+' >&2
+  prompt_read "[*] Press Enter to continue..." >/dev/null || true
   printf '
 
 ' >&2
-  info "Project"
+  section "Project"
   target_dir_input=$(prompt_with_default "Target directory" ".")
   TARGET_DIR=$(expand_path "$target_dir_input")
   PROJECT_NAME=$(prompt_with_default "Project name" "fullstack")
@@ -1757,14 +1992,14 @@ AFTER
 
   printf '
 ' >&2
-  info "Repositories"
+  section "Repositories"
 
   repo_number=1
   repo_branch_default="main"
   while :; do
     printf '
 ' >&2
-    info "Repo #$repo_number"
+    section "Repo #$repo_number"
     repo_name=$(prompt_required "Repository name")
     validate_safe_name "repo name" "$repo_name"
     repo_url=$(prompt_required "Git URL")
@@ -1773,8 +2008,7 @@ AFTER
     add_repo_config "$repo_name" "$repo_url" "$repo_branch"
     configure_repo_setup_prompt "$repo_name"
     repo_branch_default=$repo_branch
-    printf '[*] Add another repo? [y/N]: ' >&2
-    IFS= read -r answer || answer=""
+    answer=$(prompt_read "[*] Add another repo? [y/N]: ") || answer=""
     case "$answer" in
       y|Y|yes|YES) repo_number=$((repo_number + 1)); continue ;;
       *) break ;;
@@ -1783,7 +2017,7 @@ AFTER
 
   printf '
 ' >&2
-  info "Summary"
+  section "Summary"
   info "Project: $PROJECT_NAME"
   info "Main worktrees dir: $BASE_DIR"
   info "Default task branch prefix: $BRANCH_PREFIX"
@@ -1977,10 +2211,10 @@ cmd_add() {
     i=$((i + 1))
   done
   if has_task_setups && ! run_task_setups "$task"; then
-    printf '[-] Error: task setup failed\n' >&2
-    printf '[*] Worktrees were created. Fix setup with:\n' >&2
-    printf '    workbranch config\n' >&2
-    printf '[*] Then rerun the setup command shown above, or remove and add the task again.\n' >&2
+    printf '%s[-] Error:%s task setup failed\n' "$WB_RED" "$WB_RESET" >&2
+    printf '%s[*]%s Worktrees were created. Fix setup with:\n' "$WB_BLUE" "$WB_RESET" >&2
+    printf '    %sworkbranch config%s\n' "$WB_GRAY" "$WB_RESET" >&2
+    printf '%s[*]%s Then rerun the setup command shown above, or remove and add the task again.\n' "$WB_BLUE" "$WB_RESET" >&2
     return 1
   fi
 }
@@ -1990,20 +2224,20 @@ cmd_list() {
   require_project
   info "Project: $PROJECT_NAME"
   info "Base: $BASE_DIR"
-  info "Editor:"
+  section "Editor"
   if [ -n "$EDITOR_COMMAND" ]; then
     printf '    %s\n' "$EDITOR_COMMAND"
   else
     printf '    (none)\n'
   fi
-  info "Terminal:"
+  section "Terminal"
   if [ -n "$TERMINAL_COMMAND" ]; then
     printf '    %s\n' "$TERMINAL_COMMAND"
   else
     printf '    (none)\n'
   fi
   if has_repo_setups; then
-    info "Repo setup:"
+    section "Repo setup"
     i=0
     while [ $i -lt ${#REPO_NAMES[@]} ]; do
       command=$(repo_setup_at "$i")
@@ -2013,7 +2247,7 @@ cmd_list() {
       i=$((i + 1))
     done
   fi
-  info "Repos:"
+  section "Repos"
   printf '    %-11s %-16s %s\n' "repo" "base" "current"
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
@@ -2023,7 +2257,7 @@ cmd_list() {
     printf '    %-11s %-16s %s\n' "$name" "$branch" "$current"
     i=$((i + 1))
   done
-  info "Tasks:"
+  section "Tasks"
   found=0
   for path in "$PROJECT_ROOT"/*; do
     [ -d "$path" ] || continue
@@ -2039,7 +2273,7 @@ cmd_list() {
     done
     [ $task_has_repo -eq 1 ] || continue
     found=1
-    info "$dir_name"
+    section "$dir_name"
     printf '    %-11s %s\n' "repo" "branch"
     i=0
     while [ $i -lt ${#REPO_NAMES[@]} ]; do
@@ -2118,7 +2352,7 @@ cmd_status() {
   parse_repo_option "$@"
   [ ${#ARGS[@]} -eq 0 ] || die "usage: workbranch status [--repo <repo>]"
 
-  info "Base worktrees"
+  section "Base worktrees"
   print_base_status_header
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
@@ -2130,7 +2364,7 @@ cmd_status() {
   done
 
   printf '\n'
-  info "Task workspaces"
+  section "Task workspaces"
   found=0
   for path in "$PROJECT_ROOT"/*; do
     is_task_workspace_path "$path" || continue
@@ -2146,7 +2380,7 @@ cmd_status() {
       base_commit=$(head_commit_full "$base_path")
       diff_label=$(commit_diff_label "$repo_path" "$base_commit")
       if [ $task_printed -eq 0 ]; then
-        info "$task"
+        section "$task"
         print_task_status_header
       fi
       print_task_status_item "$name" "$(head_commit_short "$base_path")" "$(head_commit_short "$repo_path")" "$diff_label" "$(worktree_status_label "$repo_path")" "$(next_action_for_diff "$diff_label")"
@@ -2166,7 +2400,7 @@ cmd_status() {
     is_stale_task_directory_path "$path" || continue
     if [ $stale_found -eq 0 ]; then
       printf '\n'
-      info "Stale directories"
+      section "Stale directories"
     fi
     printf '    %-8s %s\n' "${path##*/}" "directory exists but no registered worktrees"
     stale_found=1

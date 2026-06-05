@@ -131,7 +131,13 @@ Initialize main worktrees from config.
 
 ### `workbranch path <task>`
 
-Print the absolute task workspace path. With `--repo <repo>`, print the absolute path for one task repo worktree. This command writes only the path to stdout so it can be used in scripts.
+Print the absolute task workspace path. With `--repo <repo>`, print the absolute path for one task repo worktree. This command writes only the path to stdout so it can be used in scripts. It never emits the banner, section titles, or ANSI color controls.
+
+### CLI display and color
+
+Interactive terminal output may use ANSI color, a compact help/init banner, and section markers for readability. Non-TTY output is plain by default. `NO_COLOR` disables ANSI/color/banner enhancement and takes precedence over `WORKBRANCH_COLOR=always`. `WORKBRANCH_COLOR` accepts `auto`, `always`, or `never`.
+
+Examples in this spec show the plain output shape. Enhanced terminal output may render section headings with `➤` and color status labels, but command semantics and machine-sensitive outputs such as `workbranch path` remain unchanged.
 
 ### `workbranch editor <task>` / `workbranch terminal <task>`
 

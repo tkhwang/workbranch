@@ -59,9 +59,9 @@ _run_setup_command() {
     sh -c "$_rs_command"
     setup_status=$?
     if [ $setup_status -ne 0 ]; then
-      printf '[-] Error: %s setup failed: %s\n' "$_rs_kind" "$_rs_label" >&2
-      printf '[*] Setup directory: %s\n' "$_rs_dir" >&2
-      printf '[*] Setup command: %s\n' "$_rs_command" >&2
+      printf '%s[-] Error:%s %s setup failed: %s\n' "$WB_RED" "$WB_RESET" "$_rs_kind" "$_rs_label" >&2
+      printf '%s[*]%s Setup directory: %s\n' "$WB_BLUE" "$WB_RESET" "$_rs_dir" >&2
+      printf '%s[*]%s Setup command: %s\n' "$WB_BLUE" "$WB_RESET" "$_rs_command" >&2
       exit "$setup_status"
     fi
   )

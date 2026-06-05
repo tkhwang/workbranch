@@ -3,7 +3,7 @@ cmd_status() {
   parse_repo_option "$@"
   [ ${#ARGS[@]} -eq 0 ] || die "usage: workbranch status [--repo <repo>]"
 
-  info "Base worktrees"
+  section "Base worktrees"
   print_base_status_header
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
@@ -15,7 +15,7 @@ cmd_status() {
   done
 
   printf '\n'
-  info "Task workspaces"
+  section "Task workspaces"
   found=0
   for path in "$PROJECT_ROOT"/*; do
     is_task_workspace_path "$path" || continue
@@ -31,7 +31,7 @@ cmd_status() {
       base_commit=$(head_commit_full "$base_path")
       diff_label=$(commit_diff_label "$repo_path" "$base_commit")
       if [ $task_printed -eq 0 ]; then
-        info "$task"
+        section "$task"
         print_task_status_header
       fi
       print_task_status_item "$name" "$(head_commit_short "$base_path")" "$(head_commit_short "$repo_path")" "$diff_label" "$(worktree_status_label "$repo_path")" "$(next_action_for_diff "$diff_label")"
@@ -51,7 +51,7 @@ cmd_status() {
     is_stale_task_directory_path "$path" || continue
     if [ $stale_found -eq 0 ]; then
       printf '\n'
-      info "Stale directories"
+      section "Stale directories"
     fi
     printf '    %-8s %s\n' "${path##*/}" "directory exists but no registered worktrees"
     stale_found=1

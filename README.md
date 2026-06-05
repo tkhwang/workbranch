@@ -114,6 +114,20 @@ Single-repo projects use the same shape with one repo directory inside each task
 
 Add `--repo <repo>` to supported Branch workflow and Tool commands when you want to operate on one repo only.
 
+## CLI display
+
+In an interactive terminal, `workbranch` uses color, a compact banner on help/init screens, and section titles to make command output easier to scan. Captured or piped output stays plain by default so scripts and tests do not receive ANSI escape sequences.
+
+Color controls:
+
+```bash
+NO_COLOR=1 workbranch help              # always plain
+WORKBRANCH_COLOR=never workbranch help  # always plain
+WORKBRANCH_COLOR=always workbranch help # force enhanced display
+```
+
+`workbranch path <task>` and `workbranch path <task> --repo <repo>` remain plain path-only outputs for scripting.
+
 ## Opening task workspaces
 
 Configure one editor and one terminal command for the project:

@@ -1,10 +1,13 @@
 cmd_init_interactive() {
   clone_after=${1:-yes}
   reset_config
-  info "Create a new workbranch project"
+  if color_enabled; then
+    print_banner
+  fi
+  section "Create a new workbranch project"
   printf '
 ' >&2
-  info "After workbranch"
+  section "After workbranch"
   cat >&2 <<'AFTER'
     fullstack                     // workbranch project
     ├── .workbranch.config        // config
@@ -21,20 +24,17 @@ cmd_init_interactive() {
 AFTER
   printf '
 ' >&2
-  info "Setup guide"
-  printf '    Project name      directory name for this workbranch workspace
-' >&2
-  printf '    Main worktrees    directory for each repo main worktree
-' >&2
-  printf '    Repositories      Git repos included in each task workspace
-' >&2
+  section "Setup guide"
+  item_detail "Project name      directory name for this workbranch workspace"
+  item_detail "Main worktrees    directory for each repo main worktree"
+  item_detail "Repositories      Git repos included in each task workspace"
   printf '
-[*] Press Enter to continue...' >&2
-  IFS= read -r _continue || _continue=""
+' >&2
+  prompt_read "[*] Press Enter to continue..." >/dev/null || true
   printf '
 
 ' >&2
-  info "Project"
+  section "Project"
   target_dir_input=$(prompt_with_default "Target directory" ".")
   TARGET_DIR=$(expand_path "$target_dir_input")
   PROJECT_NAME=$(prompt_with_default "Project name" "fullstack")
@@ -51,14 +51,14 @@ AFTER
 
   printf '
 ' >&2
-  info "Repositories"
+  section "Repositories"
 
   repo_number=1
   repo_branch_default="main"
   while :; do
     printf '
 ' >&2
-    info "Repo #$repo_number"
+    section "Repo #$repo_number"
     repo_name=$(prompt_required "Repository name")
     validate_safe_name "repo name" "$repo_name"
     repo_url=$(prompt_required "Git URL")
@@ -67,8 +67,7 @@ AFTER
     add_repo_config "$repo_name" "$repo_url" "$repo_branch"
     configure_repo_setup_prompt "$repo_name"
     repo_branch_default=$repo_branch
-    printf '[*] Add another repo? [y/N]: ' >&2
-    IFS= read -r answer || answer=""
+    answer=$(prompt_read "[*] Add another repo? [y/N]: ") || answer=""
     case "$answer" in
       y|Y|yes|YES) repo_number=$((repo_number + 1)); continue ;;
       *) break ;;
@@ -77,7 +76,7 @@ AFTER
 
   printf '
 ' >&2
-  info "Summary"
+  section "Summary"
   info "Project: $PROJECT_NAME"
   info "Main worktrees dir: $BASE_DIR"
   info "Default task branch prefix: $BRANCH_PREFIX"

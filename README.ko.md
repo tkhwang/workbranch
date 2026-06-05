@@ -112,6 +112,20 @@ Single-repo 프로젝트도 같은 구조를 사용하며, 각 task 안에 repo 
 
 지원되는 Branch workflow 및 Tool 명령에 `--repo <repo>`를 붙이면 특정 repo 하나만 대상으로 실행합니다.
 
+## CLI 표시
+
+대화형 터미널에서는 `workbranch`가 색상, help/init 화면의 compact banner, section title을 사용해 출력이 더 잘 보이도록 합니다. 캡처되거나 pipe된 출력은 기본적으로 plain text를 유지하므로 script와 test에 ANSI escape sequence가 들어가지 않습니다.
+
+색상 제어:
+
+```bash
+NO_COLOR=1 workbranch help              # 항상 plain
+WORKBRANCH_COLOR=never workbranch help  # 항상 plain
+WORKBRANCH_COLOR=always workbranch help # enhanced display 강제
+```
+
+`workbranch path <task>`와 `workbranch path <task> --repo <repo>`는 scripting을 위해 계속 plain path만 stdout에 출력합니다.
+
 ## 작업 workspace 열기
 
 프로젝트에서 공통으로 사용할 editor와 terminal 명령을 설정합니다.

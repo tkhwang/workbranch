@@ -1,6 +1,11 @@
 prompt_read() {
   prompt=$1
   value=""
+  case "$prompt" in
+    "[*] "*)
+      prompt="${WB_BLUE}[*]${WB_RESET} ${prompt#\[\*\] }"
+      ;;
+  esac
   if [ -t 0 ]; then
     # Use readline for interactive editing when a real terminal is attached.
     if ! IFS= read -r -e -p "$prompt" value; then
