@@ -205,6 +205,34 @@ test_init_existing_config_clones_base_repos() {
   assert_branch "$project/_base/backend" "master"
 }
 
+test_init_completes_partial_base_clones() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  (cd "$project" && run_expect_success "$WORKBRANCH" init >/dev/null)
+  printf '%s\n' "keep existing frontend clone" > "$project/_base/frontend/untouched.txt"
+  rm -rf "$project/_base/backend"
+
+  out=$(cd "$project" && run_expect_success "$WORKBRANCH" init)
+  assert_contains "$out" "Base repo exists: _base/frontend"
+  assert_contains "$out" "Cloned: _base/backend"
+  assert_file "$project/_base/frontend/untouched.txt"
+  assert_dir "$project/_base/frontend/.git"
+  assert_dir "$project/_base/backend/.git"
+  assert_branch "$project/_base/frontend" "master"
+  assert_branch "$project/_base/backend" "master"
+}
+
+test_init_rejects_already_initialized_workbranch_project() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  (cd "$project" && run_expect_success "$WORKBRANCH" init >/dev/null)
+  project_real=$(cd "$project" && pwd -P)
+
+  out=$(cd "$project" && run_expect_fail "$WORKBRANCH" init)
+  assert_contains "$out" "workbranch project already initialized: $project_real"
+  assert_contains "$out" "To edit project settings: workbranch config"
+}
+
 test_init_from_project_subdir_uses_parent_config() {
   new_fixture
   project="$FIXTURE_PROJECT"
@@ -1608,14 +1636,14 @@ INPUT
   assert_not_contains "$out" "backend: base=master task=feature/<task>"
   assert_contains "$out" "[*] Main worktrees directory [_base]:"
   assert_contains "$out" "fullstack                     // workbranch project"
-  assert_contains "$out" "├── .workbranch.config          // config"
-  assert_contains "$out" "├── _base                     // main worktrees"
-  assert_contains "$out" "│   ├── frontend              // main worktree: frontend"
-  assert_contains "$out" "│   └── backend               // main worktree: backend"
+  assert_contains "$out" "├── .workbranch.config        // config"
+  assert_contains "$out" "├── _base                     // main worktrees: _base"
+  assert_contains "$out" "│   ├── frontend              // - base frontend repo"
+  assert_contains "$out" "│   └── backend               // - base backend repo"
   assert_contains "$out" "└── login                     // task workspace"
-  assert_contains "$out" "├── frontend              // linked worktree: frontend"
-  assert_contains "$out" "├── backend               // linked worktree: backend"
-  assert_contains "$out" "└── <work here>           // cd login for this feature"
+  assert_contains "$out" "├── frontend              // - task frontend repo"
+  assert_contains "$out" "├── backend               // - task backend repo"
+  assert_contains "$out" "└── <work here>           // use AI Agents in here"
   assert_contains "$out" "Result: branch operations stay grouped by feature workspace."
   assert_contains "$out" "Multi-repo bonus: use one directory for shared AI session context."
   assert_contains "$out" "Press Enter to continue"
@@ -1918,7 +1946,7 @@ test_installer_can_add_target_directory_to_zshrc() {
 
 test_help_groups_commands() {
   out=$(run_expect_success "$WORKBRANCH" help)
-  assert_contains "$out" "Workspace:"
+  assert_contains "$out" "Workspace lifecycle:"
   assert_contains "$out" "init              Initialize a workbranch project"
   assert_contains "$out" "list              List configured repos and task workspaces"
   assert_contains "$out" "config            Create or update .workbranch.config without cloning repos"
@@ -1928,31 +1956,33 @@ test_help_groups_commands() {
   assert_not_contains "$out" "setup --clear"
   assert_not_contains "$out" "setup repo <repo>"
   assert_not_contains "$out" "setup <task>"
-  assert_contains "$out" "Git:"
+  assert_contains "$out" "Branch workflow:"
   assert_contains "$out" "Other:"
   assert_contains "$out" "-v, --version     Show the installed workbranch version"
   assert_contains "$out" "version           Show the installed workbranch version"
   assert_contains "$out" "status            Show commits, diff, and dirty state"
-  assert_contains "$out" "  vertical"
   assert_contains "$out" "pull              Pull remote base branches into main worktrees"
   assert_contains "$out" "push              Push base branches to origin"
   assert_contains "$out" "push <task>       Push task branches to origin"
-  assert_contains "$out" "  horizontal"
   assert_contains "$out" "update            Update every task workspace from local base worktrees"
   assert_contains "$out" "update --all      Update every task workspace from local base worktrees"
   assert_contains "$out" "update <task>     Update one task workspace from local base worktrees"
   assert_contains "$out" "land <task>       Land task branches into base branches"
-  assert_contains "$out" "  common"
-  assert_contains "$out" "--repo <repo>     Limit operation to one repo; otherwise all repos"
-  assert_not_contains "$out" "// vertical"
-  assert_not_contains "$out" "// horizontal"
-  assert_not_contains "$out" "// common"
+  assert_contains "$out" "  Options:"
+  assert_contains "$out" "    --repo <repo>   Limit branch workflow to one repo; otherwise all repos"
+  assert_not_contains "$out" "  vertical"
+  assert_not_contains "$out" "  horizontal"
+  assert_not_contains "$out" "  common"
   case "$out" in
     *$'\n\n'*) fail "expected compact help without blank lines; got: $out" ;;
   esac
   case "$out" in
     *"Workspace:"*"init              Initialize a workbranch project"*"list              List configured repos and task workspaces"*"config            Create or update .workbranch.config without cloning repos"*"config --rewrite  Rewrite config to current format without prompts"*"add <task>        Create a task workspace"*"remove <task>     Remove task worktrees and local task branches"*"Git:"*"status            Show commits, diff, and dirty state"*"  vertical"*"Other:"*) ;;
     *) fail "expected workspace and group ordering; got: $out" ;;
+  esac
+  case "$out" in
+    *"Other:"*"help              Show this help"*"version           Show the installed workbranch version"*"-v, --version     Show the installed workbranch version"*) ;;
+    *) fail "expected version before -v/--version in Other commands; got: $out" ;;
   esac
 }
 
@@ -1980,6 +2010,8 @@ main() {
   run_test test_safe_names_reject_dot_and_dotdot
   run_test test_invalid_config_rejected_without_execution
   run_test test_init_existing_config_clones_base_repos
+  run_test test_init_completes_partial_base_clones
+  run_test test_init_rejects_already_initialized_workbranch_project
   run_test test_init_from_project_subdir_uses_parent_config
   run_test test_init_rejects_existing_non_git_base_target
   run_test test_init_rejects_existing_non_directory_base_target
