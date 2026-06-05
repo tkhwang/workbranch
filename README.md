@@ -54,7 +54,7 @@ workbranch pull
 workbranch add <task>
 ```
 
-Use `workbranch config` when you want to update project settings, base branches, or per-repo setup commands without cloning repos again.
+Use `workbranch config` when you want to update project settings, base branches, editor/terminal launch commands, or per-repo setup commands without cloning repos again.
 
 ## What it creates
 
@@ -80,7 +80,9 @@ Single-repo projects use the same shape with one repo directory inside each task
 | Command | Use it to |
 | --- | --- |
 | `workbranch init` | Create or clone base worktrees from config |
-| `workbranch config` | Edit project settings, base branches, and repo setup commands |
+| `workbranch config` | Edit project settings, base branches, tool commands, and repo setup commands |
+| `workbranch config editor` | Update only the configured editor command |
+| `workbranch config terminal` | Update only the configured terminal command |
 | `workbranch add <task>` | Create a task workspace |
 | `workbranch list` | Show repos and task workspaces |
 | `workbranch remove <task>` | Remove task worktrees and local task branches |
@@ -96,13 +98,53 @@ Single-repo projects use the same shape with one repo directory inside each task
 | `workbranch push <task>` | Push task branches |
 | `workbranch land <task>` | Fast-forward task work back into local base branches |
 
+### Tool commands
+
+| Command | Use it to |
+| --- | --- |
+| `workbranch path <task>` | Print a task workspace or repo path |
+| `workbranch editor <task>` | Open task repo worktrees in the configured editor |
+| `workbranch terminal <task>` | Open task repo worktrees in the configured terminal |
+
 ### Other
 
 | Command | Use it to |
 | --- | --- |
 | `workbranch -v` | Show the installed version |
 
-Add `--repo <repo>` to supported Branch workflow commands when you want to operate on one repo only.
+Add `--repo <repo>` to supported Branch workflow and Tool commands when you want to operate on one repo only.
+
+## Opening task workspaces
+
+Configure one editor and one terminal command for the project:
+
+```bash
+workbranch config editor
+workbranch config terminal
+```
+
+Then open every repo in a task workspace:
+
+```bash
+workbranch editor login
+workbranch terminal login
+```
+
+Limit to one repo when needed:
+
+```bash
+workbranch editor login --repo frontend
+workbranch terminal login --repo backend
+```
+
+Print full paths for scripting:
+
+```bash
+workbranch path login
+workbranch path login --repo frontend
+```
+
+Launcher commands run repo-by-repo. Commands that keep running in the foreground, such as a raw TUI terminal command, should use `--repo` or a custom non-blocking wrapper.
 
 ## Setup commands
 

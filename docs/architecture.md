@@ -25,6 +25,8 @@ A command file owns orchestration:
 
 `src/workbranch/lib/preflight.sh` owns safety checks and aggregate preflight failure reporting.
 
+`src/workbranch/lib/tool-launcher.sh` owns editor/terminal presets, task path resolution, and configured tool execution. `src/workbranch/commands/path.sh` owns the stdout-only path command. `src/workbranch/commands/tool-launcher.sh` owns `editor` and `terminal` orchestration. These commands are not Git operations and do not modify repositories.
+
 ## Distribution boundary
 
 All install channels use the same generated `bin/workbranch` artifact:

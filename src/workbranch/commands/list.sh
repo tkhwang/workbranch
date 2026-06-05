@@ -2,6 +2,18 @@ cmd_list() {
   require_project
   info "Project: $PROJECT_NAME"
   info "Base: $BASE_DIR"
+  info "Editor:"
+  if [ -n "$EDITOR_COMMAND" ]; then
+    printf '    %s\n' "$EDITOR_COMMAND"
+  else
+    printf '    (none)\n'
+  fi
+  info "Terminal:"
+  if [ -n "$TERMINAL_COMMAND" ]; then
+    printf '    %s\n' "$TERMINAL_COMMAND"
+  else
+    printf '    (none)\n'
+  fi
   if has_repo_setups; then
     info "Repo setup:"
     i=0
