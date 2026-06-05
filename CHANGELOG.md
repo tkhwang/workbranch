@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.0](https://github.com/tkhwang/workbranch/compare/v1.0.0...v1.1.0) (2026-06-05)
+
+
+### Features
+
+* **cli:** enhance output with colors and improved layout ([37fca5a](https://github.com/tkhwang/workbranch/commit/37fca5abe0a1069926be1052efc7938e3620157b))
+* **cli:** enhance output with colors and improved layout ([9e2aca7](https://github.com/tkhwang/workbranch/commit/9e2aca747fa88b6e8eb4ecbd9f88caf8f0a6ba3f)), closes [#123](https://github.com/tkhwang/workbranch/issues/123)
+
+
+### Bug Fixes
+
+* **display:** set term for pty tests ([27f6a00](https://github.com/tkhwang/workbranch/commit/27f6a003371a27d7fe19eceadbbee9fbe95ce2a8))
+
 ## [1.0.0](https://github.com/tkhwang/workbranch/compare/v0.5.0...v1.0.0) (2026-06-05)
 
 
