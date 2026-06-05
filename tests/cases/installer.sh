@@ -1,17 +1,64 @@
 # shellcheck shell=bash
 # Sourced by tests/run.sh; uses helpers from tests/lib/helpers.sh.
+find_free_port() {
+  python3 - <<'PY'
+import socket
+
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+    sock.bind(("127.0.0.1", 0))
+    print(sock.getsockname()[1])
+PY
+}
+
+wait_for_http_server() {
+  url=$1
+  deadline=$((SECONDS + 10))
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    if command -v curl >/dev/null 2>&1; then
+      curl -fsS "$url" >/dev/null 2>&1 && return 0
+    elif command -v wget >/dev/null 2>&1; then
+      wget -q -O /dev/null "$url" >/dev/null 2>&1 && return 0
+    else
+      python3 - "$url" <<'PY' >/dev/null 2>&1 && return 0
+import sys
+import urllib.request
+
+urllib.request.urlopen(sys.argv[1], timeout=1).read()
+PY
+    fi
+    sleep 0.1
+  done
+  return 1
+}
+
+start_test_http_server() {
+  server_dir=$1
+  port=$(find_free_port)
+  WORKBRANCH_RAW_BASE_URL="http://127.0.0.1:$port"
+  (cd "$server_dir" && python3 -m http.server --bind 127.0.0.1 "$port" >/tmp/workbranch-test-http.log 2>&1) &
+  server_pid=$!
+  wait_for_http_server "$WORKBRANCH_RAW_BASE_URL/bin/workbranch" || {
+    kill "$server_pid" 2>/dev/null || true
+    wait "$server_pid" 2>/dev/null || true
+    fail "HTTP test server did not become ready on $WORKBRANCH_RAW_BASE_URL"
+  }
+}
+
+stop_test_http_server() {
+  server_pid=$1
+  kill "$server_pid" 2>/dev/null || true
+  wait "$server_pid" 2>/dev/null || true
+}
+
 test_installer_supports_pipe_to_bash() {
   TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
   mkdir -p "$TMP_ROOT/standalone" "$TMP_ROOT/server/bin"
   cp "$REPO_ROOT/install.sh" "$TMP_ROOT/standalone/install.sh"
   cp "$WORKBRANCH" "$TMP_ROOT/server/bin/workbranch"
-  cd "$TMP_ROOT/server" || return 1
-  python3 -m http.server 8765 >/tmp/workbranch-test-http.log 2>&1 &
-  server_pid=$!
+  start_test_http_server "$TMP_ROOT/server"
   cd "$TMP_ROOT/standalone" || return 1
-  sleep 1
-  out=$(HOME="$TMP_ROOT/home" PATH="/usr/bin:/bin" SHELL="/bin/zsh" WORKBRANCH_RAW_BASE_URL="http://127.0.0.1:8765" bash < "$TMP_ROOT/standalone/install.sh" 2>&1)
-  kill "$server_pid" 2>/dev/null || true
+  out=$(HOME="$TMP_ROOT/home" PATH="/usr/bin:/bin" SHELL="/bin/zsh" WORKBRANCH_RAW_BASE_URL="$WORKBRANCH_RAW_BASE_URL" bash < "$TMP_ROOT/standalone/install.sh" 2>&1)
+  stop_test_http_server "$server_pid"
   assert_contains "$out" "Downloaded workbranch"
   assert_contains "$out" "Installed workbranch"
   assert_file "$TMP_ROOT/home/.local/bin/workbranch"
@@ -50,13 +97,10 @@ test_installer_downloads_cli_when_run_standalone() {
   mkdir -p "$TMP_ROOT/standalone/bin" "$TMP_ROOT/server/bin"
   cp "$REPO_ROOT/install.sh" "$TMP_ROOT/standalone/install.sh"
   cp "$WORKBRANCH" "$TMP_ROOT/server/bin/workbranch"
-  cd "$TMP_ROOT/server" || return 1
-  python3 -m http.server 8765 >/tmp/workbranch-test-http.log 2>&1 &
-  server_pid=$!
+  start_test_http_server "$TMP_ROOT/server"
   cd "$REPO_ROOT" || return 1
-  sleep 1
-  out=$(printf '\nn\n' | HOME="$TMP_ROOT/home" PATH="/usr/bin:/bin" SHELL="/bin/zsh" WORKBRANCH_RAW_BASE_URL="http://127.0.0.1:8765" "$TMP_ROOT/standalone/install.sh" 2>&1)
-  kill "$server_pid" 2>/dev/null || true
+  out=$(printf '\nn\n' | HOME="$TMP_ROOT/home" PATH="/usr/bin:/bin" SHELL="/bin/zsh" WORKBRANCH_RAW_BASE_URL="$WORKBRANCH_RAW_BASE_URL" "$TMP_ROOT/standalone/install.sh" 2>&1)
+  stop_test_http_server "$server_pid"
   assert_contains "$out" "Downloaded workbranch"
   assert_file "$TMP_ROOT/home/.local/bin/workbranch"
   [ -x "$TMP_ROOT/home/.local/bin/workbranch" ] || fail "standalone installed workbranch is not executable"
@@ -122,4 +166,3 @@ test_installer_can_add_target_directory_to_zshrc() {
   assert_file "$TMP_ROOT/home/.zshrc"
   assert_contains "$(cat "$TMP_ROOT/home/.zshrc")" "export PATH=\"$custom_dir:\$PATH\""
 }
-

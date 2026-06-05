@@ -1,10 +1,17 @@
 # shellcheck shell=bash
 # Sourced by tests/run.sh; uses helpers from tests/lib/helpers.sh.
 test_generated_workbranch_is_up_to_date() {
-  TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
-  generated="$TMP_ROOT/workbranch.generated"
-  "$REPO_ROOT/scripts/build-workbranch.sh" "$generated" >/dev/null
-  cmp "$generated" "$WORKBRANCH" >/dev/null || fail "bin/workbranch is stale; run scripts/build-workbranch.sh"
+  tmp_root=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
+  generated="$tmp_root/workbranch.generated"
+  if ! build_output=$("$REPO_ROOT/scripts/build-workbranch.sh" "$generated" 2>&1); then
+    rm -rf "$tmp_root"
+    fail "failed to build generated workbranch: $build_output"
+  fi
+  if ! cmp "$generated" "$WORKBRANCH" >/dev/null; then
+    rm -rf "$tmp_root"
+    fail "bin/workbranch is stale; run scripts/build-workbranch.sh"
+  fi
+  rm -rf "$tmp_root"
 }
 
 test_run_test_output_uses_status_prefixes() {
@@ -43,6 +50,91 @@ test_run_expect_helpers_do_not_leak_tty_stdin() {
 test_run_expect_helpers_preserve_piped_stdin() {
   out=$(printf 'expected-pipe-input\n' | run_expect_success /bin/bash -c 'IFS= read -r line && printf "%s" "$line"')
   [ "$out" = "expected-pipe-input" ] || fail "expected piped stdin to be preserved, got: $out"
+}
+
+test_fail_helper_uses_error_prefix() {
+  out=$(
+    REPO_ROOT="$REPO_ROOT" /bin/bash <<'SCRIPT'
+set -u
+. "$REPO_ROOT/tests/lib/helpers.sh"
+fail "sample failure"
+SCRIPT
+  )
+  assert_contains "$out" "[-] Error: sample failure"
+  assert_not_contains "$out" "FAIL: sample failure"
+}
+
+test_run_test_continues_after_fail_helper() {
+  out=$(
+    REPO_ROOT="$REPO_ROOT" /bin/bash <<'SCRIPT' || true
+set -u
+. "$REPO_ROOT/tests/lib/helpers.sh"
+cleanup_fixture() { :; }
+nested_fail() { fail "nested failure"; }
+nested_pass() { return 0; }
+run_test nested_fail
+run_test nested_pass
+printf 'PASS=%s FAIL=%s\n' "$PASS" "$FAIL"
+SCRIPT
+  )
+  assert_contains "$out" "[*] nested_fail"
+  assert_contains "$out" "[-] Error: nested failure"
+  assert_contains "$out" "[-] ("
+  assert_contains "$out" "[*] nested_pass"
+  assert_contains "$out" "[+] ("
+  assert_contains "$out" "PASS=1 FAIL=1"
+}
+
+test_runner_fails_fast_when_no_case_files() {
+  tmp_root=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
+  mkdir -p "$tmp_root/tests/lib" "$tmp_root/bin"
+  cp "$REPO_ROOT/tests/run.sh" "$tmp_root/tests/run.sh"
+  cp "$REPO_ROOT/tests/lib/helpers.sh" "$tmp_root/tests/lib/helpers.sh"
+  : > "$tmp_root/bin/workbranch"
+  chmod +x "$tmp_root/bin/workbranch"
+
+  out=$(/bin/bash "$tmp_root/tests/run.sh" 2>&1)
+  status=$?
+  rm -rf "$tmp_root"
+
+  [ "$status" -ne 0 ] || fail "expected runner to fail without case files"
+  assert_contains "$out" "[-] Error: no test case files found:"
+  assert_not_contains "$out" "[*] test_generated_workbranch_is_up_to_date"
+}
+
+test_runner_rejects_non_regular_case_file() {
+  tmp_root=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
+  mkdir -p "$tmp_root/tests/lib" "$tmp_root/tests/cases/not-regular.sh" "$tmp_root/bin"
+  cp "$REPO_ROOT/tests/run.sh" "$tmp_root/tests/run.sh"
+  cp "$REPO_ROOT/tests/lib/helpers.sh" "$tmp_root/tests/lib/helpers.sh"
+  : > "$tmp_root/bin/workbranch"
+  chmod +x "$tmp_root/bin/workbranch"
+
+  out=$(/bin/bash "$tmp_root/tests/run.sh" 2>&1)
+  status=$?
+  rm -rf "$tmp_root"
+
+  [ "$status" -ne 0 ] || fail "expected runner to fail on non-regular case file"
+  assert_contains "$out" "[-] Error: invalid test case file:"
+  assert_not_contains "$out" "[*] test_generated_workbranch_is_up_to_date"
+}
+
+test_runner_reports_failed_case_source() {
+  tmp_root=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
+  mkdir -p "$tmp_root/tests/lib" "$tmp_root/tests/cases" "$tmp_root/bin"
+  cp "$REPO_ROOT/tests/run.sh" "$tmp_root/tests/run.sh"
+  cp "$REPO_ROOT/tests/lib/helpers.sh" "$tmp_root/tests/lib/helpers.sh"
+  printf '%s\n' 'return 1' > "$tmp_root/tests/cases/bad.sh"
+  : > "$tmp_root/bin/workbranch"
+  chmod +x "$tmp_root/bin/workbranch"
+
+  out=$(/bin/bash "$tmp_root/tests/run.sh" 2>&1)
+  status=$?
+  rm -rf "$tmp_root"
+
+  [ "$status" -ne 0 ] || fail "expected runner to fail when sourcing case file fails"
+  assert_contains "$out" "[-] Error: failed to source test case file:"
+  assert_not_contains "$out" "[*] test_generated_workbranch_is_up_to_date"
 }
 
 test_setup_command_is_removed() {

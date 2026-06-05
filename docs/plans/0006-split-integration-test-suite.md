@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. This is a **mechanical move with zero behavior change** — no test logic is rewritten, no assertions change.
 
-**Goal:** Mirror the modular `src/workbranch/**` layout in the test suite by splitting the single 2308-line `tests/run.sh` into a shared helper library plus per-area case files, while keeping `tests/run.sh` as the only entrypoint and preserving the exact current test ordering and 92-test pass count after the harness-output/stdin follow-ups.
+**Goal:** Mirror the modular `src/workbranch/**` layout in the test suite by splitting the single 2308-line `tests/run.sh` into a shared helper library plus per-area case files, while keeping `tests/run.sh` as the only entrypoint and preserving the exact current test ordering and 97-test pass count after the harness-output/stdin/failure-prefix/subshell-failure/case-source follow-ups.
 
 **Architecture:** Keep `tests/run.sh` as the single runnable entrypoint. It defines the path globals, sources shared helpers from `tests/lib/helpers.sh`, sources every case file under `tests/cases/*.sh`, then runs `main()` which invokes each test in the current explicit order. Test functions move verbatim into `tests/cases/<area>.sh` files grouped by command/area. Case files are *sourced*, not executed (no shebang, `# shellcheck shell=bash` directive).
 
@@ -16,7 +16,7 @@ Five structural decisions were confirmed with the user:
 
 1. **Grouping: by command/area** (not a strict 1:1 mirror of `src/`). Some `src` modules have no dedicated tests and several tests span multiple modules, so a pragmatic per-area grouping is cleaner than path mirroring.
 2. **Runner: explicit list.** `run.sh` sources helpers, glob-sources all case files, and keeps the current hand-curated `run_test` ordering in `main()`. Deterministic and byte-for-byte equivalent to today's run order. Adding a test means editing both a case file and `main()`.
-3. **Baseline test count: 89 for the split; 92 after output-prefix/stdin follow-ups.** The split started from 89 `test_*` functions and preserved that behavior. A follow-up harness-output test, `test_run_test_output_uses_status_prefixes`, plus two stdin regression tests now bring the current suite to 92 tests.
+3. **Baseline test count: 89 for the split; 97 after output-prefix/stdin/failure-prefix/subshell-failure/case-source follow-ups.** The split started from 89 `test_*` functions and preserved that behavior. A follow-up harness-output test, `test_run_test_output_uses_status_prefixes`, plus two stdin regression tests and one failure-prefix regression test, one subshell-failure regression test, and three case-source regression tests now bring the current suite to 97 tests.
 4. **New test structure: `tests/lib/helpers.sh` + `tests/cases/<area>.sh`.** Helper/driver code moves to `tests/lib/helpers.sh`; sourced-only test functions move under `tests/cases/` by command/area. Keep `tests/run.sh` as the only executable entrypoint.
 5. **Lossless move proof: reconstruct by original `run_test` order.** Do not validate move-only behavior by simply concatenating case files. Rebuild the moved test region in the original `main()`/`run_test` order, then diff that reconstruction against the original test-function region.
 
@@ -31,7 +31,7 @@ per-area test functions:  tests/cases/*.sh       (sourced; ~12 files)
 - `tests/run.sh` is a single 2308-line file containing:
   - **Header (lines 1–11):** shebang, `set -u`, `SCRIPT_DIR` / `REPO_ROOT` / `WORKBRANCH`, counters `PASS` / `FAIL` / `TMP_ROOT` / `FIXTURE_PROJECT`.
   - **Shared helpers (lines 13–151):** `log`, `fail`, `assert_*`, `manifest_version`, `run_expect_success`, `run_expect_fail`, `append_fake_tool_script`, `make_repo`, `commit_to_remote_master`, `commit_to_remote_branch`, `new_fixture`, `cleanup_fixture`, `run_test`.
-  - **89 pre-split `test_*` functions (lines 152–2206), plus one follow-up meta test after the split.**
+  - **89 pre-split `test_*` functions (lines 152–2206), plus eight follow-up meta tests after the split.**
   - **`main()` (lines 2207–end):** prereq checks, then `run_test <name>` for every test in a fixed order, then pass/fail summary.
 - Every test is self-contained: it calls `new_fixture` and is cleaned up by `cleanup_fixture` inside `run_test`. **There are no inter-test ordering dependencies**, so the explicit order is preserved purely for stable, readable output — not correctness.
 - Some test bodies contain heredocs whose lines begin with `}` (106 column-0 `}` lines vs the 89 pre-split functions). **Slice test blocks by the next function's start line, never by brace matching.**
@@ -80,7 +80,7 @@ All current tests route by name prefix. Order matters for ambiguous prefixes (`t
 | `interactive-init.sh` | `test_interactive_init_*` |
 | `installer.sh` | `test_installer_*` |
 
-Routing distribution after the harness-output/stdin follow-ups (must sum to 92): meta 8, init 9, add 10, remove 11, update 5, status 6, config 19, path 2, tool-launcher 3, git-flow 5, interactive-init 7, installer 7.
+Routing distribution after the harness-output/stdin/failure-prefix/subshell-failure/case-source follow-ups (must sum to 97): meta 13, init 9, add 10, remove 11, update 5, status 6, config 19, path 2, tool-launcher 3, git-flow 5, interactive-init 7, installer 7.
 
 ## Layering Rules
 
@@ -93,8 +93,8 @@ Routing distribution after the harness-output/stdin follow-ups (must sum to 92):
 ## Acceptance Criteria
 
 - `tests/run.sh` remains the single entrypoint; `/bin/bash ./tests/run.sh` runs the full suite unchanged.
-- All 92 tests still run, in the same order, and report `Tests passed: 92` with no failures.
-- The number of `run_test` invocations in `main()` equals 92 and matches the original order exactly.
+- All 97 tests still run, in the same order, and report `Tests passed: 97` with no failures.
+- The number of `run_test` invocations in `main()` equals 97 and matches the original order exactly.
 - Every `test_*` function is defined exactly once across `tests/cases/*.sh`; none remain in `tests/run.sh`.
 - `tests/lib/helpers.sh` defines every shared helper exactly once; none remain in `tests/run.sh`.
 - `/bin/bash -n` passes on `tests/run.sh`, `tests/lib/helpers.sh`, and every `tests/cases/*.sh`.
@@ -198,15 +198,15 @@ Evidence: 89 test blocks were routed into 12 `tests/cases/*.sh` files using next
 
 ```bash
 # Every routed test still exists exactly once across case files
-grep -hcE '^test_[a-zA-Z0-9_]*\(\) \{' tests/cases/*.sh | paste -sd+ - | bc   # expect 92
+grep -hcE '^test_[a-zA-Z0-9_]*\(\) \{' tests/cases/*.sh | paste -sd+ - | bc   # expect 97
 grep -hoE '^test_[a-zA-Z0-9_]*\(\) \{' tests/cases/*.sh | sort | uniq -d      # expect empty (no dupes)
 # No stray top-level execution leaked into case files
 grep -nE '^(main|run_test|\. )' tests/cases/*.sh                              # expect empty
 ```
 
-Expected: 92 current total, no duplicates, no top-level execution in case files.
+Expected: 97 current total, no duplicates, no top-level execution in case files.
 
-Evidence: initial split case-file scan found 89 tests; after adding `test_run_test_output_uses_status_prefixes`, current case-file scan finds 92 tests, no duplicate function names, and no top-level `main`, `run_test`, or source execution lines.
+Evidence: initial split case-file scan found 89 tests; after adding `test_run_test_output_uses_status_prefixes`, current case-file scan finds 97 tests, no duplicate function names, and no top-level `main`, `run_test`, or source execution lines.
 
 - [x] **Step 3: Verify function bodies are unchanged**
 
@@ -306,10 +306,10 @@ Evidence: `tests/run.sh` now contains 0 `test_*` functions and 0 helper definiti
 grep -E '^\s*run_test ' tests/run.sh.orig | awk '{print $2}' > /tmp/order_orig
 grep -E '^\s*run_test ' tests/run.sh      | awk '{print $2}' > /tmp/order_new
 diff /tmp/order_orig /tmp/order_new        # expect empty
-wc -l < /tmp/order_new                      # expect 92 after output-prefix/stdin follow-ups
+wc -l < /tmp/order_new                      # expect 97 after output-prefix/stdin/failure-prefix/subshell-failure/case-source follow-ups
 ```
 
-Evidence: original/new `run_test` order diff was empty for the split baseline; current `run_test` order contains 92 entries after the output-prefix/stdin follow-ups.
+Evidence: original/new `run_test` order diff was empty for the split baseline; current `run_test` order contains 97 entries after the output-prefix/stdin/failure-prefix/subshell-failure/case-source follow-ups.
 
 Additional evidence: post-runner original-order reconstruction diff was empty.
 
@@ -337,9 +337,9 @@ Evidence: `/bin/bash -n tests/run.sh tests/lib/helpers.sh tests/cases/*.sh` pass
 /bin/bash ./tests/run.sh
 ```
 
-Expected: `Tests passed: 92`, no `Tests failed:` line, exit 0.
+Expected: `Tests passed: 97`, no `Tests failed:` line, exit 0.
 
-Evidence: `/bin/bash -n tests/run.sh tests/lib/helpers.sh tests/cases/*.sh && /bin/bash ./tests/run.sh` passed with `Tests passed: 92` after adding the output-prefix/stdin meta tests.
+Evidence: `/bin/bash -n tests/run.sh tests/lib/helpers.sh tests/cases/*.sh && /bin/bash ./tests/run.sh` passed with `Tests passed: 97` after adding the output-prefix/stdin/failure-prefix/subshell-failure/case-source meta tests.
 
 - [x] **Step 3: Optional ShellCheck (when available)**
 
@@ -384,9 +384,9 @@ Run before claiming completion:
 ```bash
 ./scripts/build-workbranch.sh
 /bin/bash -n tests/run.sh tests/lib/helpers.sh tests/cases/*.sh
-/bin/bash ./tests/run.sh        # expect: Tests passed: 92
-grep -hcE '^test_[a-zA-Z0-9_]*\(\) \{' tests/cases/*.sh | paste -sd+ - | bc   # expect 92
-grep -E '^\s*run_test ' tests/run.sh | wc -l                                  # expect 92
+/bin/bash ./tests/run.sh        # expect: Tests passed: 97
+grep -hcE '^test_[a-zA-Z0-9_]*\(\) \{' tests/cases/*.sh | paste -sd+ - | bc   # expect 97
+grep -E '^\s*run_test ' tests/run.sh | wc -l                                  # expect 97
 # Also run Task 2 Step 3's reconstruction diff before deleting tests/run.sh.orig.
 ```
 

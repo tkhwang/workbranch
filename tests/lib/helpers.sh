@@ -7,7 +7,7 @@ TMP_ROOT=""
 FIXTURE_PROJECT=""
 
 log() { printf '%s\n' "$*"; }
-fail() { log "FAIL: $*"; exit 1; }
+fail() { log "[-] Error: $*"; exit 1; }
 
 assert_file() { [ -f "$1" ] || fail "expected file: $1"; }
 assert_dir() { [ -d "$1" ] || fail "expected dir: $1"; }
@@ -144,7 +144,10 @@ run_test() {
   test_name=$1
   log "[*] $test_name"
   test_started=$(date +%s)
-  if "$test_name"; then
+  if (
+    trap cleanup_fixture EXIT
+    "$test_name"
+  ); then
     test_finished=$(date +%s)
     test_elapsed=$((test_finished - test_started))
     PASS=$((PASS + 1))
@@ -155,5 +158,4 @@ run_test() {
     FAIL=$((FAIL + 1))
     log "[-] (${test_elapsed}s)"
   fi
-  cleanup_fixture
 }

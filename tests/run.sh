@@ -6,8 +6,20 @@ REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd -P)
 WORKBRANCH="$REPO_ROOT/bin/workbranch"
 
 . "$SCRIPT_DIR/lib/helpers.sh"
-for case_file in "$SCRIPT_DIR"/cases/*.sh; do
-  . "$case_file"
+cases=("$SCRIPT_DIR"/cases/*.sh)
+if [ "${#cases[@]}" -eq 0 ] || [ "${cases[0]}" = "$SCRIPT_DIR/cases/*.sh" ]; then
+  printf '%s\n' "[-] Error: no test case files found: $SCRIPT_DIR/cases/*.sh" >&2
+  exit 1
+fi
+for case_file in "${cases[@]}"; do
+  if [ ! -f "$case_file" ] || [ ! -r "$case_file" ]; then
+    printf '%s\n' "[-] Error: invalid test case file: $case_file" >&2
+    exit 1
+  fi
+  if ! . "$case_file"; then
+    printf '%s\n' "[-] Error: failed to source test case file: $case_file" >&2
+    exit 1
+  fi
 done
 
 main() {
@@ -18,6 +30,11 @@ main() {
   run_test test_run_test_output_uses_status_prefixes
   run_test test_run_expect_helpers_do_not_leak_tty_stdin
   run_test test_run_expect_helpers_preserve_piped_stdin
+  run_test test_fail_helper_uses_error_prefix
+  run_test test_run_test_continues_after_fail_helper
+  run_test test_runner_fails_fast_when_no_case_files
+  run_test test_runner_rejects_non_regular_case_file
+  run_test test_runner_reports_failed_case_source
   run_test test_help_groups_commands
   run_test test_version_reports_release_manifest_version
   run_test test_safe_names_reject_dot_and_dotdot
