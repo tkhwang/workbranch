@@ -41,7 +41,8 @@ AFTER
   validate_safe_name "project" "$PROJECT_NAME"
   BASE_DIR=$(prompt_with_default "Main worktrees directory" "_base")
   validate_safe_name "MAIN_WORKTREES_DIR" "$BASE_DIR"
-  BRANCH_PREFIX="feature"
+  BRANCH_PREFIX=$(prompt_with_default "Default task branch prefix" "feature")
+  validate_nonempty_no_space "task branch prefix" "$BRANCH_PREFIX"
 
   printf '
 ' >&2
@@ -71,42 +72,20 @@ AFTER
 
   printf '
 ' >&2
-  configure_task_setup_prompt
-
-  printf '
-' >&2
   info "Summary"
   info "Project: $PROJECT_NAME"
   info "Main worktrees dir: $BASE_DIR"
   info "Default task branch prefix: $BRANCH_PREFIX"
-  info "Task setup:"
-  if [ -n "$TASK_SETUP" ]; then
-    info "  $TASK_SETUP"
-  else
-    info "  (none)"
-  fi
   info "Repositories:"
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     info "  - $(repo_name_at "$i") $(repo_url_at "$i") base repo branch=$(repo_base_branch_at "$i")"
     i=$((i + 1))
   done
-  info "Task branch defaults:"
-  info "  - [base repo] main        -> task1 -> [task repo] feature/task1"
-  info "  - [base repo] feature/XXX -> task1 -> [task repo] feature/XXX-task1"
-  info "  - You can override each task branch when running workbranch add."
-  i=0
-  while [ $i -lt ${#REPO_NAMES[@]} ]; do
-    name=$(repo_name_at "$i")
-    base_branch=$(repo_base_branch_at "$i")
-    if [ "$base_branch" = "$BRANCH_PREFIX" ] || [ "${base_branch#"$BRANCH_PREFIX"/}" != "$base_branch" ]; then
-      task_example="${base_branch}-<task>"
-    else
-      task_example="${BRANCH_PREFIX}/<task>"
-    fi
-    info "  - $name: base=$base_branch task=$task_example"
-    i=$((i + 1))
-  done
+  info "Task branches:"
+  info "  - Chosen when running workbranch add <task>."
+  info "  - workbranch suggests defaults from each repo's base branch and the task name."
+  info "  - You can override each suggested task branch."
   printf '
 ' >&2
   if [ "$clone_after" = "yes" ]; then

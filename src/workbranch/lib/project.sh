@@ -81,6 +81,43 @@ default_repo_task_branch_at() {
   fi
 }
 
+registered_task_branch_at() {
+  local index task name base target line match branch
+  index=$1
+  task=$2
+  name=$(repo_name_at "$index")
+  base=$(base_repo_path "$name")
+  target=$(task_repo_path "$task" "$name")
+  [ -d "$base/.git" ] || [ -f "$base/.git" ] || return 1
+
+  match=0
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      worktree\ *)
+        if [ "${line#worktree }" = "$target" ]; then
+          match=1
+        else
+          match=0
+        fi
+        ;;
+      branch\ refs/heads/*)
+        if [ "$match" -eq 1 ]; then
+          branch=${line#branch refs/heads/}
+          [ -n "$branch" ] || return 1
+          printf '%s' "$branch"
+          return 0
+        fi
+        ;;
+      "")
+        match=0
+        ;;
+    esac
+  done <<EOF_WORKTREE_LIST
+$(git -C "$base" worktree list --porcelain 2>/dev/null || true)
+EOF_WORKTREE_LIST
+  return 1
+}
+
 repo_task_branch_at() {
   local index task name path current
   index=$1
@@ -97,6 +134,9 @@ repo_task_branch_at() {
       printf '%s' "$current"
       return 0
     fi
+  fi
+  if registered_task_branch_at "$index" "$task"; then
+    return 0
   fi
   default_repo_task_branch_at "$index" "$task"
 }

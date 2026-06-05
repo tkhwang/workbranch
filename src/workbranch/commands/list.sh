@@ -2,12 +2,6 @@ cmd_list() {
   require_project
   info "Project: $PROJECT_NAME"
   info "Base: $BASE_DIR"
-  info "Task setup:"
-  if [ -n "$TASK_SETUP" ]; then
-    printf '    %s\n' "$TASK_SETUP"
-  else
-    printf '    (none)\n'
-  fi
   if has_repo_setups; then
     info "Repo setup:"
     i=0

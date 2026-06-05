@@ -79,15 +79,6 @@ print_config_next_steps() {
   done
 }
 
-configure_task_setup_prompt() {
-  value=$(prompt_read "[*] Task setup command [$TASK_SETUP]: ") || die "input aborted"
-  case "$value" in
-    "") ;;
-    --clear) TASK_SETUP="" ;;
-    *) TASK_SETUP=$value ;;
-  esac
-}
-
 configure_repo_setup_prompt() {
   name=$1
   idx=$(repo_index_by_name "$name") || die "unknown repo: $name"

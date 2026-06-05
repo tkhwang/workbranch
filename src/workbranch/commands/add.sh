@@ -4,7 +4,9 @@ prompt_task_branches_for_add() {
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
+    base_branch=$(repo_base_branch_at "$i")
     default_branch=$(default_repo_task_branch_at "$i" "$task")
+    info "Repo $name base branch: $base_branch"
     branch=$(prompt_with_default "Task branch for $name" "$default_branch")
     validate_branch_name "task branch" "$branch"
     set_task_metadata_branch "$name" "$branch"
@@ -58,11 +60,11 @@ cmd_add() {
     git_ref_exists "$base" "origin/$branch" && remote_branch_exists=1
     if [ "$local_branch_exists" -eq 1 ] || [ "$remote_branch_exists" -eq 1 ]; then
       printf "[-] Error: task branch already exists for repo '%s': %s\n" "$name" "$branch" >&2
-      printf '[*] To resume it: workbranch resume %s\n' "$task" >&2
+      if [ "$local_branch_exists" -eq 1 ]; then
+        printf '[*] To delete the local branch first: workbranch remove %s\n' "$task" >&2
+      fi
       if [ "$remote_branch_exists" -eq 1 ]; then
         printf '[*] Remote origin/%s exists; delete it outside workbranch before adding again.\n' "$branch" >&2
-      else
-        printf '[*] To delete it first: workbranch remove %s\n' "$task" >&2
       fi
       exit 1
     fi

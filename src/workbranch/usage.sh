@@ -8,7 +8,6 @@ Workspace:
   config            Create or update .workbranch.config without cloning repos
   config --rewrite  Rewrite config to current format without prompts
   add <task>        Create a task workspace
-  resume <task>     Restore existing local or remote task branches
   remove <task>     Remove task worktrees and local task branches
 Git:
   status            Show commits, diff, and dirty state

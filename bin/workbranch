@@ -48,7 +48,6 @@ Workspace:
   config            Create or update .workbranch.config without cloning repos
   config --rewrite  Rewrite config to current format without prompts
   add <task>        Create a task workspace
-  resume <task>     Restore existing local or remote task branches
   remove <task>     Remove task worktrees and local task branches
 Git:
   status            Show commits, diff, and dirty state
@@ -527,6 +526,43 @@ default_repo_task_branch_at() {
   fi
 }
 
+registered_task_branch_at() {
+  local index task name base target line match branch
+  index=$1
+  task=$2
+  name=$(repo_name_at "$index")
+  base=$(base_repo_path "$name")
+  target=$(task_repo_path "$task" "$name")
+  [ -d "$base/.git" ] || [ -f "$base/.git" ] || return 1
+
+  match=0
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      worktree\ *)
+        if [ "${line#worktree }" = "$target" ]; then
+          match=1
+        else
+          match=0
+        fi
+        ;;
+      branch\ refs/heads/*)
+        if [ "$match" -eq 1 ]; then
+          branch=${line#branch refs/heads/}
+          [ -n "$branch" ] || return 1
+          printf '%s' "$branch"
+          return 0
+        fi
+        ;;
+      "")
+        match=0
+        ;;
+    esac
+  done <<EOF_WORKTREE_LIST
+$(git -C "$base" worktree list --porcelain 2>/dev/null || true)
+EOF_WORKTREE_LIST
+  return 1
+}
+
 repo_task_branch_at() {
   local index task name path current
   index=$1
@@ -543,6 +579,9 @@ repo_task_branch_at() {
       printf '%s' "$current"
       return 0
     fi
+  fi
+  if registered_task_branch_at "$index" "$task"; then
+    return 0
   fi
   default_repo_task_branch_at "$index" "$task"
 }
@@ -1381,15 +1420,6 @@ print_config_next_steps() {
   done
 }
 
-configure_task_setup_prompt() {
-  value=$(prompt_read "[*] Task setup command [$TASK_SETUP]: ") || die "input aborted"
-  case "$value" in
-    "") ;;
-    --clear) TASK_SETUP="" ;;
-    *) TASK_SETUP=$value ;;
-  esac
-}
-
 configure_repo_setup_prompt() {
   name=$1
   idx=$(repo_index_by_name "$name") || die "unknown repo: $name"
@@ -1540,7 +1570,8 @@ AFTER
   validate_safe_name "project" "$PROJECT_NAME"
   BASE_DIR=$(prompt_with_default "Main worktrees directory" "_base")
   validate_safe_name "MAIN_WORKTREES_DIR" "$BASE_DIR"
-  BRANCH_PREFIX="feature"
+  BRANCH_PREFIX=$(prompt_with_default "Default task branch prefix" "feature")
+  validate_nonempty_no_space "task branch prefix" "$BRANCH_PREFIX"
 
   printf '
 ' >&2
@@ -1570,42 +1601,20 @@ AFTER
 
   printf '
 ' >&2
-  configure_task_setup_prompt
-
-  printf '
-' >&2
   info "Summary"
   info "Project: $PROJECT_NAME"
   info "Main worktrees dir: $BASE_DIR"
   info "Default task branch prefix: $BRANCH_PREFIX"
-  info "Task setup:"
-  if [ -n "$TASK_SETUP" ]; then
-    info "  $TASK_SETUP"
-  else
-    info "  (none)"
-  fi
   info "Repositories:"
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     info "  - $(repo_name_at "$i") $(repo_url_at "$i") base repo branch=$(repo_base_branch_at "$i")"
     i=$((i + 1))
   done
-  info "Task branch defaults:"
-  info "  - [base repo] main        -> task1 -> [task repo] feature/task1"
-  info "  - [base repo] feature/XXX -> task1 -> [task repo] feature/XXX-task1"
-  info "  - You can override each task branch when running workbranch add."
-  i=0
-  while [ $i -lt ${#REPO_NAMES[@]} ]; do
-    name=$(repo_name_at "$i")
-    base_branch=$(repo_base_branch_at "$i")
-    if [ "$base_branch" = "$BRANCH_PREFIX" ] || [ "${base_branch#"$BRANCH_PREFIX"/}" != "$base_branch" ]; then
-      task_example="${base_branch}-<task>"
-    else
-      task_example="${BRANCH_PREFIX}/<task>"
-    fi
-    info "  - $name: base=$base_branch task=$task_example"
-    i=$((i + 1))
-  done
+  info "Task branches:"
+  info "  - Chosen when running workbranch add <task>."
+  info "  - workbranch suggests defaults from each repo's base branch and the task name."
+  info "  - You can override each suggested task branch."
   printf '
 ' >&2
   if [ "$clone_after" = "yes" ]; then
@@ -1670,7 +1679,9 @@ prompt_task_branches_for_add() {
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
+    base_branch=$(repo_base_branch_at "$i")
     default_branch=$(default_repo_task_branch_at "$i" "$task")
+    info "Repo $name base branch: $base_branch"
     branch=$(prompt_with_default "Task branch for $name" "$default_branch")
     validate_branch_name "task branch" "$branch"
     set_task_metadata_branch "$name" "$branch"
@@ -1724,11 +1735,11 @@ cmd_add() {
     git_ref_exists "$base" "origin/$branch" && remote_branch_exists=1
     if [ "$local_branch_exists" -eq 1 ] || [ "$remote_branch_exists" -eq 1 ]; then
       printf "[-] Error: task branch already exists for repo '%s': %s\n" "$name" "$branch" >&2
-      printf '[*] To resume it: workbranch resume %s\n' "$task" >&2
+      if [ "$local_branch_exists" -eq 1 ]; then
+        printf '[*] To delete the local branch first: workbranch remove %s\n' "$task" >&2
+      fi
       if [ "$remote_branch_exists" -eq 1 ]; then
         printf '[*] Remote origin/%s exists; delete it outside workbranch before adding again.\n' "$branch" >&2
-      else
-        printf '[*] To delete it first: workbranch remove %s\n' "$task" >&2
       fi
       exit 1
     fi
@@ -1762,174 +1773,11 @@ cmd_add() {
   fi
 }
 
-# ----- src/workbranch/commands/resume.sh -----
-resume_needs_branch_prompt() {
-  task=$1
-  stale=$2
-  task_dir_exists=$3
-  [ "$stale" -eq 1 ] && return 0
-  [ "$task_dir_exists" -eq 0 ] && return 0
-  i=0
-  while [ $i -lt ${#REPO_NAMES[@]} ]; do
-    name=$(repo_name_at "$i")
-    target=$(task_repo_path "$task" "$name")
-    if [ ! -d "$target/.git" ] && [ ! -f "$target/.git" ]; then
-      return 0
-    fi
-    i=$((i + 1))
-  done
-  return 1
-}
-
-prompt_task_branches_for_resume() {
-  task=$1
-  load_task_metadata "$task"
-  i=0
-  while [ $i -lt ${#REPO_NAMES[@]} ]; do
-    name=$(repo_name_at "$i")
-    current=$(metadata_task_branch_for_repo "$name" || true)
-    if [ -z "$current" ]; then
-      current=$(default_repo_task_branch_at "$i" "$task")
-    fi
-    branch=$(prompt_with_default "Task branch for $name" "$current")
-    validate_branch_name "task branch" "$branch"
-    set_task_metadata_branch "$name" "$branch"
-    i=$((i + 1))
-  done
-}
-
-cmd_resume() {
-  [ $# -eq 1 ] || die "usage: workbranch resume <task>"
-  task=$1
-  validate_safe_name "task" "$task"
-  require_project
-  CREATED_PATHS=()
-  CREATED_WORKTREES=()
-  CREATED_WORKTREE_BASES=()
-  CREATED_BRANCH_REPOS=()
-  CREATED_BRANCH_NAMES=()
-  task_dir="$PROJECT_ROOT/$task"
-  task_dir_exists=0
-  if [ -e "$task_dir" ] || [ -L "$task_dir" ]; then
-    [ -d "$task_dir" ] || die "task path exists but is not a directory: $task_dir"
-    task_dir_exists=1
-  fi
-
-  reset_preflight
-  stale_task_dir=0
-  if is_stale_task_directory_path "$task_dir"; then
-    stale_task_dir=1
-  fi
-  prompted_task_branches=0
-  if resume_needs_branch_prompt "$task" "$stale_task_dir" "$task_dir_exists"; then
-    prompt_task_branches_for_resume "$task"
-    prompted_task_branches=1
-  else
-    load_task_metadata "$task"
-  fi
-  if [ "$stale_task_dir" -eq 1 ]; then
-    preflight_stale_task_directory_removal "$task" 0
-  fi
-  found_task_branch=0
-  i=0
-  while [ $i -lt ${#REPO_NAMES[@]} ]; do
-    name=$(repo_name_at "$i")
-    base=$(base_repo_path "$name")
-    base_branch=$(repo_base_branch_at "$i")
-    branch=$(metadata_task_branch_for_repo "$name") || branch=$(repo_task_branch_at "$i" "$task")
-    base_label="$BASE_DIR/$name"
-    target=$(task_repo_path "$task" "$name")
-    label="$task/$name"
-    if [ ! -d "$base/.git" ] && [ ! -f "$base/.git" ]; then
-      preflight_error "$base_label missing git repo"
-      i=$((i + 1))
-      continue
-    fi
-    if [ "$stale_task_dir" -eq 0 ] && { [ -e "$target" ] || [ -L "$target" ]; }; then
-      if [ -d "$target/.git" ] || [ -f "$target/.git" ]; then
-        preflight_require_current_branch "$label" "$target" "$branch"
-        preflight_require_no_rebase "$label" "$target"
-      else
-        preflight_error "$label path exists but is not a git repo"
-      fi
-    fi
-    preflight_require_current_branch "$base_label" "$base" "$base_branch"
-    preflight_require_clean "$base_label" "$base"
-    preflight_require_no_rebase "$base_label" "$base"
-    if branch_exists "$base" "$branch"; then
-      found_task_branch=1
-    else
-      git -C "$base" fetch origin >/dev/null 2>&1 || true
-      if git_ref_exists "$base" "origin/$branch"; then
-        found_task_branch=1
-      fi
-    fi
-    i=$((i + 1))
-  done
-  if [ "$found_task_branch" -ne 1 ] && [ "$stale_task_dir" -ne 1 ]; then
-    preflight_error "no local or remote task branch found for $task"
-  fi
-  preflight_die_if_errors "resume"
-
-  if [ "$stale_task_dir" -eq 1 ]; then
-    remove_stale_task_directory_path "$task_dir" 0 || fail_with_rollback "failed to remove stale task directory: $task"
-    task_dir_exists=0
-  fi
-
-  if [ "$task_dir_exists" -eq 0 ]; then
-    mkdir -p "$task_dir" || die "failed to create task directory: $task_dir"
-    track_path "$task_dir"
-  fi
-  if [ "$prompted_task_branches" -eq 1 ]; then
-    write_task_metadata "$task"
-  fi
-
-  i=0
-  while [ $i -lt ${#REPO_NAMES[@]} ]; do
-    name=$(repo_name_at "$i")
-    base=$(base_repo_path "$name")
-    base_branch=$(repo_base_branch_at "$i")
-    branch=$(metadata_task_branch_for_repo "$name") || branch=$(repo_task_branch_at "$i" "$task")
-    target=$(task_repo_path "$task" "$name")
-    if [ -d "$target/.git" ] || [ -f "$target/.git" ]; then
-      info "Worktree already exists: $task/$name"
-    elif branch_exists "$base" "$branch"; then
-      track_worktree "$target" "$base"
-      workbranch_git_add_existing_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
-    elif git_ref_exists "$base" "origin/$branch"; then
-      track_branch "$base" "$branch"
-      workbranch_git_create_task_branch_from_remote "$base" "$branch" || fail_with_rollback "failed to create task branch for repo '$name'"
-      track_worktree "$target" "$base"
-      workbranch_git_add_existing_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
-    else
-      track_branch "$base" "$branch"
-      track_worktree "$target" "$base"
-      workbranch_git_add_new_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
-    fi
-    success "Resumed: $task/$name"
-    success "  [base repo] $base_branch -> [task repo] $branch"
-    i=$((i + 1))
-  done
-  if has_task_setups && ! run_task_setups "$task"; then
-    printf '[-] Error: task setup failed\n' >&2
-    printf '[*] Worktrees were created. Fix setup with:\n' >&2
-    printf '    workbranch config\n' >&2
-    printf '[*] Then rerun the setup command shown above, or remove and resume the task again.\n' >&2
-    return 1
-  fi
-}
-
 # ----- src/workbranch/commands/list.sh -----
 cmd_list() {
   require_project
   info "Project: $PROJECT_NAME"
   info "Base: $BASE_DIR"
-  info "Task setup:"
-  if [ -n "$TASK_SETUP" ]; then
-    printf '    %s\n' "$TASK_SETUP"
-  else
-    printf '    (none)\n'
-  fi
   if has_repo_setups; then
     info "Repo setup:"
     i=0
@@ -2384,6 +2232,12 @@ cmd_remove() {
     fi
     i=$((i + 1))
   done
+  if [ "$had_failure" -ne 0 ]; then
+    if [ -d "$PROJECT_ROOT/$task" ]; then
+      info "Task directory kept because it is not empty: $task"
+    fi
+    return 1
+  fi
   metadata_file=$(task_metadata_file "$task")
   if [ -f "$metadata_file" ]; then
     rm -f "$metadata_file" || die "failed to remove task metadata: $metadata_file"
@@ -2393,7 +2247,6 @@ cmd_remove() {
   elif [ -d "$PROJECT_ROOT/$task" ]; then
     info "Task directory kept because it is not empty: $task"
   fi
-  [ "$had_failure" -eq 0 ] || return 1
 }
 
 # ----- src/workbranch/commands/version.sh -----
@@ -2512,7 +2365,6 @@ main() {
     config) cmd_config "$@" ;;
     init) cmd_init "$@" ;;
     add) cmd_add "$@" ;;
-    resume) cmd_resume "$@" ;;
     list) cmd_list "$@" ;;
     status) cmd_status "$@" ;;
     pull) cmd_pull "$@" ;;

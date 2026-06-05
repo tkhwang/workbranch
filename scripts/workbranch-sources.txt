@@ -13,7 +13,6 @@ src/workbranch/lib/status-format.sh
 src/workbranch/commands/config.sh
 src/workbranch/commands/init.sh
 src/workbranch/commands/add.sh
-src/workbranch/commands/resume.sh
 src/workbranch/commands/list.sh
 src/workbranch/commands/status.sh
 src/workbranch/commands/pull.sh

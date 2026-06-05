@@ -43,7 +43,7 @@ workbranch push login
 workbranch remove login
 ```
 
-`workbranch add <task>` uses `<task>` as the folder name, then prompts for each repo's task branch. Press Enter to accept the default branch name. Defaults are `feature/<task>` from main-style base branches and `<base-branch>-<task>` from `feature/*`, `feat/*`, or the configured legacy prefix.
+`workbranch add <task>` uses `<task>` as the folder name, shows each repo's base branch, then prompts for that repo's task branch. Press Enter to accept the suggested default branch name. Defaults are `feature/<task>` from main-style base branches and `<base-branch>-<task>` from `feature/*`, `feat/*`, or the configured legacy prefix.
 
 Task branches are created from the current HEAD of your local `_base/<repo>` worktrees. `workbranch add` does not pull remote base branches automatically. To start from the latest remote base, run:
 
@@ -78,7 +78,6 @@ Single-repo projects use the same shape with one repo directory inside each task
 | `workbranch init` | Create or clone base worktrees from config |
 | `workbranch config` | Edit project settings, base branches, and repo setup commands |
 | `workbranch add <task>` | Create a task workspace |
-| `workbranch resume <task>` | Restore existing local or remote task branches |
 | `workbranch list` | Show repos and task workspaces |
 | `workbranch status` | Show branch, diff, and dirty state |
 | `workbranch update [task]` | Merge local base changes into task worktrees |
