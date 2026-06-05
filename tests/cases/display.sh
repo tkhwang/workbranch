@@ -1,6 +1,34 @@
 # shellcheck shell=bash
 # Sourced by tests/run.sh; uses helpers from tests/lib/helpers.sh.
 
+quote_command_arg() {
+  printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+}
+
+quote_command() {
+  _quoted_command=""
+  while [ $# -gt 0 ]; do
+    _quoted_arg=$(quote_command_arg "$1")
+    if [ -z "$_quoted_command" ]; then
+      _quoted_command=$_quoted_arg
+    else
+      _quoted_command="$_quoted_command $_quoted_arg"
+    fi
+    shift
+  done
+  printf '%s' "$_quoted_command"
+}
+
+run_with_pty() {
+  command -v script >/dev/null 2>&1 || fail "script command is required for TTY display test"
+  if script --version >/dev/null 2>&1; then
+    _pty_command=$(quote_command "$@")
+    script -q -c "$_pty_command" /dev/null
+  else
+    script -q /dev/null "$@"
+  fi
+}
+
 test_display_default_error_output_has_no_ansi() {
   out=$(run_expect_fail "$WORKBRANCH" nope)
   assert_contains "$out" "[-] Error: unknown command: nope"
@@ -24,11 +52,11 @@ test_display_no_color_overrides_forced_color() {
 }
 
 test_display_auto_redirected_stderr_has_no_ansi() {
-  command -v script >/dev/null 2>&1 || fail "script command is required for TTY display test"
   TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
   err="$TMP_ROOT/err.log"
 
-  script -q /dev/null sh -c 'err=$1; shift; TERM=xterm env -u NO_COLOR WORKBRANCH_COLOR=auto "$@" 2>"$err"' sh "$err" "$WORKBRANCH" nope >/dev/null 2>&1 || true
+  run_with_pty sh -c 'err=$1; shift; TERM=xterm env -u NO_COLOR WORKBRANCH_COLOR=auto "$@" 2>"$err"' sh "$err" "$WORKBRANCH" nope >/dev/null 2>&1 || true
+  [ -f "$err" ] || fail "expected redirected stderr log: $err"
   out=$(cat "$err")
   assert_contains "$out" "unknown command: nope"
   assert_not_contains "$out" $'\033['
@@ -78,14 +106,13 @@ test_display_forced_color_status_uses_sections_and_colored_states() {
 }
 
 test_display_auto_tty_status_preserves_table_colors() {
-  command -v script >/dev/null 2>&1 || fail "script command is required for TTY display test"
   new_fixture
   project="$FIXTURE_PROJECT"
   cd "$project" || return 1
   run_expect_success "$WORKBRANCH" init >/dev/null
   printf '%s\n' scratch > "$project/_base/frontend/scratch.txt"
 
-  out=$(script -q /dev/null sh -c 'cd "$1" && shift && exec "$@"' sh "$project" env -u NO_COLOR WORKBRANCH_COLOR=auto "$WORKBRANCH" status 2>&1)
+  out=$(run_with_pty sh -c 'cd "$1" && shift && exec "$@"' sh "$project" env -u NO_COLOR WORKBRANCH_COLOR=auto "$WORKBRANCH" status 2>&1)
   assert_contains "$out" "➤ Base worktrees"
   assert_contains "$out" $'\033[0;90mrepo'
   assert_contains "$out" $'\033[0;33muntracked\033[0m'
