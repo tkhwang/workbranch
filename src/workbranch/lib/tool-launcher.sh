@@ -1,28 +1,43 @@
+print_tool_preset() {
+  number=$1
+  name=$2
+  command=$3
+  if color_stderr_enabled; then
+    printf '    %s) %s%s%s (%s)\n' "$number" "$WB_ERR_CYAN" "$name" "$WB_ERR_RESET" "$command" >&2
+  else
+    printf '    %s) %s (%s)\n' "$number" "$name" "$command" >&2
+  fi
+}
+
 print_editor_presets() {
   info "Editor command:"
-  printf '    1) VS Code (open -a "Visual Studio Code")\n' >&2
-  printf '    2) Cursor (open -a Cursor)\n' >&2
-  printf '    3) Antigravity IDE (open -a "Antigravity IDE")\n' >&2
-  printf '    4) Custom command\n' >&2
-  printf '    5) Clear\n' >&2
+  print_tool_preset 1 "Cursor" 'open -na Cursor --args --new-window'
+  print_tool_preset 2 "Antigravity IDE" 'open -na "Antigravity IDE" --args --new-window'
+  print_tool_preset 3 "VS Code" 'open -na "Visual Studio Code" --args --new-window'
+  print_tool_preset 4 "Windsurf" 'open -na Windsurf --args --new-window'
+  print_tool_preset 5 "Zed" 'open -na Zed --args --new-window'
+  printf '    6) Custom command\n' >&2
+  printf '    7) Clear\n' >&2
 }
 
 editor_preset_command() {
   case "$1" in
-    1) printf '%s' 'open -a "Visual Studio Code"' ;;
-    2) printf '%s' 'open -a Cursor' ;;
-    3) printf '%s' 'open -a "Antigravity IDE"' ;;
+    1) printf '%s' 'open -na Cursor --args --new-window' ;;
+    2) printf '%s' 'open -na "Antigravity IDE" --args --new-window' ;;
+    3) printf '%s' 'open -na "Visual Studio Code" --args --new-window' ;;
+    4) printf '%s' 'open -na Windsurf --args --new-window' ;;
+    5) printf '%s' 'open -na Zed --args --new-window' ;;
     *) return 1 ;;
   esac
 }
 
 print_terminal_presets() {
   info "Terminal command:"
-  printf '    1) Terminal.app (open -a Terminal)\n' >&2
-  printf '    2) iTerm2 (open -a iTerm)\n' >&2
-  printf '    3) Warp (open -a Warp)\n' >&2
-  printf '    4) Ghostty (open -a Ghostty)\n' >&2
-  printf '    5) cmux (cmux)\n' >&2
+  print_tool_preset 1 "Terminal.app" 'open -a Terminal'
+  print_tool_preset 2 "iTerm2" 'open -a iTerm'
+  print_tool_preset 3 "Warp" 'open -a Warp'
+  print_tool_preset 4 "Ghostty" 'open -a Ghostty'
+  print_tool_preset 5 "cmux" 'cmux'
   printf '    6) Custom command\n' >&2
   printf '    7) Clear\n' >&2
 }
@@ -68,6 +83,15 @@ run_tool_command() {
   command=$2
   path=$3
   [ -n "$command" ] || die "$tool_label command is not configured; run workbranch config $tool_label"
+  if [ "$tool_label" = "editor" ]; then
+    case "$command" in
+      'open -a "Visual Studio Code"'|'open -na "Visual Studio Code"') command='open -na "Visual Studio Code" --args --new-window' ;;
+      'open -a Cursor'|'open -na Cursor'|'open -a "Cursor"'|'open -na "Cursor"') command='open -na Cursor --args --new-window' ;;
+      'open -a "Antigravity IDE"'|'open -na "Antigravity IDE"') command='open -na "Antigravity IDE" --args --new-window' ;;
+      'open -a Windsurf'|'open -na Windsurf'|'open -a "Windsurf"'|'open -na "Windsurf"') command='open -na Windsurf --args --new-window' ;;
+      'open -a Zed'|'open -na Zed'|'open -a "Zed"'|'open -na "Zed"') command='open -na Zed --args --new-window' ;;
+    esac
+  fi
   (
     cd "$path" || exit 1
     WORKBRANCH_TOOL_PATH=$path

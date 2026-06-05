@@ -81,6 +81,16 @@ test_display_forced_color_help_shows_banner_and_sections() {
   assert_contains "$out" "➤ Git"
 }
 
+test_display_forced_color_help_dims_git_legends() {
+  out=$(env -u NO_COLOR WORKBRANCH_COLOR=always "$WORKBRANCH" help 2>&1)
+  assert_contains "$out" $'\033[0;90m  vertical\033[0m'
+  assert_contains "$out" $'\033[0;90m  horizontal\033[0m'
+  assert_contains "$out" $'\033[0;90m  common\033[0m'
+  assert_not_contains "$out" $'\033[0;90m  pull'
+  assert_not_contains "$out" $'\033[0;90m  update'
+  assert_not_contains "$out" $'\033[0;90m  --repo'
+}
+
 test_display_no_color_suppresses_enhanced_help() {
   out=$(NO_COLOR=1 WORKBRANCH_COLOR=always "$WORKBRANCH" help 2>&1)
   assert_not_contains "$out" $'\033['

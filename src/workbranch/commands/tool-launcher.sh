@@ -15,7 +15,7 @@ cmd_tool_launcher() {
   if [ -n "$FILTER_REPO" ]; then
     resolve_task_repo_path "$task" "$FILTER_REPO"
     path=$RESOLVED_PATH
-    info "Opening $tool_label: $task/$FILTER_REPO"
+    info_tool_opening "$tool_label" "$task/$FILTER_REPO"
     run_tool_command "$tool_label" "$command" "$path" || die "failed to open $tool_label: $task/$FILTER_REPO"
     return 0
   fi
@@ -26,7 +26,7 @@ cmd_tool_launcher() {
     name=$(repo_name_at "$i")
     resolve_task_repo_path "$task" "$name"
     path=$RESOLVED_PATH
-    info "Opening $tool_label: $task/$name"
+    info_tool_opening "$tool_label" "$task/$name"
     run_tool_command "$tool_label" "$command" "$path" || die "failed to open $tool_label: $task/$name"
     i=$((i + 1))
   done

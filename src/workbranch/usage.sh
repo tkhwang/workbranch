@@ -61,16 +61,16 @@ usage_enhanced() {
   printf '  remove <task>     Remove task worktrees and local task branches\n'
   section "Git"
   printf '  status            Show commits, diff, and dirty state\n'
-  printf '  vertical\n'
+  printf '%s  vertical%s\n' "$WB_GRAY" "$WB_RESET"
   printf '  pull              Pull remote base branches into main worktrees\n'
   printf '  push              Push base branches to origin\n'
   printf '  push <task>       Push task branches to origin\n'
-  printf '  horizontal\n'
+  printf '%s  horizontal%s\n' "$WB_GRAY" "$WB_RESET"
   printf '  update            Update every task workspace from local base worktrees\n'
   printf '  update --all      Update every task workspace from local base worktrees\n'
   printf '  update <task>     Update one task workspace from local base worktrees\n'
   printf '  land <task>       Land task branches into base branches\n'
-  printf '  common\n'
+  printf '%s  common%s\n' "$WB_GRAY" "$WB_RESET"
   printf '  --repo <repo>     Limit operation to one repo; otherwise all repos\n'
   section "Tool"
   printf '  path <task>       Print a task workspace path\n'

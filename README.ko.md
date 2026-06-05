@@ -142,6 +142,8 @@ workbranch editor login
 workbranch terminal login
 ```
 
+내장 macOS editor preset은 repo path마다 별도 editor window를 엽니다. 기존 config에 `open -a Cursor`, `open -a "Antigravity IDE"`, `open -a "Visual Studio Code"`, `open -a Windsurf`, `open -a Zed` editor 명령이 남아 있어도 실행 시 `open -na ... --args --new-window`로 보정됩니다.
+
 필요하면 repo 하나로 제한합니다.
 
 ```bash

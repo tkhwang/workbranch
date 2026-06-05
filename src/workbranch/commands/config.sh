@@ -95,12 +95,12 @@ configure_editor_prompt() {
   value=$(prompt_read "[*] Choose editor [$current]: ") || die "input aborted"
   case "$value" in
     "") ;;
-    1|2|3) set_editor_command "$(editor_preset_command "$value")" ;;
-    4)
+    1|2|3|4|5) set_editor_command "$(editor_preset_command "$value")" ;;
+    6)
       custom=$(prompt_required "Custom editor command")
       set_editor_command "$custom"
       ;;
-    5|--clear) clear_editor_command ;;
+    7|--clear) clear_editor_command ;;
     *) die "invalid editor choice: $value" ;;
   esac
 }

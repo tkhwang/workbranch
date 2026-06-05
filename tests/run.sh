@@ -42,6 +42,7 @@ main() {
   run_test test_display_auto_redirected_stderr_has_no_ansi
   run_test test_display_color_never_disables_color
   run_test test_display_forced_color_help_shows_banner_and_sections
+  run_test test_display_forced_color_help_dims_git_legends
   run_test test_display_no_color_suppresses_enhanced_help
   run_test test_display_forced_color_status_uses_sections_and_colored_states
   run_test test_display_auto_tty_status_preserves_table_colors
@@ -92,6 +93,8 @@ main() {
   run_test test_path_prints_task_and_repo_paths
   run_test test_scoped_tool_paths_reject_stale_task_directories
   run_test test_editor_and_terminal_run_configured_command_for_task_repos
+  run_test test_editor_legacy_macos_app_preset_opens_new_instance_per_repo
+  run_test test_tool_launcher_forced_color_highlights_tool_and_target_path
   run_test test_tool_commands_require_configured_command
   run_test test_tool_launcher_reports_missing_task_repo_before_running_command
   run_test test_dirty_worktree_safety
@@ -103,6 +106,8 @@ main() {
   run_test test_add_preflight_requires_clean_base_on_configured_branch
   run_test test_config_reads_and_writes_editor_terminal_commands
   run_test test_config_editor_can_set_custom_command_without_prompting_repos
+  run_test test_config_editor_preset_writes_new_window_macos_app_command
+  run_test test_config_tool_preset_names_are_colored
   run_test test_config_terminal_can_clear_without_removing_editor
   run_test test_config_writes_config_without_cloning
   run_test test_config_rewrites_legacy_config_without_cloning

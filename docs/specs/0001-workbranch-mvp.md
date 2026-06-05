@@ -32,7 +32,7 @@ The config file is `.workbranch.config` in the project root.
 PROJECT_NAME fullstack
 MAIN_WORKTREES_DIR _base
 BRANCH_PREFIX feature
-EDITOR open -a "Visual Studio Code"
+EDITOR open -na Cursor --args --new-window
 TERMINAL open -a Warp
 TASK_SETUP sh scripts/workbranch-setup.sh
 
@@ -142,6 +142,8 @@ Examples in this spec show the plain output shape. Enhanced terminal output may 
 ### `workbranch editor <task>` / `workbranch terminal <task>`
 
 Run the configured editor or terminal command once per matching task repo worktree. The resolved repo path is appended as the final argument. With `--repo <repo>`, run only for that repo. Tool launchers do not modify repositories.
+
+Built-in macOS editor app presets use `open -n` plus `--args --new-window` so each matching repo path opens in a separate editor window instead of being folded into an existing workspace. Legacy configs that still contain `open -a Cursor`, `open -a "Antigravity IDE"`, `open -a "Visual Studio Code"`, `open -a Windsurf`, or `open -a Zed` are normalized to the matching `open -na ... --args --new-window` command at launch time.
 
 ### `workbranch list`
 

@@ -40,12 +40,52 @@ test_config_editor_can_set_custom_command_without_prompting_repos() {
 
   input=$(printf '%s
 %s
-' "4" "code --reuse-window")
+' "6" "code --reuse-window")
   out=$(printf '%s' "$input" | run_expect_success "$WORKBRANCH" config editor)
   assert_contains "$out" "[*] Editor command:"
   assert_not_contains "$out" "Base repo branch for frontend"
   assert_contains "$out" "[+] Config updated:"
   assert_contains "$(cat "$project/.workbranch.config")" "EDITOR code --reuse-window"
+}
+
+
+test_config_editor_preset_writes_new_window_macos_app_command() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  out=$(printf '%s
+' "1" | run_expect_success "$WORKBRANCH" config editor)
+  assert_contains "$out" "[*] Editor command:"
+  assert_contains "$out" "1) Cursor (open -na Cursor --args --new-window)"
+  assert_contains "$out" '2) Antigravity IDE (open -na "Antigravity IDE" --args --new-window)'
+  assert_contains "$out" '3) VS Code (open -na "Visual Studio Code" --args --new-window)'
+  assert_contains "$out" "4) Windsurf (open -na Windsurf --args --new-window)"
+  assert_contains "$out" "5) Zed (open -na Zed --args --new-window)"
+  assert_contains "$out" "6) Custom command"
+  assert_contains "$out" "7) Clear"
+  assert_contains "$out" "[+] Config updated:"
+  assert_contains "$(cat "$project/.workbranch.config")" "EDITOR open -na Cursor --args --new-window"
+}
+
+test_config_tool_preset_names_are_colored() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  out=$(printf '\n' | env -u NO_COLOR WORKBRANCH_COLOR=always "$WORKBRANCH" config editor 2>&1)
+  assert_contains "$out" $'1) \033[0;36mCursor\033[0m (open -na Cursor --args --new-window)'
+  assert_contains "$out" $'2) \033[0;36mAntigravity IDE\033[0m (open -na "Antigravity IDE" --args --new-window)'
+  assert_contains "$out" $'3) \033[0;36mVS Code\033[0m (open -na "Visual Studio Code" --args --new-window)'
+  assert_contains "$out" $'4) \033[0;36mWindsurf\033[0m (open -na Windsurf --args --new-window)'
+  assert_contains "$out" $'5) \033[0;36mZed\033[0m (open -na Zed --args --new-window)'
+
+  out=$(printf '\n' | env -u NO_COLOR WORKBRANCH_COLOR=always "$WORKBRANCH" config terminal 2>&1)
+  assert_contains "$out" $'1) \033[0;36mTerminal.app\033[0m (open -a Terminal)'
+  assert_contains "$out" $'2) \033[0;36miTerm2\033[0m (open -a iTerm)'
+  assert_contains "$out" $'3) \033[0;36mWarp\033[0m (open -a Warp)'
+  assert_contains "$out" $'4) \033[0;36mGhostty\033[0m (open -a Ghostty)'
+  assert_contains "$out" $'5) \033[0;36mcmux\033[0m (cmux)'
 }
 
 test_config_terminal_can_clear_without_removing_editor() {
@@ -385,4 +425,3 @@ CONFIG
   assert_not_contains "$config" "REPO_SETUP frontend"
   assert_contains "$config" "REPO_SETUP backend printf backend > repo.txt"
 }
-
