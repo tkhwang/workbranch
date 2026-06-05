@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.0.0](https://github.com/tkhwang/workbranch/compare/v0.5.0...v1.0.0) (2026-06-05)
+
+
+### ⚠ BREAKING CHANGES
+
+* **add:** The `workbranch resume <task>` command has been removed. Users should now use `workbranch add <task>` to create or re-attach to existing task workspaces.
+
+### Features
+
+* **branch:** implement explicit task branch names with per-repo meta… ([812a4de](https://github.com/tkhwang/workbranch/commit/812a4dee9f44a540c807c78f634e6f5e9151ff0d))
+* **branch:** implement explicit task branch names with per-repo metadata storage and input validation ([aba9998](https://github.com/tkhwang/workbranch/commit/aba9998adafb6e72553348ebdcc03b1a190eb1e3))
+* **tool:** add tool command - editor, terminal ([2f04671](https://github.com/tkhwang/workbranch/commit/2f04671caf9093fcbec965be149b477a328be557))
+* **tool:** add tool command - editor, terminal ([a877962](https://github.com/tkhwang/workbranch/commit/a87796256df998da9b5d798f3615e6806159759a))
+
+
+### Bug Fixes
+
+* **path:** validate task workspace and worktree paths ([1ffa897](https://github.com/tkhwang/workbranch/commit/1ffa8976002ce15a6100018489d4ff375de5287f))
+
+
+### Code Refactoring
+
+* **add:** streamline task branch creation ([e700f55](https://github.com/tkhwang/workbranch/commit/e700f55b6c5a0c01643fbd301dc858999e593647))
+
 ## [0.5.0](https://github.com/tkhwang/workbranch/compare/v0.4.0...v0.5.0) (2026-06-04)
 
 
