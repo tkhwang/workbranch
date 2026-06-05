@@ -7,14 +7,14 @@ cmd_init_interactive() {
   info "After workbranch"
   cat >&2 <<'AFTER'
     fullstack                     // workbranch project
-    ├── .workbranch.config          // config
-    ├── _base                     // main worktrees
-    │   ├── frontend              // main worktree: frontend
-    │   └── backend               // main worktree: backend
+    ├── .workbranch.config        // config
+    ├── _base                     // main worktrees: _base
+    │   ├── frontend              // - base frontend repo
+    │   └── backend               // - base backend repo
     └── login                     // task workspace
-        ├── frontend              // linked worktree: frontend
-        ├── backend               // linked worktree: backend
-        └── <work here>           // cd login for this feature
+        ├── frontend              // - task frontend repo
+        ├── backend               // - task backend repo
+        └── <work here>           // use AI Agents in here
 
     Result: branch operations stay grouped by feature workspace.
     Multi-repo bonus: use one directory for shared AI session context.
@@ -25,8 +25,6 @@ AFTER
   printf '    Project name      directory name for this workbranch workspace
 ' >&2
   printf '    Main worktrees    directory for each repo main worktree
-' >&2
-  printf '    Branch prefix     task branch prefix, e.g. feature/login
 ' >&2
   printf '    Repositories      Git repos included in each task workspace
 ' >&2
@@ -43,8 +41,8 @@ AFTER
   validate_safe_name "project" "$PROJECT_NAME"
   BASE_DIR=$(prompt_with_default "Main worktrees directory" "_base")
   validate_safe_name "MAIN_WORKTREES_DIR" "$BASE_DIR"
-  BRANCH_PREFIX=$(prompt_with_default "Branch prefix" "feature")
-  validate_nonempty_no_space "branch_prefix" "$BRANCH_PREFIX"
+  BRANCH_PREFIX=$(prompt_with_default "Default task branch prefix" "feature")
+  validate_nonempty_no_space "task branch prefix" "$BRANCH_PREFIX"
 
   printf '
 ' >&2
@@ -79,14 +77,10 @@ AFTER
 
   printf '
 ' >&2
-  configure_task_setup_prompt
-
-  printf '
-' >&2
   info "Summary"
   info "Project: $PROJECT_NAME"
   info "Main worktrees dir: $BASE_DIR"
-  info "Branch prefix: $BRANCH_PREFIX"
+  info "Default task branch prefix: $BRANCH_PREFIX"
   info "Editor:"
   if [ -n "$EDITOR_COMMAND" ]; then
     info "  $EDITOR_COMMAND"
@@ -99,33 +93,16 @@ AFTER
   else
     info "  (none)"
   fi
-  info "Task setup:"
-  if [ -n "$TASK_SETUP" ]; then
-    info "  $TASK_SETUP"
-  else
-    info "  (none)"
-  fi
   info "Repositories:"
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     info "  - $(repo_name_at "$i") $(repo_url_at "$i") base repo branch=$(repo_base_branch_at "$i")"
     i=$((i + 1))
   done
-  info "Branch policy:"
-  info "  - [base repo] main        -> task1 -> [task repo] ${BRANCH_PREFIX}/task1"
-  info "  - [base repo] ${BRANCH_PREFIX}/XXX -> task1 -> [task repo] ${BRANCH_PREFIX}/XXX-task1"
-  i=0
-  while [ $i -lt ${#REPO_NAMES[@]} ]; do
-    name=$(repo_name_at "$i")
-    base_branch=$(repo_base_branch_at "$i")
-    if [ "$base_branch" = "$BRANCH_PREFIX" ] || [ "${base_branch#"$BRANCH_PREFIX"/}" != "$base_branch" ]; then
-      task_example="${base_branch}-<task>"
-    else
-      task_example="${BRANCH_PREFIX}/<task>"
-    fi
-    info "  - $name: base=$base_branch task=$task_example"
-    i=$((i + 1))
-  done
+  info "Task branches:"
+  info "  - Chosen when running workbranch add <task>."
+  info "  - workbranch suggests defaults from each repo's base branch and the task name."
+  info "  - You can override each suggested task branch."
   printf '
 ' >&2
   if [ "$clone_after" = "yes" ]; then
@@ -171,6 +148,11 @@ cmd_init() {
   if find_project_root; then
     if [ "$(basename "$CONFIG_FILE")" = ".workbranch.config" ]; then
       parse_config "$CONFIG_FILE"
+      if all_configured_base_git_repos_exist; then
+        printf '[-] Error: workbranch project already initialized: %s\n' "$PROJECT_ROOT" >&2
+        printf '[*] To edit project settings: workbranch config\n' >&2
+        exit 1
+      fi
     elif [ "$(basename "$CONFIG_FILE")" = ".tasktree.config" ]; then
       parse_config_for_rewrite "$CONFIG_FILE"
     else
@@ -181,4 +163,17 @@ cmd_init() {
   else
     cmd_init_interactive yes
   fi
+}
+
+all_configured_base_git_repos_exist() {
+  _init_i=0
+  while [ $_init_i -lt ${#REPO_NAMES[@]} ]; do
+    _init_name=$(repo_name_at "$_init_i")
+    _init_target=$(base_repo_path "$_init_name")
+    if [ ! -d "$_init_target/.git" ] && [ ! -f "$_init_target/.git" ]; then
+      return 1
+    fi
+    _init_i=$((_init_i + 1))
+  done
+  return 0
 }

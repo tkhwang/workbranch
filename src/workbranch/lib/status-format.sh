@@ -190,7 +190,7 @@ preflight_stale_task_directory_removal() {
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     base=$(base_repo_path "$name")
-    branch=$(repo_task_branch_at "$i" "$task")
+    branch=$(metadata_task_branch_for_repo "$name") || branch=$(repo_task_branch_at "$i" "$task")
     label="$task/$name"
     if [ ! -d "$base/.git" ] && [ ! -f "$base/.git" ]; then
       preflight_error "$BASE_DIR/$name missing git repo"
@@ -211,7 +211,7 @@ remove_stale_task_directory_path() {
     name=$(repo_name_at "$i")
     path="$task_dir/$name"
     base=$(base_repo_path "$name")
-    branch=$(repo_task_branch_at "$i" "$task")
+    branch=$(metadata_task_branch_for_repo "$name") || branch=$(repo_task_branch_at "$i" "$task")
     if [ -d "$path" ]; then
       if [ "$force" -eq 1 ]; then
         git -C "$base" worktree remove --force "$path" >/dev/null 2>&1 || true

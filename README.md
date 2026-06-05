@@ -6,6 +6,8 @@ Manage Git worktree task spaces without memorizing `git worktree` commands.
 
 `workbranch` creates one task folder per feature, works with one repo or many repos, and keeps branch sync commands short and safe.
 
+Its two core workflows are **Workspace lifecycle** for creating and removing task workspaces, and **Branch workflow** for updating, landing, and pushing task branches.
+
 ![img](./docs/figs/workbranch-git-flow.png)
 
 ## Install
@@ -43,14 +45,16 @@ workbranch push login
 workbranch remove login
 ```
 
-`workbranch add <task>` creates task branches from the current HEAD of your local `_base/<repo>` worktrees. It does not pull remote base branches automatically. To start from the latest remote base, run:
+`workbranch add <task>` uses `<task>` as the folder name, shows each repo's base branch, then prompts for that repo's task branch. Press Enter to accept the suggested default branch name. Defaults are `feature/<task>` from main-style base branches and `<base-branch>-<task>` from `feature/*`, `feat/*`, or the configured legacy prefix.
+
+Task branches are created from the current HEAD of your local `_base/<repo>` worktrees. `workbranch add` does not pull remote base branches automatically. To start from the latest remote base, run:
 
 ```bash
 workbranch pull
 workbranch add <task>
 ```
 
-Use `workbranch config` when you want to update project settings, branch prefix, base branches, editor/terminal launch commands, or per-repo setup commands without cloning repos again.
+Use `workbranch config` when you want to update project settings, base branches, editor/terminal launch commands, or per-repo setup commands without cloning repos again.
 
 ## What it creates
 
@@ -71,27 +75,44 @@ Single-repo projects use the same shape with one repo directory inside each task
 
 ## Common commands
 
+### Workspace lifecycle
+
 | Command | Use it to |
 | --- | --- |
 | `workbranch init` | Create or clone base worktrees from config |
-| `workbranch config` | Edit project settings, branch prefix, base branches, tool commands, and repo setup commands |
+| `workbranch config` | Edit project settings, base branches, tool commands, and repo setup commands |
 | `workbranch config editor` | Update only the configured editor command |
 | `workbranch config terminal` | Update only the configured terminal command |
 | `workbranch add <task>` | Create a task workspace |
-| `workbranch resume <task>` | Restore existing local or remote task branches |
 | `workbranch list` | Show repos and task workspaces |
+| `workbranch remove <task>` | Remove task worktrees and local task branches |
+
+### Branch workflow
+
+| Command | Use it to |
+| --- | --- |
+| `workbranch status` | Show branch, diff, and dirty state |
+| `workbranch pull` | Pull remote base branches into `_base/<repo>` |
+| `workbranch update [task]` | Merge local base changes into task worktrees |
+| `workbranch push` | Push base branches |
+| `workbranch push <task>` | Push task branches |
+| `workbranch land <task>` | Fast-forward task work back into local base branches |
+
+### Tool commands
+
+| Command | Use it to |
+| --- | --- |
 | `workbranch path <task>` | Print a task workspace or repo path |
 | `workbranch editor <task>` | Open task repo worktrees in the configured editor |
 | `workbranch terminal <task>` | Open task repo worktrees in the configured terminal |
-| `workbranch status` | Show branch, diff, and dirty state |
-| `workbranch update [task]` | Merge local base changes into task worktrees |
-| `workbranch pull` | Pull remote base branches into `_base/<repo>` |
-| `workbranch push [task]` | Push base branches or task branches |
-| `workbranch land <task>` | Fast-forward task work back into local base branches |
-| `workbranch remove <task>` | Remove task worktrees and local task branches |
+
+### Other
+
+| Command | Use it to |
+| --- | --- |
 | `workbranch -v` | Show the installed version |
 
-Add `--repo <repo>` to supported Git and tool commands when you want to operate on one repo only.
+Add `--repo <repo>` to supported Branch workflow and Tool commands when you want to operate on one repo only.
 
 ## Opening task workspaces
 

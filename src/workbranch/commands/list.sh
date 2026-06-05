@@ -4,23 +4,13 @@ cmd_list() {
   info "Base: $BASE_DIR"
   info "Editor:"
   if [ -n "$EDITOR_COMMAND" ]; then
-    printf '    %s
-' "$EDITOR_COMMAND"
+    printf '    %s\n' "$EDITOR_COMMAND"
   else
-    printf '    (none)
-'
+    printf '    (none)\n'
   fi
   info "Terminal:"
   if [ -n "$TERMINAL_COMMAND" ]; then
-    printf '    %s
-' "$TERMINAL_COMMAND"
-  else
-    printf '    (none)
-'
-  fi
-  info "Task setup:"
-  if [ -n "$TASK_SETUP" ]; then
-    printf '    %s\n' "$TASK_SETUP"
+    printf '    %s\n' "$TERMINAL_COMMAND"
   else
     printf '    (none)\n'
   fi

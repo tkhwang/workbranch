@@ -73,10 +73,19 @@ cmd_remove() {
     fi
     i=$((i + 1))
   done
+  if [ "$had_failure" -ne 0 ]; then
+    if [ -d "$PROJECT_ROOT/$task" ]; then
+      info "Task directory kept because it is not empty: $task"
+    fi
+    return 1
+  fi
+  metadata_file=$(task_metadata_file "$task")
+  if [ -f "$metadata_file" ]; then
+    rm -f "$metadata_file" || die "failed to remove task metadata: $metadata_file"
+  fi
   if rmdir "$PROJECT_ROOT/$task" 2>/dev/null; then
     :
   elif [ -d "$PROJECT_ROOT/$task" ]; then
     info "Task directory kept because it is not empty: $task"
   fi
-  [ "$had_failure" -eq 0 ] || return 1
 }

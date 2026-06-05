@@ -6,6 +6,8 @@
 
 `workbranch`는 feature마다 하나의 task 폴더를 만들고, single repo와 multi-repo 프로젝트 모두에서 짧고 안전한 branch sync 명령을 제공합니다.
 
+핵심 흐름은 task workspace를 만들고 제거하는 **Workspace lifecycle**과 task branch를 update, land, push하는 **Branch workflow** 두 가지입니다.
+
 ![img](./docs/figs/workbranch-git-flow.png)
 
 ## Install
@@ -71,27 +73,44 @@ Single-repo 프로젝트도 같은 구조를 사용하며, 각 task 안에 repo 
 
 ## 주요 명령어
 
+### Workspace lifecycle
+
 | Command | 용도 |
 | --- | --- |
 | `workbranch init` | config 기준으로 base worktree 생성 또는 clone |
-| `workbranch config` | project 설정, branch prefix, base branch, tool command, repo setup command 수정 |
+| `workbranch config` | project 설정, base branch, tool command, repo setup command 수정 |
 | `workbranch config editor` | editor 명령만 수정 |
 | `workbranch config terminal` | terminal 명령만 수정 |
 | `workbranch add <task>` | task workspace 생성 |
-| `workbranch resume <task>` | 기존 local 또는 remote task branch 복구 |
 | `workbranch list` | repo와 task workspace 목록 확인 |
+| `workbranch remove <task>` | task worktree와 local task branch 제거 |
+
+### Branch workflow
+
+| Command | 용도 |
+| --- | --- |
+| `workbranch status` | branch, diff, dirty state 확인 |
+| `workbranch pull` | remote base branch를 `_base/<repo>`로 pull |
+| `workbranch update [task]` | local base 변경사항을 task worktree에 merge |
+| `workbranch push` | base branch push |
+| `workbranch push <task>` | task branch push |
+| `workbranch land <task>` | task 작업을 local base branch로 fast-forward 반영 |
+
+### Tool commands
+
+| Command | 용도 |
+| --- | --- |
 | `workbranch path <task>` | task workspace 또는 repo 경로 출력 |
 | `workbranch editor <task>` | 설정된 editor로 task repo worktree 열기 |
 | `workbranch terminal <task>` | 설정된 terminal로 task repo worktree 열기 |
-| `workbranch status` | branch, diff, dirty state 확인 |
-| `workbranch update [task]` | local base 변경사항을 task worktree에 merge |
-| `workbranch pull` | remote base branch를 `_base/<repo>`로 pull |
-| `workbranch push [task]` | base branch 또는 task branch push |
-| `workbranch land <task>` | task 작업을 local base branch로 fast-forward 반영 |
-| `workbranch remove <task>` | task worktree와 local task branch 제거 |
+
+### Other
+
+| Command | 용도 |
+| --- | --- |
 | `workbranch -v` | 설치된 version 확인 |
 
-지원되는 Git 및 tool 명령에 `--repo <repo>`를 붙이면 특정 repo 하나만 대상으로 실행합니다.
+지원되는 Branch workflow 및 Tool 명령에 `--repo <repo>`를 붙이면 특정 repo 하나만 대상으로 실행합니다.
 
 ## 작업 workspace 열기
 
