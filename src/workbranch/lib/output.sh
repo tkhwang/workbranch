@@ -1,14 +1,16 @@
-color_enabled() {
+color_enabled_startup() {
+  _wb_fd=$1
   [ -z "${NO_COLOR:-}" ] || return 1
   case "${WORKBRANCH_COLOR:-auto}" in
     always) return 0 ;;
     never) return 1 ;;
-    auto|'') [ -t 1 ] && [ "${TERM:-}" != "dumb" ] ;;
-    *) [ -t 1 ] && [ "${TERM:-}" != "dumb" ] ;;
+    auto|'') [ -t "$_wb_fd" ] && [ "${TERM:-}" != "dumb" ] ;;
+    *) [ -t "$_wb_fd" ] && [ "${TERM:-}" != "dumb" ] ;;
   esac
 }
 
-if color_enabled; then
+if color_enabled_startup 1; then
+  WB_COLOR_ENABLED=1
   WB_ESC=$'\033'
   WB_GREEN="${WB_ESC}[0;32m"
   WB_BLUE="${WB_ESC}[0;34m"
@@ -21,6 +23,7 @@ if color_enabled; then
   WB_BOLD="${WB_ESC}[1m"
   WB_RESET="${WB_ESC}[0m"
 else
+  WB_COLOR_ENABLED=0
   WB_ESC=""
   WB_GREEN=""
   WB_BLUE=""
@@ -33,6 +36,42 @@ else
   WB_BOLD=""
   WB_RESET=""
 fi
+
+if color_enabled_startup 2; then
+  WB_COLOR_ERR_ENABLED=1
+  WB_ERR_ESC=$'\033'
+  WB_ERR_GREEN="${WB_ERR_ESC}[0;32m"
+  WB_ERR_BLUE="${WB_ERR_ESC}[0;34m"
+  WB_ERR_CYAN="${WB_ERR_ESC}[0;36m"
+  WB_ERR_YELLOW="${WB_ERR_ESC}[0;33m"
+  WB_ERR_PURPLE="${WB_ERR_ESC}[0;35m"
+  WB_ERR_PURPLE_BOLD="${WB_ERR_ESC}[1;35m"
+  WB_ERR_RED="${WB_ERR_ESC}[0;31m"
+  WB_ERR_GRAY="${WB_ERR_ESC}[0;90m"
+  WB_ERR_BOLD="${WB_ERR_ESC}[1m"
+  WB_ERR_RESET="${WB_ERR_ESC}[0m"
+else
+  WB_COLOR_ERR_ENABLED=0
+  WB_ERR_ESC=""
+  WB_ERR_GREEN=""
+  WB_ERR_BLUE=""
+  WB_ERR_CYAN=""
+  WB_ERR_YELLOW=""
+  WB_ERR_PURPLE=""
+  WB_ERR_PURPLE_BOLD=""
+  WB_ERR_RED=""
+  WB_ERR_GRAY=""
+  WB_ERR_BOLD=""
+  WB_ERR_RESET=""
+fi
+
+color_enabled() {
+  [ "${WB_COLOR_ENABLED:-0}" -eq 1 ]
+}
+
+color_stderr_enabled() {
+  [ "${WB_COLOR_ERR_ENABLED:-0}" -eq 1 ]
+}
 
 WB_ICON_CONFIRM="◎"
 WB_ICON_SUCCESS="✓"
@@ -155,4 +194,4 @@ info() { printf '%s[*]%s %s\n' "$WB_BLUE" "$WB_RESET" "$*"; }
 
 success() { printf '%s[+]%s %s\n' "$WB_GREEN" "$WB_RESET" "$*"; }
 
-die() { printf '%s[-] Error:%s %s\n' "$WB_RED" "$WB_RESET" "$*" >&2; exit 1; }
+die() { printf '%s[-] Error:%s %s\n' "$WB_ERR_RED" "$WB_ERR_RESET" "$*" >&2; exit 1; }

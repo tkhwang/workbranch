@@ -17,7 +17,7 @@ main() {
     remove) cmd_remove "$@" ;;
     version|-v|--version) cmd_version "$@" ;;
     help|-h|--help) usage ;;
-    *) usage >&2; die "unknown command: $cmd" ;;
+    *) usage_plain >&2; die "unknown command: $cmd" ;;
   esac
 }
 

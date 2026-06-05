@@ -3,7 +3,7 @@ prompt_read() {
   value=""
   case "$prompt" in
     "[*] "*)
-      prompt="${WB_BLUE}[*]${WB_RESET} ${prompt#\[\*\] }"
+      prompt="${WB_ERR_BLUE}[*]${WB_ERR_RESET} ${prompt#\[\*\] }"
       ;;
   esac
   if [ -t 0 ]; then

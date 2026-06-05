@@ -23,6 +23,17 @@ test_display_no_color_overrides_forced_color() {
   assert_not_contains "$out" $'\033['
 }
 
+test_display_auto_redirected_stderr_has_no_ansi() {
+  command -v script >/dev/null 2>&1 || fail "script command is required for TTY display test"
+  TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
+  err="$TMP_ROOT/err.log"
+
+  script -q /dev/null sh -c 'err=$1; shift; TERM=xterm env -u NO_COLOR WORKBRANCH_COLOR=auto "$@" 2>"$err"' sh "$err" "$WORKBRANCH" nope >/dev/null 2>&1 || true
+  out=$(cat "$err")
+  assert_contains "$out" "unknown command: nope"
+  assert_not_contains "$out" $'\033['
+}
+
 test_display_color_never_disables_color() {
   out=$(WORKBRANCH_COLOR=never "$WORKBRANCH" help 2>&1)
   assert_not_contains "$out" $'\033['
@@ -61,6 +72,21 @@ test_display_forced_color_status_uses_sections_and_colored_states() {
   assert_contains "$out" $'\033['
   assert_contains "$out" "➤ Base worktrees"
   assert_contains "$out" "➤ Task workspaces"
+  assert_contains "$out" $'\033[0;90mrepo'
+  assert_contains "$out" $'\033[0;33muntracked\033[0m'
+  assert_contains "$out" $'\033[0;32mclean\033[0m'
+}
+
+test_display_auto_tty_status_preserves_table_colors() {
+  command -v script >/dev/null 2>&1 || fail "script command is required for TTY display test"
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  printf '%s\n' scratch > "$project/_base/frontend/scratch.txt"
+
+  out=$(script -q /dev/null sh -c 'cd "$1" && shift && exec "$@"' sh "$project" env -u NO_COLOR WORKBRANCH_COLOR=auto "$WORKBRANCH" status 2>&1)
+  assert_contains "$out" "➤ Base worktrees"
   assert_contains "$out" $'\033[0;90mrepo'
   assert_contains "$out" $'\033[0;33muntracked\033[0m'
   assert_contains "$out" $'\033[0;32mclean\033[0m'
