@@ -1,3 +1,19 @@
+prompt_task_branches_for_add() {
+  task=$1
+  reset_task_metadata_cache
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    base_branch=$(repo_base_branch_at "$i")
+    default_branch=$(default_repo_task_branch_at "$i" "$task")
+    info "Repo $name base branch: $base_branch"
+    branch=$(prompt_with_default "Task branch for $name" "$default_branch")
+    validate_branch_name "task branch" "$branch"
+    set_task_metadata_branch "$name" "$branch"
+    i=$((i + 1))
+  done
+}
+
 cmd_add() {
   [ $# -eq 1 ] || die "usage: workbranch add <task>"
   task=$1
@@ -30,11 +46,13 @@ cmd_add() {
   done
   preflight_die_if_errors "add"
 
+  prompt_task_branches_for_add "$task"
+
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     base=$(base_repo_path "$name")
-    branch=$(repo_task_branch_at "$i" "$task")
+    branch=$(metadata_task_branch_for_repo "$name") || branch=$(default_repo_task_branch_at "$i" "$task")
     workbranch_git_add_fetch_base "$base" || die "failed to fetch repo '$name'"
     local_branch_exists=0
     remote_branch_exists=0
@@ -42,11 +60,11 @@ cmd_add() {
     git_ref_exists "$base" "origin/$branch" && remote_branch_exists=1
     if [ "$local_branch_exists" -eq 1 ] || [ "$remote_branch_exists" -eq 1 ]; then
       printf "[-] Error: task branch already exists for repo '%s': %s\n" "$name" "$branch" >&2
-      printf '[*] To resume it: workbranch resume %s\n' "$task" >&2
+      if [ "$local_branch_exists" -eq 1 ]; then
+        printf '[*] To delete the local branch first: workbranch remove %s\n' "$task" >&2
+      fi
       if [ "$remote_branch_exists" -eq 1 ]; then
         printf '[*] Remote origin/%s exists; delete it outside workbranch before adding again.\n' "$branch" >&2
-      else
-        printf '[*] To delete it first: workbranch remove %s\n' "$task" >&2
       fi
       exit 1
     fi
@@ -55,13 +73,14 @@ cmd_add() {
 
   mkdir -p "$task_dir" || die "failed to create task directory: $task_dir"
   track_path "$task_dir"
+  write_task_metadata "$task"
 
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     base=$(base_repo_path "$name")
     base_branch=$(repo_base_branch_at "$i")
-    branch=$(repo_task_branch_at "$i" "$task")
+    branch=$(metadata_task_branch_for_repo "$name") || branch=$(default_repo_task_branch_at "$i" "$task")
     target=$(task_repo_path "$task" "$name")
     track_branch "$base" "$branch"
     track_worktree "$target" "$base"

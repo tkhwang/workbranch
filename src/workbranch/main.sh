@@ -5,7 +5,6 @@ main() {
     config) cmd_config "$@" ;;
     init) cmd_init "$@" ;;
     add) cmd_add "$@" ;;
-    resume) cmd_resume "$@" ;;
     list) cmd_list "$@" ;;
     status) cmd_status "$@" ;;
     pull) cmd_pull "$@" ;;

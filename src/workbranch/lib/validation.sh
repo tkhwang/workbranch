@@ -29,3 +29,13 @@ validate_nonempty_no_space() {
     die "invalid $label '$value': whitespace is not supported"
   fi
 }
+
+validate_branch_name() {
+  label=$1
+  value=$2
+  [ -n "$value" ] || die "invalid $label: empty value"
+  if has_whitespace "$value"; then
+    die "invalid $label '$value': whitespace is not supported"
+  fi
+  git check-ref-format --branch "$value" >/dev/null 2>&1 || die "invalid $label '$value'"
+}

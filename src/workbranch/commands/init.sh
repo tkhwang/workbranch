@@ -26,8 +26,6 @@ AFTER
 ' >&2
   printf '    Main worktrees    directory for each repo main worktree
 ' >&2
-  printf '    Branch prefix     task branch prefix, e.g. feature/login
-' >&2
   printf '    Repositories      Git repos included in each task workspace
 ' >&2
   printf '
@@ -43,8 +41,8 @@ AFTER
   validate_safe_name "project" "$PROJECT_NAME"
   BASE_DIR=$(prompt_with_default "Main worktrees directory" "_base")
   validate_safe_name "MAIN_WORKTREES_DIR" "$BASE_DIR"
-  BRANCH_PREFIX=$(prompt_with_default "Branch prefix" "feature")
-  validate_nonempty_no_space "branch_prefix" "$BRANCH_PREFIX"
+  BRANCH_PREFIX=$(prompt_with_default "Default task branch prefix" "feature")
+  validate_nonempty_no_space "task branch prefix" "$BRANCH_PREFIX"
 
   printf '
 ' >&2
@@ -74,41 +72,20 @@ AFTER
 
   printf '
 ' >&2
-  configure_task_setup_prompt
-
-  printf '
-' >&2
   info "Summary"
   info "Project: $PROJECT_NAME"
   info "Main worktrees dir: $BASE_DIR"
-  info "Branch prefix: $BRANCH_PREFIX"
-  info "Task setup:"
-  if [ -n "$TASK_SETUP" ]; then
-    info "  $TASK_SETUP"
-  else
-    info "  (none)"
-  fi
+  info "Default task branch prefix: $BRANCH_PREFIX"
   info "Repositories:"
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     info "  - $(repo_name_at "$i") $(repo_url_at "$i") base repo branch=$(repo_base_branch_at "$i")"
     i=$((i + 1))
   done
-  info "Branch policy:"
-  info "  - [base repo] main        -> task1 -> [task repo] ${BRANCH_PREFIX}/task1"
-  info "  - [base repo] ${BRANCH_PREFIX}/XXX -> task1 -> [task repo] ${BRANCH_PREFIX}/XXX-task1"
-  i=0
-  while [ $i -lt ${#REPO_NAMES[@]} ]; do
-    name=$(repo_name_at "$i")
-    base_branch=$(repo_base_branch_at "$i")
-    if [ "$base_branch" = "$BRANCH_PREFIX" ] || [ "${base_branch#"$BRANCH_PREFIX"/}" != "$base_branch" ]; then
-      task_example="${base_branch}-<task>"
-    else
-      task_example="${BRANCH_PREFIX}/<task>"
-    fi
-    info "  - $name: base=$base_branch task=$task_example"
-    i=$((i + 1))
-  done
+  info "Task branches:"
+  info "  - Chosen when running workbranch add <task>."
+  info "  - workbranch suggests defaults from each repo's base branch and the task name."
+  info "  - You can override each suggested task branch."
   printf '
 ' >&2
   if [ "$clone_after" = "yes" ]; then

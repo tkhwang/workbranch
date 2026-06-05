@@ -37,8 +37,6 @@ CONFIG_BRANCH_CHANGE_OLD=()
 CONFIG_BRANCH_CHANGE_NEW=()
 CONFIG_BASE_DIR_OLD=""
 CONFIG_BASE_DIR_NEW=""
-CONFIG_BRANCH_PREFIX_OLD=""
-CONFIG_BRANCH_PREFIX_NEW=""
 
 record_config_branch_change() {
   name=$1
@@ -54,11 +52,6 @@ print_config_next_steps() {
     info "Main worktrees dir change was saved in config only."
     info "Existing cloned base worktrees were not moved automatically."
     printf '    %s -> %s\n' "$CONFIG_BASE_DIR_OLD" "$CONFIG_BASE_DIR_NEW" >&2
-  fi
-
-  if [ -n "$CONFIG_BRANCH_PREFIX_OLD" ]; then
-    info "Branch prefix change was saved in config only."
-    info "New task workspaces will use: ${CONFIG_BRANCH_PREFIX_NEW}/<task>"
   fi
 
   [ ${#CONFIG_BRANCH_CHANGE_REPOS[@]} -gt 0 ] || return 0
@@ -84,15 +77,6 @@ print_config_next_steps() {
     printf '    git pull --ff-only origin %s\n' "$new" >&2
     i=$((i + 1))
   done
-}
-
-configure_task_setup_prompt() {
-  value=$(prompt_read "[*] Task setup command [$TASK_SETUP]: ") || die "input aborted"
-  case "$value" in
-    "") ;;
-    --clear) TASK_SETUP="" ;;
-    *) TASK_SETUP=$value ;;
-  esac
 }
 
 configure_repo_setup_prompt() {
@@ -132,7 +116,6 @@ task_workspaces_exist() {
 configure_project_settings() {
   current_project=$PROJECT_NAME
   current_base_dir=$BASE_DIR
-  current_branch_prefix=$BRANCH_PREFIX
 
   value=$(prompt_with_default "Project name" "$current_project")
   validate_safe_name "PROJECT_NAME" "$value"
@@ -149,25 +132,14 @@ remove or move existing base worktrees before changing it"
     CONFIG_BASE_DIR_NEW=$value
   fi
   BASE_DIR=$value
-
-  value=$(prompt_with_default "Branch prefix" "$current_branch_prefix")
-  validate_nonempty_no_space "BRANCH_PREFIX" "$value"
-  if [ "$value" != "$current_branch_prefix" ]; then
-    if task_workspaces_exist; then
-      die "cannot change BRANCH_PREFIX while task workspaces exist
-remove or migrate existing task workspaces before changing it"
-    fi
-    CONFIG_BRANCH_PREFIX_OLD=$current_branch_prefix
-    CONFIG_BRANCH_PREFIX_NEW=$value
-  fi
-  BRANCH_PREFIX=$value
+  [ -n "$BRANCH_PREFIX" ] || BRANCH_PREFIX="feature"
 }
 
 configure_existing_project() {
   info "Config"
   info "Project: $PROJECT_NAME"
   info "Main worktrees dir: $BASE_DIR"
-  info "Branch prefix: $BRANCH_PREFIX"
+  info "Default task branch prefix: $BRANCH_PREFIX"
   info "Press Enter to keep a current value. Type --clear at a setup prompt to remove it."
   printf '\n'
 
@@ -176,8 +148,6 @@ configure_existing_project() {
   CONFIG_BRANCH_CHANGE_NEW=()
   CONFIG_BASE_DIR_OLD=""
   CONFIG_BASE_DIR_NEW=""
-  CONFIG_BRANCH_PREFIX_OLD=""
-  CONFIG_BRANCH_PREFIX_NEW=""
 
   old_base_dir=$BASE_DIR
   configure_project_settings
