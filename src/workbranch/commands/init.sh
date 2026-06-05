@@ -48,6 +48,11 @@ AFTER
 
   printf '
 ' >&2
+  configure_editor_prompt
+  configure_terminal_prompt
+
+  printf '
+' >&2
   info "Repositories"
 
   repo_number=1
@@ -82,6 +87,18 @@ AFTER
   info "Project: $PROJECT_NAME"
   info "Main worktrees dir: $BASE_DIR"
   info "Branch prefix: $BRANCH_PREFIX"
+  info "Editor:"
+  if [ -n "$EDITOR_COMMAND" ]; then
+    info "  $EDITOR_COMMAND"
+  else
+    info "  (none)"
+  fi
+  info "Terminal:"
+  if [ -n "$TERMINAL_COMMAND" ]; then
+    info "  $TERMINAL_COMMAND"
+  else
+    info "  (none)"
+  fi
   info "Task setup:"
   if [ -n "$TASK_SETUP" ]; then
     info "  $TASK_SETUP"

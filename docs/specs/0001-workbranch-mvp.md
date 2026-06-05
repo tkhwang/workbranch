@@ -32,6 +32,8 @@ The config file is `.workbranch.config` in the project root.
 PROJECT_NAME fullstack
 MAIN_WORKTREES_DIR _base
 BRANCH_PREFIX feature
+EDITOR open -a "Visual Studio Code"
+TERMINAL open -a Warp
 TASK_SETUP sh scripts/workbranch-setup.sh
 
 REPO frontend git@github.com:example/frontend.git master
@@ -44,6 +46,8 @@ REPO_SETUP backend ./gradlew dependencies
 Format:
 
 ```text
+EDITOR <command>
+TERMINAL <command>
 TASK_SETUP <command>
 REPO <name> <git-url> <base-repo-branch>
 REPO_SETUP <repo> <command>
@@ -54,14 +58,16 @@ Rules:
 - `PROJECT_NAME` must be a safe directory name.
 - `MAIN_WORKTREES_DIR` must be a safe directory name.
 - `BRANCH_PREFIX` must be non-empty and contain no whitespace.
+- `EDITOR` is optional. It stores one project-level editor launch command text after the directive.
+- `TERMINAL` is optional. It stores one project-level terminal launch command text after the directive.
 - `TASK_SETUP` is optional. It stores one project-level command text after the directive.
 - `REPO` requires name, URL, and base repo branch.
 - `REPO_SETUP` is optional. It references an existing repo name and stores one repo-level command text after the repo name.
 - Repo names must be unique safe names.
 - Git URLs and branch names must be non-empty and contain no whitespace.
-- Config values are split on whitespace except `TASK_SETUP` and `REPO_SETUP`, which preserve command text.
+- Config values are split on whitespace except `EDITOR`, `TERMINAL`, `TASK_SETUP`, and `REPO_SETUP`, which preserve command text.
 - The file is not a shell script.
-- Safety: `.workbranch.config` is trusted project configuration. Running `workbranch add <task>` executes configured setup commands with `sh -c`, so review configs from untrusted projects before running that command.
+- Safety: `.workbranch.config` is trusted project configuration. Running `workbranch add <task>` executes configured setup commands with `sh -c`; running `workbranch editor <task>` or `workbranch terminal <task>` executes configured tool commands with the resolved repo path appended. Review configs from untrusted projects before running those commands.
 
 ## Branch names
 
@@ -85,11 +91,11 @@ Git operation internals are defined in [`docs/git-operations.md`](../git-operati
 
 Create or update config without cloning repos.
 
-If `.workbranch.config` or legacy `.tasktree.config` / `.monotree.config` already exists in the current project, load it, then prompt for the project name, main worktrees directory, branch prefix, each repo's base branch, and each repo-level setup command. Press Enter to keep the current value. Type `--clear` at a repo setup prompt to remove that setup command.
+If `.workbranch.config` or legacy `.tasktree.config` / `.monotree.config` already exists in the current project, load it, then prompt for the project name, main worktrees directory, branch prefix, editor command, terminal command, each repo's base branch, and each repo-level setup command. Press Enter to keep the current value. Type `--clear` at a tool or repo setup prompt to remove that command.
 
 Changing a repo base branch updates config only. `workbranch config` does not clone, move, rename, or check out existing worktrees. Changing `BRANCH_PREFIX` is allowed only before task workspaces exist. Changing `MAIN_WORKTREES_DIR` is allowed only before base worktrees exist. Once matching worktrees exist, `workbranch config` rejects those changes.
 
-Existing project-level `TASK_SETUP` values remain supported for `workbranch add` and are preserved by `workbranch config` unless another explicit flow clears or migrates them.
+Existing project-level `TASK_SETUP` values remain supported for `workbranch add` and are preserved by `workbranch config` unless another explicit flow clears or migrates them. `workbranch config editor` and `workbranch config terminal` update only the matching tool command.
 
 When a base branch changes after repos are cloned, `workbranch config` only updates `.workbranch.config`. It then prints the checkout/fetch/pull procedure needed for the existing `_base/<repo>` worktree.
 
@@ -103,9 +109,10 @@ If no config exists, run interactive config setup:
 2. Ask for project name, default `fullstack`.
 3. Ask for main worktrees directory, default `_base`.
 4. Ask for branch prefix, default `feature`.
-5. Explain that each repo base repo branch is checked out in `_base/<repo>` and task branches are derived from it.
-6. Ask for one or more repos: name, Git URL, base branch for this repo, and optional repo-level setup command.
-7. Write `.workbranch.config`.
+5. Ask for optional editor and terminal commands from presets or custom input.
+6. Explain that each repo base repo branch is checked out in `_base/<repo>` and task branches are derived from it.
+7. Ask for one or more repos: name, Git URL, base branch for this repo, and optional repo-level setup command.
+8. Write `.workbranch.config`.
 
 ### `workbranch init`
 
@@ -114,6 +121,14 @@ Initialize main worktrees from config.
 - If `.workbranch.config` exists in the current directory, read it and clone each repo into `_base/<repo>` on its base repo branch. Legacy `.tasktree.config` / `.monotree.config` are also accepted by `workbranch init` and can be rewritten with `workbranch config`.
 - If `.workbranch.config` does not exist, run the same interactive setup as `workbranch config`, then clone repos.
 - If cloning fails, remove paths created by the failed command.
+
+### `workbranch path <task>`
+
+Print the absolute task workspace path. With `--repo <repo>`, print the absolute path for one task repo worktree. This command writes only the path to stdout so it can be used in scripts.
+
+### `workbranch editor <task>` / `workbranch terminal <task>`
+
+Run the configured editor or terminal command once per matching task repo worktree. The resolved repo path is appended as the final argument. With `--repo <repo>`, run only for that repo. Tool launchers do not modify repositories.
 
 ### `workbranch list`
 
@@ -247,7 +262,7 @@ This is useful when the base repo branch is already a parent feature branch, suc
 
 ### `--repo <repo>`
 
-Git operations default to every configured repo. Add `--repo <repo>` to limit the operation to one repo.
+Git and tool operations default to every configured repo. Add `--repo <repo>` to limit the operation to one repo.
 
 Examples:
 

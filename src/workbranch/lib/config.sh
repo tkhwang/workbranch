@@ -97,6 +97,8 @@ reset_config() {
   BASE_DIR=""
   BRANCH_PREFIX=""
   TASK_SETUP=""
+  EDITOR_COMMAND=""
+  TERMINAL_COMMAND=""
   REPO_NAMES=()
   REPO_URLS=()
   REPO_BASE_BRANCHES=()
@@ -113,6 +115,26 @@ repo_setup_command_from_line() {
   line=$1
   command=$(printf '%s' "$line" | sed 's/^[^[:space:]]*[[:space:]]*[^[:space:]]*[[:space:]]*//; s/[[:space:]]*$//')
   printf '%s' "$command"
+}
+
+set_editor_command() {
+  command=$1
+  [ -n "$command" ] || die "editor command is empty"
+  EDITOR_COMMAND=$command
+}
+
+clear_editor_command() {
+  EDITOR_COMMAND=""
+}
+
+set_terminal_command() {
+  command=$1
+  [ -n "$command" ] || die "terminal command is empty"
+  TERMINAL_COMMAND=$command
+}
+
+clear_terminal_command() {
+  TERMINAL_COMMAND=""
 }
 
 set_repo_setup() {
@@ -144,8 +166,8 @@ has_task_setups() {
 }
 
 config_line_split_tokens() {
-  # Word splitting is intentional for directive headers. TASK_SETUP and REPO_SETUP
-  # preserve the command tail separately so command whitespace works. Pathname
+  # Word splitting is intentional for directive headers. EDITOR, TERMINAL,
+  # TASK_SETUP, and REPO_SETUP preserve the command tail separately so command whitespace works. Pathname
   # expansion is not part of the config format, so keep glob characters literal.
   line=$1
   read -r -a CONFIG_FIELDS <<< "$line"
@@ -197,6 +219,14 @@ parse_config() {
         [ -z "$BRANCH_PREFIX" ] || die "duplicate BRANCH_PREFIX directive in config"
         validate_nonempty_no_space "BRANCH_PREFIX" "$2"
         BRANCH_PREFIX=$2
+        ;;
+      EDITOR)
+        [ -z "$EDITOR_COMMAND" ] || die "duplicate EDITOR directive in config"
+        set_editor_command "$(task_setup_from_line "$line")"
+        ;;
+      TERMINAL)
+        [ -z "$TERMINAL_COMMAND" ] || die "duplicate TERMINAL directive in config"
+        set_terminal_command "$(task_setup_from_line "$line")"
         ;;
       TASK_SETUP)
         [ -z "$TASK_SETUP" ] || die "duplicate TASK_SETUP directive in config"
@@ -253,6 +283,14 @@ parse_config_for_rewrite() {
         validate_nonempty_no_space "BRANCH_PREFIX" "$2"
         BRANCH_PREFIX=$2
         ;;
+      EDITOR|editor)
+        [ -z "$EDITOR_COMMAND" ] || die "duplicate EDITOR directive in config"
+        set_editor_command "$(task_setup_from_line "$line")"
+        ;;
+      TERMINAL|terminal)
+        [ -z "$TERMINAL_COMMAND" ] || die "duplicate TERMINAL directive in config"
+        set_terminal_command "$(task_setup_from_line "$line")"
+        ;;
       TASK_SETUP|task_setup)
         [ -z "$TASK_SETUP" ] || die "duplicate TASK_SETUP directive in config"
         TASK_SETUP=$(task_setup_from_line "$line")
@@ -302,6 +340,12 @@ write_config() {
     printf 'PROJECT_NAME %s\n' "$PROJECT_NAME"
     printf 'MAIN_WORKTREES_DIR %s\n' "$BASE_DIR"
     printf 'BRANCH_PREFIX %s\n' "$BRANCH_PREFIX"
+    if [ -n "$EDITOR_COMMAND" ]; then
+      printf 'EDITOR %s\n' "$EDITOR_COMMAND"
+    fi
+    if [ -n "$TERMINAL_COMMAND" ]; then
+      printf 'TERMINAL %s\n' "$TERMINAL_COMMAND"
+    fi
     if [ -n "$TASK_SETUP" ]; then
       printf 'TASK_SETUP %s\n' "$TASK_SETUP"
     fi

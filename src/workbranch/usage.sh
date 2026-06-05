@@ -5,10 +5,7 @@ Usage:
 Workspace:
   init              Initialize a workbranch project
   list              List configured repos and task workspaces
-  config            Create or update .workbranch.config without cloning repos
-  config --rewrite  Rewrite config to current format without prompts
   add <task>        Create a task workspace
-  resume <task>     Restore existing local or remote task branches
   remove <task>     Remove task worktrees and local task branches
 Git:
   status            Show commits, diff, and dirty state
@@ -23,6 +20,15 @@ Git:
   land <task>       Land task branches into base branches
   common
   --repo <repo>     Limit operation to one repo; otherwise all repos
+Tool:
+  path <task>       Print a task workspace path
+  editor <task>     Open task repo worktrees in the configured editor
+  terminal <task>   Open task repo worktrees in the configured terminal
+Config:
+  config            Create or update .workbranch.config without cloning repos
+  config editor     Update only the configured editor command
+  config terminal   Update only the configured terminal command
+  config --rewrite  Rewrite config to current format without prompts
 Other:
   help              Show this help
   -v, --version     Show the installed workbranch version

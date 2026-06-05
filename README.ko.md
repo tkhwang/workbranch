@@ -50,7 +50,7 @@ workbranch pull
 workbranch add <task>
 ```
 
-repo를 다시 clone하지 않고 project 설정, branch prefix, base branch, repo별 setup command를 수정하려면 `workbranch config`를 사용합니다.
+repo를 다시 clone하지 않고 project 설정, branch prefix, base branch, editor/terminal 실행 명령, repo별 setup command를 수정하려면 `workbranch config`를 사용합니다.
 
 ## 생성되는 구조
 
@@ -74,10 +74,15 @@ Single-repo 프로젝트도 같은 구조를 사용하며, 각 task 안에 repo 
 | Command | 용도 |
 | --- | --- |
 | `workbranch init` | config 기준으로 base worktree 생성 또는 clone |
-| `workbranch config` | project 설정, branch prefix, base branch, repo setup command 수정 |
+| `workbranch config` | project 설정, branch prefix, base branch, tool command, repo setup command 수정 |
+| `workbranch config editor` | editor 명령만 수정 |
+| `workbranch config terminal` | terminal 명령만 수정 |
 | `workbranch add <task>` | task workspace 생성 |
 | `workbranch resume <task>` | 기존 local 또는 remote task branch 복구 |
 | `workbranch list` | repo와 task workspace 목록 확인 |
+| `workbranch path <task>` | task workspace 또는 repo 경로 출력 |
+| `workbranch editor <task>` | 설정된 editor로 task repo worktree 열기 |
+| `workbranch terminal <task>` | 설정된 terminal로 task repo worktree 열기 |
 | `workbranch status` | branch, diff, dirty state 확인 |
 | `workbranch update [task]` | local base 변경사항을 task worktree에 merge |
 | `workbranch pull` | remote base branch를 `_base/<repo>`로 pull |
@@ -86,7 +91,39 @@ Single-repo 프로젝트도 같은 구조를 사용하며, 각 task 안에 repo 
 | `workbranch remove <task>` | task worktree와 local task branch 제거 |
 | `workbranch -v` | 설치된 version 확인 |
 
-지원되는 Git 명령에 `--repo <repo>`를 붙이면 특정 repo 하나만 대상으로 실행합니다.
+지원되는 Git 및 tool 명령에 `--repo <repo>`를 붙이면 특정 repo 하나만 대상으로 실행합니다.
+
+## 작업 workspace 열기
+
+프로젝트에서 공통으로 사용할 editor와 terminal 명령을 설정합니다.
+
+```bash
+workbranch config editor
+workbranch config terminal
+```
+
+작업 workspace 안의 모든 repo를 엽니다.
+
+```bash
+workbranch editor login
+workbranch terminal login
+```
+
+필요하면 repo 하나로 제한합니다.
+
+```bash
+workbranch editor login --repo frontend
+workbranch terminal login --repo backend
+```
+
+스크립트에서 사용할 전체 경로를 출력합니다.
+
+```bash
+workbranch path login
+workbranch path login --repo frontend
+```
+
+Launcher 명령은 repo별로 순서대로 실행됩니다. foreground에 계속 머무는 TUI terminal 명령은 `--repo`를 쓰거나 non-blocking custom wrapper로 설정하세요.
 
 ## Setup command
 

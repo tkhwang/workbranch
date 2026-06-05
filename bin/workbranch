@@ -15,6 +15,8 @@ PROJECT_NAME=""
 BASE_DIR=""
 BRANCH_PREFIX=""
 TASK_SETUP=""
+EDITOR_COMMAND=""
+TERMINAL_COMMAND=""
 REPO_NAMES=()
 REPO_URLS=()
 REPO_BASE_BRANCHES=()
@@ -43,10 +45,7 @@ Usage:
 Workspace:
   init              Initialize a workbranch project
   list              List configured repos and task workspaces
-  config            Create or update .workbranch.config without cloning repos
-  config --rewrite  Rewrite config to current format without prompts
   add <task>        Create a task workspace
-  resume <task>     Restore existing local or remote task branches
   remove <task>     Remove task worktrees and local task branches
 Git:
   status            Show commits, diff, and dirty state
@@ -61,6 +60,15 @@ Git:
   land <task>       Land task branches into base branches
   common
   --repo <repo>     Limit operation to one repo; otherwise all repos
+Tool:
+  path <task>       Print a task workspace path
+  editor <task>     Open task repo worktrees in the configured editor
+  terminal <task>   Open task repo worktrees in the configured terminal
+Config:
+  config            Create or update .workbranch.config without cloning repos
+  config editor     Update only the configured editor command
+  config terminal   Update only the configured terminal command
+  config --rewrite  Rewrite config to current format without prompts
 Other:
   help              Show this help
   -v, --version     Show the installed workbranch version
@@ -201,6 +209,8 @@ reset_config() {
   BASE_DIR=""
   BRANCH_PREFIX=""
   TASK_SETUP=""
+  EDITOR_COMMAND=""
+  TERMINAL_COMMAND=""
   REPO_NAMES=()
   REPO_URLS=()
   REPO_BASE_BRANCHES=()
@@ -217,6 +227,26 @@ repo_setup_command_from_line() {
   line=$1
   command=$(printf '%s' "$line" | sed 's/^[^[:space:]]*[[:space:]]*[^[:space:]]*[[:space:]]*//; s/[[:space:]]*$//')
   printf '%s' "$command"
+}
+
+set_editor_command() {
+  command=$1
+  [ -n "$command" ] || die "editor command is empty"
+  EDITOR_COMMAND=$command
+}
+
+clear_editor_command() {
+  EDITOR_COMMAND=""
+}
+
+set_terminal_command() {
+  command=$1
+  [ -n "$command" ] || die "terminal command is empty"
+  TERMINAL_COMMAND=$command
+}
+
+clear_terminal_command() {
+  TERMINAL_COMMAND=""
 }
 
 set_repo_setup() {
@@ -248,8 +278,8 @@ has_task_setups() {
 }
 
 config_line_split_tokens() {
-  # Word splitting is intentional for directive headers. TASK_SETUP and REPO_SETUP
-  # preserve the command tail separately so command whitespace works. Pathname
+  # Word splitting is intentional for directive headers. EDITOR, TERMINAL,
+  # TASK_SETUP, and REPO_SETUP preserve the command tail separately so command whitespace works. Pathname
   # expansion is not part of the config format, so keep glob characters literal.
   line=$1
   read -r -a CONFIG_FIELDS <<< "$line"
@@ -301,6 +331,14 @@ parse_config() {
         [ -z "$BRANCH_PREFIX" ] || die "duplicate BRANCH_PREFIX directive in config"
         validate_nonempty_no_space "BRANCH_PREFIX" "$2"
         BRANCH_PREFIX=$2
+        ;;
+      EDITOR)
+        [ -z "$EDITOR_COMMAND" ] || die "duplicate EDITOR directive in config"
+        set_editor_command "$(task_setup_from_line "$line")"
+        ;;
+      TERMINAL)
+        [ -z "$TERMINAL_COMMAND" ] || die "duplicate TERMINAL directive in config"
+        set_terminal_command "$(task_setup_from_line "$line")"
         ;;
       TASK_SETUP)
         [ -z "$TASK_SETUP" ] || die "duplicate TASK_SETUP directive in config"
@@ -357,6 +395,14 @@ parse_config_for_rewrite() {
         validate_nonempty_no_space "BRANCH_PREFIX" "$2"
         BRANCH_PREFIX=$2
         ;;
+      EDITOR|editor)
+        [ -z "$EDITOR_COMMAND" ] || die "duplicate EDITOR directive in config"
+        set_editor_command "$(task_setup_from_line "$line")"
+        ;;
+      TERMINAL|terminal)
+        [ -z "$TERMINAL_COMMAND" ] || die "duplicate TERMINAL directive in config"
+        set_terminal_command "$(task_setup_from_line "$line")"
+        ;;
       TASK_SETUP|task_setup)
         [ -z "$TASK_SETUP" ] || die "duplicate TASK_SETUP directive in config"
         TASK_SETUP=$(task_setup_from_line "$line")
@@ -406,6 +452,12 @@ write_config() {
     printf 'PROJECT_NAME %s\n' "$PROJECT_NAME"
     printf 'MAIN_WORKTREES_DIR %s\n' "$BASE_DIR"
     printf 'BRANCH_PREFIX %s\n' "$BRANCH_PREFIX"
+    if [ -n "$EDITOR_COMMAND" ]; then
+      printf 'EDITOR %s\n' "$EDITOR_COMMAND"
+    fi
+    if [ -n "$TERMINAL_COMMAND" ]; then
+      printf 'TERMINAL %s\n' "$TERMINAL_COMMAND"
+    fi
     if [ -n "$TASK_SETUP" ]; then
       printf 'TASK_SETUP %s\n' "$TASK_SETUP"
     fi
@@ -832,6 +884,80 @@ expand_path() {
   esac
 }
 
+# ----- src/workbranch/lib/tool-launcher.sh -----
+print_editor_presets() {
+  info "Editor command:"
+  printf '    1) VS Code (open -a "Visual Studio Code")\n' >&2
+  printf '    2) Cursor (open -a Cursor)\n' >&2
+  printf '    3) Antigravity IDE (open -a "Antigravity IDE")\n' >&2
+  printf '    4) Custom command\n' >&2
+  printf '    5) Clear\n' >&2
+}
+
+editor_preset_command() {
+  case "$1" in
+    1) printf '%s' 'open -a "Visual Studio Code"' ;;
+    2) printf '%s' 'open -a Cursor' ;;
+    3) printf '%s' 'open -a "Antigravity IDE"' ;;
+    *) return 1 ;;
+  esac
+}
+
+print_terminal_presets() {
+  info "Terminal command:"
+  printf '    1) Terminal.app (open -a Terminal)\n' >&2
+  printf '    2) iTerm2 (open -a iTerm)\n' >&2
+  printf '    3) Warp (open -a Warp)\n' >&2
+  printf '    4) Ghostty (open -a Ghostty)\n' >&2
+  printf '    5) cmux (cmux)\n' >&2
+  printf '    6) Custom command\n' >&2
+  printf '    7) Clear\n' >&2
+}
+
+terminal_preset_command() {
+  case "$1" in
+    1) printf '%s' 'open -a Terminal' ;;
+    2) printf '%s' 'open -a iTerm' ;;
+    3) printf '%s' 'open -a Warp' ;;
+    4) printf '%s' 'open -a Ghostty' ;;
+    5) printf '%s' 'cmux' ;;
+    *) return 1 ;;
+  esac
+}
+
+canonical_path() {
+  path=$1
+  (cd "$path" 2>/dev/null && pwd -P) || return 1
+}
+
+resolve_task_path() {
+  task=$1
+  task_dir="$PROJECT_ROOT/$task"
+  is_task_workspace_path "$task_dir" || die "task workspace not found: $task"
+  RESOLVED_PATH=$(canonical_path "$task_dir") || die "task workspace not found: $task"
+}
+
+resolve_task_repo_path() {
+  task=$1
+  repo=$2
+  repo_path=$(task_repo_path "$task" "$repo")
+  [ -d "$repo_path" ] || die "task repo not found: $task/$repo"
+  RESOLVED_PATH=$(canonical_path "$repo_path") || die "task repo not found: $task/$repo"
+}
+
+run_tool_command() {
+  tool_label=$1
+  command=$2
+  path=$3
+  [ -n "$command" ] || die "$tool_label command is not configured; run workbranch config $tool_label"
+  (
+    cd "$path" || exit 1
+    WORKBRANCH_TOOL_PATH=$path
+    export WORKBRANCH_TOOL_PATH
+    sh -c "$command \"\$WORKBRANCH_TOOL_PATH\""
+  )
+}
+
 # ----- src/workbranch/lib/task-setup.sh -----
 repo_names_joined() {
   _repo_names_out=""
@@ -1163,13 +1289,18 @@ remove_stale_task_directory_path() {
 # ----- src/workbranch/commands/config.sh -----
 cmd_config() {
   rewrite_only=0
+  config_target="all"
   case $# in
     0) ;;
     1)
-      [ "$1" = "--rewrite" ] || die "usage: workbranch config [--rewrite]"
-      rewrite_only=1
+      case "$1" in
+        --rewrite) rewrite_only=1 ;;
+        editor) config_target="editor" ;;
+        terminal) config_target="terminal" ;;
+        *) die "usage: workbranch config [editor|terminal|--rewrite]" ;;
+      esac
       ;;
-    *) die "usage: workbranch config [--rewrite]" ;;
+    *) die "usage: workbranch config [editor|terminal|--rewrite]" ;;
   esac
   CREATED_PATHS=()
   CREATED_WORKTREES=()
@@ -1180,7 +1311,11 @@ cmd_config() {
     parse_config_for_rewrite "$CONFIG_FILE"
     CONFIG_FILE="$PROJECT_ROOT/.workbranch.config"
     if [ "$rewrite_only" -eq 0 ]; then
-      configure_existing_project
+      case "$config_target" in
+        all) configure_existing_project ;;
+        editor) configure_editor_prompt ;;
+        terminal) configure_terminal_prompt ;;
+      esac
     fi
     write_config "$CONFIG_FILE"
     if [ "$rewrite_only" -eq 1 ]; then
@@ -1191,6 +1326,7 @@ cmd_config() {
     fi
   else
     [ "$rewrite_only" -eq 0 ] || die "no enclosing workbranch project found"
+    [ "$config_target" = "all" ] || die "no enclosing workbranch project found"
     cmd_init_interactive no
   fi
 }
@@ -1255,6 +1391,38 @@ configure_task_setup_prompt() {
     "") ;;
     --clear) TASK_SETUP="" ;;
     *) TASK_SETUP=$value ;;
+  esac
+}
+
+configure_editor_prompt() {
+  print_editor_presets
+  current=${EDITOR_COMMAND:-keep}
+  value=$(prompt_read "[*] Choose editor [$current]: ") || die "input aborted"
+  case "$value" in
+    "") ;;
+    1|2|3) set_editor_command "$(editor_preset_command "$value")" ;;
+    4)
+      custom=$(prompt_required "Custom editor command")
+      set_editor_command "$custom"
+      ;;
+    5|--clear) clear_editor_command ;;
+    *) die "invalid editor choice: $value" ;;
+  esac
+}
+
+configure_terminal_prompt() {
+  print_terminal_presets
+  current=${TERMINAL_COMMAND:-keep}
+  value=$(prompt_read "[*] Choose terminal [$current]: ") || die "input aborted"
+  case "$value" in
+    "") ;;
+    1|2|3|4|5) set_terminal_command "$(terminal_preset_command "$value")" ;;
+    6)
+      custom=$(prompt_required "Custom terminal command")
+      set_terminal_command "$custom"
+      ;;
+    7|--clear) clear_terminal_command ;;
+    *) die "invalid terminal choice: $value" ;;
   esac
 }
 
@@ -1346,6 +1514,9 @@ configure_existing_project() {
   configure_project_settings
 
   printf '\n'
+  configure_editor_prompt
+  configure_terminal_prompt
+
   info "Repositories"
 
   i=0
@@ -1429,6 +1600,11 @@ AFTER
 
   printf '
 ' >&2
+  configure_editor_prompt
+  configure_terminal_prompt
+
+  printf '
+' >&2
   info "Repositories"
 
   repo_number=1
@@ -1463,6 +1639,18 @@ AFTER
   info "Project: $PROJECT_NAME"
   info "Main worktrees dir: $BASE_DIR"
   info "Branch prefix: $BRANCH_PREFIX"
+  info "Editor:"
+  if [ -n "$EDITOR_COMMAND" ]; then
+    info "  $EDITOR_COMMAND"
+  else
+    info "  (none)"
+  fi
+  info "Terminal:"
+  if [ -n "$TERMINAL_COMMAND" ]; then
+    info "  $TERMINAL_COMMAND"
+  else
+    info "  (none)"
+  fi
   info "Task setup:"
   if [ -n "$TASK_SETUP" ]; then
     info "  $TASK_SETUP"
@@ -1744,6 +1932,22 @@ cmd_list() {
   require_project
   info "Project: $PROJECT_NAME"
   info "Base: $BASE_DIR"
+  info "Editor:"
+  if [ -n "$EDITOR_COMMAND" ]; then
+    printf '    %s
+' "$EDITOR_COMMAND"
+  else
+    printf '    (none)
+'
+  fi
+  info "Terminal:"
+  if [ -n "$TERMINAL_COMMAND" ]; then
+    printf '    %s
+' "$TERMINAL_COMMAND"
+  else
+    printf '    (none)
+'
+  fi
   info "Task setup:"
   if [ -n "$TASK_SETUP" ]; then
     printf '    %s\n' "$TASK_SETUP"
@@ -1798,6 +2002,66 @@ cmd_list() {
     done
   done
   [ $found -eq 1 ] || info "  (none)"
+}
+
+# ----- src/workbranch/commands/path.sh -----
+cmd_path() {
+  require_project
+  parse_repo_option "$@"
+  [ ${#ARGS[@]} -eq 1 ] || die "usage: workbranch path <task> [--repo <repo>]"
+  task=${ARGS[0]}
+  validate_safe_name "task" "$task"
+
+  # Keep stdout path-only: do not call info/success in this command.
+  if [ -n "$FILTER_REPO" ]; then
+    resolve_task_repo_path "$task" "$FILTER_REPO"
+  else
+    resolve_task_path "$task"
+  fi
+  printf '%s\n' "$RESOLVED_PATH"
+}
+
+# ----- src/workbranch/commands/tool-launcher.sh -----
+cmd_tool_launcher() {
+  tool_label=$1
+  shift
+  require_project
+  case "$tool_label" in
+    editor) command=$EDITOR_COMMAND ;;
+    terminal) command=$TERMINAL_COMMAND ;;
+    *) die "unknown tool launcher: $tool_label" ;;
+  esac
+  parse_repo_option "$@"
+  [ ${#ARGS[@]} -eq 1 ] || die "usage: workbranch $tool_label <task> [--repo <repo>]"
+  task=${ARGS[0]}
+  validate_safe_name "task" "$task"
+
+  if [ -n "$FILTER_REPO" ]; then
+    resolve_task_repo_path "$task" "$FILTER_REPO"
+    path=$RESOLVED_PATH
+    info "Opening $tool_label: $task/$FILTER_REPO"
+    run_tool_command "$tool_label" "$command" "$path" || die "failed to open $tool_label: $task/$FILTER_REPO"
+    return 0
+  fi
+
+  resolve_task_path "$task"
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    resolve_task_repo_path "$task" "$name"
+    path=$RESOLVED_PATH
+    info "Opening $tool_label: $task/$name"
+    run_tool_command "$tool_label" "$command" "$path" || die "failed to open $tool_label: $task/$name"
+    i=$((i + 1))
+  done
+}
+
+cmd_editor() {
+  cmd_tool_launcher editor "$@"
+}
+
+cmd_terminal() {
+  cmd_tool_launcher terminal "$@"
 }
 
 # ----- src/workbranch/commands/status.sh -----
@@ -2330,6 +2594,9 @@ main() {
     add) cmd_add "$@" ;;
     resume) cmd_resume "$@" ;;
     list) cmd_list "$@" ;;
+    path) cmd_path "$@" ;;
+    editor) cmd_editor "$@" ;;
+    terminal) cmd_terminal "$@" ;;
     status) cmd_status "$@" ;;
     pull) cmd_pull "$@" ;;
     update) cmd_update "$@" ;;

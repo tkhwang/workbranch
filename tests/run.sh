@@ -64,6 +64,16 @@ run_expect_fail() {
   printf '%s' "$out"
 }
 
+append_fake_tool_script() {
+  script=$1
+  cat > "$script" <<'SCRIPT'
+#!/usr/bin/env sh
+set -eu
+printf '%s\n' "$PWD|$1" >> "$WORKBRANCH_FAKE_TOOL_LOG"
+SCRIPT
+  chmod +x "$script"
+}
+
 make_repo() {
   name=$1
   seed="$TMP_ROOT/seeds/$name"
@@ -1122,6 +1132,91 @@ test_status_skips_partial_task_workspaces() {
   assert_not_contains "$out" "[*] Next"
 }
 
+test_path_prints_task_and_repo_paths() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  canonical_project=$(pwd -P)
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  out=$(run_expect_success "$WORKBRANCH" path login)
+  [ "$out" = "$canonical_project/login" ] || fail "expected task path, got: $out"
+
+  out=$(run_expect_success "$WORKBRANCH" path login --repo frontend)
+  [ "$out" = "$canonical_project/login/frontend" ] || fail "expected frontend path, got: $out"
+
+  out=$(run_expect_fail "$WORKBRANCH" path missing)
+  assert_contains "$out" "task workspace not found: missing"
+
+  out=$(run_expect_fail "$WORKBRANCH" path login --repo unknown)
+  assert_contains "$out" "unknown repo: unknown"
+}
+
+test_editor_and_terminal_run_configured_command_for_task_repos() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  canonical_project=$(pwd -P)
+  fake_tool="$TMP_ROOT/fake-tool.sh"
+  append_fake_tool_script "$fake_tool"
+  export WORKBRANCH_FAKE_TOOL_LOG="$TMP_ROOT/tool.log"
+
+  cat >> "$project/.workbranch.config" <<CONFIG
+EDITOR $fake_tool
+TERMINAL $fake_tool
+CONFIG
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  out=$(run_expect_success "$WORKBRANCH" editor login --repo frontend)
+  assert_contains "$out" "[*] Opening editor: login/frontend"
+  assert_contains "$(cat "$WORKBRANCH_FAKE_TOOL_LOG")" "$canonical_project/login/frontend|$canonical_project/login/frontend"
+
+  : > "$WORKBRANCH_FAKE_TOOL_LOG"
+  out=$(run_expect_success "$WORKBRANCH" terminal login)
+  assert_contains "$out" "[*] Opening terminal: login/frontend"
+  assert_contains "$out" "[*] Opening terminal: login/backend"
+  assert_contains "$(cat "$WORKBRANCH_FAKE_TOOL_LOG")" "$canonical_project/login/frontend|$canonical_project/login/frontend"
+  assert_contains "$(cat "$WORKBRANCH_FAKE_TOOL_LOG")" "$canonical_project/login/backend|$canonical_project/login/backend"
+}
+
+test_tool_commands_require_configured_command() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  out=$(run_expect_fail "$WORKBRANCH" editor login)
+  assert_contains "$out" "editor command is not configured; run workbranch config editor"
+
+  out=$(run_expect_fail "$WORKBRANCH" terminal login --repo frontend)
+  assert_contains "$out" "terminal command is not configured; run workbranch config terminal"
+}
+
+test_tool_launcher_reports_missing_task_repo_before_running_command() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  fake_tool="$TMP_ROOT/fake-tool.sh"
+  append_fake_tool_script "$fake_tool"
+  export WORKBRANCH_FAKE_TOOL_LOG="$TMP_ROOT/tool.log"
+
+  cat >> "$project/.workbranch.config" <<CONFIG
+EDITOR $fake_tool
+CONFIG
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  rm -rf "$project/login/frontend"
+
+  out=$(run_expect_fail "$WORKBRANCH" editor login --repo frontend)
+  assert_contains "$out" "task repo not found: login/frontend"
+  assert_not_exists "$WORKBRANCH_FAKE_TOOL_LOG"
+}
+
 test_dirty_worktree_safety() {
   new_fixture
   project="$FIXTURE_PROJECT"
@@ -1260,6 +1355,53 @@ test_add_preflight_requires_clean_base_on_configured_branch() {
   assert_not_exists "$project/login"
 }
 
+test_config_reads_and_writes_editor_terminal_commands() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  cat >> "$project/.workbranch.config" <<'CONFIG'
+EDITOR open -a "Visual Studio Code"
+TERMINAL open -a Warp
+CONFIG
+
+  out=$(run_expect_success "$WORKBRANCH" config --rewrite)
+  assert_contains "$out" "[+] Config rewritten:"
+  config=$(cat "$project/.workbranch.config")
+  assert_contains "$config" 'EDITOR open -a "Visual Studio Code"'
+  assert_contains "$config" "TERMINAL open -a Warp"
+}
+
+test_config_editor_can_set_custom_command_without_prompting_repos() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  input=$(printf '%s\n%s\n' "4" "code --reuse-window")
+  out=$(printf '%s' "$input" | run_expect_success "$WORKBRANCH" config editor)
+  assert_contains "$out" "[*] Editor command:"
+  assert_not_contains "$out" "Base repo branch for frontend"
+  assert_contains "$out" "[+] Config updated:"
+  assert_contains "$(cat "$project/.workbranch.config")" "EDITOR code --reuse-window"
+}
+
+test_config_terminal_can_clear_without_removing_editor() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  cat >> "$project/.workbranch.config" <<'CONFIG'
+EDITOR open -a Cursor
+TERMINAL open -a Warp
+CONFIG
+
+  out=$(printf '%s\n' "7" | run_expect_success "$WORKBRANCH" config terminal)
+  assert_contains "$out" "[*] Terminal command:"
+  assert_contains "$out" "[+] Config updated:"
+  config=$(cat "$project/.workbranch.config")
+  assert_contains "$config" "EDITOR open -a Cursor"
+  assert_not_contains "$config" "TERMINAL open -a Warp"
+}
+
 test_config_writes_config_without_cloning() {
   TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
   mkdir -p "$TMP_ROOT/remotes" "$TMP_ROOT/seeds" "$TMP_ROOT/work"
@@ -1270,6 +1412,8 @@ test_config_writes_config_without_cloning() {
 fullstack
 _base
 feature
+
+
 frontend
 $frontend_remote
 master
@@ -1445,20 +1589,26 @@ test_config_preserves_task_setup_while_prompting_repo_setup() {
   cd "$project" || return 1
   printf '\nTASK_SETUP pnpm install\n' >> "$project/.workbranch.config"
 
-  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "" "" "" "" 'printf frontend > repo.txt' "" "" | run_expect_success "$WORKBRANCH" config)
+  out=$(printf '%s\n' "" "" "" "" "" "" 'printf frontend > repo.txt' "" "" | run_expect_success "$WORKBRANCH" config)
   assert_contains "$out" "[*] Project name [fullstack]:"
   assert_contains "$out" "[*] Main worktrees dir [_base]:"
   assert_contains "$out" "[*] Branch prefix [feature]:"
+  assert_contains "$out" "[*] Editor command:"
+  assert_contains "$out" "[*] Choose editor [keep]:"
+  assert_contains "$out" "[*] Terminal command:"
+  assert_contains "$out" "[*] Choose terminal [keep]:"
   assert_contains "$out" "[*] Base repo branch for frontend [master]:"
   assert_contains "$out" "[*] Repo setup command for frontend []:"
   assert_contains "$out" "[*] Base repo branch for backend [master]:"
   assert_contains "$out" "[*] Repo setup command for backend []:"
   assert_not_contains "$out" "Task setup command"
-  assert_contains "$out" "$(printf '%s \n\n%s' "[*] Branch prefix [feature]:" "[*] Repositories")"
+  assert_contains "$out" "$(printf '%s \n\n%s' "[*] Branch prefix [feature]:" "[*] Editor command:")"
+  assert_contains "$out" "$(printf '%s \n%s' "[*] Choose editor [keep]:" "[*] Terminal command:")"
+  assert_contains "$out" "$(printf '%s \n%s' "[*] Choose terminal [keep]:" "[*] Repositories")"
   assert_contains "$out" "$(printf '%s \n\n%s' "[*] Repo setup command for frontend []:" "[*] Base repo branch for backend [master]:")"
   assert_contains "$out" "$(printf '%s \n\n%s' "[*] Repo setup command for backend []:" "[+] Config updated:")"
   case "$out" in
-    *"Base repo branch for frontend"*"Repo setup command for frontend"*"Base repo branch for backend"*"Repo setup command for backend"*) ;;
+    *"Editor command"*"Terminal command"*"Base repo branch for frontend"*"Repo setup command for frontend"*"Base repo branch for backend"*"Repo setup command for backend"*) ;;
     *) fail "expected config to ask branch and setup per repo only; got: $out" ;;
   esac
   assert_contains "$out" "[+] Config updated:"
@@ -1473,7 +1623,7 @@ test_config_can_change_branch_prefix_without_cloning() {
   cd "$project" || return 1
   run_expect_success "$WORKBRANCH" init >/dev/null
 
-  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "" "" "ticket" "" "" "" "" | run_expect_success "$WORKBRANCH" config)
+  out=$(printf '%s\n' "" "" "ticket" "" "" "" "" "" "" | run_expect_success "$WORKBRANCH" config)
   assert_contains "$out" "[*] Branch prefix [feature]:"
   assert_contains "$out" "[+] Config updated:"
   config=$(cat "$project/.workbranch.config")
@@ -1494,7 +1644,7 @@ test_config_rejects_branch_prefix_change_when_task_workspaces_exist() {
   run_expect_success "$WORKBRANCH" init >/dev/null
   run_expect_success "$WORKBRANCH" add login >/dev/null
 
-  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "" "" "ticket" "" "" "" "" | run_expect_fail "$WORKBRANCH" config)
+  out=$(printf '%s\n' "" "" "ticket" "" "" "" "" "" "" | run_expect_success "$WORKBRANCH" config)
   assert_contains "$out" "cannot change BRANCH_PREFIX while task workspaces exist"
   assert_contains "$out" "remove or migrate existing task workspaces before changing it"
   assert_contains "$(cat "$project/.workbranch.config")" "BRANCH_PREFIX feature"
@@ -1513,7 +1663,7 @@ test_config_rejects_branch_prefix_change_when_stale_task_directory_exists() {
   run_expect_success "$WORKBRANCH" add login >/dev/null
   rm -f "$project/login/frontend/.git" "$project/login/backend/.git"
 
-  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "" "" "ticket" "" "" "" "" | run_expect_fail "$WORKBRANCH" config)
+  out=$(printf '%s\n' "" "" "ticket" "" "" "" "" "" "" | run_expect_success "$WORKBRANCH" config)
   assert_contains "$out" "cannot change BRANCH_PREFIX while task workspaces exist"
   assert_contains "$(cat "$project/.workbranch.config")" "BRANCH_PREFIX feature"
   assert_not_contains "$(cat "$project/.workbranch.config")" "BRANCH_PREFIX ticket"
@@ -1547,7 +1697,7 @@ test_config_guides_base_branch_change_for_cloned_repo() {
   cd "$project" || return 1
   run_expect_success "$WORKBRANCH" init >/dev/null
 
-  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "" "" "" "develop" "" "" "" "" | run_expect_success "$WORKBRANCH" config)
+  out=$(printf '%s\n' "" "" "" "" "" "develop" "" "" "" | run_expect_success "$WORKBRANCH" config)
   assert_contains "$out" "[*] _base/frontend current branch: master"
   assert_contains "$out" "[+] Config updated:"
   assert_contains "$out" "[*] Base branch changes were saved in config only."
@@ -1564,7 +1714,7 @@ test_repo_setup_can_be_configured_and_run_per_repo() {
   frontend_cmd='printf "%s:%s:%s\n" "$WORKBRANCH_REPO" "$WORKBRANCH_TASK" "$(basename "$PWD")" >> "$WORKBRANCH_TASK_DIR/setup.log"; printf "%s\n" "$WORKBRANCH_REPO_DIR" > repo-setup-dir.txt'
   backend_cmd='printf "%s:%s:%s\n" "$WORKBRANCH_REPO" "$WORKBRANCH_TASK" "$(basename "$PWD")" >> "$WORKBRANCH_TASK_DIR/setup.log"; printf "%s\n" "$WORKBRANCH_BASE_REPO_DIR" > repo-base-dir.txt'
 
-  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "" "" "" "" "$frontend_cmd" "" "$backend_cmd" | run_expect_success "$WORKBRANCH" config)
+  out=$(printf '%s\n' "" "" "" "" "" "" "$frontend_cmd" "" "$backend_cmd" | run_expect_success "$WORKBRANCH" config)
   assert_contains "$out" "[+] Config updated:"
   config=$(cat "$project/.workbranch.config")
   assert_contains "$config" "REPO_SETUP frontend $frontend_cmd"
@@ -1644,7 +1794,7 @@ REPO_SETUP frontend printf frontend > repo.txt
 REPO_SETUP backend printf backend > repo.txt
 CONFIG
 
-  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "" "" "" "" "--clear" "" "" | run_expect_success "$WORKBRANCH" config)
+  out=$(printf '%s\n' "" "" "" "" "" "" "--clear" "" "" | run_expect_success "$WORKBRANCH" config)
   assert_contains "$out" "[+] Config updated:"
   config=$(cat "$project/.workbranch.config")
   assert_not_contains "$config" "REPO_SETUP frontend"
@@ -1662,6 +1812,8 @@ test_interactive_init_writes_config_and_clones() {
 fullstack
 _base
 feature
+
+
 frontend
 $frontend_remote
 master
@@ -1714,6 +1866,8 @@ INPUT
   assert_contains "$out" "Multi-repo bonus: use one directory for shared AI session context."
   assert_contains "$out" "Press Enter to continue"
   assert_contains "$out" "[*] Project"
+  assert_contains "$out" "[*] Editor command:"
+  assert_contains "$out" "[*] Terminal command:"
   assert_contains "$out" "[*] Repo #1"
   assert_contains "$out" "[*] Repo #2"
   assert_contains "$out" "[*] Task setup command []:"
@@ -1740,6 +1894,8 @@ test_interactive_init_can_cancel_before_creating_project() {
 fullstack
 _base
 feature
+
+
 frontend
 $frontend_remote
 master
@@ -1768,6 +1924,8 @@ $TMP_ROOT/target
 fullstack
 _base
 feature
+
+
 frontend
 $frontend_remote
 master
@@ -1795,6 +1953,8 @@ test_interactive_init_accepts_slash_repo_base_branch() {
 fullstack
 _base
 feature
+
+
 frontend
 $frontend_remote
 feature/cpq
@@ -1992,8 +2152,14 @@ test_help_groups_commands() {
   assert_contains "$out" "init              Initialize a workbranch project"
   assert_contains "$out" "list              List configured repos and task workspaces"
   assert_contains "$out" "config            Create or update .workbranch.config without cloning repos"
+  assert_contains "$out" "path <task>       Print a task workspace path"
+  assert_contains "$out" "editor <task>     Open task repo worktrees in the configured editor"
+  assert_contains "$out" "terminal <task>   Open task repo worktrees in the configured terminal"
+  assert_contains "$out" "Tool:"
+  assert_contains "$out" "Config:"
+  assert_contains "$out" "config editor     Update only the configured editor command"
+  assert_contains "$out" "config terminal   Update only the configured terminal command"
   assert_contains "$out" "config --rewrite  Rewrite config to current format without prompts"
-  assert_contains "$out" "resume <task>     Restore existing local or remote task branches"
   assert_not_contains "$out" "setup             Add or change"
   assert_not_contains "$out" "setup --clear"
   assert_not_contains "$out" "setup repo <repo>"
@@ -2021,7 +2187,7 @@ test_help_groups_commands() {
     *$'\n\n'*) fail "expected compact help without blank lines; got: $out" ;;
   esac
   case "$out" in
-    *"Workspace:"*"init              Initialize a workbranch project"*"list              List configured repos and task workspaces"*"config            Create or update .workbranch.config without cloning repos"*"config --rewrite  Rewrite config to current format without prompts"*"add <task>        Create a task workspace"*"resume <task>     Restore existing local or remote task branches"*"remove <task>     Remove task worktrees and local task branches"*"Git:"*"status            Show commits, diff, and dirty state"*"  vertical"*"Other:"*) ;;
+    *"Workspace:"*"init              Initialize a workbranch project"*"list              List configured repos and task workspaces"*"add <task>        Create a task workspace"*"remove <task>     Remove task worktrees and local task branches"*"Git:"*"status            Show commits, diff, and dirty state"*"  vertical"*"Tool:"*"path <task>       Print a task workspace path"*"editor <task>     Open task repo worktrees in the configured editor"*"terminal <task>   Open task repo worktrees in the configured terminal"*"Config:"*"config            Create or update .workbranch.config without cloning repos"*"config editor     Update only the configured editor command"*"config terminal   Update only the configured terminal command"*"config --rewrite  Rewrite config to current format without prompts"*"Other:"*) ;;
     *) fail "expected workspace and group ordering; got: $out" ;;
   esac
 }
@@ -2085,6 +2251,10 @@ main() {
   run_test test_status_reports_stale_task_shaped_directories_separately
   run_test test_status_reports_standalone_repo_task_dirs_as_stale
   run_test test_status_skips_partial_task_workspaces
+  run_test test_path_prints_task_and_repo_paths
+  run_test test_editor_and_terminal_run_configured_command_for_task_repos
+  run_test test_tool_commands_require_configured_command
+  run_test test_tool_launcher_reports_missing_task_repo_before_running_command
   run_test test_dirty_worktree_safety
   run_test test_remove_reports_kept_task_directory_with_extra_files
   run_test test_remove_treats_missing_worktree_as_already_removed
@@ -2092,6 +2262,9 @@ main() {
   run_test test_remove_continues_after_worktree_remove_failure
   run_test test_pull_preflight_requires_base_worktree_on_configured_branch
   run_test test_add_preflight_requires_clean_base_on_configured_branch
+  run_test test_config_reads_and_writes_editor_terminal_commands
+  run_test test_config_editor_can_set_custom_command_without_prompting_repos
+  run_test test_config_terminal_can_clear_without_removing_editor
   run_test test_config_writes_config_without_cloning
   run_test test_config_rewrites_legacy_config_without_cloning
   run_test test_config_keeps_glob_characters_literal

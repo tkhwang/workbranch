@@ -2,6 +2,22 @@ cmd_list() {
   require_project
   info "Project: $PROJECT_NAME"
   info "Base: $BASE_DIR"
+  info "Editor:"
+  if [ -n "$EDITOR_COMMAND" ]; then
+    printf '    %s
+' "$EDITOR_COMMAND"
+  else
+    printf '    (none)
+'
+  fi
+  info "Terminal:"
+  if [ -n "$TERMINAL_COMMAND" ]; then
+    printf '    %s
+' "$TERMINAL_COMMAND"
+  else
+    printf '    (none)
+'
+  fi
   info "Task setup:"
   if [ -n "$TASK_SETUP" ]; then
     printf '    %s\n' "$TASK_SETUP"
