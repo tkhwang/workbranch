@@ -1,0 +1,236 @@
+# shellcheck shell=bash
+# Sourced by tests/run.sh; uses helpers from tests/lib/helpers.sh.
+test_safe_names_reject_dot_and_dotdot() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  cat > "$project/.workbranch.config" <<CONFIG
+PROJECT_NAME .
+MAIN_WORKTREES_DIR _base
+BRANCH_PREFIX feature
+REPO frontend $TMP_ROOT/remotes/frontend.git master
+CONFIG
+  out=$(run_expect_fail "$WORKBRANCH" list)
+  assert_contains "$out" "invalid PROJECT_NAME '.'"
+
+  cat > "$project/.workbranch.config" <<CONFIG
+PROJECT_NAME fullstack
+MAIN_WORKTREES_DIR ..
+BRANCH_PREFIX feature
+REPO frontend $TMP_ROOT/remotes/frontend.git master
+CONFIG
+  out=$(run_expect_fail "$WORKBRANCH" list)
+  assert_contains "$out" "invalid MAIN_WORKTREES_DIR '..'"
+
+  cat > "$project/.workbranch.config" <<CONFIG
+PROJECT_NAME fullstack
+MAIN_WORKTREES_DIR _base
+BRANCH_PREFIX feature
+REPO . $TMP_ROOT/remotes/frontend.git master
+CONFIG
+  out=$(run_expect_fail "$WORKBRANCH" list)
+  assert_contains "$out" "invalid repo name '.'"
+}
+
+test_add_uses_feat_parent_branch_as_default() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  commit_to_remote_branch frontend feat/cpq parent-frontend
+  cat > "$project/.workbranch.config" <<CONFIG
+PROJECT_NAME fullstack
+MAIN_WORKTREES_DIR _base
+BRANCH_PREFIX feature
+
+REPO frontend $TMP_ROOT/remotes/frontend.git feat/cpq
+CONFIG
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+
+  out=$(printf '\n' | "$WORKBRANCH" add ui 2>&1)
+  status=$?
+  [ "$status" -eq 0 ] || fail "add failed: $out"
+  assert_contains "$out" "Repo frontend base branch: feat/cpq"
+  assert_contains "$out" "Task branch for frontend [feat/cpq-ui]"
+  assert_branch "$project/ui/frontend" "feat/cpq-ui"
+}
+
+test_add_task_branch_override_is_used_by_later_commands() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+
+  out=$(printf 'tk/login-frontend\ntk/login-backend\n' | "$WORKBRANCH" add login 2>&1)
+  status=$?
+  [ "$status" -eq 0 ] || fail "add with branch overrides failed: $out"
+
+  assert_branch "$project/login/frontend" "tk/login-frontend"
+  assert_branch "$project/login/backend" "tk/login-backend"
+  assert_contains "$(cat "$project/login/.workbranch.task")" "REPO_BRANCH frontend tk/login-frontend"
+  assert_contains "$(cat "$project/login/.workbranch.task")" "REPO_BRANCH backend tk/login-backend"
+
+  git -C "$project/login/frontend" config user.name "Workbranch Test"
+  git -C "$project/login/frontend" config user.email "workbranch-test@example.com"
+  printf 'frontend scoped\n' > "$project/login/frontend/scoped.txt"
+  git -C "$project/login/frontend" add scoped.txt
+  git -C "$project/login/frontend" commit -m "frontend scoped" >/dev/null
+
+  out=$("$WORKBRANCH" push login --repo frontend 2>&1)
+  status=$?
+  [ "$status" -eq 0 ] || fail "push with branch override failed: $out"
+  assert_remote_file "$TMP_ROOT/remotes/frontend.git" tk/login-frontend scoped.txt "frontend scoped"
+  assert_remote_missing_file "$TMP_ROOT/remotes/frontend.git" feature/login scoped.txt
+}
+
+test_add_rejects_existing_task_branch() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  git -C "$project/_base/frontend" branch feature/login
+
+  out=$(run_expect_fail "$WORKBRANCH" add login)
+  assert_contains "$out" "task branch already exists for repo 'frontend': feature/login"
+  assert_contains "$out" "To delete the local branch first: workbranch remove login"
+  assert_not_contains "$out" "workbranch resume"
+  assert_not_exists "$project/login"
+}
+
+test_add_rejects_remote_only_task_branch_without_remove_advice() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  commit_to_remote_branch frontend feature/login remote-frontend
+
+  out=$(run_expect_fail "$WORKBRANCH" add login)
+  assert_contains "$out" "task branch already exists for repo 'frontend': feature/login"
+  assert_contains "$out" "Remote origin/feature/login exists; delete it outside workbranch before adding again."
+  assert_not_contains "$out" "workbranch resume"
+  assert_not_contains "$out" "workbranch remove login"
+  assert_not_exists "$project/login"
+}
+
+test_add_rejects_invalid_task_branch_override() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+
+  out=$(printf 'bad branch\n' | "$WORKBRANCH" add login 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "expected invalid task branch override to fail"
+  assert_contains "$out" "invalid task branch 'bad branch'"
+  assert_not_exists "$project/login"
+}
+
+test_add_rolls_back_branch_when_new_worktree_helper_fails() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+
+  real_git=$(command -v git)
+  fakebin="$TMP_ROOT/fakebin"
+  mkdir -p "$fakebin"
+  cat > "$fakebin/git" <<'GIT'
+#!/usr/bin/env bash
+if [ "${1:-}" = "-C" ] && [ "${2:-}" = "$FAIL_WORKTREE_BASE" ] && [ "${3:-}" = "worktree" ] && [ "${4:-}" = "add" ]; then
+  target=$5
+  branch=$7
+  "$REAL_GIT" -C "$FAIL_WORKTREE_BASE" branch "$branch" HEAD >/dev/null 2>&1 || true
+  mkdir -p "$target"
+  exit 1
+fi
+exec "$REAL_GIT" "$@"
+GIT
+  chmod +x "$fakebin/git"
+
+  old_path=$PATH
+  export REAL_GIT=$real_git
+  export FAIL_WORKTREE_BASE=$(cd "$project/_base/backend" && pwd -P)
+  PATH="$fakebin:$PATH"
+  out=$(run_expect_fail "$WORKBRANCH" add login)
+  PATH=$old_path
+  unset REAL_GIT FAIL_WORKTREE_BASE
+
+  assert_contains "$out" "failed to create worktree for repo 'backend'"
+  assert_not_exists "$project/login"
+  if git -C "$project/_base/backend" show-ref --verify --quiet refs/heads/feature/login; then
+    fail "expected failed add to roll back backend feature/login branch"
+  fi
+}
+
+test_add_rolls_back_dirty_worktree_registration() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+
+  real_git=$(command -v git)
+  fakebin="$TMP_ROOT/fakebin"
+  mkdir -p "$fakebin"
+  cat > "$fakebin/git" <<'GIT'
+#!/usr/bin/env bash
+if [ "${1:-}" = "-C" ] && [ "${2:-}" = "$FAIL_WORKTREE_BASE" ] && [ "${3:-}" = "worktree" ] && [ "${4:-}" = "add" ]; then
+  printf '%s\n' "dirty rollback marker" > "$DIRTY_WORKTREE_PATH/rollback-dirty.txt"
+  exit 1
+fi
+exec "$REAL_GIT" "$@"
+GIT
+  chmod +x "$fakebin/git"
+
+  old_path=$PATH
+  export REAL_GIT=$real_git
+  export FAIL_WORKTREE_BASE=$(cd "$project/_base/backend" && pwd -P)
+  export DIRTY_WORKTREE_PATH="$project/login/frontend"
+  PATH="$fakebin:$PATH"
+  out=$(run_expect_fail "$WORKBRANCH" add login)
+  PATH=$old_path
+  unset REAL_GIT FAIL_WORKTREE_BASE DIRTY_WORKTREE_PATH
+
+  assert_contains "$out" "failed to create worktree for repo 'backend'"
+  assert_not_exists "$project/login"
+  if git -C "$project/_base/frontend" worktree list --porcelain | grep -F "$project/login/frontend" >/dev/null; then
+    fail "expected rollback to remove dirty frontend worktree registration"
+  fi
+}
+
+test_add_branches_from_local_base_after_land_before_push() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add first >/dev/null
+
+  git -C "$project/first/frontend" config user.name "Workbranch Test"
+  git -C "$project/first/frontend" config user.email "workbranch-test@example.com"
+  printf '%s\n' "landed locally" > "$project/first/frontend/landed-local.txt"
+  git -C "$project/first/frontend" add landed-local.txt
+  git -C "$project/first/frontend" commit -m "landed locally" >/dev/null
+
+  run_expect_success "$WORKBRANCH" land first --repo frontend >/dev/null
+  assert_file "$project/_base/frontend/landed-local.txt"
+  assert_remote_missing_file "$TMP_ROOT/remotes/frontend.git" master landed-local.txt
+
+  run_expect_success "$WORKBRANCH" add second >/dev/null
+  assert_file "$project/second/frontend/landed-local.txt"
+}
+
+test_add_preflight_requires_clean_base_on_configured_branch() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  git -C "$project/_base/frontend" checkout -b unrelated >/dev/null 2>&1
+  printf '%s\n' "dirty base" > "$project/_base/frontend/dirty.txt"
+
+  out=$(run_expect_fail "$WORKBRANCH" add login)
+  assert_contains "$out" "Cannot add: preflight failed"
+  assert_contains "$out" "_base/frontend expected branch master, got unrelated"
+  assert_contains "$out" "_base/frontend dirty worktree"
+  assert_not_exists "$project/login"
+}
+
