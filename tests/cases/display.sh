@@ -112,7 +112,7 @@ test_display_auto_tty_status_preserves_table_colors() {
   run_expect_success "$WORKBRANCH" init >/dev/null
   printf '%s\n' scratch > "$project/_base/frontend/scratch.txt"
 
-  out=$(run_with_pty sh -c 'cd "$1" && shift && exec "$@"' sh "$project" env -u NO_COLOR WORKBRANCH_COLOR=auto "$WORKBRANCH" status 2>&1)
+  out=$(run_with_pty sh -c 'cd "$1" && shift && exec "$@"' sh "$project" env -u NO_COLOR TERM=xterm WORKBRANCH_COLOR=auto "$WORKBRANCH" status 2>&1)
   assert_contains "$out" "➤ Base worktrees"
   assert_contains "$out" $'\033[0;90mrepo'
   assert_contains "$out" $'\033[0;33muntracked\033[0m'
