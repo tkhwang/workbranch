@@ -111,6 +111,8 @@ test_display_forced_color_status_uses_sections_and_colored_states() {
   assert_contains "$out" "➤ Base worktrees"
   assert_contains "$out" "➤ Task workspaces"
   assert_contains "$out" $'\033[0;90mrepo'
+  assert_contains "$out" $'\033[0;36mfrontend   \033[0m'
+  assert_contains "$out" $'\033[0;35mmaster          \033[0m'
   assert_contains "$out" $'\033[0;33muntracked\033[0m'
   assert_contains "$out" $'\033[0;32mclean    \033[0m'
 }
@@ -125,8 +127,23 @@ test_display_auto_tty_status_preserves_table_colors() {
   out=$(run_with_pty sh -c 'cd "$1" && shift && exec "$@"' sh "$project" env -u NO_COLOR TERM=xterm WORKBRANCH_COLOR=auto "$WORKBRANCH" status 2>&1)
   assert_contains "$out" "➤ Base worktrees"
   assert_contains "$out" $'\033[0;90mrepo'
+  assert_contains "$out" $'\033[0;36mfrontend   \033[0m'
+  assert_contains "$out" $'\033[0;35mmaster          \033[0m'
   assert_contains "$out" $'\033[0;33muntracked\033[0m'
   assert_contains "$out" $'\033[0;32mclean    \033[0m'
+}
+
+test_display_forced_color_list_uses_repo_and_branch_colors() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  out=$(env -u NO_COLOR WORKBRANCH_COLOR=always "$WORKBRANCH" list 2>&1)
+  assert_contains "$out" $'\033[0;36mfrontend   \033[0m'
+  assert_contains "$out" $'\033[0;35mmaster          \033[0m'
+  assert_contains "$out" $'\033[0;35mfeature/login\033[0m'
 }
 
 test_display_forced_color_init_shows_banner_and_sections() {

@@ -142,6 +142,22 @@ color_next_action() {
   next_action_color "$1"
 }
 
+color_repo_name() {
+  color_text "$WB_CYAN" "$1"
+}
+
+color_branch_name() {
+  color_text "$WB_PURPLE" "$1"
+}
+
+color_repo_cell() {
+  color_cell "$WB_CYAN" "$1" "$2"
+}
+
+color_branch_cell() {
+  color_cell "$WB_PURPLE" "$1" "$2"
+}
+
 section() {
   if color_enabled; then
     printf '\n%s%s %s%s\n' "$WB_PURPLE_BOLD" "$WB_ICON_ARROW" "$1" "$WB_RESET"
