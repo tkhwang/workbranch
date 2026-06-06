@@ -5,12 +5,17 @@ cmd_status() {
 
   section "Base worktrees"
   print_base_status_header
+  base_next_found=0
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     repo_matches_filter "$name" || { i=$((i + 1)); continue; }
     path=$(base_repo_path "$name")
-    print_base_status_item "$name" "$(branch_or_unknown "$path")" "$(head_commit_short "$path")" "$(worktree_status_label "$path")"
+    branch=$(branch_or_unknown "$path")
+    remote_diff=$(remote_diff_label "$path" "$branch")
+    base_next=$(next_action_for_base_remote "$remote_diff")
+    [ "$base_next" = "-" ] || base_next_found=1
+    print_base_status_item "$name" "$branch" "$(head_commit_short "$path")" "$remote_diff" "$(worktree_status_label "$path")" "$base_next"
     i=$((i + 1))
   done
 
@@ -40,9 +45,9 @@ cmd_status() {
     done
     [ $task_printed -eq 1 ] && found=1
   done
-  if [ $found -eq 1 ]; then
+  if [ $found -eq 1 ] || [ $base_next_found -eq 1 ]; then
     printf '\n'
-    print_next_legend
+    print_next_legend "$base_next_found" "$found"
   fi
   [ $found -eq 1 ] || info "(none)"
 

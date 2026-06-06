@@ -91,7 +91,7 @@ Single-repo projects use the same shape with one repo directory inside each task
 
 | Command | Use it to |
 | --- | --- |
-| `workbranch status` | Show branch, diff, and dirty state |
+| `workbranch status` | Show base remote diff, task diff, and dirty state |
 | `workbranch pull` | Pull remote base branches into `_base/<repo>` |
 | `workbranch update [task]` | Merge local base changes into task worktrees |
 | `workbranch push` | Push base branches |

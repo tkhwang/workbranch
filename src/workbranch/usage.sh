@@ -22,7 +22,7 @@ Workspace:
   add <task>        Create a task workspace
   remove <task>     Remove task worktrees and local task branches
 Git:
-  status            Show commits, diff, and dirty state
+  status            Show remote diff, task diff, and dirty state
   vertical
   pull              Pull remote base branches into main worktrees
   push              Push base branches to origin
@@ -61,7 +61,7 @@ usage_enhanced() {
   printf '  add <task>        Create a task workspace\n'
   printf '  remove <task>     Remove task worktrees and local task branches\n'
   section "Git"
-  printf '  status            Show commits, diff, and dirty state\n'
+  printf '  status            Show remote diff, task diff, and dirty state\n'
   printf '%s  vertical%s\n' "$WB_GRAY" "$WB_RESET"
   printf '  pull              Pull remote base branches into main worktrees\n'
   printf '  push              Push base branches to origin\n'

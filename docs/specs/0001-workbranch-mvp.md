@@ -151,13 +151,13 @@ Show configured repos, base branches, current branches, and task workspaces.
 
 ### `workbranch status`
 
-Show commit position, clean/dirty state, and the next suggested action for task worktrees.
+Show base commit position versus its cached remote-tracking branch, task commit position versus local base, clean/dirty state, and the next suggested action.
 
 ```text
 [*] Base worktrees
-    repo        branch           commit     status
-    frontend    master           a1b2c3d4e  clean
-    backend     master           f6e7d8c9a  untracked
+    repo        branch           commit     remote  status    next
+    frontend    master           a1b2c3d4e  -1      clean     pull
+    backend     master           f6e7d8c9a  0       untracked -
 
 [*] Task workspaces
 [*] login
@@ -166,6 +166,7 @@ Show commit position, clean/dirty state, and the next suggested action for task 
     backend     a1b2c3d4e  a1b2c3d4e  0     modified  -
 
 [*] Next
+    pull    base is behind remote: workbranch pull
     land    task has commits not in base: workbranch land <task>
     update  task is behind base: workbranch update <task>
 ```

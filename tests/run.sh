@@ -85,6 +85,7 @@ main() {
   run_test test_add_rolls_back_branch_when_new_worktree_helper_fails
   run_test test_add_rolls_back_dirty_worktree_registration
   run_test test_add_branches_from_local_base_after_land_before_push
+  run_test test_status_reports_base_remote_diff_and_next_action
   run_test test_status_reports_base_task_diff_and_worktree_state
   run_test test_status_repo_filter_skips_tasks_without_matching_rows
   run_test test_status_reports_stale_task_shaped_directories_separately

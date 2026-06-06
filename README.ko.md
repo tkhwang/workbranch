@@ -89,7 +89,7 @@ Single-repo 프로젝트도 같은 구조를 사용하며, 각 task 안에 repo 
 
 | Command | 용도 |
 | --- | --- |
-| `workbranch status` | branch, diff, dirty state 확인 |
+| `workbranch status` | base remote diff, task diff, dirty state 확인 |
 | `workbranch pull` | remote base branch를 `_base/<repo>`로 pull |
 | `workbranch update [task]` | local base 변경사항을 task worktree에 merge |
 | `workbranch push` | base branch push |

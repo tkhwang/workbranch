@@ -16,6 +16,35 @@ test_list_shows_overridden_task_branches() {
   assert_contains "$out" "tk/login-backend"
 }
 
+
+test_status_reports_base_remote_diff_and_next_action() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+
+  commit_to_remote_master frontend remote-frontend
+  git -C "$project/_base/frontend" fetch origin >/dev/null 2>&1
+
+  git -C "$project/_base/backend" config user.name "Workbranch Test"
+  git -C "$project/_base/backend" config user.email "workbranch-test@example.com"
+  printf '%s\n' "local backend" > "$project/_base/backend/local-backend.txt"
+  git -C "$project/_base/backend" add local-backend.txt
+  git -C "$project/_base/backend" commit -m "local backend" >/dev/null
+
+  base_frontend=$(git -C "$project/_base/frontend" rev-parse --short=9 HEAD)
+  base_backend=$(git -C "$project/_base/backend" rev-parse --short=9 HEAD)
+
+  out=$(run_expect_success "$WORKBRANCH" status)
+  assert_contains "$out" "    repo        branch           commit     remote  status    next"
+  assert_contains "$out" "$(printf '    %-11s %-16s %-10s %-7s %-9s %s' frontend master "$base_frontend" -1 clean pull)"
+  assert_contains "$out" "$(printf '    %-11s %-16s %-10s %-7s %-9s %s' backend master "$base_backend" +1 clean push)"
+  assert_contains "$out" "pull    base is behind remote: workbranch pull"
+  assert_contains "$out" "push    base has commits not in remote: workbranch push"
+  assert_not_contains "$out" "land    task has commits not in base"
+  assert_not_contains "$out" "update  task is behind base"
+}
+
 test_status_reports_base_task_diff_and_worktree_state() {
   new_fixture
   project="$FIXTURE_PROJECT"
@@ -39,11 +68,11 @@ test_status_reports_base_task_diff_and_worktree_state() {
 
   out=$(run_expect_success "$WORKBRANCH" status)
   assert_contains "$out" "[*] Base worktrees"
-  assert_contains "$out" "    repo        branch           commit     status"
-  assert_contains "$out" "$(printf '    %-11s %-16s %-10s %s' frontend master "$base_frontend" untracked)"
-  assert_contains "$out" "$(printf '    %-11s %-16s %-10s %s' backend master "$base_backend" clean)"
+  assert_contains "$out" "    repo        branch           commit     remote  status    next"
+  assert_contains "$out" "$(printf '    %-11s %-16s %-10s %-7s %-9s %s' frontend master "$base_frontend" 0 untracked -)"
+  assert_contains "$out" "$(printf '    %-11s %-16s %-10s %-7s %-9s %s' backend master "$base_backend" 0 clean -)"
   case "$out" in
-    *"$(printf '    %-11s %-16s %-10s %s' backend master "$base_backend" clean)"$'\n\n'"[*] Task workspaces"*) ;;
+    *"$(printf '    %-11s %-16s %-10s %-7s %-9s %s' backend master "$base_backend" 0 clean -)"$'\n\n'"[*] Task workspaces"*) ;;
     *) fail "expected blank line between base worktrees and task workspaces; got: $out" ;;
   esac
   assert_contains "$out" "[*] Task workspaces"
