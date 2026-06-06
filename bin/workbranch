@@ -193,6 +193,43 @@ color_branch_cell() {
   color_cell "$WB_PURPLE" "$1" "$2"
 }
 
+format_repo_target() {
+  _wb_task=$1
+  _wb_repo=$2
+  if [ -n "$_wb_task" ]; then
+    printf '%s/%s' "$_wb_task" "$(color_repo_name "$_wb_repo")"
+  else
+    color_repo_name "$_wb_repo"
+  fi
+}
+
+repo_log_separator() {
+  _wb_seen=${1:-0}
+  [ "$_wb_seen" -eq 0 ] || printf '\n'
+}
+
+info_repo_branch() {
+  _wb_action=$1
+  _wb_task=$2
+  _wb_repo=$3
+  _wb_branch=$4
+  info "$_wb_action $(format_repo_target "$_wb_task" "$_wb_repo"): $(color_branch_name "$_wb_branch")"
+}
+
+success_repo_target() {
+  _wb_action=$1
+  _wb_task=$2
+  _wb_repo=$3
+  success "$_wb_action: $(format_repo_target "$_wb_task" "$_wb_repo")"
+}
+
+success_landed_repo_branch() {
+  _wb_task=$1
+  _wb_repo=$2
+  _wb_branch=$3
+  success "Landed: $(format_repo_target "$_wb_task" "$_wb_repo") -> $(color_branch_name "$_wb_branch")"
+}
+
 section() {
   if color_enabled; then
     printf '\n%s%s %s%s\n' "$WB_PURPLE_BOLD" "$WB_ICON_ARROW" "$1" "$WB_RESET"
@@ -2752,13 +2789,17 @@ cmd_pull() {
   preflight_die_if_errors "pull"
 
   i=0
+  repo_log_seen=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     repo_matches_filter "$name" || { i=$((i + 1)); continue; }
     branch=$(repo_base_branch_at "$i")
     base=$(base_repo_path "$name")
+    repo_log_separator "$repo_log_seen"
+    info_repo_branch "Pulling" "" "$name" "$branch"
     ensure_current_branch "$base" "$branch"
     workbranch_git_pull_base "$name" "$base" "$branch"
+    repo_log_seen=1
     i=$((i + 1))
   done
 }
@@ -2797,18 +2838,23 @@ preflight_update_task() {
 update_task() {
   task=$1
   i=0
+  repo_log_seen=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     repo_matches_filter "$name" || { i=$((i + 1)); continue; }
     base=$(base_repo_path "$name")
     base_branch=$(repo_base_branch_at "$i")
+    branch=$(repo_task_branch_at "$i" "$task")
     task_path=$(task_repo_path "$task" "$name")
     [ -d "$base/.git" ] || [ -f "$base/.git" ] || die "base repo missing for '$name': $base"
     [ -d "$task_path/.git" ] || [ -f "$task_path/.git" ] || die "task repo missing for '$name': $task_path"
+    repo_log_separator "$repo_log_seen"
+    info_repo_branch "Updating" "$task" "$name" "$branch"
     ensure_current_branch "$base" "$base_branch"
     ensure_clean_worktree "$task_path"
     workbranch_git_update_task "$task_path" "$(head_commit_full "$base")"
-    success "Updated: $task/$name"
+    success_repo_target "Updated" "$task" "$name"
+    repo_log_seen=1
     i=$((i + 1))
   done
 }
@@ -2871,13 +2917,16 @@ cmd_push_base() {
   preflight_die_if_errors "push"
 
   i=0
+  repo_log_seen=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     repo_matches_filter "$name" || { i=$((i + 1)); continue; }
     branch=$(repo_base_branch_at "$i")
     base=$(base_repo_path "$name")
-    info "Pushing $name: $branch"
+    repo_log_separator "$repo_log_seen"
+    info_repo_branch "Pushing" "" "$name" "$branch"
     workbranch_git_push_base "$name" "$base" "$branch"
+    repo_log_seen=1
     i=$((i + 1))
   done
 }
@@ -2906,13 +2955,16 @@ cmd_push_task() {
   preflight_die_if_errors "push"
 
   i=0
+  repo_log_seen=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     repo_matches_filter "$name" || { i=$((i + 1)); continue; }
     branch=$(repo_task_branch_at "$i" "$task")
     path=$(task_repo_path "$task" "$name")
-    info "Pushing $task/$name: $branch"
+    repo_log_separator "$repo_log_seen"
+    info_repo_branch "Pushing" "$task" "$name" "$branch"
     workbranch_git_push_task "$name" "$path" "$branch"
+    repo_log_seen=1
     i=$((i + 1))
   done
 }
@@ -2977,17 +3029,21 @@ cmd_land() {
   preflight_die_if_errors "land"
 
   i=0
+  repo_log_seen=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     repo_matches_filter "$name" || { i=$((i + 1)); continue; }
     base=$(base_repo_path "$name")
     branch=$(repo_task_branch_at "$i" "$task")
     base_branch=$(repo_base_branch_at "$i")
+    repo_log_separator "$repo_log_seen"
+    info_repo_branch "Landing" "$task" "$name" "$base_branch"
     workbranch_git_land_checkout_base "$name" "$base" "$base_branch"
     ensure_current_branch "$base" "$base_branch"
     workbranch_git_land_pull_base "$name" "$base" "$base_branch"
     workbranch_git_land_task "$name" "$base" "$branch" "$task"
-    success "Landed: $task/$name -> $base_branch"
+    success_landed_repo_branch "$task" "$name" "$base_branch"
+    repo_log_seen=1
     i=$((i + 1))
   done
 }

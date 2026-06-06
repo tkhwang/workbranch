@@ -158,6 +158,43 @@ color_branch_cell() {
   color_cell "$WB_PURPLE" "$1" "$2"
 }
 
+format_repo_target() {
+  _wb_task=$1
+  _wb_repo=$2
+  if [ -n "$_wb_task" ]; then
+    printf '%s/%s' "$_wb_task" "$(color_repo_name "$_wb_repo")"
+  else
+    color_repo_name "$_wb_repo"
+  fi
+}
+
+repo_log_separator() {
+  _wb_seen=${1:-0}
+  [ "$_wb_seen" -eq 0 ] || printf '\n'
+}
+
+info_repo_branch() {
+  _wb_action=$1
+  _wb_task=$2
+  _wb_repo=$3
+  _wb_branch=$4
+  info "$_wb_action $(format_repo_target "$_wb_task" "$_wb_repo"): $(color_branch_name "$_wb_branch")"
+}
+
+success_repo_target() {
+  _wb_action=$1
+  _wb_task=$2
+  _wb_repo=$3
+  success "$_wb_action: $(format_repo_target "$_wb_task" "$_wb_repo")"
+}
+
+success_landed_repo_branch() {
+  _wb_task=$1
+  _wb_repo=$2
+  _wb_branch=$3
+  success "Landed: $(format_repo_target "$_wb_task" "$_wb_repo") -> $(color_branch_name "$_wb_branch")"
+}
+
 section() {
   if color_enabled; then
     printf '\n%s%s %s%s\n' "$WB_PURPLE_BOLD" "$WB_ICON_ARROW" "$1" "$WB_RESET"

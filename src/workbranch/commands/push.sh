@@ -21,13 +21,16 @@ cmd_push_base() {
   preflight_die_if_errors "push"
 
   i=0
+  repo_log_seen=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     repo_matches_filter "$name" || { i=$((i + 1)); continue; }
     branch=$(repo_base_branch_at "$i")
     base=$(base_repo_path "$name")
-    info "Pushing $name: $branch"
+    repo_log_separator "$repo_log_seen"
+    info_repo_branch "Pushing" "" "$name" "$branch"
     workbranch_git_push_base "$name" "$base" "$branch"
+    repo_log_seen=1
     i=$((i + 1))
   done
 }
@@ -56,13 +59,16 @@ cmd_push_task() {
   preflight_die_if_errors "push"
 
   i=0
+  repo_log_seen=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     repo_matches_filter "$name" || { i=$((i + 1)); continue; }
     branch=$(repo_task_branch_at "$i" "$task")
     path=$(task_repo_path "$task" "$name")
-    info "Pushing $task/$name: $branch"
+    repo_log_separator "$repo_log_seen"
+    info_repo_branch "Pushing" "$task" "$name" "$branch"
     workbranch_git_push_task "$name" "$path" "$branch"
+    repo_log_seen=1
     i=$((i + 1))
   done
 }

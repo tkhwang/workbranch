@@ -26,13 +26,17 @@ cmd_pull() {
   preflight_die_if_errors "pull"
 
   i=0
+  repo_log_seen=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     repo_matches_filter "$name" || { i=$((i + 1)); continue; }
     branch=$(repo_base_branch_at "$i")
     base=$(base_repo_path "$name")
+    repo_log_separator "$repo_log_seen"
+    info_repo_branch "Pulling" "" "$name" "$branch"
     ensure_current_branch "$base" "$branch"
     workbranch_git_pull_base "$name" "$base" "$branch"
+    repo_log_seen=1
     i=$((i + 1))
   done
 }

@@ -43,17 +43,21 @@ cmd_land() {
   preflight_die_if_errors "land"
 
   i=0
+  repo_log_seen=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     repo_matches_filter "$name" || { i=$((i + 1)); continue; }
     base=$(base_repo_path "$name")
     branch=$(repo_task_branch_at "$i" "$task")
     base_branch=$(repo_base_branch_at "$i")
+    repo_log_separator "$repo_log_seen"
+    info_repo_branch "Landing" "$task" "$name" "$base_branch"
     workbranch_git_land_checkout_base "$name" "$base" "$base_branch"
     ensure_current_branch "$base" "$base_branch"
     workbranch_git_land_pull_base "$name" "$base" "$base_branch"
     workbranch_git_land_task "$name" "$base" "$branch" "$task"
-    success "Landed: $task/$name -> $base_branch"
+    success_landed_repo_branch "$task" "$name" "$base_branch"
+    repo_log_seen=1
     i=$((i + 1))
   done
 }
