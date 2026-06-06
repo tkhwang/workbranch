@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.4.0](https://github.com/tkhwang/workbranch/compare/v1.3.0...v1.4.0) (2026-06-06)
+
+
+### Features
+
+* **platform:** add platform support and detection ([3ae6d08](https://github.com/tkhwang/workbranch/commit/3ae6d08c6b164a3eec61e97734a399ce7d4fb6ad))
+* **platform:** add platform support and detection ([327efe9](https://github.com/tkhwang/workbranch/commit/327efe9a8f6417509c92be2c7dcc10f62aadfd19))
+
+
+### Bug Fixes
+
+* **tests:** update ide login test for macos ([3af2844](https://github.com/tkhwang/workbranch/commit/3af28448664215660a0d5a7b44801c53a9041841))
+
 ## [1.3.0](https://github.com/tkhwang/workbranch/compare/v1.2.0...v1.3.0) (2026-06-06)
 
 
