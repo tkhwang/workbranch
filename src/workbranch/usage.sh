@@ -19,7 +19,7 @@ Usage:
 Workspace:
   init              Initialize a workbranch project
   list              List configured repos and task workspaces
-  add <task>        Create a task workspace
+  add <task> [--from <ref>]  Create a task workspace
   remove <task>     Remove task worktrees and local task branches
 Git:
   status            Show remote diff, task diff, and dirty state
@@ -58,7 +58,7 @@ usage_enhanced() {
   section "Workspace"
   printf '  init              Initialize a workbranch project\n'
   printf '  list              List configured repos and task workspaces\n'
-  printf '  add <task>        Create a task workspace\n'
+  printf '  add <task> [--from <ref>]  Create a task workspace\n'
   printf '  remove <task>     Remove task worktrees and local task branches\n'
   section "Git"
   printf '  status            Show remote diff, task diff, and dirty state\n'

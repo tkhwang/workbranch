@@ -47,12 +47,14 @@ workbranch remove login
 
 `workbranch add <task>` uses `<task>` as the folder name, shows each repo's base branch, then prompts for that repo's task branch. Press Enter to accept the suggested default branch name. Defaults are `feature/<task>` from main-style base branches and `<base-branch>-<task>` from `feature/*`, `feat/*`, or the configured legacy prefix.
 
-Task branches are created from the current HEAD of your local `_base/<repo>` worktrees. `workbranch add` does not pull remote base branches automatically. To start from the latest remote base, run:
+Plain `workbranch add <task>` creates task branches from the current HEAD of your local `_base/<repo>` worktrees. It does not pull remote base branches automatically. To start from the latest remote base, run:
 
 ```bash
 workbranch pull
 workbranch add <task>
 ```
+
+Use `workbranch add <task> --from <ref>` to seed the new task branches from another source ref. For example, `workbranch add task1 --from feat/XXX` fetches origin, prefers `origin/feat/XXX` when it exists, and creates the linked task worktrees from that ref while still using the prompted task branch names. Later `workbranch status` still compares the task branch to the current local base; the source ref is creation context, not a persistent status baseline.
 
 Use `workbranch config` when you want to update project settings, base branches, IDE/terminal launch commands, or per-repo setup commands without cloning repos again.
 
@@ -83,7 +85,7 @@ Single-repo projects use the same shape with one repo directory inside each task
 | `workbranch config` | Edit project settings, base branches, tool commands, and repo setup commands |
 | `workbranch config ide` | Update only the configured IDE command |
 | `workbranch config terminal` | Update only the configured terminal command |
-| `workbranch add <task>` | Create a task workspace |
+| `workbranch add <task> [--from <ref>]` | Create a task workspace |
 | `workbranch list` | Show repos and task workspaces |
 | `workbranch remove <task>` | Remove task worktrees and local task branches |
 

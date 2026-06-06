@@ -55,6 +55,39 @@ CONFIG
   assert_branch "$project/ui/frontend" "feat/cpq-ui"
 }
 
+
+test_add_from_remote_ref_seeds_task_branch_from_origin_ref() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  commit_to_remote_branch frontend feat/parent seeded-frontend
+  commit_to_remote_branch backend feat/parent seeded-backend
+
+  out=$(printf '\n\n' | "$WORKBRANCH" add login --from feat/parent 2>&1)
+  status=$?
+  [ "$status" -eq 0 ] || fail "add --from remote ref failed: $out"
+
+  assert_branch "$project/login/frontend" "feature/login"
+  assert_branch "$project/login/backend" "feature/login"
+  assert_file "$project/login/frontend/seeded-frontend.txt"
+  assert_file "$project/login/backend/seeded-backend.txt"
+  assert_contains "$out" "[source] origin/feat/parent -> [task repo] feature/login"
+  assert_not_contains "$(cat "$project/login/.workbranch.task")" "feat/parent"
+}
+
+test_add_from_missing_ref_fails_before_creating_task() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  commit_to_remote_branch frontend feat/parent seeded-frontend
+
+  out=$(run_expect_fail "$WORKBRANCH" add login --from feat/parent)
+  assert_contains "$out" "_base/backend missing source ref: feat/parent"
+  assert_not_exists "$project/login"
+}
+
 test_add_task_branch_override_is_used_by_later_commands() {
   new_fixture
   project="$FIXTURE_PROJECT"

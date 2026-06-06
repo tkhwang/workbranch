@@ -171,7 +171,7 @@ Show base commit position versus its cached remote-tracking branch, task commit 
     update  task is behind base: workbranch update <task>
 ```
 
-### `workbranch add <task>`
+### `workbranch add <task> [--from <ref>]`
 
 Create one task workspace with one linked worktree per repo.
 
@@ -181,7 +181,7 @@ For each repo:
 2. Show the repo's configured base branch, then prompt for the task branch name, defaulting from the branch naming rule above.
 3. Fail if the chosen local or remote task branch already exists. Local task branches can be deleted with `workbranch remove <task>` before adding again; remote-only task branches must be deleted or renamed outside workbranch.
 4. Create the task directory and write `<task>/.workbranch.task`.
-5. Create a new local task branch from the base branch.
+5. Create a new local task branch from the base branch, or from the resolved `--from` source ref when provided. Bare `--from feat/x` prefers `origin/feat/x`; explicit `origin/feat/x`, `refs/...`, `HEAD`, and existing local refs are also accepted.
 6. Create a linked worktree at `<task>/<repo>`.
 7. Run configured repo-level setup commands. If no repo setup ran and the operation is not repo-filtered, run project-level `TASK_SETUP` when configured.
 

@@ -45,12 +45,14 @@ workbranch push login
 workbranch remove login
 ```
 
-`workbranch add <task>`는 local `_base/<repo>` worktree의 현재 HEAD에서 task branch를 만듭니다. remote base branch를 자동으로 pull하지 않습니다. 최신 remote base에서 시작하려면 다음 순서로 실행하세요.
+기본 `workbranch add <task>`는 local `_base/<repo>` worktree의 현재 HEAD에서 task branch를 만듭니다. remote base branch를 자동으로 pull하지 않습니다. 최신 remote base에서 시작하려면 다음 순서로 실행하세요.
 
 ```bash
 workbranch pull
 workbranch add <task>
 ```
+
+다른 source ref에서 새 task branch를 시작하려면 `workbranch add <task> --from <ref>`를 사용하세요. 예를 들어 `workbranch add task1 --from feat/XXX`는 origin을 fetch한 뒤 `origin/feat/XXX`가 있으면 그것을 우선 사용하고, prompt로 정한 task branch 이름은 그대로 유지한 채 linked task worktree를 만듭니다. 이후 `workbranch status`는 여전히 task branch를 현재 local base와 비교하며, source ref는 생성 시점 정보일 뿐 지속적인 status 기준이 아닙니다.
 
 repo를 다시 clone하지 않고 project 설정, branch prefix, base branch, IDE/terminal 실행 명령, repo별 setup command를 수정하려면 `workbranch config`를 사용합니다.
 
@@ -81,7 +83,7 @@ Single-repo 프로젝트도 같은 구조를 사용하며, 각 task 안에 repo 
 | `workbranch config` | project 설정, base branch, tool command, repo setup command 수정 |
 | `workbranch config ide` | IDE 명령만 수정 |
 | `workbranch config terminal` | terminal 명령만 수정 |
-| `workbranch add <task>` | task workspace 생성 |
+| `workbranch add <task> [--from <ref>]` | task workspace 생성 |
 | `workbranch list` | repo와 task workspace 목록 확인 |
 | `workbranch remove <task>` | task worktree와 local task branch 제거 |
 

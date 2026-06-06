@@ -24,11 +24,11 @@ Optional:
 
 ## Commands
 
-### `workbranch add <task>`
+### `workbranch add <task> [--from <ref>]`
 
-Direction: base -> task worktree.
+Direction: base/source ref -> task worktree.
 
-Before creating worktrees, `workbranch add <task>` shows each repo's configured base branch, then prompts for that repo's task branch. Press Enter to accept the default branch name. The chosen branches are saved in `<task>/.workbranch.task`.
+Before creating worktrees, `workbranch add <task> [--from <ref>]` shows each repo's configured base branch, then prompts for that repo's task branch. Press Enter to accept the default branch name. The chosen task branches are saved in `<task>/.workbranch.task`; the optional `--from` ref is only the starting source, is not stored as the task branch, and does not become a persistent `status` comparison baseline.
 
 For each repo:
 
@@ -36,6 +36,13 @@ For each repo:
 cd _base/<repo>
 git fetch origin
 git worktree add <task>/<repo> -b <task-branch> HEAD
+```
+
+With `--from <ref>`, workbranch fetches origin and resolves the source ref per repo. Bare refs such as `feat/x` prefer `origin/feat/x` when present; explicit `origin/feat/x`, `refs/...`, `HEAD`, and existing local refs are also accepted.
+
+```bash
+git fetch origin
+git worktree add <task>/<repo> -b <task-branch> <resolved-source-ref>
 ```
 
 If the task branch already exists locally or remotely, `workbranch add <task>` fails. For local task branches, run `workbranch remove <task>` to delete the local branch before adding again. For remote-only task branches, delete or rename the remote branch outside workbranch before adding again.
