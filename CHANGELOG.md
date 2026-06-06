@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.3.0](https://github.com/tkhwang/workbranch/compare/v1.2.0...v1.3.0) (2026-06-06)
+
+
+### Features
+
+* add a task from remote branch ref ([fc6f903](https://github.com/tkhwang/workbranch/commit/fc6f903b6ce0739c43864ff189dc2949dc69e8cd))
+* **add:** support creating task branches from a source ref ([603c45f](https://github.com/tkhwang/workbranch/commit/603c45f00cdee5ebc549fd9a7354ed54da3c1ef6))
+* **status:** show remote diff for base worktrees ([8d0bb49](https://github.com/tkhwang/workbranch/commit/8d0bb49ccfc4faffdab13f124678aabbe9239cd1))
+
+
+### Bug Fixes
+
+* **add:** handle empty --from value and unset upstream ([0bb5669](https://github.com/tkhwang/workbranch/commit/0bb5669e4924f721a49e74b0a4584c330baba934))
+
 ## [1.2.0](https://github.com/tkhwang/workbranch/compare/v1.1.0...v1.2.0) (2026-06-06)
 
 
