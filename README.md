@@ -54,7 +54,7 @@ workbranch pull
 workbranch add <task>
 ```
 
-Use `workbranch config` when you want to update project settings, base branches, editor/terminal launch commands, or per-repo setup commands without cloning repos again.
+Use `workbranch config` when you want to update project settings, base branches, IDE/terminal launch commands, or per-repo setup commands without cloning repos again.
 
 ## What it creates
 
@@ -81,7 +81,7 @@ Single-repo projects use the same shape with one repo directory inside each task
 | --- | --- |
 | `workbranch init` | Create or clone base worktrees from config |
 | `workbranch config` | Edit project settings, base branches, tool commands, and repo setup commands |
-| `workbranch config editor` | Update only the configured editor command |
+| `workbranch config ide` | Update only the configured IDE command |
 | `workbranch config terminal` | Update only the configured terminal command |
 | `workbranch add <task>` | Create a task workspace |
 | `workbranch list` | Show repos and task workspaces |
@@ -103,7 +103,8 @@ Single-repo projects use the same shape with one repo directory inside each task
 | Command | Use it to |
 | --- | --- |
 | `workbranch path <task>` | Print a task workspace or repo path |
-| `workbranch editor <task>` | Open task repo worktrees in the configured editor |
+| `workbranch finder <task>` | Open the task workspace folder in Finder |
+| `workbranch ide <task>` | Open task repo worktrees in the configured IDE |
 | `workbranch terminal <task>` | Open task repo worktrees in the configured terminal |
 
 ### Other
@@ -130,26 +131,27 @@ WORKBRANCH_COLOR=always workbranch help # force enhanced display
 
 ## Opening task workspaces
 
-Configure one editor and one terminal command for the project:
+Configure one IDE and one terminal command for the project:
 
 ```bash
-workbranch config editor
+workbranch config ide
 workbranch config terminal
 ```
 
 Then open every repo in a task workspace:
 
 ```bash
-workbranch editor login
+workbranch finder login
+workbranch ide login
 workbranch terminal login
 ```
 
-Built-in macOS editor presets open each repo path in a separate editor window. Existing configs that use the older `open -a Cursor`, `open -a "Antigravity IDE"`, `open -a "Visual Studio Code"`, `open -a Windsurf`, or `open -a Zed` editor commands are launched as `open -na ... --args --new-window` for the same behavior.
+Built-in macOS IDE presets open each repo path in a separate IDE window for VS Code-like apps. The config directive is `IDE <command>`; preset order is Cursor, Antigravity, Windsurf, Zed, Sublime Text, Xcode, then VS Code. Existing `IDE open -a Cursor`, `IDE open -a "Antigravity IDE"`, `IDE open -a "Visual Studio Code"`, or `IDE open -a Windsurf` command shapes are launched as `open -na ... --args --new-window` for the same behavior. Zed remains `open -na Zed` until its CLI contract is verified.
 
 Limit to one repo when needed:
 
 ```bash
-workbranch editor login --repo frontend
+workbranch ide login --repo frontend
 workbranch terminal login --repo backend
 ```
 

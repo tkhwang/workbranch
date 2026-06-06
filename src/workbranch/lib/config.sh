@@ -97,7 +97,7 @@ reset_config() {
   BASE_DIR=""
   BRANCH_PREFIX=""
   TASK_SETUP=""
-  EDITOR_COMMAND=""
+  IDE_COMMAND=""
   TERMINAL_COMMAND=""
   REPO_NAMES=()
   REPO_URLS=()
@@ -117,14 +117,14 @@ repo_setup_command_from_line() {
   printf '%s' "$command"
 }
 
-set_editor_command() {
+set_ide_command() {
   command=$1
-  [ -n "$command" ] || die "editor command is empty"
-  EDITOR_COMMAND=$command
+  [ -n "$command" ] || die "IDE command is empty"
+  IDE_COMMAND=$command
 }
 
-clear_editor_command() {
-  EDITOR_COMMAND=""
+clear_ide_command() {
+  IDE_COMMAND=""
 }
 
 set_terminal_command() {
@@ -166,7 +166,7 @@ has_task_setups() {
 }
 
 config_line_split_tokens() {
-  # Word splitting is intentional for directive headers. EDITOR, TERMINAL,
+  # Word splitting is intentional for directive headers. IDE, TERMINAL,
   # TASK_SETUP, and REPO_SETUP preserve the command tail separately so command whitespace works. Pathname
   # expansion is not part of the config format, so keep glob characters literal.
   line=$1
@@ -220,9 +220,9 @@ parse_config() {
         validate_nonempty_no_space "BRANCH_PREFIX" "$2"
         BRANCH_PREFIX=$2
         ;;
-      EDITOR)
-        [ -z "$EDITOR_COMMAND" ] || die "duplicate EDITOR directive in config"
-        set_editor_command "$(task_setup_from_line "$line")"
+      IDE)
+        [ -z "$IDE_COMMAND" ] || die "duplicate IDE directive in config"
+        set_ide_command "$(task_setup_from_line "$line")"
         ;;
       TERMINAL)
         [ -z "$TERMINAL_COMMAND" ] || die "duplicate TERMINAL directive in config"
@@ -283,9 +283,9 @@ parse_config_for_rewrite() {
         validate_nonempty_no_space "BRANCH_PREFIX" "$2"
         BRANCH_PREFIX=$2
         ;;
-      EDITOR|editor)
-        [ -z "$EDITOR_COMMAND" ] || die "duplicate EDITOR directive in config"
-        set_editor_command "$(task_setup_from_line "$line")"
+      IDE|ide)
+        [ -z "$IDE_COMMAND" ] || die "duplicate IDE directive in config"
+        set_ide_command "$(task_setup_from_line "$line")"
         ;;
       TERMINAL|terminal)
         [ -z "$TERMINAL_COMMAND" ] || die "duplicate TERMINAL directive in config"
@@ -340,8 +340,8 @@ write_config() {
     printf 'PROJECT_NAME %s\n' "$PROJECT_NAME"
     printf 'MAIN_WORKTREES_DIR %s\n' "$BASE_DIR"
     printf 'BRANCH_PREFIX %s\n' "$BRANCH_PREFIX"
-    if [ -n "$EDITOR_COMMAND" ]; then
-      printf 'EDITOR %s\n' "$EDITOR_COMMAND"
+    if [ -n "$IDE_COMMAND" ]; then
+      printf 'IDE %s\n' "$IDE_COMMAND"
     fi
     if [ -n "$TERMINAL_COMMAND" ]; then
       printf 'TERMINAL %s\n' "$TERMINAL_COMMAND"

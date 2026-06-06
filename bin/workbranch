@@ -15,7 +15,7 @@ PROJECT_NAME=""
 BASE_DIR=""
 BRANCH_PREFIX=""
 TASK_SETUP=""
-EDITOR_COMMAND=""
+IDE_COMMAND=""
 TERMINAL_COMMAND=""
 REPO_NAMES=()
 REPO_URLS=()
@@ -283,11 +283,12 @@ Git:
   --repo <repo>     Limit operation to one repo; otherwise all repos
 Tool:
   path <task>       Print a task workspace path
-  editor <task>     Open task repo worktrees in the configured editor
+  finder <task>     Open a task workspace in Finder
+  ide <task>        Open task repo worktrees in the configured IDE
   terminal <task>   Open task repo worktrees in the configured terminal
 Config:
   config            Create or update .workbranch.config without cloning repos
-  config editor     Update only the configured editor command
+  config ide        Update only the configured IDE command
   config terminal   Update only the configured terminal command
   config --rewrite  Rewrite config to current format without prompts
 Other:
@@ -321,11 +322,12 @@ usage_enhanced() {
   printf '  --repo <repo>     Limit operation to one repo; otherwise all repos\n'
   section "Tool"
   printf '  path <task>       Print a task workspace path\n'
-  printf '  editor <task>     Open task repo worktrees in the configured editor\n'
+  printf '  finder <task>     Open a task workspace in Finder\n'
+  printf '  ide <task>        Open task repo worktrees in the configured IDE\n'
   printf '  terminal <task>   Open task repo worktrees in the configured terminal\n'
   section "Config"
   printf '  config            Create or update .workbranch.config without cloning repos\n'
-  printf '  config editor     Update only the configured editor command\n'
+  printf '  config ide        Update only the configured IDE command\n'
   printf '  config terminal   Update only the configured terminal command\n'
   printf '  config --rewrite  Rewrite config to current format without prompts\n'
   section "Other"
@@ -485,7 +487,7 @@ reset_config() {
   BASE_DIR=""
   BRANCH_PREFIX=""
   TASK_SETUP=""
-  EDITOR_COMMAND=""
+  IDE_COMMAND=""
   TERMINAL_COMMAND=""
   REPO_NAMES=()
   REPO_URLS=()
@@ -505,14 +507,14 @@ repo_setup_command_from_line() {
   printf '%s' "$command"
 }
 
-set_editor_command() {
+set_ide_command() {
   command=$1
-  [ -n "$command" ] || die "editor command is empty"
-  EDITOR_COMMAND=$command
+  [ -n "$command" ] || die "IDE command is empty"
+  IDE_COMMAND=$command
 }
 
-clear_editor_command() {
-  EDITOR_COMMAND=""
+clear_ide_command() {
+  IDE_COMMAND=""
 }
 
 set_terminal_command() {
@@ -554,7 +556,7 @@ has_task_setups() {
 }
 
 config_line_split_tokens() {
-  # Word splitting is intentional for directive headers. EDITOR, TERMINAL,
+  # Word splitting is intentional for directive headers. IDE, TERMINAL,
   # TASK_SETUP, and REPO_SETUP preserve the command tail separately so command whitespace works. Pathname
   # expansion is not part of the config format, so keep glob characters literal.
   line=$1
@@ -608,9 +610,9 @@ parse_config() {
         validate_nonempty_no_space "BRANCH_PREFIX" "$2"
         BRANCH_PREFIX=$2
         ;;
-      EDITOR)
-        [ -z "$EDITOR_COMMAND" ] || die "duplicate EDITOR directive in config"
-        set_editor_command "$(task_setup_from_line "$line")"
+      IDE)
+        [ -z "$IDE_COMMAND" ] || die "duplicate IDE directive in config"
+        set_ide_command "$(task_setup_from_line "$line")"
         ;;
       TERMINAL)
         [ -z "$TERMINAL_COMMAND" ] || die "duplicate TERMINAL directive in config"
@@ -671,9 +673,9 @@ parse_config_for_rewrite() {
         validate_nonempty_no_space "BRANCH_PREFIX" "$2"
         BRANCH_PREFIX=$2
         ;;
-      EDITOR|editor)
-        [ -z "$EDITOR_COMMAND" ] || die "duplicate EDITOR directive in config"
-        set_editor_command "$(task_setup_from_line "$line")"
+      IDE|ide)
+        [ -z "$IDE_COMMAND" ] || die "duplicate IDE directive in config"
+        set_ide_command "$(task_setup_from_line "$line")"
         ;;
       TERMINAL|terminal)
         [ -z "$TERMINAL_COMMAND" ] || die "duplicate TERMINAL directive in config"
@@ -728,8 +730,8 @@ write_config() {
     printf 'PROJECT_NAME %s\n' "$PROJECT_NAME"
     printf 'MAIN_WORKTREES_DIR %s\n' "$BASE_DIR"
     printf 'BRANCH_PREFIX %s\n' "$BRANCH_PREFIX"
-    if [ -n "$EDITOR_COMMAND" ]; then
-      printf 'EDITOR %s\n' "$EDITOR_COMMAND"
+    if [ -n "$IDE_COMMAND" ]; then
+      printf 'IDE %s\n' "$IDE_COMMAND"
     fi
     if [ -n "$TERMINAL_COMMAND" ]; then
       printf 'TERMINAL %s\n' "$TERMINAL_COMMAND"
@@ -1344,46 +1346,48 @@ print_tool_preset() {
   fi
 }
 
-print_editor_presets() {
-  info "Editor command:"
+print_ide_presets() {
+  info "IDE command:"
   print_tool_preset 1 "Cursor" 'open -na Cursor --args --new-window'
-  print_tool_preset 2 "Antigravity IDE" 'open -na "Antigravity IDE" --args --new-window'
-  print_tool_preset 3 "VS Code" 'open -na "Visual Studio Code" --args --new-window'
-  print_tool_preset 4 "Windsurf" 'open -na Windsurf --args --new-window'
-  print_tool_preset 5 "Zed" 'open -na Zed --args --new-window'
-  printf '    6) Custom command\n' >&2
-  printf '    7) Clear\n' >&2
+  print_tool_preset 2 "Antigravity" 'open -na "Antigravity IDE" --args --new-window'
+  print_tool_preset 3 "Windsurf" 'open -na Windsurf --args --new-window'
+  print_tool_preset 4 "Zed" 'open -na Zed'
+  print_tool_preset 5 "Sublime Text" 'open -na "Sublime Text"'
+  print_tool_preset 6 "Xcode" 'open -na Xcode'
+  print_tool_preset 7 "VS Code" 'open -na "Visual Studio Code" --args --new-window'
+  printf '    8) Custom command\n' >&2
+  printf '    9) Clear\n' >&2
 }
 
-editor_preset_command() {
+ide_preset_command() {
   case "$1" in
     1) printf '%s' 'open -na Cursor --args --new-window' ;;
     2) printf '%s' 'open -na "Antigravity IDE" --args --new-window' ;;
-    3) printf '%s' 'open -na "Visual Studio Code" --args --new-window' ;;
-    4) printf '%s' 'open -na Windsurf --args --new-window' ;;
-    5) printf '%s' 'open -na Zed --args --new-window' ;;
+    3) printf '%s' 'open -na Windsurf --args --new-window' ;;
+    4) printf '%s' 'open -na Zed' ;;
+    5) printf '%s' 'open -na "Sublime Text"' ;;
+    6) printf '%s' 'open -na Xcode' ;;
+    7) printf '%s' 'open -na "Visual Studio Code" --args --new-window' ;;
     *) return 1 ;;
   esac
 }
 
 print_terminal_presets() {
   info "Terminal command:"
-  print_tool_preset 1 "Terminal.app" 'open -a Terminal'
-  print_tool_preset 2 "iTerm2" 'open -a iTerm'
-  print_tool_preset 3 "Warp" 'open -a Warp'
+  print_tool_preset 1 "iTerm" 'open -a iTerm'
+  print_tool_preset 2 "Warp" 'open -a Warp'
+  print_tool_preset 3 "Terminal.app" 'open -a Terminal'
   print_tool_preset 4 "Ghostty" 'open -a Ghostty'
-  print_tool_preset 5 "cmux" 'cmux'
-  printf '    6) Custom command\n' >&2
-  printf '    7) Clear\n' >&2
+  printf '    5) Custom command\n' >&2
+  printf '    6) Clear\n' >&2
 }
 
 terminal_preset_command() {
   case "$1" in
-    1) printf '%s' 'open -a Terminal' ;;
-    2) printf '%s' 'open -a iTerm' ;;
-    3) printf '%s' 'open -a Warp' ;;
+    1) printf '%s' 'open -a iTerm' ;;
+    2) printf '%s' 'open -a Warp' ;;
+    3) printf '%s' 'open -a Terminal' ;;
     4) printf '%s' 'open -a Ghostty' ;;
-    5) printf '%s' 'cmux' ;;
     *) return 1 ;;
   esac
 }
@@ -1418,20 +1422,40 @@ run_tool_command() {
   command=$2
   path=$3
   [ -n "$command" ] || die "$tool_label command is not configured; run workbranch config $tool_label"
-  if [ "$tool_label" = "editor" ]; then
-    case "$command" in
-      'open -a "Visual Studio Code"'|'open -na "Visual Studio Code"') command='open -na "Visual Studio Code" --args --new-window' ;;
-      'open -a Cursor'|'open -na Cursor'|'open -a "Cursor"'|'open -na "Cursor"') command='open -na Cursor --args --new-window' ;;
-      'open -a "Antigravity IDE"'|'open -na "Antigravity IDE"') command='open -na "Antigravity IDE" --args --new-window' ;;
-      'open -a Windsurf'|'open -na Windsurf'|'open -a "Windsurf"'|'open -na "Windsurf"') command='open -na Windsurf --args --new-window' ;;
-      'open -a Zed'|'open -na Zed'|'open -a "Zed"'|'open -na "Zed"') command='open -na Zed --args --new-window' ;;
-    esac
-  fi
+  case "$tool_label" in
+    ide)
+      case "$command" in
+        'open -a "Visual Studio Code"'|'open -na "Visual Studio Code"') command='open -na "Visual Studio Code" --args --new-window' ;;
+        'open -a Cursor'|'open -na Cursor'|'open -a "Cursor"'|'open -na "Cursor"') command='open -na Cursor --args --new-window' ;;
+        'open -a "Antigravity IDE"'|'open -na "Antigravity IDE"') command='open -na "Antigravity IDE" --args --new-window' ;;
+        'open -a Windsurf'|'open -na Windsurf'|'open -a "Windsurf"'|'open -na "Windsurf"') command='open -na Windsurf --args --new-window' ;;
+      esac
+      ;;
+  esac
   (
     cd "$path" || exit 1
     WORKBRANCH_TOOL_PATH=$path
     export WORKBRANCH_TOOL_PATH
     sh -c "$command \"\$WORKBRANCH_TOOL_PATH\""
+  )
+}
+
+run_finder_command() {
+  path=$1
+  (
+    # Keep cwd aligned with the opened absolute path so tests can observe it via fake open.
+    cd "$path" || exit 1
+    case "$(uname -s)" in
+      Darwin) open "$path" ;;
+      Linux)
+        if command -v xdg-open >/dev/null 2>&1; then
+          xdg-open "$path"
+        else
+          die "finder command is not available on this platform"
+        fi
+        ;;
+      *) die "finder command is not available on this platform" ;;
+    esac
   )
 }
 
@@ -1790,12 +1814,12 @@ cmd_config() {
     1)
       case "$1" in
         --rewrite) rewrite_only=1 ;;
-        editor) config_target="editor" ;;
+        ide) config_target="ide" ;;
         terminal) config_target="terminal" ;;
-        *) die "usage: workbranch config [editor|terminal|--rewrite]" ;;
+        *) die "usage: workbranch config [ide|terminal|--rewrite]" ;;
       esac
       ;;
-    *) die "usage: workbranch config [editor|terminal|--rewrite]" ;;
+    *) die "usage: workbranch config [ide|terminal|--rewrite]" ;;
   esac
   CREATED_PATHS=()
   CREATED_WORKTREES=()
@@ -1808,7 +1832,7 @@ cmd_config() {
     if [ "$rewrite_only" -eq 0 ]; then
       case "$config_target" in
         all) configure_existing_project ;;
-        editor) configure_editor_prompt ;;
+        ide) configure_ide_prompt ;;
         terminal) configure_terminal_prompt ;;
       esac
     fi
@@ -1873,19 +1897,19 @@ print_config_next_steps() {
   done
 }
 
-configure_editor_prompt() {
-  print_editor_presets
-  current=${EDITOR_COMMAND:-keep}
-  value=$(prompt_read "[*] Choose editor [$current]: ") || die "input aborted"
+configure_ide_prompt() {
+  print_ide_presets
+  current=${IDE_COMMAND:-keep}
+  value=$(prompt_read "[*] Choose IDE [$current]: ") || die "input aborted"
   case "$value" in
     "") ;;
-    1|2|3|4|5) set_editor_command "$(editor_preset_command "$value")" ;;
-    6)
-      custom=$(prompt_required "Custom editor command")
-      set_editor_command "$custom"
+    1|2|3|4|5|6|7) set_ide_command "$(ide_preset_command "$value")" ;;
+    8)
+      custom=$(prompt_required "Custom IDE command")
+      set_ide_command "$custom"
       ;;
-    7|--clear) clear_editor_command ;;
-    *) die "invalid editor choice: $value" ;;
+    9|--clear) clear_ide_command ;;
+    *) die "invalid IDE choice: $value" ;;
   esac
 }
 
@@ -1895,12 +1919,12 @@ configure_terminal_prompt() {
   value=$(prompt_read "[*] Choose terminal [$current]: ") || die "input aborted"
   case "$value" in
     "") ;;
-    1|2|3|4|5) set_terminal_command "$(terminal_preset_command "$value")" ;;
-    6)
+    1|2|3|4) set_terminal_command "$(terminal_preset_command "$value")" ;;
+    5)
       custom=$(prompt_required "Custom terminal command")
       set_terminal_command "$custom"
       ;;
-    7|--clear) clear_terminal_command ;;
+    6|--clear) clear_terminal_command ;;
     *) die "invalid terminal choice: $value" ;;
   esac
 }
@@ -1979,7 +2003,7 @@ configure_existing_project() {
   configure_project_settings
 
   printf '\n'
-  configure_editor_prompt
+  configure_ide_prompt
   configure_terminal_prompt
 
   info "Repositories"
@@ -2063,7 +2087,7 @@ AFTER
 
   printf '
 ' >&2
-  configure_editor_prompt
+  configure_ide_prompt
   configure_terminal_prompt
 
   printf '
@@ -2097,9 +2121,9 @@ AFTER
   info "Project: $PROJECT_NAME"
   info "Main worktrees dir: $BASE_DIR"
   info "Default task branch prefix: $BRANCH_PREFIX"
-  info "Editor:"
-  if [ -n "$EDITOR_COMMAND" ]; then
-    info "  $EDITOR_COMMAND"
+  info "IDE:"
+  if [ -n "$IDE_COMMAND" ]; then
+    info "  $IDE_COMMAND"
   else
     info "  (none)"
   fi
@@ -2300,9 +2324,9 @@ cmd_list() {
   require_project
   info "Project: $PROJECT_NAME"
   info "Base: $BASE_DIR"
-  section "Editor"
-  if [ -n "$EDITOR_COMMAND" ]; then
-    printf '    %s\n' "$EDITOR_COMMAND"
+  section "IDE"
+  if [ -n "$IDE_COMMAND" ]; then
+    printf '    %s\n' "$IDE_COMMAND"
   else
     printf '    (none)\n'
   fi
@@ -2385,9 +2409,13 @@ cmd_tool_launcher() {
   shift
   require_project
   case "$tool_label" in
-    editor) command=$EDITOR_COMMAND ;;
+    ide) command=$IDE_COMMAND ;;
     terminal) command=$TERMINAL_COMMAND ;;
     *) die "unknown tool launcher: $tool_label" ;;
+  esac
+  display_label=$tool_label
+  case "$tool_label" in
+    ide) display_label="IDE" ;;
   esac
   parse_repo_option "$@"
   [ ${#ARGS[@]} -eq 1 ] || die "usage: workbranch $tool_label <task> [--repo <repo>]"
@@ -2397,7 +2425,7 @@ cmd_tool_launcher() {
   if [ -n "$FILTER_REPO" ]; then
     resolve_task_repo_path "$task" "$FILTER_REPO"
     path=$RESOLVED_PATH
-    info_tool_opening "$tool_label" "$task/$FILTER_REPO"
+    info_tool_opening "$display_label" "$task/$FILTER_REPO"
     run_tool_command "$tool_label" "$command" "$path" || die "failed to open $tool_label: $task/$FILTER_REPO"
     return 0
   fi
@@ -2408,18 +2436,39 @@ cmd_tool_launcher() {
     name=$(repo_name_at "$i")
     resolve_task_repo_path "$task" "$name"
     path=$RESOLVED_PATH
-    info_tool_opening "$tool_label" "$task/$name"
+    info_tool_opening "$display_label" "$task/$name"
     run_tool_command "$tool_label" "$command" "$path" || die "failed to open $tool_label: $task/$name"
     i=$((i + 1))
   done
 }
 
-cmd_editor() {
-  cmd_tool_launcher editor "$@"
+cmd_ide() {
+  cmd_tool_launcher ide "$@"
 }
 
 cmd_terminal() {
   cmd_tool_launcher terminal "$@"
+}
+
+cmd_finder() {
+  require_project
+  parse_repo_option "$@"
+  [ ${#ARGS[@]} -eq 1 ] || die "usage: workbranch finder <task> [--repo <repo>]"
+  task=${ARGS[0]}
+  validate_safe_name "task" "$task"
+
+  if [ -n "$FILTER_REPO" ]; then
+    resolve_task_repo_path "$task" "$FILTER_REPO"
+    path=$RESOLVED_PATH
+    info_tool_opening "Finder" "$task/$FILTER_REPO"
+    run_finder_command "$path" || die "failed to open Finder: $task/$FILTER_REPO"
+    return 0
+  fi
+
+  resolve_task_path "$task"
+  path=$RESOLVED_PATH
+  info_tool_opening "Finder" "$task"
+  run_finder_command "$path" || die "failed to open Finder: $task"
 }
 
 # ----- src/workbranch/commands/status.sh -----
@@ -2961,7 +3010,8 @@ main() {
     add) cmd_add "$@" ;;
     list) cmd_list "$@" ;;
     path) cmd_path "$@" ;;
-    editor) cmd_editor "$@" ;;
+    ide) cmd_ide "$@" ;;
+    finder) cmd_finder "$@" ;;
     terminal) cmd_terminal "$@" ;;
     status) cmd_status "$@" ;;
     pull) cmd_pull "$@" ;;

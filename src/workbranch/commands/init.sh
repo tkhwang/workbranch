@@ -46,7 +46,7 @@ AFTER
 
   printf '
 ' >&2
-  configure_editor_prompt
+  configure_ide_prompt
   configure_terminal_prompt
 
   printf '
@@ -80,9 +80,9 @@ AFTER
   info "Project: $PROJECT_NAME"
   info "Main worktrees dir: $BASE_DIR"
   info "Default task branch prefix: $BRANCH_PREFIX"
-  info "Editor:"
-  if [ -n "$EDITOR_COMMAND" ]; then
-    info "  $EDITOR_COMMAND"
+  info "IDE:"
+  if [ -n "$IDE_COMMAND" ]; then
+    info "  $IDE_COMMAND"
   else
     info "  (none)"
   fi

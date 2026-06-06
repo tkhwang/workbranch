@@ -2,9 +2,9 @@ cmd_list() {
   require_project
   info "Project: $PROJECT_NAME"
   info "Base: $BASE_DIR"
-  section "Editor"
-  if [ -n "$EDITOR_COMMAND" ]; then
-    printf '    %s\n' "$EDITOR_COMMAND"
+  section "IDE"
+  if [ -n "$IDE_COMMAND" ]; then
+    printf '    %s\n' "$IDE_COMMAND"
   else
     printf '    (none)\n'
   fi

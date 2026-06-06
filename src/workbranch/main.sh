@@ -7,7 +7,8 @@ main() {
     add) cmd_add "$@" ;;
     list) cmd_list "$@" ;;
     path) cmd_path "$@" ;;
-    editor) cmd_editor "$@" ;;
+    ide) cmd_ide "$@" ;;
+    finder) cmd_finder "$@" ;;
     terminal) cmd_terminal "$@" ;;
     status) cmd_status "$@" ;;
     pull) cmd_pull "$@" ;;

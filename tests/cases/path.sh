@@ -32,7 +32,7 @@ test_scoped_tool_paths_reject_stale_task_directories() {
   export WORKBRANCH_FAKE_TOOL_LOG="$TMP_ROOT/tool.log"
 
   cat >> "$project/.workbranch.config" <<CONFIG
-EDITOR $fake_tool
+IDE $fake_tool
 CONFIG
 
   run_expect_success "$WORKBRANCH" init >/dev/null
@@ -46,7 +46,7 @@ CONFIG
   out=$(run_expect_fail "$WORKBRANCH" path login --repo frontend)
   assert_contains "$out" "task repo not found or not a registered worktree: login/frontend"
 
-  out=$(run_expect_fail "$WORKBRANCH" editor login --repo frontend)
+  out=$(run_expect_fail "$WORKBRANCH" ide login --repo frontend)
   assert_contains "$out" "task repo not found or not a registered worktree: login/frontend"
   assert_not_exists "$WORKBRANCH_FAKE_TOOL_LOG"
 }

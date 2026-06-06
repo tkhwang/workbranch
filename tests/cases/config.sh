@@ -16,56 +16,58 @@ CONFIG
   assert_not_exists "$TMP_ROOT/pwned"
 }
 
-test_config_reads_and_writes_editor_terminal_commands() {
+test_config_reads_and_writes_ide_terminal_commands() {
   new_fixture
   project="$FIXTURE_PROJECT"
   cd "$project" || return 1
 
   cat >> "$project/.workbranch.config" <<'CONFIG'
-EDITOR open -a "Visual Studio Code"
+IDE open -a "Visual Studio Code"
 TERMINAL open -a Warp
 CONFIG
 
   out=$(run_expect_success "$WORKBRANCH" config --rewrite)
   assert_contains "$out" "[+] Config rewritten:"
   config=$(cat "$project/.workbranch.config")
-  assert_contains "$config" 'EDITOR open -a "Visual Studio Code"'
+  assert_contains "$config" 'IDE open -a "Visual Studio Code"'
   assert_contains "$config" "TERMINAL open -a Warp"
 }
 
-test_config_editor_can_set_custom_command_without_prompting_repos() {
+test_config_ide_can_set_custom_command_without_prompting_repos() {
   new_fixture
   project="$FIXTURE_PROJECT"
   cd "$project" || return 1
 
   input=$(printf '%s
 %s
-' "6" "code --reuse-window")
-  out=$(printf '%s' "$input" | run_expect_success "$WORKBRANCH" config editor)
-  assert_contains "$out" "[*] Editor command:"
+' "8" "code --reuse-window")
+  out=$(printf '%s' "$input" | run_expect_success "$WORKBRANCH" config ide)
+  assert_contains "$out" "[*] IDE command:"
   assert_not_contains "$out" "Base repo branch for frontend"
   assert_contains "$out" "[+] Config updated:"
-  assert_contains "$(cat "$project/.workbranch.config")" "EDITOR code --reuse-window"
+  assert_contains "$(cat "$project/.workbranch.config")" "IDE code --reuse-window"
 }
 
 
-test_config_editor_preset_writes_new_window_macos_app_command() {
+test_config_ide_preset_uses_superset_level1_order() {
   new_fixture
   project="$FIXTURE_PROJECT"
   cd "$project" || return 1
 
   out=$(printf '%s
-' "1" | run_expect_success "$WORKBRANCH" config editor)
-  assert_contains "$out" "[*] Editor command:"
+' "1" | run_expect_success "$WORKBRANCH" config ide)
+  assert_contains "$out" "[*] IDE command:"
   assert_contains "$out" "1) Cursor (open -na Cursor --args --new-window)"
-  assert_contains "$out" '2) Antigravity IDE (open -na "Antigravity IDE" --args --new-window)'
-  assert_contains "$out" '3) VS Code (open -na "Visual Studio Code" --args --new-window)'
-  assert_contains "$out" "4) Windsurf (open -na Windsurf --args --new-window)"
-  assert_contains "$out" "5) Zed (open -na Zed --args --new-window)"
-  assert_contains "$out" "6) Custom command"
-  assert_contains "$out" "7) Clear"
+  assert_contains "$out" '2) Antigravity (open -na "Antigravity IDE" --args --new-window)'
+  assert_contains "$out" "3) Windsurf (open -na Windsurf --args --new-window)"
+  assert_contains "$out" "4) Zed (open -na Zed)"
+  assert_contains "$out" '5) Sublime Text (open -na "Sublime Text")'
+  assert_contains "$out" "6) Xcode (open -na Xcode)"
+  assert_contains "$out" '7) VS Code (open -na "Visual Studio Code" --args --new-window'
+  assert_contains "$out" "8) Custom command"
+  assert_contains "$out" "9) Clear"
   assert_contains "$out" "[+] Config updated:"
-  assert_contains "$(cat "$project/.workbranch.config")" "EDITOR open -na Cursor --args --new-window"
+  assert_contains "$(cat "$project/.workbranch.config")" "IDE open -na Cursor --args --new-window"
 }
 
 test_config_tool_preset_names_are_colored() {
@@ -73,36 +75,37 @@ test_config_tool_preset_names_are_colored() {
   project="$FIXTURE_PROJECT"
   cd "$project" || return 1
 
-  out=$(printf '\n' | env -u NO_COLOR WORKBRANCH_COLOR=always "$WORKBRANCH" config editor 2>&1)
+  out=$(printf '\n' | env -u NO_COLOR WORKBRANCH_COLOR=always "$WORKBRANCH" config ide 2>&1)
   assert_contains "$out" $'1) \033[0;36mCursor\033[0m (open -na Cursor --args --new-window)'
-  assert_contains "$out" $'2) \033[0;36mAntigravity IDE\033[0m (open -na "Antigravity IDE" --args --new-window)'
-  assert_contains "$out" $'3) \033[0;36mVS Code\033[0m (open -na "Visual Studio Code" --args --new-window)'
-  assert_contains "$out" $'4) \033[0;36mWindsurf\033[0m (open -na Windsurf --args --new-window)'
-  assert_contains "$out" $'5) \033[0;36mZed\033[0m (open -na Zed --args --new-window)'
+  assert_contains "$out" $'2) \033[0;36mAntigravity\033[0m (open -na "Antigravity IDE" --args --new-window)'
+  assert_contains "$out" $'3) \033[0;36mWindsurf\033[0m (open -na Windsurf --args --new-window)'
+  assert_contains "$out" $'4) \033[0;36mZed\033[0m (open -na Zed)'
+  assert_contains "$out" $'5) \033[0;36mSublime Text\033[0m (open -na "Sublime Text")'
+  assert_contains "$out" $'6) \033[0;36mXcode\033[0m (open -na Xcode)'
+  assert_contains "$out" $'7) \033[0;36mVS Code\033[0m (open -na "Visual Studio Code" --args --new-window)'
 
   out=$(printf '\n' | env -u NO_COLOR WORKBRANCH_COLOR=always "$WORKBRANCH" config terminal 2>&1)
-  assert_contains "$out" $'1) \033[0;36mTerminal.app\033[0m (open -a Terminal)'
-  assert_contains "$out" $'2) \033[0;36miTerm2\033[0m (open -a iTerm)'
-  assert_contains "$out" $'3) \033[0;36mWarp\033[0m (open -a Warp)'
+  assert_contains "$out" $'1) \033[0;36miTerm\033[0m (open -a iTerm)'
+  assert_contains "$out" $'2) \033[0;36mWarp\033[0m (open -a Warp)'
+  assert_contains "$out" $'3) \033[0;36mTerminal.app\033[0m (open -a Terminal)'
   assert_contains "$out" $'4) \033[0;36mGhostty\033[0m (open -a Ghostty)'
-  assert_contains "$out" $'5) \033[0;36mcmux\033[0m (cmux)'
-}
+  }
 
-test_config_terminal_can_clear_without_removing_editor() {
+test_config_terminal_can_clear_without_removing_ide() {
   new_fixture
   project="$FIXTURE_PROJECT"
   cd "$project" || return 1
   cat >> "$project/.workbranch.config" <<'CONFIG'
-EDITOR open -a Cursor
+IDE open -a Cursor
 TERMINAL open -a Warp
 CONFIG
 
   out=$(printf '%s
-' "7" | run_expect_success "$WORKBRANCH" config terminal)
+' "6" | run_expect_success "$WORKBRANCH" config terminal)
   assert_contains "$out" "[*] Terminal command:"
   assert_contains "$out" "[+] Config updated:"
   config=$(cat "$project/.workbranch.config")
-  assert_contains "$config" "EDITOR open -a Cursor"
+  assert_contains "$config" "IDE open -a Cursor"
   assert_not_contains "$config" "TERMINAL open -a Warp"
 }
 
@@ -264,8 +267,8 @@ test_config_preserves_task_setup_while_prompting_repo_setup() {
   assert_contains "$out" "[*] Project name [fullstack]:"
   assert_contains "$out" "[*] Main worktrees dir [_base]:"
   assert_not_contains "$out" "[*] Branch prefix [feature]:"
-  assert_contains "$out" "[*] Editor command:"
-  assert_contains "$out" "[*] Choose editor [keep]:"
+  assert_contains "$out" "[*] IDE command:"
+  assert_contains "$out" "[*] Choose IDE [keep]:"
   assert_contains "$out" "[*] Terminal command:"
   assert_contains "$out" "[*] Choose terminal [keep]:"
   assert_contains "$out" "[*] Base repo branch for frontend [master]:"

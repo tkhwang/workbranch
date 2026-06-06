@@ -9,46 +9,48 @@ print_tool_preset() {
   fi
 }
 
-print_editor_presets() {
-  info "Editor command:"
+print_ide_presets() {
+  info "IDE command:"
   print_tool_preset 1 "Cursor" 'open -na Cursor --args --new-window'
-  print_tool_preset 2 "Antigravity IDE" 'open -na "Antigravity IDE" --args --new-window'
-  print_tool_preset 3 "VS Code" 'open -na "Visual Studio Code" --args --new-window'
-  print_tool_preset 4 "Windsurf" 'open -na Windsurf --args --new-window'
-  print_tool_preset 5 "Zed" 'open -na Zed --args --new-window'
-  printf '    6) Custom command\n' >&2
-  printf '    7) Clear\n' >&2
+  print_tool_preset 2 "Antigravity" 'open -na "Antigravity IDE" --args --new-window'
+  print_tool_preset 3 "Windsurf" 'open -na Windsurf --args --new-window'
+  print_tool_preset 4 "Zed" 'open -na Zed'
+  print_tool_preset 5 "Sublime Text" 'open -na "Sublime Text"'
+  print_tool_preset 6 "Xcode" 'open -na Xcode'
+  print_tool_preset 7 "VS Code" 'open -na "Visual Studio Code" --args --new-window'
+  printf '    8) Custom command\n' >&2
+  printf '    9) Clear\n' >&2
 }
 
-editor_preset_command() {
+ide_preset_command() {
   case "$1" in
     1) printf '%s' 'open -na Cursor --args --new-window' ;;
     2) printf '%s' 'open -na "Antigravity IDE" --args --new-window' ;;
-    3) printf '%s' 'open -na "Visual Studio Code" --args --new-window' ;;
-    4) printf '%s' 'open -na Windsurf --args --new-window' ;;
-    5) printf '%s' 'open -na Zed --args --new-window' ;;
+    3) printf '%s' 'open -na Windsurf --args --new-window' ;;
+    4) printf '%s' 'open -na Zed' ;;
+    5) printf '%s' 'open -na "Sublime Text"' ;;
+    6) printf '%s' 'open -na Xcode' ;;
+    7) printf '%s' 'open -na "Visual Studio Code" --args --new-window' ;;
     *) return 1 ;;
   esac
 }
 
 print_terminal_presets() {
   info "Terminal command:"
-  print_tool_preset 1 "Terminal.app" 'open -a Terminal'
-  print_tool_preset 2 "iTerm2" 'open -a iTerm'
-  print_tool_preset 3 "Warp" 'open -a Warp'
+  print_tool_preset 1 "iTerm" 'open -a iTerm'
+  print_tool_preset 2 "Warp" 'open -a Warp'
+  print_tool_preset 3 "Terminal.app" 'open -a Terminal'
   print_tool_preset 4 "Ghostty" 'open -a Ghostty'
-  print_tool_preset 5 "cmux" 'cmux'
-  printf '    6) Custom command\n' >&2
-  printf '    7) Clear\n' >&2
+  printf '    5) Custom command\n' >&2
+  printf '    6) Clear\n' >&2
 }
 
 terminal_preset_command() {
   case "$1" in
-    1) printf '%s' 'open -a Terminal' ;;
-    2) printf '%s' 'open -a iTerm' ;;
-    3) printf '%s' 'open -a Warp' ;;
+    1) printf '%s' 'open -a iTerm' ;;
+    2) printf '%s' 'open -a Warp' ;;
+    3) printf '%s' 'open -a Terminal' ;;
     4) printf '%s' 'open -a Ghostty' ;;
-    5) printf '%s' 'cmux' ;;
     *) return 1 ;;
   esac
 }
@@ -83,19 +85,39 @@ run_tool_command() {
   command=$2
   path=$3
   [ -n "$command" ] || die "$tool_label command is not configured; run workbranch config $tool_label"
-  if [ "$tool_label" = "editor" ]; then
-    case "$command" in
-      'open -a "Visual Studio Code"'|'open -na "Visual Studio Code"') command='open -na "Visual Studio Code" --args --new-window' ;;
-      'open -a Cursor'|'open -na Cursor'|'open -a "Cursor"'|'open -na "Cursor"') command='open -na Cursor --args --new-window' ;;
-      'open -a "Antigravity IDE"'|'open -na "Antigravity IDE"') command='open -na "Antigravity IDE" --args --new-window' ;;
-      'open -a Windsurf'|'open -na Windsurf'|'open -a "Windsurf"'|'open -na "Windsurf"') command='open -na Windsurf --args --new-window' ;;
-      'open -a Zed'|'open -na Zed'|'open -a "Zed"'|'open -na "Zed"') command='open -na Zed --args --new-window' ;;
-    esac
-  fi
+  case "$tool_label" in
+    ide)
+      case "$command" in
+        'open -a "Visual Studio Code"'|'open -na "Visual Studio Code"') command='open -na "Visual Studio Code" --args --new-window' ;;
+        'open -a Cursor'|'open -na Cursor'|'open -a "Cursor"'|'open -na "Cursor"') command='open -na Cursor --args --new-window' ;;
+        'open -a "Antigravity IDE"'|'open -na "Antigravity IDE"') command='open -na "Antigravity IDE" --args --new-window' ;;
+        'open -a Windsurf'|'open -na Windsurf'|'open -a "Windsurf"'|'open -na "Windsurf"') command='open -na Windsurf --args --new-window' ;;
+      esac
+      ;;
+  esac
   (
     cd "$path" || exit 1
     WORKBRANCH_TOOL_PATH=$path
     export WORKBRANCH_TOOL_PATH
     sh -c "$command \"\$WORKBRANCH_TOOL_PATH\""
+  )
+}
+
+run_finder_command() {
+  path=$1
+  (
+    # Keep cwd aligned with the opened absolute path so tests can observe it via fake open.
+    cd "$path" || exit 1
+    case "$(uname -s)" in
+      Darwin) open "$path" ;;
+      Linux)
+        if command -v xdg-open >/dev/null 2>&1; then
+          xdg-open "$path"
+        else
+          die "finder command is not available on this platform"
+        fi
+        ;;
+      *) die "finder command is not available on this platform" ;;
+    esac
   )
 }
