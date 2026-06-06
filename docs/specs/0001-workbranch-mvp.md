@@ -167,6 +167,7 @@ Show base commit position versus its cached remote-tracking branch, task commit 
 
 [*] Next
     pull    base is behind remote: workbranch pull
+    push    base has commits not in remote: workbranch push
     land    task has commits not in base: workbranch land <task>
     update  task is behind base: workbranch update <task>
 ```

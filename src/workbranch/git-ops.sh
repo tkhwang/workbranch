@@ -27,7 +27,10 @@ workbranch_git_add_new_task_worktree() {
   task_branch=$3
   source_ref=${4:-HEAD}
   workbranch_git_prune_stale_worktrees "$base_path" || return 1
-  git -C "$base_path" worktree add "$target_path" -b "$task_branch" "$source_ref" >/dev/null 2>&1
+  git -C "$base_path" worktree add "$target_path" -b "$task_branch" "$source_ref" >/dev/null 2>&1 || return 1
+  if [ "$source_ref" != "HEAD" ]; then
+    git -C "$target_path" branch --unset-upstream >/dev/null 2>&1 || true
+  fi
 }
 
 workbranch_git_delete_task_branch() {

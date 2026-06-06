@@ -70,6 +70,7 @@ main() {
   run_test test_land_preflight_blocks_all_repos_before_partial_land
   run_test test_push_supports_task_and_base_branches_after_fast_forward_merge
   run_test test_add_uses_feat_parent_branch_as_default
+  run_test test_add_rejects_empty_from_equals
   run_test test_add_from_remote_ref_seeds_task_branch_from_origin_ref
   run_test test_add_from_missing_ref_fails_before_creating_task
   run_test test_add_task_branch_override_is_used_by_later_commands

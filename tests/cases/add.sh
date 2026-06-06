@@ -56,6 +56,18 @@ CONFIG
 }
 
 
+
+test_add_rejects_empty_from_equals() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+
+  out=$(run_expect_fail "$WORKBRANCH" add login --from=)
+  assert_contains "$out" "missing value for --from"
+  assert_not_exists "$project/login"
+}
+
 test_add_from_remote_ref_seeds_task_branch_from_origin_ref() {
   new_fixture
   project="$FIXTURE_PROJECT"
@@ -73,6 +85,12 @@ test_add_from_remote_ref_seeds_task_branch_from_origin_ref() {
   assert_file "$project/login/frontend/seeded-frontend.txt"
   assert_file "$project/login/backend/seeded-backend.txt"
   assert_contains "$out" "[source] origin/feat/parent -> [task repo] feature/login"
+  if git -C "$project/login/frontend" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' >/dev/null 2>&1; then
+    fail "expected add --from not to set frontend upstream"
+  fi
+  if git -C "$project/login/backend" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' >/dev/null 2>&1; then
+    fail "expected add --from not to set backend upstream"
+  fi
   assert_not_contains "$(cat "$project/login/.workbranch.task")" "feat/parent"
 }
 

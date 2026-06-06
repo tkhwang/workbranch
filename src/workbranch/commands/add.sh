@@ -26,6 +26,7 @@ parse_add_options() {
         ;;
       --from=*)
         ADD_FROM_REF=${1#--from=}
+        [ -n "$ADD_FROM_REF" ] || die "missing value for --from"
         shift
         ;;
       --*)
