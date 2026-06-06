@@ -52,7 +52,7 @@ workbranch pull
 workbranch add <task>
 ```
 
-repo를 다시 clone하지 않고 project 설정, branch prefix, base branch, editor/terminal 실행 명령, repo별 setup command를 수정하려면 `workbranch config`를 사용합니다.
+repo를 다시 clone하지 않고 project 설정, branch prefix, base branch, IDE/terminal 실행 명령, repo별 setup command를 수정하려면 `workbranch config`를 사용합니다.
 
 ## 생성되는 구조
 
@@ -79,7 +79,7 @@ Single-repo 프로젝트도 같은 구조를 사용하며, 각 task 안에 repo 
 | --- | --- |
 | `workbranch init` | config 기준으로 base worktree 생성 또는 clone |
 | `workbranch config` | project 설정, base branch, tool command, repo setup command 수정 |
-| `workbranch config editor` | editor 명령만 수정 |
+| `workbranch config ide` | IDE 명령만 수정 |
 | `workbranch config terminal` | terminal 명령만 수정 |
 | `workbranch add <task>` | task workspace 생성 |
 | `workbranch list` | repo와 task workspace 목록 확인 |
@@ -101,7 +101,8 @@ Single-repo 프로젝트도 같은 구조를 사용하며, 각 task 안에 repo 
 | Command | 용도 |
 | --- | --- |
 | `workbranch path <task>` | task workspace 또는 repo 경로 출력 |
-| `workbranch editor <task>` | 설정된 editor로 task repo worktree 열기 |
+| `workbranch finder <task>` | Finder로 task workspace folder 열기 |
+| `workbranch ide <task>` | 설정된 IDE로 task repo worktree 열기 |
 | `workbranch terminal <task>` | 설정된 terminal로 task repo worktree 열기 |
 
 ### Other
@@ -128,24 +129,27 @@ WORKBRANCH_COLOR=always workbranch help # enhanced display 강제
 
 ## 작업 workspace 열기
 
-프로젝트에서 공통으로 사용할 editor와 terminal 명령을 설정합니다.
+프로젝트에서 공통으로 사용할 IDE와 terminal 명령을 설정합니다.
 
 ```bash
-workbranch config editor
+workbranch config ide
 workbranch config terminal
 ```
 
 작업 workspace 안의 모든 repo를 엽니다.
 
 ```bash
-workbranch editor login
+workbranch finder login
+workbranch ide login
 workbranch terminal login
 ```
+
+내장 macOS IDE preset은 VS Code 계열 app에서 repo path마다 별도 IDE window를 엽니다. config directive는 `IDE <command>`입니다. preset 순서는 Cursor, Antigravity, Windsurf, Zed, Sublime Text, Xcode, VS Code입니다. `IDE open -a Cursor`, `IDE open -a "Antigravity IDE"`, `IDE open -a "Visual Studio Code"`, `IDE open -a Windsurf` 형태는 실행 시 `open -na ... --args --new-window`로 보정됩니다. Zed는 검증 전까지 `open -na Zed`로 유지합니다.
 
 필요하면 repo 하나로 제한합니다.
 
 ```bash
-workbranch editor login --repo frontend
+workbranch ide login --repo frontend
 workbranch terminal login --repo backend
 ```
 

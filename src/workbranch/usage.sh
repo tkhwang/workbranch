@@ -36,11 +36,12 @@ Git:
   --repo <repo>     Limit operation to one repo; otherwise all repos
 Tool:
   path <task>       Print a task workspace path
-  editor <task>     Open task repo worktrees in the configured editor
+  finder <task>     Open a task workspace in Finder
+  ide <task>        Open task repo worktrees in the configured IDE
   terminal <task>   Open task repo worktrees in the configured terminal
 Config:
   config            Create or update .workbranch.config without cloning repos
-  config editor     Update only the configured editor command
+  config ide        Update only the configured IDE command
   config terminal   Update only the configured terminal command
   config --rewrite  Rewrite config to current format without prompts
 Other:
@@ -61,24 +62,25 @@ usage_enhanced() {
   printf '  remove <task>     Remove task worktrees and local task branches\n'
   section "Git"
   printf '  status            Show commits, diff, and dirty state\n'
-  printf '  vertical\n'
+  printf '%s  vertical%s\n' "$WB_GRAY" "$WB_RESET"
   printf '  pull              Pull remote base branches into main worktrees\n'
   printf '  push              Push base branches to origin\n'
   printf '  push <task>       Push task branches to origin\n'
-  printf '  horizontal\n'
+  printf '%s  horizontal%s\n' "$WB_GRAY" "$WB_RESET"
   printf '  update            Update every task workspace from local base worktrees\n'
   printf '  update --all      Update every task workspace from local base worktrees\n'
   printf '  update <task>     Update one task workspace from local base worktrees\n'
   printf '  land <task>       Land task branches into base branches\n'
-  printf '  common\n'
+  printf '%s  common%s\n' "$WB_GRAY" "$WB_RESET"
   printf '  --repo <repo>     Limit operation to one repo; otherwise all repos\n'
   section "Tool"
   printf '  path <task>       Print a task workspace path\n'
-  printf '  editor <task>     Open task repo worktrees in the configured editor\n'
+  printf '  finder <task>     Open a task workspace in Finder\n'
+  printf '  ide <task>        Open task repo worktrees in the configured IDE\n'
   printf '  terminal <task>   Open task repo worktrees in the configured terminal\n'
   section "Config"
   printf '  config            Create or update .workbranch.config without cloning repos\n'
-  printf '  config editor     Update only the configured editor command\n'
+  printf '  config ide        Update only the configured IDE command\n'
   printf '  config terminal   Update only the configured terminal command\n'
   printf '  config --rewrite  Rewrite config to current format without prompts\n'
   section "Other"

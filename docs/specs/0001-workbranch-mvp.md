@@ -32,7 +32,7 @@ The config file is `.workbranch.config` in the project root.
 PROJECT_NAME fullstack
 MAIN_WORKTREES_DIR _base
 BRANCH_PREFIX feature
-EDITOR open -a "Visual Studio Code"
+IDE open -na Cursor --args --new-window
 TERMINAL open -a Warp
 TASK_SETUP sh scripts/workbranch-setup.sh
 
@@ -46,7 +46,7 @@ REPO_SETUP backend ./gradlew dependencies
 Format:
 
 ```text
-EDITOR <command>
+IDE <command>
 TERMINAL <command>
 TASK_SETUP <command>
 REPO <name> <git-url> <base-repo-branch>
@@ -58,16 +58,16 @@ Rules:
 - `PROJECT_NAME` must be a safe directory name.
 - `MAIN_WORKTREES_DIR` must be a safe directory name.
 - `BRANCH_PREFIX` is retained for compatibility and as the default branch prompt prefix. New interactive setup asks for the default task branch prefix and writes the selected value.
-- `EDITOR` is optional. It stores one project-level editor launch command text after the directive.
+- `IDE` is optional. It stores one project-level IDE launch command text after the directive.
 - `TERMINAL` is optional. It stores one project-level terminal launch command text after the directive.
 - `TASK_SETUP` is optional. It stores one project-level command text after the directive.
 - `REPO` requires name, URL, and base repo branch.
 - `REPO_SETUP` is optional. It references an existing repo name and stores one repo-level command text after the repo name.
 - Repo names must be unique safe names.
 - Git URLs and branch names must be non-empty and contain no whitespace.
-- Config values are split on whitespace except `EDITOR`, `TERMINAL`, `TASK_SETUP`, and `REPO_SETUP`, which preserve command text.
+- Config values are split on whitespace except `IDE`, `TERMINAL`, `TASK_SETUP`, and `REPO_SETUP`, which preserve command text.
 - The file is not a shell script.
-- Safety: `.workbranch.config` is trusted project configuration. Running `workbranch add <task>` executes configured setup commands with `sh -c`; running `workbranch editor <task>` or `workbranch terminal <task>` executes configured tool commands with the resolved repo path appended. Review configs from untrusted projects before running those commands.
+- Safety: `.workbranch.config` is trusted project configuration. Running `workbranch add <task>` executes configured setup commands with `sh -c`; running `workbranch ide <task>` or `workbranch terminal <task>` executes configured tool commands with the resolved repo path appended. Review configs from untrusted projects before running those commands.
 
 ## Branch names
 
@@ -98,11 +98,11 @@ Git operation internals are defined in [`docs/git-operations.md`](../git-operati
 
 Create or update config without cloning repos.
 
-If `.workbranch.config` or legacy `.tasktree.config` / `.monotree.config` already exists in the current project, load it, then prompt for the project name, main worktrees directory, editor command, terminal command, each repo's base branch, and each repo-level setup command. Press Enter to keep the current value. Type `--clear` at a tool or repo setup prompt to remove that command.
+If `.workbranch.config` or legacy `.tasktree.config` / `.monotree.config` already exists in the current project, load it, then prompt for the project name, main worktrees directory, IDE command, terminal command, each repo's base branch, and each repo-level setup command. Press Enter to keep the current value. Type `--clear` at a tool or repo setup prompt to remove that command.
 
 Changing a repo base branch updates config only. `workbranch config` does not clone, move, rename, or check out existing worktrees. Existing `BRANCH_PREFIX` values are preserved silently; it is no longer an interactive setting. Changing `MAIN_WORKTREES_DIR` is allowed only before base worktrees exist. Once matching base worktrees exist, `workbranch config` rejects that change.
 
-Existing project-level `TASK_SETUP` values remain supported for `workbranch add` and are preserved by `workbranch config` unless another explicit flow clears or migrates them. `workbranch config editor` and `workbranch config terminal` update only the matching tool command.
+Existing project-level `TASK_SETUP` values remain supported for `workbranch add` and are preserved by `workbranch config` unless another explicit flow clears or migrates them. `workbranch config ide` and `workbranch config terminal` update only the matching tool command.
 
 When a base branch changes after repos are cloned, `workbranch config` only updates `.workbranch.config`. It then prints the checkout/fetch/pull procedure needed for the existing `_base/<repo>` worktree.
 
@@ -116,7 +116,7 @@ If no config exists, run interactive config setup:
 2. Ask for project name, default `fullstack`.
 3. Ask for main worktrees directory, default `_base`.
 4. Ask for the default task branch prefix, defaulting to `feature`, and write `BRANCH_PREFIX <prefix>`.
-5. Ask for optional editor and terminal commands from presets or custom input.
+5. Ask for optional IDE and terminal commands from presets or custom input.
 6. Explain that each repo base repo branch is checked out in `_base/<repo>` and task branch names are prompted by `workbranch add`.
 7. Ask for one or more repos: name, Git URL, base branch for this repo, and optional repo-level setup command.
 8. Write `.workbranch.config`.
@@ -139,9 +139,11 @@ Interactive terminal output may use ANSI color, a compact help/init banner, and 
 
 Examples in this spec show the plain output shape. Enhanced terminal output may render section headings with `➤` and color status labels, but command semantics and machine-sensitive outputs such as `workbranch path` remain unchanged.
 
-### `workbranch editor <task>` / `workbranch terminal <task>`
+### `workbranch finder <task>` / `workbranch ide <task>` / `workbranch terminal <task>`
 
-Run the configured editor or terminal command once per matching task repo worktree. The resolved repo path is appended as the final argument. With `--repo <repo>`, run only for that repo. Tool launchers do not modify repositories.
+`finder` opens the task root folder by default and one repo folder with `--repo <repo>`. `ide` and `terminal` run the configured command once per matching task repo worktree. The resolved repo path is appended as the final argument. With `--repo <repo>`, run only for that repo. Tool launchers do not modify repositories.
+
+Built-in macOS IDE app presets use `open -n` plus `--args --new-window` for VS Code-like apps so each matching repo path opens in a separate IDE window instead of being folded into an existing workspace. `IDE open -a Cursor`, `IDE open -a "Antigravity IDE"`, `IDE open -a "Visual Studio Code"`, and `IDE open -a Windsurf` are normalized to the matching `open -na ... --args --new-window` command at launch time. Zed remains `open -na Zed` until its CLI contract is verified.
 
 ### `workbranch list`
 

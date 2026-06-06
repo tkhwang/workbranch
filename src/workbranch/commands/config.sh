@@ -6,12 +6,12 @@ cmd_config() {
     1)
       case "$1" in
         --rewrite) rewrite_only=1 ;;
-        editor) config_target="editor" ;;
+        ide) config_target="ide" ;;
         terminal) config_target="terminal" ;;
-        *) die "usage: workbranch config [editor|terminal|--rewrite]" ;;
+        *) die "usage: workbranch config [ide|terminal|--rewrite]" ;;
       esac
       ;;
-    *) die "usage: workbranch config [editor|terminal|--rewrite]" ;;
+    *) die "usage: workbranch config [ide|terminal|--rewrite]" ;;
   esac
   CREATED_PATHS=()
   CREATED_WORKTREES=()
@@ -24,7 +24,7 @@ cmd_config() {
     if [ "$rewrite_only" -eq 0 ]; then
       case "$config_target" in
         all) configure_existing_project ;;
-        editor) configure_editor_prompt ;;
+        ide) configure_ide_prompt ;;
         terminal) configure_terminal_prompt ;;
       esac
     fi
@@ -89,19 +89,19 @@ print_config_next_steps() {
   done
 }
 
-configure_editor_prompt() {
-  print_editor_presets
-  current=${EDITOR_COMMAND:-keep}
-  value=$(prompt_read "[*] Choose editor [$current]: ") || die "input aborted"
+configure_ide_prompt() {
+  print_ide_presets
+  current=${IDE_COMMAND:-keep}
+  value=$(prompt_read "[*] Choose IDE [$current]: ") || die "input aborted"
   case "$value" in
     "") ;;
-    1|2|3) set_editor_command "$(editor_preset_command "$value")" ;;
-    4)
-      custom=$(prompt_required "Custom editor command")
-      set_editor_command "$custom"
+    1|2|3|4|5|6|7) set_ide_command "$(ide_preset_command "$value")" ;;
+    8)
+      custom=$(prompt_required "Custom IDE command")
+      set_ide_command "$custom"
       ;;
-    5|--clear) clear_editor_command ;;
-    *) die "invalid editor choice: $value" ;;
+    9|--clear) clear_ide_command ;;
+    *) die "invalid IDE choice: $value" ;;
   esac
 }
 
@@ -111,12 +111,12 @@ configure_terminal_prompt() {
   value=$(prompt_read "[*] Choose terminal [$current]: ") || die "input aborted"
   case "$value" in
     "") ;;
-    1|2|3|4|5) set_terminal_command "$(terminal_preset_command "$value")" ;;
-    6)
+    1|2|3|4) set_terminal_command "$(terminal_preset_command "$value")" ;;
+    5)
       custom=$(prompt_required "Custom terminal command")
       set_terminal_command "$custom"
       ;;
-    7|--clear) clear_terminal_command ;;
+    6|--clear) clear_terminal_command ;;
     *) die "invalid terminal choice: $value" ;;
   esac
 }
@@ -195,7 +195,7 @@ configure_existing_project() {
   configure_project_settings
 
   printf '\n'
-  configure_editor_prompt
+  configure_ide_prompt
   configure_terminal_prompt
 
   info "Repositories"

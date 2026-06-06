@@ -178,11 +178,12 @@ test_help_groups_commands() {
   assert_contains "$out" "--repo <repo>     Limit operation to one repo; otherwise all repos"
   assert_contains "$out" "Tool:"
   assert_contains "$out" "path <task>       Print a task workspace path"
-  assert_contains "$out" "editor <task>     Open task repo worktrees in the configured editor"
+  assert_contains "$out" "finder <task>     Open a task workspace in Finder"
+  assert_contains "$out" "ide <task>        Open task repo worktrees in the configured IDE"
   assert_contains "$out" "terminal <task>   Open task repo worktrees in the configured terminal"
   assert_contains "$out" "Config:"
   assert_contains "$out" "config            Create or update .workbranch.config without cloning repos"
-  assert_contains "$out" "config editor     Update only the configured editor command"
+  assert_contains "$out" "config ide        Update only the configured IDE command"
   assert_contains "$out" "config terminal   Update only the configured terminal command"
   assert_contains "$out" "config --rewrite  Rewrite config to current format without prompts"
   assert_contains "$out" "Other:"
@@ -198,7 +199,7 @@ test_help_groups_commands() {
 '*) fail "expected compact help without blank lines; got: $out" ;;
   esac
   case "$out" in
-    *"Workspace:"*"init              Initialize a workbranch project"*"list              List configured repos and task workspaces"*"add <task>        Create a task workspace"*"remove <task>     Remove task worktrees and local task branches"*"Git:"*"status            Show commits, diff, and dirty state"*"  vertical"*"Tool:"*"path <task>       Print a task workspace path"*"editor <task>     Open task repo worktrees in the configured editor"*"terminal <task>   Open task repo worktrees in the configured terminal"*"Config:"*"config            Create or update .workbranch.config without cloning repos"*"config editor     Update only the configured editor command"*"config terminal   Update only the configured terminal command"*"config --rewrite  Rewrite config to current format without prompts"*"Other:"*) ;;
+    *"Workspace:"*"init              Initialize a workbranch project"*"list              List configured repos and task workspaces"*"add <task>        Create a task workspace"*"remove <task>     Remove task worktrees and local task branches"*"Git:"*"status            Show commits, diff, and dirty state"*"  vertical"*"Tool:"*"path <task>       Print a task workspace path"*"finder <task>     Open a task workspace in Finder"*"ide <task>        Open task repo worktrees in the configured IDE"*"terminal <task>   Open task repo worktrees in the configured terminal"*"Config:"*"config            Create or update .workbranch.config without cloning repos"*"config ide        Update only the configured IDE command"*"config terminal   Update only the configured terminal command"*"config --rewrite  Rewrite config to current format without prompts"*"Other:"*) ;;
     *) fail "expected workspace, git, tool, config, and other group ordering; got: $out" ;;
   esac
 }

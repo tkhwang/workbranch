@@ -192,6 +192,19 @@ item_review() {
 
 info() { printf '%s[*]%s %s\n' "$WB_BLUE" "$WB_RESET" "$*"; }
 
+info_tool_opening() {
+  _wb_tool_label=$1
+  _wb_tool_target=$2
+  if color_enabled; then
+    printf '%s[*]%s Opening %s%s%s: %s%s%s\n' \
+      "$WB_BLUE" "$WB_RESET" \
+      "$WB_PURPLE" "$_wb_tool_label" "$WB_RESET" \
+      "$WB_CYAN" "$_wb_tool_target" "$WB_RESET"
+  else
+    info "Opening $_wb_tool_label: $_wb_tool_target"
+  fi
+}
+
 success() { printf '%s[+]%s %s\n' "$WB_GREEN" "$WB_RESET" "$*"; }
 
 die() { printf '%s[-] Error:%s %s\n' "$WB_ERR_RED" "$WB_ERR_RESET" "$*" >&2; exit 1; }
