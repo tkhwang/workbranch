@@ -1,5 +1,18 @@
 # shellcheck shell=bash
 # Sourced by tests/run.sh; uses helpers from tests/lib/helpers.sh.
+append_fake_finder_scripts() {
+  fake_bin=$1
+  mkdir -p "$fake_bin"
+  for launcher in open xdg-open; do
+    cat > "$fake_bin/$launcher" <<'SCRIPT'
+#!/usr/bin/env sh
+set -eu
+printf '%s|%s\n' "$PWD" "$*" >> "$WORKBRANCH_FAKE_TOOL_LOG"
+SCRIPT
+    chmod +x "$fake_bin/$launcher"
+  done
+}
+
 test_ide_and_terminal_run_configured_command_for_task_repos() {
   new_fixture
   project="$FIXTURE_PROJECT"
@@ -134,13 +147,7 @@ test_finder_opens_task_root_without_repo_filter() {
   cd "$project" || return 1
   canonical_project=$(pwd -P)
   fake_bin="$TMP_ROOT/bin"
-  mkdir -p "$fake_bin"
-  cat > "$fake_bin/open" <<'SCRIPT'
-#!/usr/bin/env sh
-set -eu
-printf '%s|%s\n' "$PWD" "$*" >> "$WORKBRANCH_FAKE_TOOL_LOG"
-SCRIPT
-  chmod +x "$fake_bin/open"
+  append_fake_finder_scripts "$fake_bin"
   export WORKBRANCH_FAKE_TOOL_LOG="$TMP_ROOT/finder.log"
 
   run_expect_success "$WORKBRANCH" init >/dev/null
@@ -159,13 +166,7 @@ test_finder_repo_filter_opens_one_repo_path() {
   cd "$project" || return 1
   canonical_project=$(pwd -P)
   fake_bin="$TMP_ROOT/bin"
-  mkdir -p "$fake_bin"
-  cat > "$fake_bin/open" <<'SCRIPT'
-#!/usr/bin/env sh
-set -eu
-printf '%s|%s\n' "$PWD" "$*" >> "$WORKBRANCH_FAKE_TOOL_LOG"
-SCRIPT
-  chmod +x "$fake_bin/open"
+  append_fake_finder_scripts "$fake_bin"
   export WORKBRANCH_FAKE_TOOL_LOG="$TMP_ROOT/finder.log"
 
   run_expect_success "$WORKBRANCH" init >/dev/null
@@ -175,4 +176,27 @@ SCRIPT
   assert_contains "$out" "[*] Opening Finder: login/frontend"
   assert_contains "$(cat "$WORKBRANCH_FAKE_TOOL_LOG")" "$canonical_project/login/frontend|$canonical_project/login/frontend"
   assert_not_contains "$(cat "$WORKBRANCH_FAKE_TOOL_LOG")" "$canonical_project/login/backend"
+}
+
+test_finder_linux_branch_uses_xdg_open() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  canonical_project=$(pwd -P)
+  fake_bin="$TMP_ROOT/bin"
+  append_fake_finder_scripts "$fake_bin"
+  cat > "$fake_bin/uname" <<'SCRIPT'
+#!/usr/bin/env sh
+printf '%s\n' Linux
+SCRIPT
+  chmod +x "$fake_bin/uname"
+  export WORKBRANCH_FAKE_TOOL_LOG="$TMP_ROOT/finder.log"
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  printf '\n\n' | run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  out=$(PATH="$fake_bin:$PATH" run_expect_success "$WORKBRANCH" finder login --repo backend)
+  assert_contains "$out" "[*] Opening Finder: login/backend"
+  assert_contains "$(cat "$WORKBRANCH_FAKE_TOOL_LOG")" "$canonical_project/login/backend|$canonical_project/login/backend"
+  assert_not_contains "$(cat "$WORKBRANCH_FAKE_TOOL_LOG")" "$canonical_project/login/frontend"
 }

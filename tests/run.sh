@@ -96,6 +96,7 @@ main() {
   run_test test_ide_legacy_macos_app_preset_opens_new_instance_per_repo
   run_test test_finder_opens_task_root_without_repo_filter
   run_test test_finder_repo_filter_opens_one_repo_path
+  run_test test_finder_linux_branch_uses_xdg_open
   run_test test_tool_launcher_forced_color_highlights_tool_and_target_path
   run_test test_tool_commands_require_configured_command
   run_test test_tool_launcher_reports_missing_task_repo_before_running_command
