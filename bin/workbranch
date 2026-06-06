@@ -154,8 +154,8 @@ diff_color() {
 
 next_action_color() {
   case "$1" in
-    land) printf '%s' "$WB_GREEN" ;;
-    update|check) printf '%s' "$WB_YELLOW" ;;
+    land|push) printf '%s' "$WB_GREEN" ;;
+    update|pull|check) printf '%s' "$WB_YELLOW" ;;
     -) printf '%s' "$WB_GRAY" ;;
     *) printf '%s' "$WB_GRAY" ;;
   esac
@@ -266,10 +266,10 @@ Usage:
 Workspace:
   init              Initialize a workbranch project
   list              List configured repos and task workspaces
-  add <task>        Create a task workspace
+  add <task> [--from <ref>]  Create a task workspace
   remove <task>     Remove task worktrees and local task branches
 Git:
-  status            Show commits, diff, and dirty state
+  status            Show remote diff, task diff, and dirty state
   vertical
   pull              Pull remote base branches into main worktrees
   push              Push base branches to origin
@@ -305,10 +305,10 @@ usage_enhanced() {
   section "Workspace"
   printf '  init              Initialize a workbranch project\n'
   printf '  list              List configured repos and task workspaces\n'
-  printf '  add <task>        Create a task workspace\n'
+  printf '  add <task> [--from <ref>]  Create a task workspace\n'
   printf '  remove <task>     Remove task worktrees and local task branches\n'
   section "Git"
-  printf '  status            Show commits, diff, and dirty state\n'
+  printf '  status            Show remote diff, task diff, and dirty state\n'
   printf '%s  vertical%s\n' "$WB_GRAY" "$WB_RESET"
   printf '  pull              Pull remote base branches into main worktrees\n'
   printf '  push              Push base branches to origin\n'
@@ -1632,6 +1632,29 @@ commit_diff_label() {
   fi
 }
 
+remote_diff_label() {
+  path=$1
+  branch=$2
+  [ -d "$path" ] || { printf 'missing'; return 0; }
+  remote_ref="refs/remotes/origin/$branch"
+  remote_commit=$(git -C "$path" rev-parse --verify --quiet "$remote_ref^{commit}" 2>/dev/null) || {
+    printf 'missing'
+    return 0
+  }
+  commit_diff_label "$path" "$remote_commit"
+}
+
+next_action_for_base_remote() {
+  diff_label=$1
+  case "$diff_label" in
+    0) printf '-' ;;
+    +*) printf 'push' ;;
+    -*) printf 'pull' ;;
+    ±*) printf 'check' ;;
+    *) printf 'check' ;;
+  esac
+}
+
 next_action_for_diff() {
   diff_label=$1
   case "$diff_label" in
@@ -1644,23 +1667,29 @@ next_action_for_diff() {
 }
 
 print_base_status_header() {
-  printf '    %s %s %s %s\n' \
+  printf '    %s %s %s %s %s %s\n' \
     "$(table_header 11 repo)" \
     "$(table_header 16 branch)" \
     "$(table_header 10 commit)" \
-    "$(color_text "$WB_GRAY" status)"
+    "$(table_header 7 remote)" \
+    "$(table_header 9 status)" \
+    "$(color_text "$WB_GRAY" next)"
 }
 
 print_base_status_item() {
   name=$1
   branch=$2
   commit=$3
-  state=$4
-  printf '    %-11s %-16s %-10s %s\n' \
+  remote_diff=$4
+  state=$5
+  next_action=$6
+  printf '    %-11s %-16s %-10s %s %s %s\n' \
     "$name" \
     "$branch" \
     "$commit" \
-    "$(color_text "$(color_status "$state")" "$state")"
+    "$(color_cell "$(color_diff "$remote_diff")" 7 "$remote_diff")" \
+    "$(color_cell "$(color_status "$state")" 9 "$state")" \
+    "$(color_text "$(color_next_action "$next_action")" "$next_action")"
 }
 
 print_task_status_header() {
@@ -1690,9 +1719,17 @@ print_task_status_item() {
 }
 
 print_next_legend() {
+  show_base=${1:-0}
+  show_task=${2:-0}
   section "Next"
-  item_detail "land    task has commits not in base: workbranch land <task>"
-  item_detail "update  task is behind base: workbranch update <task>"
+  if [ "$show_base" -eq 1 ]; then
+    item_detail "pull    base is behind remote: workbranch pull"
+    item_detail "push    base has commits not in remote: workbranch push"
+  fi
+  if [ "$show_task" -eq 1 ]; then
+    item_detail "land    task has commits not in base: workbranch land <task>"
+    item_detail "update  task is behind base: workbranch update <task>"
+  fi
 }
 
 is_task_workspace_path() {
@@ -2235,9 +2272,63 @@ prompt_task_branches_for_add() {
   done
 }
 
+parse_add_options() {
+  ADD_FROM_REF=""
+  ARGS=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --from)
+        [ $# -ge 2 ] || die "missing value for --from"
+        ADD_FROM_REF=$2
+        shift 2
+        ;;
+      --from=*)
+        ADD_FROM_REF=${1#--from=}
+        [ -n "$ADD_FROM_REF" ] || die "missing value for --from"
+        shift
+        ;;
+      --*)
+        die "usage: workbranch add <task> [--from <ref>]"
+        ;;
+      *)
+        ARGS[${#ARGS[@]}]=$1
+        shift
+        ;;
+    esac
+  done
+
+  [ ${#ARGS[@]} -eq 1 ] || die "usage: workbranch add <task> [--from <ref>]"
+  if [ -n "$ADD_FROM_REF" ]; then
+    validate_nonempty_no_space "source ref" "$ADD_FROM_REF"
+  fi
+}
+
+resolve_add_source_ref() {
+  base=$1
+  requested=$2
+  case "$requested" in
+    "")
+      printf 'HEAD'
+      return 0
+      ;;
+    origin/*|refs/*|HEAD)
+      git_ref_exists "$base" "$requested" || return 1
+      printf '%s' "$requested"
+      return 0
+      ;;
+  esac
+
+  if git_ref_exists "$base" "origin/$requested"; then
+    printf 'origin/%s' "$requested"
+    return 0
+  fi
+  git_ref_exists "$base" "$requested" || return 1
+  printf '%s' "$requested"
+}
+
 cmd_add() {
-  [ $# -eq 1 ] || die "usage: workbranch add <task>"
-  task=$1
+  parse_add_options "$@"
+  task=${ARGS[0]}
   validate_safe_name "task" "$task"
   require_project
   CREATED_PATHS=()
@@ -2267,14 +2358,34 @@ cmd_add() {
   done
   preflight_die_if_errors "add"
 
+  if [ -n "$ADD_FROM_REF" ]; then
+    reset_preflight
+    i=0
+    while [ $i -lt ${#REPO_NAMES[@]} ]; do
+      name=$(repo_name_at "$i")
+      base=$(base_repo_path "$name")
+      base_label="$BASE_DIR/$name"
+      preflight_fetch_origin "$base_label" "$base"
+      if ! resolve_add_source_ref "$base" "$ADD_FROM_REF" >/dev/null; then
+        preflight_error "$base_label missing source ref: $ADD_FROM_REF"
+      fi
+      i=$((i + 1))
+    done
+    preflight_die_if_errors "add"
+  fi
+
   prompt_task_branches_for_add "$task"
+  ADD_SOURCE_REFS=()
 
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     base=$(base_repo_path "$name")
+    base_label="$BASE_DIR/$name"
     branch=$(metadata_task_branch_for_repo "$name") || branch=$(default_repo_task_branch_at "$i" "$task")
     workbranch_git_add_fetch_base "$base" || die "failed to fetch repo '$name'"
+    source_ref=$(resolve_add_source_ref "$base" "$ADD_FROM_REF") || die "$base_label missing source ref: $ADD_FROM_REF"
+    ADD_SOURCE_REFS[$i]=$source_ref
     local_branch_exists=0
     remote_branch_exists=0
     branch_exists "$base" "$branch" && local_branch_exists=1
@@ -2302,12 +2413,17 @@ cmd_add() {
     base=$(base_repo_path "$name")
     base_branch=$(repo_base_branch_at "$i")
     branch=$(metadata_task_branch_for_repo "$name") || branch=$(default_repo_task_branch_at "$i" "$task")
+    source_ref=${ADD_SOURCE_REFS[$i]:-HEAD}
     target=$(task_repo_path "$task" "$name")
     track_branch "$base" "$branch"
     track_worktree "$target" "$base"
-    workbranch_git_add_new_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
+    workbranch_git_add_new_task_worktree "$base" "$target" "$branch" "$source_ref" || fail_with_rollback "failed to create worktree for repo '$name'"
     success "Created: $task/$name"
-    success "  [base repo] $base_branch -> [task repo] $branch"
+    if [ -n "$ADD_FROM_REF" ]; then
+      success "  [source] $source_ref -> [task repo] $branch"
+    else
+      success "  [base repo] $base_branch -> [task repo] $branch"
+    fi
     i=$((i + 1))
   done
   if has_task_setups && ! run_task_setups "$task"; then
@@ -2479,12 +2595,17 @@ cmd_status() {
 
   section "Base worktrees"
   print_base_status_header
+  base_next_found=0
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     repo_matches_filter "$name" || { i=$((i + 1)); continue; }
     path=$(base_repo_path "$name")
-    print_base_status_item "$name" "$(branch_or_unknown "$path")" "$(head_commit_short "$path")" "$(worktree_status_label "$path")"
+    branch=$(branch_or_unknown "$path")
+    remote_diff=$(remote_diff_label "$path" "$branch")
+    base_next=$(next_action_for_base_remote "$remote_diff")
+    [ "$base_next" = "-" ] || base_next_found=1
+    print_base_status_item "$name" "$branch" "$(head_commit_short "$path")" "$remote_diff" "$(worktree_status_label "$path")" "$base_next"
     i=$((i + 1))
   done
 
@@ -2514,9 +2635,9 @@ cmd_status() {
     done
     [ $task_printed -eq 1 ] && found=1
   done
-  if [ $found -eq 1 ]; then
+  if [ $found -eq 1 ] || [ $base_next_found -eq 1 ]; then
     printf '\n'
-    print_next_legend
+    print_next_legend "$base_next_found" "$found"
   fi
   [ $found -eq 1 ] || info "(none)"
 
@@ -2926,8 +3047,12 @@ workbranch_git_add_new_task_worktree() {
   base_path=$1
   target_path=$2
   task_branch=$3
+  source_ref=${4:-HEAD}
   workbranch_git_prune_stale_worktrees "$base_path" || return 1
-  git -C "$base_path" worktree add "$target_path" -b "$task_branch" HEAD >/dev/null 2>&1
+  git -C "$base_path" worktree add "$target_path" -b "$task_branch" "$source_ref" >/dev/null 2>&1 || return 1
+  if [ "$source_ref" != "HEAD" ]; then
+    git -C "$target_path" branch --unset-upstream >/dev/null 2>&1 || true
+  fi
 }
 
 workbranch_git_delete_task_branch() {

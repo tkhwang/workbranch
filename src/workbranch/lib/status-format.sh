@@ -71,6 +71,29 @@ commit_diff_label() {
   fi
 }
 
+remote_diff_label() {
+  path=$1
+  branch=$2
+  [ -d "$path" ] || { printf 'missing'; return 0; }
+  remote_ref="refs/remotes/origin/$branch"
+  remote_commit=$(git -C "$path" rev-parse --verify --quiet "$remote_ref^{commit}" 2>/dev/null) || {
+    printf 'missing'
+    return 0
+  }
+  commit_diff_label "$path" "$remote_commit"
+}
+
+next_action_for_base_remote() {
+  diff_label=$1
+  case "$diff_label" in
+    0) printf '-' ;;
+    +*) printf 'push' ;;
+    -*) printf 'pull' ;;
+    ±*) printf 'check' ;;
+    *) printf 'check' ;;
+  esac
+}
+
 next_action_for_diff() {
   diff_label=$1
   case "$diff_label" in
@@ -83,23 +106,29 @@ next_action_for_diff() {
 }
 
 print_base_status_header() {
-  printf '    %s %s %s %s\n' \
+  printf '    %s %s %s %s %s %s\n' \
     "$(table_header 11 repo)" \
     "$(table_header 16 branch)" \
     "$(table_header 10 commit)" \
-    "$(color_text "$WB_GRAY" status)"
+    "$(table_header 7 remote)" \
+    "$(table_header 9 status)" \
+    "$(color_text "$WB_GRAY" next)"
 }
 
 print_base_status_item() {
   name=$1
   branch=$2
   commit=$3
-  state=$4
-  printf '    %-11s %-16s %-10s %s\n' \
+  remote_diff=$4
+  state=$5
+  next_action=$6
+  printf '    %-11s %-16s %-10s %s %s %s\n' \
     "$name" \
     "$branch" \
     "$commit" \
-    "$(color_text "$(color_status "$state")" "$state")"
+    "$(color_cell "$(color_diff "$remote_diff")" 7 "$remote_diff")" \
+    "$(color_cell "$(color_status "$state")" 9 "$state")" \
+    "$(color_text "$(color_next_action "$next_action")" "$next_action")"
 }
 
 print_task_status_header() {
@@ -129,9 +158,17 @@ print_task_status_item() {
 }
 
 print_next_legend() {
+  show_base=${1:-0}
+  show_task=${2:-0}
   section "Next"
-  item_detail "land    task has commits not in base: workbranch land <task>"
-  item_detail "update  task is behind base: workbranch update <task>"
+  if [ "$show_base" -eq 1 ]; then
+    item_detail "pull    base is behind remote: workbranch pull"
+    item_detail "push    base has commits not in remote: workbranch push"
+  fi
+  if [ "$show_task" -eq 1 ]; then
+    item_detail "land    task has commits not in base: workbranch land <task>"
+    item_detail "update  task is behind base: workbranch update <task>"
+  fi
 }
 
 is_task_workspace_path() {

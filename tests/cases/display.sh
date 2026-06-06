@@ -112,7 +112,7 @@ test_display_forced_color_status_uses_sections_and_colored_states() {
   assert_contains "$out" "➤ Task workspaces"
   assert_contains "$out" $'\033[0;90mrepo'
   assert_contains "$out" $'\033[0;33muntracked\033[0m'
-  assert_contains "$out" $'\033[0;32mclean\033[0m'
+  assert_contains "$out" $'\033[0;32mclean    \033[0m'
 }
 
 test_display_auto_tty_status_preserves_table_colors() {
@@ -126,7 +126,7 @@ test_display_auto_tty_status_preserves_table_colors() {
   assert_contains "$out" "➤ Base worktrees"
   assert_contains "$out" $'\033[0;90mrepo'
   assert_contains "$out" $'\033[0;33muntracked\033[0m'
-  assert_contains "$out" $'\033[0;32mclean\033[0m'
+  assert_contains "$out" $'\033[0;32mclean    \033[0m'
 }
 
 test_display_forced_color_init_shows_banner_and_sections() {

@@ -19,10 +19,10 @@ Usage:
 Workspace:
   init              Initialize a workbranch project
   list              List configured repos and task workspaces
-  add <task>        Create a task workspace
+  add <task> [--from <ref>]  Create a task workspace
   remove <task>     Remove task worktrees and local task branches
 Git:
-  status            Show commits, diff, and dirty state
+  status            Show remote diff, task diff, and dirty state
   vertical
   pull              Pull remote base branches into main worktrees
   push              Push base branches to origin
@@ -58,10 +58,10 @@ usage_enhanced() {
   section "Workspace"
   printf '  init              Initialize a workbranch project\n'
   printf '  list              List configured repos and task workspaces\n'
-  printf '  add <task>        Create a task workspace\n'
+  printf '  add <task> [--from <ref>]  Create a task workspace\n'
   printf '  remove <task>     Remove task worktrees and local task branches\n'
   section "Git"
-  printf '  status            Show commits, diff, and dirty state\n'
+  printf '  status            Show remote diff, task diff, and dirty state\n'
   printf '%s  vertical%s\n' "$WB_GRAY" "$WB_RESET"
   printf '  pull              Pull remote base branches into main worktrees\n'
   printf '  push              Push base branches to origin\n'

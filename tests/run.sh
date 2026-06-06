@@ -70,6 +70,9 @@ main() {
   run_test test_land_preflight_blocks_all_repos_before_partial_land
   run_test test_push_supports_task_and_base_branches_after_fast_forward_merge
   run_test test_add_uses_feat_parent_branch_as_default
+  run_test test_add_rejects_empty_from_equals
+  run_test test_add_from_remote_ref_seeds_task_branch_from_origin_ref
+  run_test test_add_from_missing_ref_fails_before_creating_task
   run_test test_add_task_branch_override_is_used_by_later_commands
   run_test test_add_rejects_existing_task_branch
   run_test test_add_rejects_remote_only_task_branch_without_remove_advice
@@ -85,6 +88,7 @@ main() {
   run_test test_add_rolls_back_branch_when_new_worktree_helper_fails
   run_test test_add_rolls_back_dirty_worktree_registration
   run_test test_add_branches_from_local_base_after_land_before_push
+  run_test test_status_reports_base_remote_diff_and_next_action
   run_test test_status_reports_base_task_diff_and_worktree_state
   run_test test_status_repo_filter_skips_tasks_without_matching_rows
   run_test test_status_reports_stale_task_shaped_directories_separately

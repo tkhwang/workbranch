@@ -14,9 +14,63 @@ prompt_task_branches_for_add() {
   done
 }
 
+parse_add_options() {
+  ADD_FROM_REF=""
+  ARGS=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --from)
+        [ $# -ge 2 ] || die "missing value for --from"
+        ADD_FROM_REF=$2
+        shift 2
+        ;;
+      --from=*)
+        ADD_FROM_REF=${1#--from=}
+        [ -n "$ADD_FROM_REF" ] || die "missing value for --from"
+        shift
+        ;;
+      --*)
+        die "usage: workbranch add <task> [--from <ref>]"
+        ;;
+      *)
+        ARGS[${#ARGS[@]}]=$1
+        shift
+        ;;
+    esac
+  done
+
+  [ ${#ARGS[@]} -eq 1 ] || die "usage: workbranch add <task> [--from <ref>]"
+  if [ -n "$ADD_FROM_REF" ]; then
+    validate_nonempty_no_space "source ref" "$ADD_FROM_REF"
+  fi
+}
+
+resolve_add_source_ref() {
+  base=$1
+  requested=$2
+  case "$requested" in
+    "")
+      printf 'HEAD'
+      return 0
+      ;;
+    origin/*|refs/*|HEAD)
+      git_ref_exists "$base" "$requested" || return 1
+      printf '%s' "$requested"
+      return 0
+      ;;
+  esac
+
+  if git_ref_exists "$base" "origin/$requested"; then
+    printf 'origin/%s' "$requested"
+    return 0
+  fi
+  git_ref_exists "$base" "$requested" || return 1
+  printf '%s' "$requested"
+}
+
 cmd_add() {
-  [ $# -eq 1 ] || die "usage: workbranch add <task>"
-  task=$1
+  parse_add_options "$@"
+  task=${ARGS[0]}
   validate_safe_name "task" "$task"
   require_project
   CREATED_PATHS=()
@@ -46,14 +100,34 @@ cmd_add() {
   done
   preflight_die_if_errors "add"
 
+  if [ -n "$ADD_FROM_REF" ]; then
+    reset_preflight
+    i=0
+    while [ $i -lt ${#REPO_NAMES[@]} ]; do
+      name=$(repo_name_at "$i")
+      base=$(base_repo_path "$name")
+      base_label="$BASE_DIR/$name"
+      preflight_fetch_origin "$base_label" "$base"
+      if ! resolve_add_source_ref "$base" "$ADD_FROM_REF" >/dev/null; then
+        preflight_error "$base_label missing source ref: $ADD_FROM_REF"
+      fi
+      i=$((i + 1))
+    done
+    preflight_die_if_errors "add"
+  fi
+
   prompt_task_branches_for_add "$task"
+  ADD_SOURCE_REFS=()
 
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     base=$(base_repo_path "$name")
+    base_label="$BASE_DIR/$name"
     branch=$(metadata_task_branch_for_repo "$name") || branch=$(default_repo_task_branch_at "$i" "$task")
     workbranch_git_add_fetch_base "$base" || die "failed to fetch repo '$name'"
+    source_ref=$(resolve_add_source_ref "$base" "$ADD_FROM_REF") || die "$base_label missing source ref: $ADD_FROM_REF"
+    ADD_SOURCE_REFS[$i]=$source_ref
     local_branch_exists=0
     remote_branch_exists=0
     branch_exists "$base" "$branch" && local_branch_exists=1
@@ -81,12 +155,17 @@ cmd_add() {
     base=$(base_repo_path "$name")
     base_branch=$(repo_base_branch_at "$i")
     branch=$(metadata_task_branch_for_repo "$name") || branch=$(default_repo_task_branch_at "$i" "$task")
+    source_ref=${ADD_SOURCE_REFS[$i]:-HEAD}
     target=$(task_repo_path "$task" "$name")
     track_branch "$base" "$branch"
     track_worktree "$target" "$base"
-    workbranch_git_add_new_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
+    workbranch_git_add_new_task_worktree "$base" "$target" "$branch" "$source_ref" || fail_with_rollback "failed to create worktree for repo '$name'"
     success "Created: $task/$name"
-    success "  [base repo] $base_branch -> [task repo] $branch"
+    if [ -n "$ADD_FROM_REF" ]; then
+      success "  [source] $source_ref -> [task repo] $branch"
+    else
+      success "  [base repo] $base_branch -> [task repo] $branch"
+    fi
     i=$((i + 1))
   done
   if has_task_setups && ! run_task_setups "$task"; then

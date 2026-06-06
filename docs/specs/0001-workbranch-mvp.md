@@ -151,13 +151,13 @@ Show configured repos, base branches, current branches, and task workspaces.
 
 ### `workbranch status`
 
-Show commit position, clean/dirty state, and the next suggested action for task worktrees.
+Show base commit position versus its cached remote-tracking branch, task commit position versus local base, clean/dirty state, and the next suggested action.
 
 ```text
 [*] Base worktrees
-    repo        branch           commit     status
-    frontend    master           a1b2c3d4e  clean
-    backend     master           f6e7d8c9a  untracked
+    repo        branch           commit     remote  status    next
+    frontend    master           a1b2c3d4e  -1      clean     pull
+    backend     master           f6e7d8c9a  0       untracked -
 
 [*] Task workspaces
 [*] login
@@ -166,11 +166,13 @@ Show commit position, clean/dirty state, and the next suggested action for task 
     backend     a1b2c3d4e  a1b2c3d4e  0     modified  -
 
 [*] Next
+    pull    base is behind remote: workbranch pull
+    push    base has commits not in remote: workbranch push
     land    task has commits not in base: workbranch land <task>
     update  task is behind base: workbranch update <task>
 ```
 
-### `workbranch add <task>`
+### `workbranch add <task> [--from <ref>]`
 
 Create one task workspace with one linked worktree per repo.
 
@@ -180,7 +182,7 @@ For each repo:
 2. Show the repo's configured base branch, then prompt for the task branch name, defaulting from the branch naming rule above.
 3. Fail if the chosen local or remote task branch already exists. Local task branches can be deleted with `workbranch remove <task>` before adding again; remote-only task branches must be deleted or renamed outside workbranch.
 4. Create the task directory and write `<task>/.workbranch.task`.
-5. Create a new local task branch from the base branch.
+5. Create a new local task branch from the base branch, or from the resolved `--from` source ref when provided. Bare `--from feat/x` prefers `origin/feat/x`; explicit `origin/feat/x`, `refs/...`, `HEAD`, and existing local refs are also accepted.
 6. Create a linked worktree at `<task>/<repo>`.
 7. Run configured repo-level setup commands. If no repo setup ran and the operation is not repo-filtered, run project-level `TASK_SETUP` when configured.
 
