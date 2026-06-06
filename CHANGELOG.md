@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.0](https://github.com/tkhwang/workbranch/compare/v1.4.0...v1.5.0) (2026-06-06)
+
+
+### Features
+
+* **display:** add colors for repo and branch names ([c72688e](https://github.com/tkhwang/workbranch/commit/c72688ecc7e647861a89803720024845c0080d6e))
+* **log:** enhance log formatting ([4298bde](https://github.com/tkhwang/workbranch/commit/4298bdec89b9a579b3a2b2aaee4eef19c71cc6b0))
+
 ## [1.4.0](https://github.com/tkhwang/workbranch/compare/v1.3.0...v1.4.0) (2026-06-06)
 
 
