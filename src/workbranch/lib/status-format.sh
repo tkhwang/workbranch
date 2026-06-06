@@ -122,9 +122,9 @@ print_base_status_item() {
   remote_diff=$4
   state=$5
   next_action=$6
-  printf '    %-11s %-16s %-10s %s %s %s\n' \
-    "$name" \
-    "$branch" \
+  printf '    %s %s %-10s %s %s %s\n' \
+    "$(color_repo_cell 11 "$name")" \
+    "$(color_branch_cell 16 "$branch")" \
     "$commit" \
     "$(color_cell "$(color_diff "$remote_diff")" 7 "$remote_diff")" \
     "$(color_cell "$(color_status "$state")" 9 "$state")" \
@@ -148,8 +148,8 @@ print_task_status_item() {
   diff_label=$4
   state=$5
   next_action=$6
-  printf '    %-11s %-10s %-10s %s %s %s\n' \
-    "$name" \
+  printf '    %s %-10s %-10s %s %s %s\n' \
+    "$(color_repo_cell 11 "$name")" \
     "$base_commit" \
     "$task_commit" \
     "$(color_cell "$(color_diff "$diff_label")" 5 "$diff_label")" \

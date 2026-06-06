@@ -26,13 +26,13 @@ cmd_list() {
     done
   fi
   section "Repos"
-  printf '    %-11s %-16s %s\n' "repo" "base" "current"
+  printf '    %s %s %s\n' "$(table_header 11 repo)" "$(table_header 16 base)" "$(color_text "$WB_GRAY" current)"
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     branch=$(repo_base_branch_at "$i")
     current=$(branch_or_unknown "$(base_repo_path "$name")")
-    printf '    %-11s %-16s %s\n' "$name" "$branch" "$current"
+    printf '    %s %s %s\n' "$(color_repo_cell 11 "$name")" "$(color_branch_cell 16 "$branch")" "$(color_branch_name "$current")"
     i=$((i + 1))
   done
   section "Tasks"
@@ -52,12 +52,12 @@ cmd_list() {
     [ $task_has_repo -eq 1 ] || continue
     found=1
     section "$dir_name"
-    printf '    %-11s %s\n' "repo" "branch"
+    printf '    %s %s\n' "$(table_header 11 repo)" "$(color_text "$WB_GRAY" branch)"
     i=0
     while [ $i -lt ${#REPO_NAMES[@]} ]; do
       name=$(repo_name_at "$i")
       current=$(branch_or_unknown "$path/$name")
-      printf '    %-11s %s\n' "$name" "$current"
+      printf '    %s %s\n' "$(color_repo_cell 11 "$name")" "$(color_branch_name "$current")"
       i=$((i + 1))
     done
   done

@@ -111,6 +111,8 @@ test_display_forced_color_status_uses_sections_and_colored_states() {
   assert_contains "$out" "➤ Base worktrees"
   assert_contains "$out" "➤ Task workspaces"
   assert_contains "$out" $'\033[0;90mrepo'
+  assert_contains "$out" $'\033[0;36mfrontend   \033[0m'
+  assert_contains "$out" $'\033[0;35mmaster          \033[0m'
   assert_contains "$out" $'\033[0;33muntracked\033[0m'
   assert_contains "$out" $'\033[0;32mclean    \033[0m'
 }
@@ -125,8 +127,71 @@ test_display_auto_tty_status_preserves_table_colors() {
   out=$(run_with_pty sh -c 'cd "$1" && shift && exec "$@"' sh "$project" env -u NO_COLOR TERM=xterm WORKBRANCH_COLOR=auto "$WORKBRANCH" status 2>&1)
   assert_contains "$out" "➤ Base worktrees"
   assert_contains "$out" $'\033[0;90mrepo'
+  assert_contains "$out" $'\033[0;36mfrontend   \033[0m'
+  assert_contains "$out" $'\033[0;35mmaster          \033[0m'
   assert_contains "$out" $'\033[0;33muntracked\033[0m'
   assert_contains "$out" $'\033[0;32mclean    \033[0m'
+}
+
+test_display_forced_color_list_uses_repo_and_branch_colors() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  out=$(env -u NO_COLOR WORKBRANCH_COLOR=always "$WORKBRANCH" list 2>&1)
+  assert_contains "$out" $'\033[0;36mfrontend   \033[0m'
+  assert_contains "$out" $'\033[0;35mmaster          \033[0m'
+  assert_contains "$out" $'\033[0;35mfeature/login\033[0m'
+}
+
+test_display_forced_color_push_log_uses_repo_and_branch_colors() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  git -C "$project/login/frontend" config user.name "Workbranch Test"
+  git -C "$project/login/frontend" config user.email "workbranch-test@example.com"
+  git -C "$project/login/backend" config user.name "Workbranch Test"
+  git -C "$project/login/backend" config user.email "workbranch-test@example.com"
+  printf '%s\n' "push frontend" > "$project/login/frontend/push.txt"
+  git -C "$project/login/frontend" add push.txt
+  git -C "$project/login/frontend" commit -m "push frontend" >/dev/null
+  printf '%s\n' "push backend" > "$project/login/backend/push.txt"
+  git -C "$project/login/backend" add push.txt
+  git -C "$project/login/backend" commit -m "push backend" >/dev/null
+
+  out=$(env -u NO_COLOR WORKBRANCH_COLOR=always "$WORKBRANCH" push login 2>&1)
+  assert_contains "$out" $'Pushing login/\033[0;36mfrontend\033[0m: \033[0;35mfeature/login\033[0m'
+  assert_contains "$out" $'\n\n\033[0;34m[*]\033[0m Pushing login/\033[0;36mbackend\033[0m: \033[0;35mfeature/login\033[0m'
+}
+
+test_display_forced_color_land_log_uses_repo_and_branch_colors() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  git -C "$project/login/frontend" config user.name "Workbranch Test"
+  git -C "$project/login/frontend" config user.email "workbranch-test@example.com"
+  git -C "$project/login/backend" config user.name "Workbranch Test"
+  git -C "$project/login/backend" config user.email "workbranch-test@example.com"
+  printf '%s\n' "land frontend" > "$project/login/frontend/land.txt"
+  git -C "$project/login/frontend" add land.txt
+  git -C "$project/login/frontend" commit -m "land frontend" >/dev/null
+  printf '%s\n' "land backend" > "$project/login/backend/land.txt"
+  git -C "$project/login/backend" add land.txt
+  git -C "$project/login/backend" commit -m "land backend" >/dev/null
+
+  out=$(env -u NO_COLOR WORKBRANCH_COLOR=always "$WORKBRANCH" land login 2>&1)
+  assert_contains "$out" $'Landing login/\033[0;36mfrontend\033[0m: \033[0;35mmaster\033[0m'
+  assert_contains "$out" $'\n\n\033[0;34m[*]\033[0m Landing login/\033[0;36mbackend\033[0m: \033[0;35mmaster\033[0m'
+  assert_contains "$out" $'Landed: login/\033[0;36mfrontend\033[0m -> \033[0;35mmaster\033[0m'
+  assert_contains "$out" $'Landed: login/\033[0;36mbackend\033[0m -> \033[0;35mmaster\033[0m'
 }
 
 test_display_forced_color_init_shows_banner_and_sections() {

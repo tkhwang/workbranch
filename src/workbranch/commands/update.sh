@@ -31,18 +31,23 @@ preflight_update_task() {
 update_task() {
   task=$1
   i=0
+  repo_log_seen=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
     repo_matches_filter "$name" || { i=$((i + 1)); continue; }
     base=$(base_repo_path "$name")
     base_branch=$(repo_base_branch_at "$i")
+    branch=$(repo_task_branch_at "$i" "$task")
     task_path=$(task_repo_path "$task" "$name")
     [ -d "$base/.git" ] || [ -f "$base/.git" ] || die "base repo missing for '$name': $base"
     [ -d "$task_path/.git" ] || [ -f "$task_path/.git" ] || die "task repo missing for '$name': $task_path"
+    repo_log_separator "$repo_log_seen"
+    info_repo_branch "Updating" "$task" "$name" "$branch"
     ensure_current_branch "$base" "$base_branch"
     ensure_clean_worktree "$task_path"
     workbranch_git_update_task "$task_path" "$(head_commit_full "$base")"
-    success "Updated: $task/$name"
+    success_repo_target "Updated" "$task" "$name"
+    repo_log_seen=1
     i=$((i + 1))
   done
 }
