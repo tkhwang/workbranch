@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.0](https://github.com/tkhwang/workbranch/compare/v1.1.0...v1.2.0) (2026-06-06)
+
+
+### Features
+
+* **finder:** add xdg-open support for linux ([9d472b5](https://github.com/tkhwang/workbranch/commit/9d472b595f3d69bc322657b23434cac2e27e8b97))
+* **tool:** enhance editor and terminal tool launching ([50f2f1e](https://github.com/tkhwang/workbranch/commit/50f2f1e797d3cc5d3ae94210a032260c42c7e6e9))
+* **tool:** enhance editor and terminal tool launching ([cc7dc99](https://github.com/tkhwang/workbranch/commit/cc7dc99f4a777bd70022f0fb68d8ea803bee1587))
+
 ## [1.1.0](https://github.com/tkhwang/workbranch/compare/v1.0.0...v1.1.0) (2026-06-05)
 
 
