@@ -2,6 +2,10 @@ main() {
   cmd=${1:-help}
   if [ $# -gt 0 ]; then shift; fi
   case "$cmd" in
+    help|-h|--help|version|-v|--version|config|ide|finder|terminal) ;;
+    *) require_core_supported_platform ;;
+  esac
+  case "$cmd" in
     config) cmd_config "$@" ;;
     init) cmd_init "$@" ;;
     add) cmd_add "$@" ;;

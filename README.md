@@ -73,6 +73,14 @@ my-app-workspace
 
 Single-repo projects use the same shape with one repo directory inside each task.
 
+## Platform support
+
+Core workbranch commands are supported on macOS, Linux, and WSL. Tool app launchers are macOS-only because the built-in app presets use macOS `open` and macOS app names.
+
+Supported everywhere: Git/worktree commands, `path`, `list`, `status`, `config`, `init`, and generated CLI distribution checks.
+
+macOS-only: `finder`, `ide`, `terminal`, `config ide`, and `config terminal`. On Linux/WSL, full `workbranch config` and `workbranch init` stay available and skip tool app prompts.
+
 ## Common commands
 
 ### Workspace lifecycle

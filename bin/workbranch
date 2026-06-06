@@ -244,6 +244,57 @@ success() { printf '%s[+]%s %s\n' "$WB_GREEN" "$WB_RESET" "$*"; }
 
 die() { printf '%s[-] Error:%s %s\n' "$WB_ERR_RED" "$WB_ERR_RESET" "$*" >&2; exit 1; }
 
+# ----- src/workbranch/lib/platform.sh -----
+detect_platform() {
+  if [ -n "${WORKBRANCH_TEST_PLATFORM:-}" ]; then
+    case "$WORKBRANCH_TEST_PLATFORM" in
+      macos|linux|wsl|other) printf '%s' "$WORKBRANCH_TEST_PLATFORM" ;;
+      *) die "invalid WORKBRANCH_TEST_PLATFORM: $WORKBRANCH_TEST_PLATFORM" ;;
+    esac
+    return 0
+  fi
+
+  case "$(uname -s 2>/dev/null || printf unknown)" in
+    Darwin) printf '%s' macos ;;
+    Linux)
+      if [ -n "${WSL_INTEROP:-}" ] || grep -qiE '(microsoft|wsl)' /proc/version 2>/dev/null; then
+        printf '%s' wsl
+      else
+        printf '%s' linux
+      fi
+      ;;
+    *) printf '%s' other ;;
+  esac
+}
+
+is_core_supported_platform() {
+  case "$(detect_platform)" in
+    macos|linux|wsl) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+is_macos_platform() {
+  [ "$(detect_platform)" = "macos" ]
+}
+
+require_core_supported_platform() {
+  platform=$(detect_platform)
+  case "$platform" in
+    macos|linux|wsl) return 0 ;;
+    *) die "unsupported platform: $platform; workbranch supports macOS, Linux, and WSL" ;;
+  esac
+}
+
+require_macos_tool_platform() {
+  label=$1
+  is_macos_platform || die "workbranch $label is only supported on macOS; core workbranch commands support macOS, Linux, and WSL"
+}
+
+info_skip_tool_prompts_for_platform() {
+  info "Tool app launchers are macOS-only; skipping IDE/Terminal prompts."
+}
+
 # ----- src/workbranch/usage.sh -----
 print_banner() {
   printf '%s' "$WB_PURPLE_BOLD"
@@ -1445,17 +1496,7 @@ run_finder_command() {
   (
     # Keep cwd aligned with the opened absolute path so tests can observe it via fake open.
     cd "$path" || exit 1
-    case "$(uname -s)" in
-      Darwin) open "$path" ;;
-      Linux)
-        if command -v xdg-open >/dev/null 2>&1; then
-          xdg-open "$path"
-        else
-          die "finder command is not available on this platform"
-        fi
-        ;;
-      *) die "finder command is not available on this platform" ;;
-    esac
+    open "$path"
   )
 }
 
@@ -1821,6 +1862,10 @@ cmd_config() {
       ;;
     *) die "usage: workbranch config [ide|terminal|--rewrite]" ;;
   esac
+  case "$config_target" in
+    ide|terminal) require_macos_tool_platform "config $config_target" ;;
+    *) require_core_supported_platform ;;
+  esac
   CREATED_PATHS=()
   CREATED_WORKTREES=()
   CREATED_WORKTREE_BASES=()
@@ -1929,6 +1974,15 @@ configure_terminal_prompt() {
   esac
 }
 
+configure_tool_prompts_if_macos() {
+  if is_macos_platform; then
+    configure_ide_prompt
+    configure_terminal_prompt
+  else
+    info_skip_tool_prompts_for_platform
+  fi
+}
+
 configure_repo_setup_prompt() {
   name=$1
   idx=$(repo_index_by_name "$name") || die "unknown repo: $name"
@@ -2003,8 +2057,7 @@ configure_existing_project() {
   configure_project_settings
 
   printf '\n'
-  configure_ide_prompt
-  configure_terminal_prompt
+  configure_tool_prompts_if_macos
 
   info "Repositories"
 
@@ -2087,8 +2140,7 @@ AFTER
 
   printf '
 ' >&2
-  configure_ide_prompt
-  configure_terminal_prompt
+  configure_tool_prompts_if_macos
 
   printf '
 ' >&2
@@ -2407,6 +2459,7 @@ cmd_path() {
 cmd_tool_launcher() {
   tool_label=$1
   shift
+  require_macos_tool_platform "$tool_label"
   require_project
   case "$tool_label" in
     ide) command=$IDE_COMMAND ;;
@@ -2451,6 +2504,7 @@ cmd_terminal() {
 }
 
 cmd_finder() {
+  require_macos_tool_platform finder
   require_project
   parse_repo_option "$@"
   [ ${#ARGS[@]} -eq 1 ] || die "usage: workbranch finder <task> [--repo <repo>]"
@@ -2685,6 +2739,7 @@ cmd_push_base() {
     repo_matches_filter "$name" || { i=$((i + 1)); continue; }
     branch=$(repo_base_branch_at "$i")
     base=$(base_repo_path "$name")
+    info "Pushing $name: $branch"
     workbranch_git_push_base "$name" "$base" "$branch"
     i=$((i + 1))
   done
@@ -2719,6 +2774,7 @@ cmd_push_task() {
     repo_matches_filter "$name" || { i=$((i + 1)); continue; }
     branch=$(repo_task_branch_at "$i" "$task")
     path=$(task_repo_path "$task" "$name")
+    info "Pushing $task/$name: $branch"
     workbranch_git_push_task "$name" "$path" "$branch"
     i=$((i + 1))
   done
@@ -3004,6 +3060,10 @@ workbranch_git_land_task() {
 main() {
   cmd=${1:-help}
   if [ $# -gt 0 ]; then shift; fi
+  case "$cmd" in
+    help|-h|--help|version|-v|--version|config|ide|finder|terminal) ;;
+    *) require_core_supported_platform ;;
+  esac
   case "$cmd" in
     config) cmd_config "$@" ;;
     init) cmd_init "$@" ;;

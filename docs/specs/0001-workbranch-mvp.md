@@ -139,6 +139,12 @@ Interactive terminal output may use ANSI color, a compact help/init banner, and 
 
 Examples in this spec show the plain output shape. Enhanced terminal output may render section headings with `➤` and color status labels, but command semantics and machine-sensitive outputs such as `workbranch path` remain unchanged.
 
+### Platform support
+
+Core commands support macOS, Linux, and WSL. Operational commands fail on unsupported platforms before project parsing with `unsupported platform: <platform>; workbranch supports macOS, Linux, and WSL`. `help` and `version` remain available on unsupported platforms.
+
+Tool app launcher commands are macOS-only: `finder`, `ide`, and `terminal`. Tool-specific config commands are also macOS-only: `config ide` and `config terminal`. Full `config` and `init` remain available on Linux/WSL and skip tool app prompts.
+
 ### `workbranch finder <task>` / `workbranch ide <task>` / `workbranch terminal <task>`
 
 `finder` opens the task root folder by default and one repo folder with `--repo <repo>`. `ide` and `terminal` run the configured command once per matching task repo worktree. The resolved repo path is appended as the final argument. With `--repo <repo>`, run only for that repo. Tool launchers do not modify repositories.

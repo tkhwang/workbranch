@@ -13,6 +13,10 @@ cmd_config() {
       ;;
     *) die "usage: workbranch config [ide|terminal|--rewrite]" ;;
   esac
+  case "$config_target" in
+    ide|terminal) require_macos_tool_platform "config $config_target" ;;
+    *) require_core_supported_platform ;;
+  esac
   CREATED_PATHS=()
   CREATED_WORKTREES=()
   CREATED_WORKTREE_BASES=()
@@ -121,6 +125,15 @@ configure_terminal_prompt() {
   esac
 }
 
+configure_tool_prompts_if_macos() {
+  if is_macos_platform; then
+    configure_ide_prompt
+    configure_terminal_prompt
+  else
+    info_skip_tool_prompts_for_platform
+  fi
+}
+
 configure_repo_setup_prompt() {
   name=$1
   idx=$(repo_index_by_name "$name") || die "unknown repo: $name"
@@ -195,8 +208,7 @@ configure_existing_project() {
   configure_project_settings
 
   printf '\n'
-  configure_ide_prompt
-  configure_terminal_prompt
+  configure_tool_prompts_if_macos
 
   info "Repositories"
 

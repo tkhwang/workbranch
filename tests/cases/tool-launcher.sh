@@ -3,7 +3,7 @@
 append_fake_finder_scripts() {
   fake_bin=$1
   mkdir -p "$fake_bin"
-  for launcher in open xdg-open; do
+  for launcher in open; do
     cat > "$fake_bin/$launcher" <<'SCRIPT'
 #!/usr/bin/env sh
 set -eu
@@ -32,12 +32,12 @@ CONFIG
 
 ' | run_expect_success "$WORKBRANCH" add login >/dev/null
 
-  out=$(run_expect_success "$WORKBRANCH" ide login --repo frontend)
+  out=$(WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" ide login --repo frontend)
   assert_contains "$out" "[*] Opening IDE: login/frontend"
   assert_contains "$(cat "$WORKBRANCH_FAKE_TOOL_LOG")" "$canonical_project/login/frontend|$canonical_project/login/frontend"
 
   : > "$WORKBRANCH_FAKE_TOOL_LOG"
-  out=$(run_expect_success "$WORKBRANCH" terminal login)
+  out=$(WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" terminal login)
   assert_contains "$out" "[*] Opening terminal: login/frontend"
   assert_contains "$out" "[*] Opening terminal: login/backend"
   assert_contains "$(cat "$WORKBRANCH_FAKE_TOOL_LOG")" "$canonical_project/login/frontend|$canonical_project/login/frontend"
@@ -67,7 +67,7 @@ CONFIG
   run_expect_success "$WORKBRANCH" init >/dev/null
   printf '\n\n' | run_expect_success "$WORKBRANCH" add login >/dev/null
 
-  PATH="$fake_bin:$PATH" run_expect_success "$WORKBRANCH" ide login >/dev/null
+  PATH="$fake_bin:$PATH" WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" ide login >/dev/null
   log=$(cat "$WORKBRANCH_FAKE_TOOL_LOG")
   assert_contains "$log" "$canonical_project/login/frontend|-na Visual Studio Code --args --new-window $canonical_project/login/frontend"
   assert_contains "$log" "$canonical_project/login/backend|-na Visual Studio Code --args --new-window $canonical_project/login/backend"
@@ -91,11 +91,11 @@ CONFIG
   run_expect_success "$WORKBRANCH" init >/dev/null
   printf '\n\n' | run_expect_success "$WORKBRANCH" add login >/dev/null
 
-  out=$(env -u NO_COLOR WORKBRANCH_COLOR=always "$WORKBRANCH" ide login --repo frontend 2>&1)
+  out=$(env -u NO_COLOR WORKBRANCH_COLOR=always WORKBRANCH_TEST_PLATFORM=macos "$WORKBRANCH" ide login --repo frontend 2>&1)
   assert_contains "$out" $'\033[0;35mIDE\033[0m'
   assert_contains "$out" $'\033[0;36mlogin/frontend\033[0m'
 
-  out=$(env -u NO_COLOR WORKBRANCH_COLOR=always "$WORKBRANCH" terminal login --repo backend 2>&1)
+  out=$(env -u NO_COLOR WORKBRANCH_COLOR=always WORKBRANCH_TEST_PLATFORM=macos "$WORKBRANCH" terminal login --repo backend 2>&1)
   assert_contains "$out" $'\033[0;35mterminal\033[0m'
   assert_contains "$out" $'\033[0;36mlogin/backend\033[0m'
 }
@@ -109,10 +109,10 @@ test_tool_commands_require_configured_command() {
 
 ' | run_expect_success "$WORKBRANCH" add login >/dev/null
 
-  out=$(run_expect_fail "$WORKBRANCH" ide login)
+  out=$(WORKBRANCH_TEST_PLATFORM=macos run_expect_fail "$WORKBRANCH" ide login)
   assert_contains "$out" "ide command is not configured; run workbranch config ide"
 
-  out=$(run_expect_fail "$WORKBRANCH" terminal login --repo frontend)
+  out=$(WORKBRANCH_TEST_PLATFORM=macos run_expect_fail "$WORKBRANCH" terminal login --repo frontend)
   assert_contains "$out" "terminal command is not configured; run workbranch config terminal"
 }
 
@@ -134,7 +134,7 @@ CONFIG
 ' | run_expect_success "$WORKBRANCH" add login >/dev/null
   rm -rf "$project/login/frontend"
 
-  out=$(run_expect_fail "$WORKBRANCH" ide login --repo frontend)
+  out=$(WORKBRANCH_TEST_PLATFORM=macos run_expect_fail "$WORKBRANCH" ide login --repo frontend)
   assert_contains "$out" "task repo not found: login/frontend"
   assert_not_exists "$WORKBRANCH_FAKE_TOOL_LOG"
 }
@@ -153,7 +153,7 @@ test_finder_opens_task_root_without_repo_filter() {
   run_expect_success "$WORKBRANCH" init >/dev/null
   printf '\n\n' | run_expect_success "$WORKBRANCH" add login >/dev/null
 
-  out=$(PATH="$fake_bin:$PATH" run_expect_success "$WORKBRANCH" finder login)
+  out=$(PATH="$fake_bin:$PATH" WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" finder login)
   assert_contains "$out" "[*] Opening Finder: login"
   assert_contains "$(cat "$WORKBRANCH_FAKE_TOOL_LOG")" "$canonical_project/login|$canonical_project/login"
   assert_not_contains "$(cat "$WORKBRANCH_FAKE_TOOL_LOG")" "$canonical_project/login/frontend"
@@ -172,31 +172,27 @@ test_finder_repo_filter_opens_one_repo_path() {
   run_expect_success "$WORKBRANCH" init >/dev/null
   printf '\n\n' | run_expect_success "$WORKBRANCH" add login >/dev/null
 
-  out=$(PATH="$fake_bin:$PATH" run_expect_success "$WORKBRANCH" finder login --repo frontend)
+  out=$(PATH="$fake_bin:$PATH" WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" finder login --repo frontend)
   assert_contains "$out" "[*] Opening Finder: login/frontend"
   assert_contains "$(cat "$WORKBRANCH_FAKE_TOOL_LOG")" "$canonical_project/login/frontend|$canonical_project/login/frontend"
   assert_not_contains "$(cat "$WORKBRANCH_FAKE_TOOL_LOG")" "$canonical_project/login/backend"
 }
 
-test_finder_linux_branch_uses_xdg_open() {
-  new_fixture
-  project="$FIXTURE_PROJECT"
-  cd "$project" || return 1
-  canonical_project=$(pwd -P)
-  fake_bin="$TMP_ROOT/bin"
-  append_fake_finder_scripts "$fake_bin"
-  cat > "$fake_bin/uname" <<'SCRIPT'
-#!/usr/bin/env sh
-printf '%s\n' Linux
-SCRIPT
-  chmod +x "$fake_bin/uname"
-  export WORKBRANCH_FAKE_TOOL_LOG="$TMP_ROOT/finder.log"
 
-  run_expect_success "$WORKBRANCH" init >/dev/null
-  printf '\n\n' | run_expect_success "$WORKBRANCH" add login >/dev/null
+test_tool_app_commands_are_macos_only() {
+  out=$(WORKBRANCH_TEST_PLATFORM=linux run_expect_fail "$WORKBRANCH" finder login)
+  assert_contains "$out" "workbranch finder is only supported on macOS; core workbranch commands support macOS, Linux, and WSL"
+  assert_not_contains "$out" "no enclosing workbranch project found"
 
-  out=$(PATH="$fake_bin:$PATH" run_expect_success "$WORKBRANCH" finder login --repo backend)
-  assert_contains "$out" "[*] Opening Finder: login/backend"
-  assert_contains "$(cat "$WORKBRANCH_FAKE_TOOL_LOG")" "$canonical_project/login/backend|$canonical_project/login/backend"
-  assert_not_contains "$(cat "$WORKBRANCH_FAKE_TOOL_LOG")" "$canonical_project/login/frontend"
+  out=$(WORKBRANCH_TEST_PLATFORM=other run_expect_fail "$WORKBRANCH" finder login)
+  assert_contains "$out" "workbranch finder is only supported on macOS; core workbranch commands support macOS, Linux, and WSL"
+  assert_not_contains "$out" "unsupported platform: other"
+
+  out=$(WORKBRANCH_TEST_PLATFORM=wsl run_expect_fail "$WORKBRANCH" ide login)
+  assert_contains "$out" "workbranch ide is only supported on macOS; core workbranch commands support macOS, Linux, and WSL"
+  assert_not_contains "$out" "no enclosing workbranch project found"
+
+  out=$(WORKBRANCH_TEST_PLATFORM=linux run_expect_fail "$WORKBRANCH" terminal login)
+  assert_contains "$out" "workbranch terminal is only supported on macOS; core workbranch commands support macOS, Linux, and WSL"
+  assert_not_contains "$out" "no enclosing workbranch project found"
 }

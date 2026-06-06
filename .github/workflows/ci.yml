@@ -29,6 +29,15 @@ jobs:
       - name: Run integration tests
         run: ./tests/run.sh
 
+      - name: Run platform contract smoke tests
+        run: |
+          WORKBRANCH_TEST_PLATFORM=macos ./bin/workbranch help >/dev/null
+          WORKBRANCH_TEST_PLATFORM=linux ./bin/workbranch help >/dev/null
+          WORKBRANCH_TEST_PLATFORM=wsl ./bin/workbranch version >/dev/null
+          WORKBRANCH_TEST_PLATFORM=other ./bin/workbranch list 2>&1 | grep 'unsupported platform: other'
+          WORKBRANCH_TEST_PLATFORM=linux ./bin/workbranch finder task1 2>&1 | grep 'workbranch finder is only supported on macOS'
+          WORKBRANCH_TEST_PLATFORM=wsl ./bin/workbranch config ide 2>&1 | grep 'workbranch config ide is only supported on macOS'
+
       - name: ShellCheck sources
         run: |
           find src/workbranch scripts -type f -name '*.sh' -print0 | xargs -0 shellcheck -s bash -S warning -e SC2034 install.sh
