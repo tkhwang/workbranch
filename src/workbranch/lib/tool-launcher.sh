@@ -108,16 +108,6 @@ run_finder_command() {
   (
     # Keep cwd aligned with the opened absolute path so tests can observe it via fake open.
     cd "$path" || exit 1
-    case "$(uname -s)" in
-      Darwin) open "$path" ;;
-      Linux)
-        if command -v xdg-open >/dev/null 2>&1; then
-          xdg-open "$path"
-        else
-          die "finder command is not available on this platform"
-        fi
-        ;;
-      *) die "finder command is not available on this platform" ;;
-    esac
+    open "$path"
   )
 }

@@ -46,7 +46,7 @@ CONFIG
   out=$(run_expect_fail "$WORKBRANCH" path login --repo frontend)
   assert_contains "$out" "task repo not found or not a registered worktree: login/frontend"
 
-  out=$(run_expect_fail "$WORKBRANCH" ide login --repo frontend)
+  out=$(WORKBRANCH_TEST_PLATFORM=macos run_expect_fail "$WORKBRANCH" ide login --repo frontend)
   assert_contains "$out" "task repo not found or not a registered worktree: login/frontend"
   assert_not_exists "$WORKBRANCH_FAKE_TOOL_LOG"
 }

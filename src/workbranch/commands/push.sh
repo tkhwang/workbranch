@@ -26,6 +26,7 @@ cmd_push_base() {
     repo_matches_filter "$name" || { i=$((i + 1)); continue; }
     branch=$(repo_base_branch_at "$i")
     base=$(base_repo_path "$name")
+    info "Pushing $name: $branch"
     workbranch_git_push_base "$name" "$base" "$branch"
     i=$((i + 1))
   done
@@ -60,6 +61,7 @@ cmd_push_task() {
     repo_matches_filter "$name" || { i=$((i + 1)); continue; }
     branch=$(repo_task_branch_at "$i" "$task")
     path=$(task_repo_path "$task" "$name")
+    info "Pushing $task/$name: $branch"
     workbranch_git_push_task "$name" "$path" "$branch"
     i=$((i + 1))
   done

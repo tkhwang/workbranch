@@ -46,8 +46,7 @@ AFTER
 
   printf '
 ' >&2
-  configure_ide_prompt
-  configure_terminal_prompt
+  configure_tool_prompts_if_macos
 
   printf '
 ' >&2

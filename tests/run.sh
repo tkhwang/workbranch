@@ -50,6 +50,9 @@ main() {
   run_test test_display_forced_color_preflight_guidance_is_colored
   run_test test_display_forced_color_task_setup_failure_is_colored
   run_test test_version_reports_release_manifest_version
+  run_test test_help_and_version_work_on_unsupported_platform
+  run_test test_core_commands_reject_unsupported_platform
+  run_test test_core_commands_allow_linux_and_wsl
   run_test test_safe_names_reject_dot_and_dotdot
   run_test test_invalid_config_rejected_without_execution
   run_test test_init_existing_config_clones_base_repos
@@ -100,7 +103,7 @@ main() {
   run_test test_ide_legacy_macos_app_preset_opens_new_instance_per_repo
   run_test test_finder_opens_task_root_without_repo_filter
   run_test test_finder_repo_filter_opens_one_repo_path
-  run_test test_finder_linux_branch_uses_xdg_open
+  run_test test_tool_app_commands_are_macos_only
   run_test test_tool_launcher_forced_color_highlights_tool_and_target_path
   run_test test_tool_commands_require_configured_command
   run_test test_tool_launcher_reports_missing_task_repo_before_running_command
@@ -116,6 +119,8 @@ main() {
   run_test test_config_ide_preset_uses_superset_level1_order
   run_test test_config_tool_preset_names_are_colored
   run_test test_config_terminal_can_clear_without_removing_ide
+  run_test test_config_tool_targets_are_macos_only
+  run_test test_full_config_skips_tool_prompts_on_linux
   run_test test_config_writes_config_without_cloning
   run_test test_config_rewrites_legacy_config_without_cloning
   run_test test_config_keeps_glob_characters_literal
@@ -140,6 +145,7 @@ main() {
   run_test test_interactive_init_accepts_slash_repo_base_branch
   run_test test_interactive_init_rejects_slash_in_main_worktrees_directory
   run_test test_interactive_init_eof_aborts_required_prompt
+  run_test test_interactive_init_skips_tool_prompts_on_wsl
   run_test test_installer_downloads_cli_when_run_standalone
   run_test test_installer_standalone_uses_embedded_raw_base_url
   run_test test_installer_supports_pipe_to_bash

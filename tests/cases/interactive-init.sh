@@ -26,7 +26,7 @@ n
 Y
 INPUT
 )
-  out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | run_expect_success "$WORKBRANCH" init)
+  out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" init)
   assert_contains "$out" "[*] Create a new workbranch project"
   assert_not_contains "$out" "[*] Before workbranch"
   assert_not_contains "$out" "Problem: separate agents do not share context, session, or file search."
@@ -105,7 +105,7 @@ n
 Y
 INPUT
 )
-  out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | run_expect_success "$WORKBRANCH" init)
+  out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" init)
   assert_contains "$out" "[*] Default task branch prefix [feature]:"
   assert_contains "$out" "[*] Default task branch prefix: feat"
   assert_contains "$(cat "$TMP_ROOT/work/fullstack/.workbranch.config")" "BRANCH_PREFIX feat"
@@ -135,7 +135,7 @@ n
 n
 INPUT
 )
-  out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | run_expect_success "$WORKBRANCH" init)
+  out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" init)
   assert_contains "$out" "[*] Summary"
   assert_contains "$out" "[*] Create project now? [Y/n]:"
   assert_contains "$out" "[*] Cancelled."
@@ -164,7 +164,7 @@ n
 Y
 INPUT
 )
-  out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | run_expect_success "$WORKBRANCH" init)
+  out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" init)
   assert_contains "$out" "[+] Initialized"
   assert_file "$TMP_ROOT/target/fullstack/.workbranch.config"
   assert_dir "$TMP_ROOT/target/fullstack/_base/frontend/.git"
@@ -192,7 +192,7 @@ n
 Y
 INPUT
 )
-  out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | run_expect_success "$WORKBRANCH" init)
+  out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" init)
   assert_contains "$out" "[+] Initialized"
   assert_contains "$(cat "$TMP_ROOT/work/fullstack/.workbranch.config")" "REPO frontend $frontend_remote feature/cpq"
   assert_branch "$TMP_ROOT/work/fullstack/_base/frontend" "feature/cpq"
@@ -208,7 +208,7 @@ fullstack
 feature/cpq
 INPUT
 )
-  out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | run_expect_fail "$WORKBRANCH" init)
+  out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | WORKBRANCH_TEST_PLATFORM=macos run_expect_fail "$WORKBRANCH" init)
   assert_contains "$out" "invalid MAIN_WORKTREES_DIR 'feature/cpq'"
 }
 
@@ -250,3 +250,29 @@ INPUT
 }
 
 
+test_interactive_init_skips_tool_prompts_on_wsl() {
+  TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
+  mkdir -p "$TMP_ROOT/remotes" "$TMP_ROOT/seeds" "$TMP_ROOT/work"
+  frontend_remote=$(make_repo frontend)
+  input=$(cat <<INPUT
+
+.
+fullstack
+_base
+feature
+frontend
+$frontend_remote
+master
+
+n
+Y
+INPUT
+)
+  out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | WORKBRANCH_TEST_PLATFORM=wsl run_expect_success "$WORKBRANCH" init)
+  assert_contains "$out" "[*] Tool app launchers are macOS-only; skipping IDE/Terminal prompts."
+  assert_not_contains "$out" "[*] IDE command:"
+  assert_not_contains "$out" "[*] Terminal command:"
+  config=$(cat "$TMP_ROOT/work/fullstack/.workbranch.config")
+  assert_not_contains "$config" "IDE "
+  assert_not_contains "$config" "TERMINAL "
+}

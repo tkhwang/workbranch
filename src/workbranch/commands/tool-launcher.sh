@@ -1,6 +1,7 @@
 cmd_tool_launcher() {
   tool_label=$1
   shift
+  require_macos_tool_platform "$tool_label"
   require_project
   case "$tool_label" in
     ide) command=$IDE_COMMAND ;;
@@ -45,6 +46,7 @@ cmd_terminal() {
 }
 
 cmd_finder() {
+  require_macos_tool_platform finder
   require_project
   parse_repo_option "$@"
   [ ${#ARGS[@]} -eq 1 ] || die "usage: workbranch finder <task> [--repo <repo>]"

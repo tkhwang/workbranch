@@ -174,7 +174,9 @@ CONFIG
   git -C "$project/ui/backend" add normal.txt
   git -C "$project/ui/backend" commit -m "feature backend" >/dev/null
 
-  run_expect_success "$WORKBRANCH" push ui >/dev/null
+  out=$(run_expect_success "$WORKBRANCH" push ui)
+  assert_contains "$out" "[*] Pushing ui/frontend: feature/cpq-ui"
+  assert_contains "$out" "[*] Pushing ui/backend: feature/ui"
   assert_remote_file "$TMP_ROOT/remotes/frontend.git" feature/cpq-ui landed.txt "landed frontend"
   assert_remote_file "$TMP_ROOT/remotes/backend.git" feature/ui normal.txt "feature backend"
   assert_remote_missing_file "$TMP_ROOT/remotes/frontend.git" feature/cpq landed.txt
@@ -183,7 +185,9 @@ CONFIG
   assert_remote_missing_file "$TMP_ROOT/remotes/frontend.git" feature/cpq landed.txt
   assert_remote_missing_file "$TMP_ROOT/remotes/backend.git" master normal.txt
 
-  run_expect_success "$WORKBRANCH" push >/dev/null
+  out=$(run_expect_success "$WORKBRANCH" push)
+  assert_contains "$out" "[*] Pushing frontend: feature/cpq"
+  assert_contains "$out" "[*] Pushing backend: master"
   assert_remote_file "$TMP_ROOT/remotes/frontend.git" feature/cpq landed.txt "landed frontend"
   assert_remote_missing_file "$TMP_ROOT/remotes/frontend.git" master landed.txt
   assert_remote_file "$TMP_ROOT/remotes/backend.git" master normal.txt "feature backend"

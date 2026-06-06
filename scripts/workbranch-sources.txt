@@ -1,5 +1,6 @@
 src/workbranch/globals.sh
 src/workbranch/lib/output.sh
+src/workbranch/lib/platform.sh
 src/workbranch/usage.sh
 src/workbranch/lib/validation.sh
 src/workbranch/lib/config.sh

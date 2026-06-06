@@ -41,7 +41,7 @@ test_config_ide_can_set_custom_command_without_prompting_repos() {
   input=$(printf '%s
 %s
 ' "8" "code --reuse-window")
-  out=$(printf '%s' "$input" | run_expect_success "$WORKBRANCH" config ide)
+  out=$(printf '%s' "$input" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" config ide)
   assert_contains "$out" "[*] IDE command:"
   assert_not_contains "$out" "Base repo branch for frontend"
   assert_contains "$out" "[+] Config updated:"
@@ -55,7 +55,7 @@ test_config_ide_preset_uses_superset_level1_order() {
   cd "$project" || return 1
 
   out=$(printf '%s
-' "1" | run_expect_success "$WORKBRANCH" config ide)
+' "1" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" config ide)
   assert_contains "$out" "[*] IDE command:"
   assert_contains "$out" "1) Cursor (open -na Cursor --args --new-window)"
   assert_contains "$out" '2) Antigravity (open -na "Antigravity IDE" --args --new-window)'
@@ -75,7 +75,7 @@ test_config_tool_preset_names_are_colored() {
   project="$FIXTURE_PROJECT"
   cd "$project" || return 1
 
-  out=$(printf '\n' | env -u NO_COLOR WORKBRANCH_COLOR=always "$WORKBRANCH" config ide 2>&1)
+  out=$(printf '\n' | env -u NO_COLOR WORKBRANCH_COLOR=always WORKBRANCH_TEST_PLATFORM=macos "$WORKBRANCH" config ide 2>&1)
   assert_contains "$out" $'1) \033[0;36mCursor\033[0m (open -na Cursor --args --new-window)'
   assert_contains "$out" $'2) \033[0;36mAntigravity\033[0m (open -na "Antigravity IDE" --args --new-window)'
   assert_contains "$out" $'3) \033[0;36mWindsurf\033[0m (open -na Windsurf --args --new-window)'
@@ -84,7 +84,7 @@ test_config_tool_preset_names_are_colored() {
   assert_contains "$out" $'6) \033[0;36mXcode\033[0m (open -na Xcode)'
   assert_contains "$out" $'7) \033[0;36mVS Code\033[0m (open -na "Visual Studio Code" --args --new-window)'
 
-  out=$(printf '\n' | env -u NO_COLOR WORKBRANCH_COLOR=always "$WORKBRANCH" config terminal 2>&1)
+  out=$(printf '\n' | env -u NO_COLOR WORKBRANCH_COLOR=always WORKBRANCH_TEST_PLATFORM=macos "$WORKBRANCH" config terminal 2>&1)
   assert_contains "$out" $'1) \033[0;36miTerm\033[0m (open -a iTerm)'
   assert_contains "$out" $'2) \033[0;36mWarp\033[0m (open -a Warp)'
   assert_contains "$out" $'3) \033[0;36mTerminal.app\033[0m (open -a Terminal)'
@@ -101,12 +101,37 @@ TERMINAL open -a Warp
 CONFIG
 
   out=$(printf '%s
-' "6" | run_expect_success "$WORKBRANCH" config terminal)
+' "6" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" config terminal)
   assert_contains "$out" "[*] Terminal command:"
   assert_contains "$out" "[+] Config updated:"
   config=$(cat "$project/.workbranch.config")
   assert_contains "$config" "IDE open -a Cursor"
   assert_not_contains "$config" "TERMINAL open -a Warp"
+}
+
+test_config_tool_targets_are_macos_only() {
+  out=$(WORKBRANCH_TEST_FORCE_TTY_STDIN=1 WORKBRANCH_TEST_PLATFORM=linux run_expect_fail "$WORKBRANCH" config ide)
+  assert_contains "$out" "workbranch config ide is only supported on macOS; core workbranch commands support macOS, Linux, and WSL"
+  assert_not_contains "$out" "no enclosing workbranch project found"
+
+  out=$(WORKBRANCH_TEST_FORCE_TTY_STDIN=1 WORKBRANCH_TEST_PLATFORM=other run_expect_fail "$WORKBRANCH" config ide)
+  assert_contains "$out" "workbranch config ide is only supported on macOS; core workbranch commands support macOS, Linux, and WSL"
+  assert_not_contains "$out" "unsupported platform: other"
+
+  out=$(WORKBRANCH_TEST_FORCE_TTY_STDIN=1 WORKBRANCH_TEST_PLATFORM=wsl run_expect_fail "$WORKBRANCH" config terminal)
+  assert_contains "$out" "workbranch config terminal is only supported on macOS; core workbranch commands support macOS, Linux, and WSL"
+  assert_not_contains "$out" "no enclosing workbranch project found"
+}
+
+test_full_config_skips_tool_prompts_on_linux() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n' "" "" "" "" "" "" | WORKBRANCH_TEST_PLATFORM=linux run_expect_success "$WORKBRANCH" config)
+  assert_contains "$out" "[*] Tool app launchers are macOS-only; skipping IDE/Terminal prompts."
+  assert_not_contains "$out" "[*] IDE command:"
+  assert_not_contains "$out" "[*] Terminal command:"
 }
 
 test_config_writes_config_without_cloning() {
@@ -129,7 +154,7 @@ n
 Y
 INPUT
 )
-  out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | run_expect_success "$WORKBRANCH" config)
+  out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" config)
   assert_contains "$out" "Config written"
   project="$TMP_ROOT/work/fullstack"
   assert_file "$project/.workbranch.config"
@@ -263,7 +288,7 @@ test_config_preserves_task_setup_while_prompting_repo_setup() {
   cd "$project" || return 1
   printf '\nTASK_SETUP pnpm install\n' >> "$project/.workbranch.config"
 
-  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "" "" "" "" "" 'printf frontend > repo.txt' "" "" | run_expect_success "$WORKBRANCH" config)
+  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "" "" "" "" "" 'printf frontend > repo.txt' "" "" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" config)
   assert_contains "$out" "[*] Project name [fullstack]:"
   assert_contains "$out" "[*] Main worktrees dir [_base]:"
   assert_not_contains "$out" "[*] Branch prefix [feature]:"
@@ -295,7 +320,7 @@ test_config_preserves_existing_branch_prefix_without_prompting() {
   sed -i.bak 's/BRANCH_PREFIX feature/BRANCH_PREFIX ticket/' "$project/.workbranch.config"
   rm -f "$project/.workbranch.config.bak"
 
-  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "" "" "" "" "" "" "" "" | run_expect_success "$WORKBRANCH" config)
+  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "" "" "" "" "" "" "" "" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" config)
   assert_contains "$out" "[+] Config updated:"
   assert_contains "$(cat "$project/.workbranch.config")" "BRANCH_PREFIX ticket"
   assert_not_contains "$out" "Branch prefix [ticket]"
@@ -307,7 +332,7 @@ test_config_rejects_main_worktrees_dir_change_when_base_worktrees_exist() {
   cd "$project" || return 1
   run_expect_success "$WORKBRANCH" init >/dev/null
 
-  out=$(printf '%s\n%s\n' "" "_main" | run_expect_fail "$WORKBRANCH" config)
+  out=$(printf '%s\n%s\n' "" "_main" | WORKBRANCH_TEST_PLATFORM=macos run_expect_fail "$WORKBRANCH" config)
   assert_contains "$out" "cannot change MAIN_WORKTREES_DIR while base worktrees exist: _base"
   assert_contains "$out" "remove or move existing base worktrees before changing it"
   assert_contains "$(cat "$project/.workbranch.config")" "MAIN_WORKTREES_DIR _base"
@@ -325,7 +350,7 @@ test_config_guides_base_branch_change_for_cloned_repo() {
   cd "$project" || return 1
   run_expect_success "$WORKBRANCH" init >/dev/null
 
-  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "" "" "" "" "develop" "" "" "" | run_expect_success "$WORKBRANCH" config)
+  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "" "" "" "" "develop" "" "" "" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" config)
   assert_contains "$out" "[*] _base/frontend current branch: master"
   assert_contains "$out" "[+] Config updated:"
   assert_contains "$out" "[*] Base branch changes were saved in config only."
@@ -342,7 +367,7 @@ test_repo_setup_can_be_configured_and_run_per_repo() {
   frontend_cmd='printf "%s:%s:%s\n" "$WORKBRANCH_REPO" "$WORKBRANCH_TASK" "$(basename "$PWD")" >> "$WORKBRANCH_TASK_DIR/setup.log"; printf "%s\n" "$WORKBRANCH_REPO_DIR" > repo-setup-dir.txt'
   backend_cmd='printf "%s:%s:%s\n" "$WORKBRANCH_REPO" "$WORKBRANCH_TASK" "$(basename "$PWD")" >> "$WORKBRANCH_TASK_DIR/setup.log"; printf "%s\n" "$WORKBRANCH_BASE_REPO_DIR" > repo-base-dir.txt'
 
-  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "" "" "" "" "" "$frontend_cmd" "" "$backend_cmd" | run_expect_success "$WORKBRANCH" config)
+  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "" "" "" "" "" "$frontend_cmd" "" "$backend_cmd" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" config)
   assert_contains "$out" "[+] Config updated:"
   config=$(cat "$project/.workbranch.config")
   assert_contains "$config" "REPO_SETUP frontend $frontend_cmd"
@@ -422,7 +447,7 @@ REPO_SETUP frontend printf frontend > repo.txt
 REPO_SETUP backend printf backend > repo.txt
 CONFIG
 
-  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "" "" "" "" "" "--clear" "" "" | run_expect_success "$WORKBRANCH" config)
+  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "" "" "" "" "" "--clear" "" "" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" config)
   assert_contains "$out" "[+] Config updated:"
   config=$(cat "$project/.workbranch.config")
   assert_not_contains "$config" "REPO_SETUP frontend"
