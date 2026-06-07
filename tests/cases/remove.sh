@@ -260,3 +260,66 @@ GIT
   assert_file "$project/login/.workbranch.task"
   assert_contains "$out" "Task directory kept because it is not empty: login"
 }
+
+test_prune_removes_only_fully_merged_tasks() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  printf '\n\n' | run_expect_success "$WORKBRANCH" add feat-done >/dev/null
+  printf '\n\n' | run_expect_success "$WORKBRANCH" add feat-live >/dev/null
+
+  git -C "$project/feat-done/frontend" config user.name "Workbranch Test"
+  git -C "$project/feat-done/frontend" config user.email "workbranch-test@example.com"
+  git -C "$project/feat-done/backend" config user.name "Workbranch Test"
+  git -C "$project/feat-done/backend" config user.email "workbranch-test@example.com"
+  printf '%s\n' "done frontend" > "$project/feat-done/frontend/done-frontend.txt"
+  git -C "$project/feat-done/frontend" add done-frontend.txt
+  git -C "$project/feat-done/frontend" commit -m "done frontend" >/dev/null
+  printf '%s\n' "done backend" > "$project/feat-done/backend/done-backend.txt"
+  git -C "$project/feat-done/backend" add done-backend.txt
+  git -C "$project/feat-done/backend" commit -m "done backend" >/dev/null
+  run_expect_success "$WORKBRANCH" land feat-done >/dev/null
+
+  git -C "$project/feat-live/frontend" config user.name "Workbranch Test"
+  git -C "$project/feat-live/frontend" config user.email "workbranch-test@example.com"
+  printf '%s\n' "live frontend" > "$project/feat-live/frontend/live-frontend.txt"
+  git -C "$project/feat-live/frontend" add live-frontend.txt
+  git -C "$project/feat-live/frontend" commit -m "live frontend" >/dev/null
+
+  out=$(run_expect_success "$WORKBRANCH" prune)
+  assert_contains "$out" "Pruning merged task: feat-done"
+  assert_contains "$out" "Skipped: feat-live (feat-live/frontend not merged into master)"
+  assert_not_exists "$project/feat-done"
+  assert_dir "$project/feat-live"
+  if git -C "$project/_base/frontend" show-ref --verify --quiet refs/heads/feat/done; then
+    fail "expected prune to delete merged frontend branch"
+  fi
+  if git -C "$project/_base/backend" show-ref --verify --quiet refs/heads/feat/done; then
+    fail "expected prune to delete merged backend branch"
+  fi
+  git -C "$project/_base/frontend" show-ref --verify --quiet refs/heads/feat/live ||
+    fail "expected prune to keep unmerged frontend branch"
+}
+
+test_prune_skips_dirty_merged_task() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  printf '\n\n' | run_expect_success "$WORKBRANCH" add feat-dirty >/dev/null
+
+  git -C "$project/feat-dirty/frontend" config user.name "Workbranch Test"
+  git -C "$project/feat-dirty/frontend" config user.email "workbranch-test@example.com"
+  printf '%s\n' "dirty done" > "$project/feat-dirty/frontend/dirty-done.txt"
+  git -C "$project/feat-dirty/frontend" add dirty-done.txt
+  git -C "$project/feat-dirty/frontend" commit -m "dirty done" >/dev/null
+  run_expect_success "$WORKBRANCH" land feat-dirty >/dev/null
+  printf '%s\n' "dirty worktree" > "$project/feat-dirty/frontend/dirty.txt"
+
+  out=$(run_expect_success "$WORKBRANCH" prune)
+  assert_contains "$out" "Skipped: feat-dirty (feat-dirty/frontend dirty worktree)"
+  assert_dir "$project/feat-dirty"
+  git -C "$project/_base/frontend" show-ref --verify --quiet refs/heads/feat/dirty ||
+    fail "expected prune to keep dirty merged frontend branch"
+}

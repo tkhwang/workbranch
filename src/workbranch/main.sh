@@ -18,11 +18,12 @@ main() {
     doctor) cmd_doctor "$@" ;;
     pull) cmd_pull "$@" ;;
     update) cmd_update "$@" ;;
-    sync) cmd_sync "$@" ;;
+    refresh) cmd_refresh "$@" ;;
     finalize) cmd_finalize "$@" ;;
     push) cmd_push "$@" ;;
     land) cmd_land "$@" ;;
     remove) cmd_remove "$@" ;;
+    prune) cmd_prune "$@" ;;
     completion) cmd_completion "$@" ;;
     __complete-tasks) cmd_complete_tasks ;;
     __complete-repos) cmd_complete_repos ;;

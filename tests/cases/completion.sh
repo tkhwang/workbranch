@@ -17,8 +17,10 @@ test_complete_helpers_list_tasks_repos_and_commands() {
   assert_contains "$repos" "backend"
   assert_contains "$commands" "completion"
   assert_contains "$commands" "update"
-  assert_contains "$commands" "sync"
+  assert_contains "$commands" "refresh"
+  assert_not_contains "$commands" "sync"
   assert_contains "$commands" "doctor"
+  assert_contains "$commands" "prune"
 }
 
 test_complete_helpers_are_silent_outside_project() {
@@ -68,7 +70,12 @@ test_completion_bash_completes_tasks_and_repos() {
   _workbranch
   assert_contains "${COMPREPLY[*]}" "feat-login"
 
-  COMP_WORDS=(workbranch sync --repo "")
+  COMP_WORDS=(workbranch refresh "")
+  COMP_CWORD=2
+  _workbranch
+  assert_contains "${COMPREPLY[*]}" "feat-login"
+
+  COMP_WORDS=(workbranch refresh --repo "")
   COMP_CWORD=3
   _workbranch
   assert_contains "${COMPREPLY[*]}" "frontend"
@@ -107,16 +114,11 @@ test_completion_bash_uses_command_specific_flags() {
   _workbranch
   assert_not_contains "${COMPREPLY[*]-}" "feat-login"
 
-  COMP_WORDS=(workbranch sync --)
+  COMP_WORDS=(workbranch refresh --)
   COMP_CWORD=2
   _workbranch
   assert_contains "${COMPREPLY[*]}" "--repo"
   assert_not_contains "${COMPREPLY[*]}" "--all"
-
-  COMP_WORDS=(workbranch sync "")
-  COMP_CWORD=2
-  _workbranch
-  assert_not_contains "${COMPREPLY[*]-}" "feat-login"
 
   COMP_WORDS=(workbranch add --)
   COMP_CWORD=2
@@ -129,7 +131,8 @@ test_completion_fish_emits_complete_command() {
   out=$("$WORKBRANCH" completion fish)
   assert_contains "$out" "complete -c workbranch"
   assert_contains "$out" "__complete-tasks"
-  assert_contains "$out" "__workbranch_seen_command sync' -l repo"
+  assert_contains "$out" "__workbranch_seen_command refresh' -l repo"
+  assert_not_contains "$out" "__workbranch_seen_command sync' -l repo"
   assert_contains "$out" "__workbranch_seen_command doctor' -l repo"
   assert_contains "$out" "__workbranch_seen_command doctor' -l fix"
 }

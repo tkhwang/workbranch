@@ -19,7 +19,7 @@ Horizontal:
   land        task        -> local base
 
 Composite:
-  sync        remote base -> local base, then local base -> task
+  refresh        remote base -> local base, then local base -> task
 
 Maintenance:
   doctor      inspect project health; --fix prunes stale worktree registrations
@@ -95,13 +95,13 @@ Safety:
 - Fails before running if `_base/<repo>` has a rebase in progress.
 - Conflict resolution is left to Git and the user.
 
-### `workbranch sync`
+### `workbranch refresh [<task>]`
 
-Direction: remote base -> local base, then local base -> every task.
+Direction: remote base -> local base, then local base -> task workspace(s).
 
-For each repo, `workbranch sync` first validates that every target task workspace can be updated. If there are no task workspaces, or any target task worktree is dirty, missing, on the wrong branch, or has a rebase in progress, the command fails before pulling base branches.
+Without `<task>`, `workbranch refresh` targets every task workspace. With `<task>`, it targets only that task workspace. For each repo, `refresh` first validates that every target task workspace can be updated. If there are no task workspaces, or any target task worktree is dirty, missing, on the wrong branch, or has a rebase in progress, the command fails before pulling base branches.
 
-After update preflight passes, sync runs the same base pull behavior as `workbranch pull`:
+After update preflight passes, refresh runs the same base pull behavior as `workbranch pull`:
 
 ```bash
 cd _base/<repo>
@@ -119,7 +119,7 @@ Safety:
 
 - Fails before pulling if task updates cannot run.
 - Pull failures abort before any task update.
-- Uses existing pull and update Git operations; sync does not introduce a separate Git primitive.
+- Uses existing pull and update Git operations; refresh does not introduce a separate Git primitive.
 
 ### `workbranch update <task>`
 

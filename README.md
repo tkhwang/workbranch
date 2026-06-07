@@ -4,7 +4,7 @@
 
 Manage Git worktree task spaces without memorizing `git worktree` commands.
 
-`workbranch` creates one task folder per feature, works with one repo or many repos, and keeps branch sync commands short and safe.
+`workbranch` creates one task folder per feature, works with one repo or many repos, and keeps branch refresh commands short and safe.
 
 Its two core workflows are **Workspace lifecycle** for creating and removing task workspaces, and **Branch workflow** for updating, landing, and pushing task branches.
 
@@ -40,7 +40,7 @@ workbranch init
 workbranch add
 cd feat-login/<repo>
 # work on the task
-workbranch sync
+workbranch refresh feat-login
 workbranch push feat-login
 workbranch remove feat-login
 ```
@@ -74,7 +74,7 @@ workbranch add
 
 Use `workbranch add [<task>] --from <ref>` to seed the new task branches from another source ref. For example, `workbranch add task1 --from feat/XXX` fetches origin, prefers `origin/feat/XXX` when it exists, and creates the linked task worktrees from that ref while still using the prompted task branch names. Later `workbranch status` still compares the task branch to the current local base; the source ref is creation context, not a persistent status baseline.
 
-During active work, run `workbranch sync` to pull remote base branches into `_base/<repo>` and then update every task workspace from those refreshed local bases. `sync` first checks that task worktrees are updateable; dirty or otherwise blocked tasks stop the command before base branches are pulled.
+During active work, run `workbranch refresh` to pull remote base branches into `_base/<repo>` and then update every task workspace from those refreshed local bases. Use `workbranch refresh <task>` to refresh one task. `refresh` first checks that target task worktrees are updateable; dirty or otherwise blocked tasks stop the command before base branches are pulled.
 
 Use `workbranch config` when you want to update project settings, base branches, IDE/terminal launch commands, or per-repo setup commands without cloning repos again. If base branches change, existing `_base/<repo>` worktrees are fetched, checked out, and fast-forward pulled to those branches. Use `workbranch config base` when you only want to update base branches.
 
@@ -126,11 +126,18 @@ macOS-only: `finder`, `ide`, `terminal`, `config ide`, and `config terminal`. On
 | `workbranch status` | Show base remote diff, task diff, and dirty state |
 | `workbranch pull` | Pull remote base branches into `_base/<repo>` |
 | `workbranch update [task]` | Merge local base changes into task worktrees |
-| `workbranch sync` | Pull base branches, then update every task workspace |
 | `workbranch push` | Push base branches |
 | `workbranch push <task>` | Push task branches |
 | `workbranch land <task>` | Fast-forward task work back into local base branches |
+
+### Combined flow
+
+| Command | Use it to |
+| --- | --- |
+| `workbranch refresh` | Pull base branches, then update every task workspace |
+| `workbranch refresh <task>` | Pull base branches, then update one task workspace |
 | `workbranch finalize <task>` | Pull base branches, update one task, then land it into local base branches |
+| `workbranch prune` | Remove clean task workspaces already merged into local base branches |
 
 ### Tool commands
 

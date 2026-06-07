@@ -382,11 +382,14 @@ Git:
   update            Update every task workspace from local base worktrees
   update --all      Update every task workspace from local base worktrees
   update <task>     Update one task workspace from local base worktrees
-  sync              Pull base branches, then update every task workspace
   land <task>       Land task branches into base branches
-  finalize <task>   Pull base, update task, then land task
   common
   --repo <repo>     Limit operation to one repo; otherwise all repos
+Combined:
+  refresh           Pull base branches, then update every task workspace
+  refresh <task>    Pull base branches, then update one task workspace
+  finalize <task>   Pull base, update task, then land task
+  prune             Remove fully merged task workspaces
 Tool:
   path <task>       Print a task workspace path
   finder <task>     Open a task workspace in Finder
@@ -398,8 +401,6 @@ Config:
   config ide        Update only the configured IDE command
   config terminal   Update only the configured terminal command
   config --rewrite  Rewrite config to current format without prompts
-Completion:
-  completion <shell>   Print a shell completion script (bash, zsh, fish)
 Other:
   doctor            Diagnose project health; --fix applies safe repairs
   help              Show this help
@@ -427,11 +428,14 @@ usage_enhanced() {
   printf '  update            Update every task workspace from local base worktrees\n'
   printf '  update --all      Update every task workspace from local base worktrees\n'
   printf '  update <task>     Update one task workspace from local base worktrees\n'
-  printf '  sync              Pull base branches, then update every task workspace\n'
   printf '  land <task>       Land task branches into base branches\n'
-  printf '  finalize <task>   Pull base, update task, then land task\n'
   printf '%s  common%s\n' "$WB_GRAY" "$WB_RESET"
   printf '  --repo <repo>     Limit operation to one repo; otherwise all repos\n'
+  section "Combined"
+  printf '  refresh           Pull base branches, then update every task workspace\n'
+  printf '  refresh <task>    Pull base branches, then update one task workspace\n'
+  printf '  finalize <task>   Pull base, update task, then land task\n'
+  printf '  prune             Remove fully merged task workspaces\n'
   section "Tool"
   printf '  path <task>       Print a task workspace path\n'
   printf '  finder <task>     Open a task workspace in Finder\n'
@@ -443,8 +447,6 @@ usage_enhanced() {
   printf '  config ide        Update only the configured IDE command\n'
   printf '  config terminal   Update only the configured terminal command\n'
   printf '  config --rewrite  Rewrite config to current format without prompts\n'
-  section "Completion"
-  printf '  completion <shell>   Print a shell completion script (bash, zsh, fish)\n'
   section "Other"
   printf '  doctor            Diagnose project health; --fix applies safe repairs\n'
   printf '  help              Show this help\n'
@@ -3457,18 +3459,31 @@ cmd_update() {
   run_update_all
 }
 
-# ----- src/workbranch/commands/sync.sh -----
-cmd_sync() {
+# ----- src/workbranch/commands/refresh.sh -----
+cmd_refresh() {
   require_project
   parse_repo_option "$@"
-  [ ${#ARGS[@]} -eq 0 ] || die "usage: workbranch sync [--repo <repo>]"
-  collect_update_all_tasks
-  preflight_update_all_tasks
+  [ ${#ARGS[@]} -le 1 ] || die "usage: workbranch refresh [task] [--repo <repo>]"
+  if [ ${#ARGS[@]} -eq 1 ]; then
+    task=$(normalize_task_argument "${ARGS[0]}")
+    validate_task_folder_name "$task"
+    reset_preflight
+    preflight_update_task "$task"
+    preflight_die_if_errors "update"
+  else
+    collect_update_all_tasks
+    preflight_update_all_tasks
+  fi
   section "Pulling base branches"
   run_pull
   printf '\n'
-  section "Updating task workspaces"
-  execute_update_all_tasks
+  if [ ${#ARGS[@]} -eq 1 ]; then
+    section "Updating task workspace"
+    update_task "$task"
+  else
+    section "Updating task workspaces"
+    execute_update_all_tasks
+  fi
 }
 
 # ----- src/workbranch/commands/push.sh -----
@@ -3757,6 +3772,107 @@ cmd_remove() {
   fi
 }
 
+# ----- src/workbranch/commands/prune.sh -----
+prune_skip_reason() {
+  printf '%s' "$1"
+}
+
+prune_task_is_fully_merged() {
+  local task i name base task_path base_branch branch label base_label
+  task=$1
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    base=$(base_repo_path "$name")
+    task_path=$(task_repo_path "$task" "$name")
+    base_branch=$(repo_base_branch_at "$i")
+    branch=$(repo_task_branch_at "$i" "$task")
+    label="$task/$name"
+    base_label="$BASE_DIR/$name"
+
+    if [ ! -d "$base/.git" ] && [ ! -f "$base/.git" ]; then
+      prune_skip_reason "$base_label missing git repo"
+      return 1
+    fi
+    if [ "$(branch_or_unknown "$base")" != "$base_branch" ]; then
+      prune_skip_reason "$base_label expected branch $base_branch, got $(branch_or_unknown "$base")"
+      return 1
+    fi
+    if is_rebase_in_progress "$base"; then
+      prune_skip_reason "$base_label rebase in progress"
+      return 1
+    fi
+    if [ ! -d "$task_path/.git" ] && [ ! -f "$task_path/.git" ]; then
+      prune_skip_reason "$label missing git repo"
+      return 1
+    fi
+    if [ "$(branch_or_unknown "$task_path")" != "$branch" ]; then
+      prune_skip_reason "$label expected branch $branch, got $(branch_or_unknown "$task_path")"
+      return 1
+    fi
+    if is_git_dirty "$task_path"; then
+      prune_skip_reason "$label dirty worktree"
+      return 1
+    fi
+    if is_rebase_in_progress "$task_path"; then
+      prune_skip_reason "$label rebase in progress"
+      return 1
+    fi
+    if ! branch_exists "$base" "$branch"; then
+      prune_skip_reason "$label missing task branch $branch"
+      return 1
+    fi
+    if ! git_is_ancestor "$base" "$branch" "$base_branch"; then
+      prune_skip_reason "$label not merged into $base_branch"
+      return 1
+    fi
+    i=$((i + 1))
+  done
+  return 0
+}
+
+collect_prune_tasks() {
+  local path task reason
+  tasks_to_prune=()
+  tasks_to_skip=()
+  prune_skip_reasons=()
+  for path in "$PROJECT_ROOT"/*; do
+    is_task_workspace_path "$path" || continue
+    task=${path##*/}
+    if reason=$(prune_task_is_fully_merged "$task"); then
+      tasks_to_prune[${#tasks_to_prune[@]}]="$task"
+    else
+      tasks_to_skip[${#tasks_to_skip[@]}]="$task"
+      prune_skip_reasons[${#prune_skip_reasons[@]}]="$reason"
+    fi
+  done
+}
+
+cmd_prune() {
+  require_project
+  [ $# -eq 0 ] || die "usage: workbranch prune"
+  collect_prune_tasks
+
+  i=0
+  while [ $i -lt ${#tasks_to_skip[@]} ]; do
+    info "Skipped: ${tasks_to_skip[$i]} (${prune_skip_reasons[$i]})"
+    i=$((i + 1))
+  done
+
+  if [ ${#tasks_to_prune[@]} -eq 0 ]; then
+    info "No merged tasks to prune"
+    return 0
+  fi
+
+  i=0
+  while [ $i -lt ${#tasks_to_prune[@]} ]; do
+    task=${tasks_to_prune[$i]}
+    info "Pruning merged task: $task"
+    cmd_remove "$task" --force
+    i=$((i + 1))
+  done
+}
+
 # ----- src/workbranch/commands/version.sh -----
 cmd_version() {
   [ $# -eq 0 ] || die "usage: workbranch version"
@@ -3902,7 +4018,7 @@ cmd_complete_repos() {
 }
 
 cmd_complete_commands() {
-  printf '%s\n' add completion config doctor finalize finder help ide init land list path pull push remove status sync terminal update version
+  printf '%s\n' add completion config doctor finalize finder help ide init land list path prune pull push refresh remove status terminal update version
 }
 
 print_completion_bash() {
@@ -3945,7 +4061,7 @@ _workbranch() {
         remove) words='--force' ;;
         doctor) words='--fix --repo' ;;
         update) words='--all --repo' ;;
-        status|pull|push|land|finalize|sync|path|finder|ide|terminal) words='--repo' ;;
+        status|pull|push|land|finalize|refresh|path|finder|ide|terminal) words='--repo' ;;
         *) words='' ;;
       esac
       COMPREPLY=( $(compgen -W "$words" -- "$cur") )
@@ -3954,7 +4070,7 @@ _workbranch() {
   esac
 
   case "$cmd" in
-    remove|update|push|land|finalize|path|finder|ide|terminal)
+    remove|update|push|land|finalize|refresh|path|finder|ide|terminal)
       words=$($wb_bin __complete-tasks 2>/dev/null || true)
       COMPREPLY=( $(compgen -W "$words" -- "$cur") )
       return 0
@@ -3998,7 +4114,7 @@ _workbranch() {
       remove) flags=(--force) ;;
       doctor) flags=(--fix --repo) ;;
       update) flags=(--all --repo) ;;
-      status|pull|push|land|finalize|sync|path|finder|ide|terminal) flags=(--repo) ;;
+      status|pull|push|land|finalize|refresh|path|finder|ide|terminal) flags=(--repo) ;;
       *) flags=() ;;
     esac
     _describe 'option' flags
@@ -4006,7 +4122,7 @@ _workbranch() {
   fi
 
   case "$cmd" in
-    remove|update|push|land|finalize|path|finder|ide|terminal)
+    remove|update|push|land|finalize|refresh|path|finder|ide|terminal)
       tasks=(${(f)"$($wb_bin __complete-tasks 2>/dev/null)"})
       _describe 'task' tasks
       return
@@ -4055,6 +4171,7 @@ end
 
 complete -c workbranch -f -n '__workbranch_completing_command' -a '(__workbranch_complete_commands)'
 complete -c workbranch -f -n '__workbranch_seen_command update' -a '(__workbranch_complete_tasks)'
+complete -c workbranch -f -n '__workbranch_seen_command refresh' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command remove' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command push' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command land' -a '(__workbranch_complete_tasks)'
@@ -4075,7 +4192,7 @@ complete -c workbranch -n '__workbranch_seen_command pull' -l repo -d 'Limit ope
 complete -c workbranch -n '__workbranch_seen_command push' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command land' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command finalize' -l repo -d 'Limit operation to one repo'
-complete -c workbranch -n '__workbranch_seen_command sync' -l repo -d 'Limit operation to one repo'
+complete -c workbranch -n '__workbranch_seen_command refresh' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command doctor' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command path' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command finder' -l repo -d 'Limit operation to one repo'
@@ -4115,11 +4232,12 @@ main() {
     doctor) cmd_doctor "$@" ;;
     pull) cmd_pull "$@" ;;
     update) cmd_update "$@" ;;
-    sync) cmd_sync "$@" ;;
+    refresh) cmd_refresh "$@" ;;
     finalize) cmd_finalize "$@" ;;
     push) cmd_push "$@" ;;
     land) cmd_land "$@" ;;
     remove) cmd_remove "$@" ;;
+    prune) cmd_prune "$@" ;;
     completion) cmd_completion "$@" ;;
     __complete-tasks) cmd_complete_tasks ;;
     __complete-repos) cmd_complete_repos ;;

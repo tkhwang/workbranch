@@ -256,6 +256,26 @@ Fails if any matching base worktree has a rebase in progress.
 
 Same as `workbranch update`, but only for one task workspace.
 
+### `workbranch refresh [<task>]`
+
+Pull remote base branches into local base worktrees, then update task workspaces from those refreshed local bases.
+
+Without `<task>`, `refresh` updates every task workspace. With `<task>`, it updates only that task workspace. Before pulling, `refresh` preflights the target task worktrees the same way `workbranch update` does. If any target task worktree is dirty, missing, on the wrong branch, or has a rebase in progress, no base branch is pulled.
+
+For the pull phase:
+
+```bash
+cd _base/<repo>
+git pull --ff-only origin <base-branch>
+```
+
+For the update phase:
+
+```bash
+cd <task>/<repo>
+git rebase <_base/repo HEAD>
+```
+
 ### `workbranch push`
 
 Push base branches to origin.
@@ -331,6 +351,19 @@ If the task worktree directory was removed manually, `workbranch remove <task>` 
 Fails if any task worktree is dirty.
 Use `workbranch remove <task> --force` to discard dirty local task worktrees and local task branches.
 
+### `workbranch prune`
+
+Remove task workspaces that are already fully merged into the configured local base branches.
+
+For each healthy task workspace, `prune` checks every configured repo:
+
+- the base worktree exists and is checked out to its configured base branch;
+- the task worktree exists, is checked out to its task branch, is clean, and has no rebase in progress;
+- the task branch exists locally; and
+- the task branch is an ancestor of the configured local base branch.
+
+Only tasks that pass for every repo are removed. Unmerged, dirty, partial, stale, or branch-drifted tasks are skipped with a reason. `prune` removes local task worktrees and local task branches only; it does not push and does not delete remote task branches.
+
 ### `workbranch version`
 
 Print the installed CLI version as `workbranch <version>`. `workbranch -v` and `workbranch --version` are aliases. The generated single-file executable embeds the version from `.release-please-manifest.json` at build time and falls back to `0.0.0-dev` when no manifest version is available.
@@ -370,6 +403,7 @@ If the user declines, print direct-run and manual PATH guidance.
 - `finalize <task>` pulls base branches, updates one task, and lands it locally without pushing or removing the task workspace.
 - `--repo <repo>` limits supported Git commands to one repo.
 - `remove <task>` removes linked worktrees and local task branches.
+- `prune` removes clean task workspaces already merged into local base branches.
 - `-v`, `--version`, and `version` print the manifest-backed installed CLI version.
 - Dirty worktree checks prevent unsafe operations.
 - Integration tests use temporary local bare remotes.
