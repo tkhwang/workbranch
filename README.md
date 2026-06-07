@@ -38,11 +38,11 @@ Homebrew installs published releases. The curl installer tracks `main`.
 ```bash
 workbranch init
 workbranch add
-cd feat+login/<repo>
+cd feat-login/<repo>
 # work on the task
-workbranch update feat+login
-workbranch push feat+login
-workbranch remove feat+login
+workbranch update feat-login
+workbranch push feat-login
+workbranch remove feat-login
 ```
 
 ## Task identity and branch names
@@ -56,14 +56,14 @@ New task creation asks for two values:
 
 `workbranch` derives:
 
-- task folder: `feat+login`
+- task folder: `feat-login`
 - per-repo default Git branch:
   - base `main` or `master` -> `feat/login`
   - base `feature/cpq` -> `feature/cpq-login`
 
-Folder names and branch names stay separate because folders must be path-safe while Git branches normally use `/`. `workbranch` uses `+` as the folder-safe slash escape, so `feat+login` is the task-folder form of `feat/login`. Repo-specific branch prompts still let you override the default per repo.
+Folder names and branch names stay separate because folders must be path-safe while Git branches normally use `/`. `workbranch` uses `-` as the folder-safe type/detail separator, so `feat-login` is the task-folder form of `feat/login`. Repo-specific branch prompts still let you override the default per repo.
 
-Interactive `workbranch add <detail>` enters the same creation flow, using `<detail>` as the default Task detail name. For example, `workbranch add login` asks for Task type, shows `login` as the editable detail default, and recommends the folder `feat+login`; each repo then suggests a branch from its configured base branch. `workbranch add feat+login` remains a direct shorthand for the conventional task key. Non-interactive scripts can still pass task keys without `+`; those legacy explicit keys keep branch-prefix defaults for compatibility.
+Interactive `workbranch add <detail>` enters the same creation flow, using `<detail>` as the default Task detail name. For example, `workbranch add login` asks for Task type, shows `login` as the editable detail default, and recommends the folder `feat-login`; each repo then suggests a branch from its configured base branch. `workbranch add feat-login` remains a direct shorthand for the conventional task key. Non-interactive scripts can still pass task keys without the conventional `type-` prefix; those legacy explicit keys keep branch-prefix defaults for compatibility.
 
 By default, `workbranch add` creates task branches from the current HEAD of your local `_base/<repo>` worktrees. It does not pull remote base branches automatically. To start from the latest remote base, run:
 

@@ -21,12 +21,12 @@ test_list_shows_conventional_task_folder_and_branch() {
   project="$FIXTURE_PROJECT"
   cd "$project" || return 1
   run_expect_success "$WORKBRANCH" init >/dev/null
-  printf '\n\n' | "$WORKBRANCH" add feat+branch-name >/dev/null 2>&1 || fail "add failed"
+  printf '\n\n' | "$WORKBRANCH" add feat-branch-name >/dev/null 2>&1 || fail "add failed"
 
   out=$("$WORKBRANCH" list 2>&1)
   status=$?
   [ "$status" -eq 0 ] || fail "list failed: $out"
-  assert_contains "$out" "feat+branch-name"
+  assert_contains "$out" "feat-branch-name"
   assert_contains "$out" "feat/branch-name"
 }
 

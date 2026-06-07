@@ -64,20 +64,20 @@ test_add_derives_branch_from_conventional_task_folder() {
   cd "$project" || return 1
   run_expect_success "$WORKBRANCH" init >/dev/null
 
-  out=$(printf '\n\n' | "$WORKBRANCH" add feat+branch-name 2>&1)
+  out=$(printf '\n\n' | "$WORKBRANCH" add feat-branch-name 2>&1)
   status=$?
 
   [ "$status" -eq 0 ] || fail "add with conventional task folder failed: $out"
   assert_contains "$out" "Repo frontend"
   assert_contains "$out" "  task repo branch [feat/branch-name]"
-  assert_contains "$out" "  task repo folder: feat+branch-name/frontend"
+  assert_contains "$out" "  task repo folder: feat-branch-name/frontend"
   assert_contains "$out" "Repo backend"
   assert_contains "$out" "  task repo branch [feat/branch-name]"
-  assert_contains "$out" "  task repo folder: feat+branch-name/backend"
-  assert_branch "$project/feat+branch-name/frontend" "feat/branch-name"
-  assert_branch "$project/feat+branch-name/backend" "feat/branch-name"
-  assert_contains "$(cat "$project/feat+branch-name/.workbranch.task")" "REPO_BRANCH frontend feat/branch-name"
-  assert_contains "$(cat "$project/feat+branch-name/.workbranch.task")" "REPO_BRANCH backend feat/branch-name"
+  assert_contains "$out" "  task repo folder: feat-branch-name/backend"
+  assert_branch "$project/feat-branch-name/frontend" "feat/branch-name"
+  assert_branch "$project/feat-branch-name/backend" "feat/branch-name"
+  assert_contains "$(cat "$project/feat-branch-name/.workbranch.task")" "REPO_BRANCH frontend feat/branch-name"
+  assert_contains "$(cat "$project/feat-branch-name/.workbranch.task")" "REPO_BRANCH backend feat/branch-name"
 }
 
 test_add_derives_conventional_branch_from_parent_feature_base() {
@@ -96,18 +96,18 @@ CONFIG
   cd "$project" || return 1
   run_expect_success "$WORKBRANCH" init >/dev/null
 
-  out=$(printf '\n\n' | "$WORKBRANCH" add feat+task1 2>&1)
+  out=$(printf '\n\n' | "$WORKBRANCH" add feat-task1 2>&1)
   status=$?
 
   [ "$status" -eq 0 ] || fail "add with conventional task on feature base failed: $out"
   assert_not_contains "$out" "Default task branch:"
   assert_contains "$out" "  base branch: feature/cpq"
   assert_contains "$out" "  task repo branch [feature/cpq-task1]"
-  assert_contains "$out" "  task repo folder: feat+task1/frontend"
-  assert_branch "$project/feat+task1/frontend" "feature/cpq-task1"
-  assert_branch "$project/feat+task1/backend" "feature/cpq-task1"
-  assert_contains "$(cat "$project/feat+task1/.workbranch.task")" "REPO_BRANCH frontend feature/cpq-task1"
-  assert_contains "$(cat "$project/feat+task1/.workbranch.task")" "REPO_BRANCH backend feature/cpq-task1"
+  assert_contains "$out" "  task repo folder: feat-task1/frontend"
+  assert_branch "$project/feat-task1/frontend" "feature/cpq-task1"
+  assert_branch "$project/feat-task1/backend" "feature/cpq-task1"
+  assert_contains "$(cat "$project/feat-task1/.workbranch.task")" "REPO_BRANCH frontend feature/cpq-task1"
+  assert_contains "$(cat "$project/feat-task1/.workbranch.task")" "REPO_BRANCH backend feature/cpq-task1"
 }
 
 test_add_prompts_for_task_type_and_detail_without_task_argument() {
@@ -123,10 +123,10 @@ test_add_prompts_for_task_type_and_detail_without_task_argument() {
   assert_contains "$out" "Task type examples: feat, fix, chore, docs, refactor, test, perf, ci, build, revert"
   assert_contains "$out" "Task type [feat]"
   assert_contains "$out" "Task detail name"
-  assert_contains "$out" "Task folder: feat+branch-name"
+  assert_contains "$out" "Task folder: feat-branch-name"
   assert_not_contains "$out" "Default task branch:"
-  assert_branch "$project/feat+branch-name/frontend" "feat/branch-name"
-  assert_branch "$project/feat+branch-name/backend" "feat/branch-name"
+  assert_branch "$project/feat-branch-name/frontend" "feat/branch-name"
+  assert_branch "$project/feat-branch-name/backend" "feat/branch-name"
 }
 
 test_add_task_argument_prefills_interactive_task_detail() {
@@ -142,10 +142,10 @@ test_add_task_argument_prefills_interactive_task_detail() {
   assert_contains "$out" "Task type examples: feat, fix, chore, docs, refactor, test, perf, ci, build, revert"
   assert_contains "$out" "Task type [feat]"
   assert_contains "$out" "Task detail name [implement-login]"
-  assert_contains "$out" "Task folder: feat+implement-login"
+  assert_contains "$out" "Task folder: feat-implement-login"
   assert_not_contains "$out" "Default task branch:"
-  assert_branch "$project/feat+implement-login/frontend" "feat/implement-login"
-  assert_branch "$project/feat+implement-login/backend" "feat/implement-login"
+  assert_branch "$project/feat-implement-login/frontend" "feat/implement-login"
+  assert_branch "$project/feat-implement-login/backend" "feat/implement-login"
   assert_not_exists "$project/implement-login"
 }
 
@@ -161,17 +161,17 @@ test_add_without_task_argument_supports_from_ref() {
   status=$?
 
   [ "$status" -eq 0 ] || fail "interactive add --from failed: $out"
-  assert_branch "$project/feat+branch-name/frontend" "feat/branch-name"
-  assert_branch "$project/feat+branch-name/backend" "feat/branch-name"
-  assert_file "$project/feat+branch-name/frontend/seeded-frontend.txt"
-  assert_file "$project/feat+branch-name/backend/seeded-backend.txt"
+  assert_branch "$project/feat-branch-name/frontend" "feat/branch-name"
+  assert_branch "$project/feat-branch-name/backend" "feat/branch-name"
+  assert_file "$project/feat-branch-name/frontend/seeded-frontend.txt"
+  assert_file "$project/feat-branch-name/backend/seeded-backend.txt"
   assert_contains "$out" "[source] origin/feat/parent -> [task repo] feat/branch-name"
-  if git -C "$project/feat+branch-name/frontend" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' >/dev/null 2>&1; then
+  if git -C "$project/feat-branch-name/frontend" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' >/dev/null 2>&1; then
     fail "expected add --from not to set frontend upstream"
   fi
 }
 
-test_add_explicit_task_without_plus_keeps_legacy_default() {
+test_add_explicit_task_without_conventional_prefix_keeps_legacy_default() {
   new_fixture
   project="$FIXTURE_PROJECT"
   cd "$project" || return 1
@@ -186,15 +186,15 @@ test_add_explicit_task_without_plus_keeps_legacy_default() {
   assert_branch "$project/implement-login/frontend" "feature/implement-login"
 }
 
-test_add_rejects_unknown_conventional_task_type() {
+test_add_rejects_legacy_plus_task_folder() {
   new_fixture
   project="$FIXTURE_PROJECT"
   cd "$project" || return 1
   run_expect_success "$WORKBRANCH" init >/dev/null
 
-  out=$(run_expect_fail "$WORKBRANCH" add unknown+branch-name)
-  assert_contains "$out" "invalid task type 'unknown'"
-  assert_not_exists "$project/unknown+branch-name"
+  out=$(run_expect_fail "$WORKBRANCH" add feat+branch-name)
+  assert_contains "$out" "invalid task 'feat+branch-name' (expected [A-Za-z0-9._-]+)"
+  assert_not_exists "$project/feat+branch-name"
 }
 
 test_add_rejects_conventional_detail_that_builds_invalid_branch() {
@@ -203,11 +203,11 @@ test_add_rejects_conventional_detail_that_builds_invalid_branch() {
   cd "$project" || return 1
   run_expect_success "$WORKBRANCH" init >/dev/null
 
-  out=$(run_expect_fail "$WORKBRANCH" add feat+bad.lock)
+  out=$(run_expect_fail "$WORKBRANCH" add feat-bad.lock)
   assert_contains "$out" "invalid task detail name 'bad.lock': produces invalid branch 'feat/bad.lock'"
   assert_not_contains "$out" "invalid task ''"
   assert_not_contains "$out" "task repo branch"
-  assert_not_exists "$project/feat+bad.lock"
+  assert_not_exists "$project/feat-bad.lock"
 }
 
 

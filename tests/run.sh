@@ -82,8 +82,8 @@ main() {
   run_test test_add_prompts_for_task_type_and_detail_without_task_argument
   run_test test_add_task_argument_prefills_interactive_task_detail
   run_test test_add_without_task_argument_supports_from_ref
-  run_test test_add_explicit_task_without_plus_keeps_legacy_default
-  run_test test_add_rejects_unknown_conventional_task_type
+  run_test test_add_explicit_task_without_conventional_prefix_keeps_legacy_default
+  run_test test_add_rejects_legacy_plus_task_folder
   run_test test_add_rejects_conventional_detail_that_builds_invalid_branch
   run_test test_add_rejects_empty_from_equals
   run_test test_add_from_remote_ref_seeds_task_branch_from_origin_ref
@@ -176,4 +176,6 @@ main() {
   fi
 }
 
-main "$@"
+# Detach stdin from any TTY so non-interactive tests see EOF (as in CI) instead
+# of blocking on terminal input. Tests that need input pipe their own stdin.
+main "$@" </dev/null

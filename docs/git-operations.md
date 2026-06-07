@@ -28,7 +28,7 @@ Optional:
 
 Direction: base/source ref -> task worktree.
 
-Before creating worktrees, `workbranch add [<task>] [--from <ref>]` resolves the task key, shows each repo's configured base branch, then prompts for that repo's task branch. Without `<task>`, it asks for task type and detail name and derives the recommended task key `type+detail`. In an interactive terminal, `workbranch add <detail>` enters that same flow with `<detail>` prefilled as the editable detail default. `workbranch add type+detail` remains a direct conventional shorthand. For conventional task keys, each repo derives its default branch from its configured base branch: `main`/`master`-style bases use `type/detail`, while parent feature bases such as `feature/cpq` use `feature/cpq-detail`. Non-interactive task keys without `+` keep legacy defaults for script compatibility. The chosen task branches are saved in `<task>/.workbranch.task`; the optional `--from` ref is only the starting source, is not stored as the task branch, and does not become a persistent `status` comparison baseline.
+Before creating worktrees, `workbranch add [<task>] [--from <ref>]` resolves the task key, shows each repo's configured base branch, then prompts for that repo's task branch. Without `<task>`, it asks for task type and detail name and derives the recommended task key `type-detail`. In an interactive terminal, `workbranch add <detail>` enters that same flow with `<detail>` prefilled as the editable detail default. `workbranch add type-detail` remains a direct conventional shorthand. For conventional task keys, each repo derives its default branch from its configured base branch: `main`/`master`-style bases use `type/detail`, while parent feature bases such as `feature/cpq` use `feature/cpq-detail`. Non-interactive task keys without the conventional `type-` prefix keep legacy defaults for script compatibility. The chosen task branches are saved in `<task>/.workbranch.task`; the optional `--from` ref is only the starting source, is not stored as the task branch, and does not become a persistent `status` comparison baseline.
 
 For each repo:
 
@@ -145,14 +145,14 @@ git push -u origin <task-branch>
 
 ## Branch naming
 
-For each repo, task branch names are explicit values chosen at `workbranch add` prompts. Recommended task keys use `type+detail`; their default branch depends on each repo's configured base branch. Interactive `add <detail>` pre-fills that detail in the creation flow; non-interactive task keys without `+` keep the legacy defaults:
+For each repo, task branch names are explicit values chosen at `workbranch add` prompts. Recommended task keys use `type-detail`; their default branch depends on each repo's configured base branch. Interactive `add <detail>` pre-fills that detail in the creation flow; non-interactive task keys without the conventional `type-` prefix keep the legacy defaults:
 
 ```text
-base master       + task key feat+login -> feat/login
-base feature/cpq  + task key feat+task1 -> feature/cpq-task1
+base master       + task key feat-login -> feat/login
+base feature/cpq  + task key feat-task1 -> feature/cpq-task1
 base master       + non-interactive login -> feature/login
 base feature/cpq  + non-interactive task1 -> feature/cpq-task1
-task key feat+login      + override tk/login -> tk/login
+task key feat-login      + override tk/login -> tk/login
 ```
 
 Chosen branches are persisted in `<task>/.workbranch.task`. Later commands resolve task branches in this order:

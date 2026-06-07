@@ -4,7 +4,7 @@
 
 **Goal:** Remove the hidden default branch-prefix mental model by making new task identity explicit: users choose a conventional task type and detail name, then `workbranch` derives a safe task folder from those two values and suggests each repo's task branch from that repo's configured base branch.
 
-**Architecture:** Keep base branch ownership in `workbranch config`, keep task folder names and Git branch names as separate surfaces, and change `workbranch add` so the default interactive path derives the task folder from `type + detail`. The task folder becomes `type+detail-name`; repo default branches use `type/detail-name` for main/master-style bases and `<base-branch>-<detail-name>` for parent feature bases such as `feature/cpq`; repo-specific branch overrides and `.workbranch.task` metadata remain the source of truth for later commands.
+**Architecture:** Keep base branch ownership in `workbranch config`, keep task folder names and Git branch names as separate surfaces, and change `workbranch add` so the default interactive path derives the task folder from `type / detail`. The task folder becomes `type-detail-name`; repo default branches use `type/detail-name` for main/master-style bases and `<base-branch>-<detail-name>` for parent feature bases such as `feature/cpq`; repo-specific branch overrides and `.workbranch.task` metadata remain the source of truth for later commands.
 
 **Tech Stack:** Portable Bash, Git worktrees, line-oriented `.workbranch.config`, task metadata in `<task>/.workbranch.task`, generated single-file CLI via `scripts/build-workbranch.sh`, integration tests in `tests/run.sh`.
 
@@ -27,7 +27,7 @@ The new mental model should be:
 task type   = feat
 detail name = branch-name
 
-folder      = feat+branch-name
+folder      = feat-branch-name
 branch      = feat/branch-name          # when repo base is main/master
 branch      = feature/cpq-branch-name   # when repo base is feature/cpq
 ```
@@ -52,14 +52,14 @@ The folder and branch are visibly related, but they are not the same string. Thi
    - Derive the task folder from those values.
 
 2. **Folder and branch remain separate surfaces.**
-   - Folder/workspace key: `feat+branch-name`.
+   - Folder/workspace key: `feat-branch-name`.
    - Default branch for main/master-style bases: `feat/branch-name`.
    - Default branch for parent feature bases such as `feature/cpq`: `feature/cpq-branch-name`.
-   - Later commands still operate by task folder name: `workbranch status feat+branch-name`, `workbranch path feat+branch-name`, `workbranch remove feat+branch-name`.
+   - Later commands still operate by task folder name: `workbranch status feat-branch-name`, `workbranch path feat-branch-name`, `workbranch remove feat-branch-name`.
 
-3. **Use `+` as the folder-safe slash escape.**
+3. **Use `-` as the folder-safe type/detail separator.**
    - Git branches use `/` because `feat/branch-name` is the familiar conventional branch shape.
-   - Task folders use `+` because a literal `/` creates nested directories and makes the task root ambiguous, while `+` stays readable and does not need shell quoting in normal CLI usage.
+   - Task folders use `-` because a literal `/` creates nested directories and makes the task root ambiguous, while `-` stays readable and does not need shell quoting in normal CLI usage.
    - Rejected alternatives:
      - `feat/branch-name` as folder: ambiguous task root and nested path semantics.
      - `feat-branch-name`: readable, but the type/detail boundary is weak.
@@ -81,13 +81,13 @@ The folder and branch are visibly related, but they are not the same string. Thi
    - Existing task folders such as `login` continue to work.
    - Interactive `workbranch add <detail>` enters the conventional task identity flow and uses `<detail>` as the editable detail default.
    - Existing non-interactive `workbranch add <task>` remains supported for scripts and user-chosen task names.
-   - The `type+detail` form is the recommended conventional task key, not the only valid task key.
-   - A task key without `+` remains valid when it passes the legacy safe-name rule; its default branch naming is deliberately classified as legacy/default fallback.
+   - The `type-detail` form is the recommended conventional task key, not the only valid task key.
+   - A task key without the conventional `type-` prefix remains valid when it passes the legacy safe-name rule; its default branch naming is deliberately classified as legacy/default fallback.
 
 7. **Normalize task command arguments for shell completion.**
    - Commands that take a task key should accept a trailing `/` added by shell completion.
-   - `workbranch remove feat+branch-name/` should behave like `workbranch remove feat+branch-name`.
-   - This is only trailing-slash normalization, not path support: `feat+branch-name/frontend`, `./feat+branch-name`, and nested paths remain invalid task keys.
+   - `workbranch remove feat-branch-name/` should behave like `workbranch remove feat-branch-name`.
+   - This is only trailing-slash normalization, not path support: `feat-branch-name/frontend`, `./feat-branch-name`, and nested paths remain invalid task keys.
    - Apply this consistently to task-taking commands: `add`, `path`, `finder`, `ide`, `terminal`, `update <task>`, `push <task>`, `land <task>`, and `remove`.
 
 ## Resolved Decision Gate
@@ -95,14 +95,14 @@ The folder and branch are visibly related, but they are not the same string. Thi
 - [x] **Interactive vs non-interactive `workbranch add <task>` default branch rule**
   - Impact: script compatibility, mental model, and whether legacy `BRANCH_PREFIX` remains visible in new task creation.
   - Current evidence: `README.md`, `docs/specs/0001-workbranch-mvp.md`, and `src/workbranch/lib/project.sh` currently default `workbranch add login` to `feature/login` from `BRANCH_PREFIX` or `feature` fallback.
-  - Resolution: in an interactive terminal, `workbranch add <detail>` enters the same task identity prompt as zero-arg `workbranch add`, using `<detail>` as the editable Task detail name default. If `<task>` contains exactly one `+` with a known conventional type, derive the default branch by replacing that delimiter with `/` as a direct shorthand. In non-interactive use, no-plus `<task>` values remain explicit task keys and use the existing legacy default branch rule.
-  - Rationale: This matches the user-facing creation flow (`add task1` asks for type and recommends `feat+task1`) while preserving automation and arbitrary no-plus task names for scripts.
-  - Rejected alternative: make every non-TTY `workbranch add <task>` prompt or reject non-`type+detail` names. That would enforce clarity faster, but it is a breaking change for scripts and current README examples.
+  - Resolution: in an interactive terminal, `workbranch add <detail>` enters the same task identity prompt as zero-arg `workbranch add`, using `<detail>` as the editable Task detail name default. If `<task>` starts with a known conventional type followed by `-`, derive the default branch by splitting on the first `-` and using everything after it as the detail. In non-interactive use, non-conventional `<task>` values remain explicit task keys and use the existing legacy default branch rule.
+  - Rationale: This matches the user-facing creation flow (`add task1` asks for type and recommends `feat-task1`) while preserving automation and arbitrary non-conventional task names for scripts.
+  - Rejected alternative: make every non-TTY `workbranch add <task>` prompt or reject non-`type-detail` names. That would enforce clarity faster, but it is a breaking change for scripts and current README examples.
 
 - [x] **Repo base-aware branch defaults for conventional task keys**
   - Impact: feature-parent workflows should keep parent context in new task branches.
-  - Resolution: `type+detail` remains the task folder identity. For each repo, default branch is `type/detail` when the base branch is main/master-style, and `<base-branch>-<detail>` when the base branch is a parent feature branch such as `feature/cpq` or `feat/cpq`.
-  - Rationale: `feat+task1` keeps the conventional task identity while `feature/cpq-task1` preserves the repo's actual parent branch context.
+  - Resolution: `type-detail` remains the task folder identity. For each repo, default branch is `type/detail` when the base branch is main/master-style, and `<base-branch>-<detail>` when the base branch is a parent feature branch such as `feature/cpq` or `feat/cpq`.
+  - Rationale: `feat-task1` keeps the conventional task identity while `feature/cpq-task1` preserves the repo's actual parent branch context.
   - Rejected alternative: always use `type/detail` for conventional task keys. That loses the parent feature context for repos based on `feature/cpq`.
 
 ## Target UX
@@ -118,17 +118,17 @@ Prompts:
 ```text
 [*] Task type [feat]: feat
 [*] Task detail name: branch-name
-[*] Task folder: feat+branch-name
+[*] Task folder: feat-branch-name
 
 [*] Repo frontend
 [*]   base branch: main
 [*]   task repo branch [feat/branch-name]:
-[*]   task repo folder: feat+branch-name/frontend
+[*]   task repo folder: feat-branch-name/frontend
 
 [*] Repo backend
 [*]   base branch: feature/cpq
 [*]   task repo branch [feature/cpq-branch-name]:
-[*]   task repo folder: feat+branch-name/backend
+[*]   task repo folder: feat-branch-name/backend
 ```
 
 Result:
@@ -139,7 +139,7 @@ fullstack
 ├── _base
 │   ├── frontend
 │   └── backend
-└── feat+branch-name
+└── feat-branch-name
     ├── .workbranch.task
     ├── frontend     # branch feat/branch-name unless overridden
     └── backend      # branch feature/cpq-branch-name unless overridden
@@ -157,7 +157,7 @@ REPO_BRANCH backend feature/cpq-branch-name
 ### Explicit shorthand path
 
 ```bash
-workbranch add feat+branch-name
+workbranch add feat-branch-name
 ```
 
 Default branch prompt on a main/master-style base:
@@ -166,7 +166,7 @@ Default branch prompt on a main/master-style base:
 [*] Repo frontend
 [*]   base branch: main
 [*]   task repo branch [feat/branch-name]:
-[*]   task repo folder: feat+branch-name/frontend
+[*]   task repo folder: feat-branch-name/frontend
 ```
 
 ### Legacy-compatible path
@@ -221,42 +221,42 @@ Rules:
 
 Rules:
 
-- The canonical task key and folder for conventional tasks is `<type>+<detail>`.
-- `type+detail` is recommended for new conventional tasks, but not mandatory for every explicit task key.
-- `+` is allowed only as the task type/detail delimiter.
+- The canonical task key and folder for conventional tasks is `<type>-<detail>`.
+- `type-detail` is recommended for new conventional tasks, but not mandatory for every explicit task key.
+- The first `-` after a known task type is the task type/detail delimiter; the detail may contain additional `-` characters.
 - Type and detail remain individually validated with the safe-name rule.
 - Existing and user-chosen non-conventional task keys such as `login` or `implement-login` remain valid through the legacy safe-name rule.
-- A task key with `+` but without a known conventional type should be rejected rather than silently treated as legacy shorthand, because `+` is now reserved for conventional identity.
+- A task key with `-` but without a known conventional type remains a legacy explicit key, preserving existing names such as `implement-login`.
 - Task command arguments may include completion-added trailing `/` characters; strip trailing `/` before validation.
 - Do not strip or interpret leading paths or embedded slashes. After trailing-slash normalization, the existing validation rules still reject `/`.
 
 ### Derived values
 
 ```text
-task folder    = <type>+<detail>
+task folder    = <type>-<detail>
 default branch = <type>/<detail>
 ```
 
-`+` is the folder-safe representation of the branch slash. Use this wording in prompts and docs:
+`-` is the folder-safe representation of the branch slash. Use this wording in prompts and docs:
 
 ```text
 Git branch uses slash:     feat/branch-name
-Folder uses slash escape:  feat+branch-name
+Folder uses type/detail separator:  feat-branch-name
 ```
 
 Do not use `{type}/{detail}` as the task folder. It creates nested directories (`feat/branch-name/<repo>`) and makes it unclear whether the task workspace is `feat` or `feat/branch-name`.
 
-If a user enters an explicit task folder containing exactly one `+` delimiter:
+If a user enters an explicit task folder beginning with a known `<type>-` prefix:
 
 ```text
-feat+branch-name -> feat/branch-name
-fix+path-output  -> fix/path-output
+feat-branch-name -> feat/branch-name
+fix-path-output  -> fix/path-output
 ```
 
-Additional `+` characters are rejected because `+` is reserved for the type/detail boundary:
+Additional `-` characters stay inside the detail after the first delimiter:
 
 ```text
-feat+a+b -> invalid task key
+feat-a-b -> feat/a-b
 ```
 
 ## Target File Structure
@@ -285,7 +285,7 @@ tests/cases/config.sh                      # remove user-visible prefix assertio
 tests/cases/interactive-init.sh            # remove prefix prompt test, add no-prefix setup assertion
 tests/cases/path.sh                        # trailing-slash task argument regression
 tests/cases/remove.sh                      # trailing-slash task argument regression
-tests/cases/status.sh                      # ensure list/status display handles feat+folder + feat/branch
+tests/cases/status.sh                      # ensure list/status display handles feat-folder + feat/branch
 tests/cases/meta.sh                        # update help usage assertion for optional add task
 tests/run.sh                               # register new tests in stable order
 bin/workbranch                             # regenerated only by scripts/build-workbranch.sh
@@ -301,7 +301,7 @@ bin/workbranch                             # regenerated only by scripts/build-w
 - Modify: `tests/cases/add.sh`
 - Modify: `tests/run.sh`
 
-- [x] Add failing integration coverage for `workbranch add feat+branch-name` deriving `feat/branch-name` as the default branch.
+- [x] Add failing integration coverage for `workbranch add feat-branch-name` deriving `feat/branch-name` as the default branch.
 
   Test shape in `tests/cases/add.sh`:
 
@@ -310,16 +310,16 @@ bin/workbranch                             # regenerated only by scripts/build-w
     new_fixture
     cd "$project" || fail "cd project failed"
 
-    out=$(printf '\n\n' | "$WORKBRANCH" add feat+branch-name 2>&1)
+    out=$(printf '\n\n' | "$WORKBRANCH" add feat-branch-name 2>&1)
     status=$?
 
     [ "$status" -eq 0 ] || fail "add with conventional task folder failed: $out"
     assert_contains "$out" "Task branch for frontend [feat/branch-name]"
     assert_contains "$out" "Task branch for backend [feat/branch-name]"
-    assert_branch "$project/feat+branch-name/frontend" "feat/branch-name"
-    assert_branch "$project/feat+branch-name/backend" "feat/branch-name"
-    assert_contains "$(cat "$project/feat+branch-name/.workbranch.task")" "REPO_BRANCH frontend feat/branch-name"
-    assert_contains "$(cat "$project/feat+branch-name/.workbranch.task")" "REPO_BRANCH backend feat/branch-name"
+    assert_branch "$project/feat-branch-name/frontend" "feat/branch-name"
+    assert_branch "$project/feat-branch-name/backend" "feat/branch-name"
+    assert_contains "$(cat "$project/feat-branch-name/.workbranch.task")" "REPO_BRANCH frontend feat/branch-name"
+    assert_contains "$(cat "$project/feat-branch-name/.workbranch.task")" "REPO_BRANCH backend feat/branch-name"
   }
   ```
 
@@ -339,7 +339,7 @@ bin/workbranch                             # regenerated only by scripts/build-w
   ./tests/run.sh
   ```
 
-  Expected before implementation: the suite fails at `test_add_derives_branch_from_conventional_task_folder` because `feat+branch-name` still defaults through legacy `feature/feat+branch-name`. The runner currently has no single-test filter, so use the full suite and read the named failure.
+  Expected before implementation: the suite fails at `test_add_derives_branch_from_conventional_task_folder` because `feat-branch-name` still defaults through legacy `feature/feat-branch-name`. The runner currently has no single-test filter, so use the full suite and read the named failure.
 
 - [x] Add `src/workbranch/lib/task-identity.sh` with these helpers:
 
@@ -404,7 +404,7 @@ bin/workbranch                             # regenerated only by scripts/build-w
     value=$(normalize_task_argument "$1")
     [ -n "$value" ] || die "invalid task '$1' (expected task key)"
     if task_identity_has_delimiter "$value"; then
-      task_identity_has_multiple_delimiters "$value" && die "invalid task '$value' (expected exactly one + delimiter)"
+      task_identity_has_multiple_delimiters "$value" && die "invalid task '$value' (expected a known type- prefix)"
       type=$(task_identity_type_from_folder "$value")
       detail=$(task_identity_detail_from_folder "$value")
       validate_task_type "$type"
@@ -436,7 +436,7 @@ bin/workbranch                             # regenerated only by scripts/build-w
     local task type detail
     task=$(normalize_task_argument "$1")
     task_identity_has_delimiter "$task" || return 1
-    task_identity_has_multiple_delimiters "$task" && die "invalid task '$task' (expected exactly one + delimiter)"
+    task_identity_has_multiple_delimiters "$task" && die "invalid task '$task' (expected a known type- prefix)"
     type=$(task_identity_type_from_folder "$task")
     detail=$(task_identity_detail_from_folder "$task")
     conventional_task_type_is_known "$type" || return 1
@@ -501,9 +501,9 @@ bin/workbranch                             # regenerated only by scripts/build-w
     [ "$status" -eq 0 ] || fail "interactive add failed: $out"
     assert_contains "$out" "Task type [feat]"
     assert_contains "$out" "Task detail name"
-    assert_contains "$out" "Task folder: feat+branch-name"
-    assert_branch "$project/feat+branch-name/frontend" "feat/branch-name"
-    assert_branch "$project/feat+branch-name/backend" "feat/branch-name"
+    assert_contains "$out" "Task folder: feat-branch-name"
+    assert_branch "$project/feat-branch-name/frontend" "feat/branch-name"
+    assert_branch "$project/feat-branch-name/backend" "feat/branch-name"
   }
   ```
 
@@ -524,7 +524,7 @@ bin/workbranch                             # regenerated only by scripts/build-w
   ```text
   workbranch add                 # interactive task identity prompt
   workbranch add <detail>        # interactive identity prompt with detail default
-  workbranch add type+detail     # explicit conventional shorthand path
+  workbranch add type-detail     # explicit conventional shorthand path
   workbranch add --from <ref>    # interactive identity prompt with source ref
   workbranch add <task> --from <ref>
   ```
@@ -575,9 +575,9 @@ bin/workbranch                             # regenerated only by scripts/build-w
   - `src/workbranch/commands/remove.sh`
 
 - [x] Add trailing-slash regressions:
-  - `workbranch path feat+branch-name/` prints the same task path as `workbranch path feat+branch-name`.
-  - `workbranch remove feat+branch-name/ --force` removes the same task workspace and branches as `workbranch remove feat+branch-name --force`.
-  - Keep an invalid-path assertion such as `workbranch path feat+branch-name/frontend` failing as an invalid task key.
+  - `workbranch path feat-branch-name/` prints the same task path as `workbranch path feat-branch-name`.
+  - `workbranch remove feat-branch-name/ --force` removes the same task workspace and branches as `workbranch remove feat-branch-name --force`.
+  - Keep an invalid-path assertion such as `workbranch path feat-branch-name/frontend` failing as an invalid task key.
 
 - [x] Rebuild and run targeted add tests.
 
@@ -632,7 +632,7 @@ INPUT
 
     assert_not_contains "$out" "Default task branch prefix"
     assert_contains "$out" "Task identity:"
-    assert_contains "$out" "folder type+detail"
+    assert_contains "$out" "folder type-detail"
     assert_contains "$out" "Each repo suggests a task branch from its base branch"
     assert_contains "$(cat "$TMP_ROOT/work/fullstack/.workbranch.config")" "BRANCH_PREFIX feature"
   }
@@ -646,7 +646,7 @@ INPUT
     ```text
     Task identity:
       - New tasks can be created with workbranch add.
-      - workbranch asks for task type and detail name, then derives folder type+detail.
+      - workbranch asks for task type and detail name, then derives folder type-detail.
       - Each repo suggests a task branch from its base branch, and you can override it.
     ```
 
@@ -700,11 +700,11 @@ INPUT
   ```bash
   workbranch init
   workbranch add
-  cd feat+login/<repo>
+  cd feat-login/<repo>
   # work on the task
-  workbranch update feat+login
-  workbranch push feat+login
-  workbranch remove feat+login
+  workbranch update feat-login
+  workbranch push feat-login
+  workbranch remove feat-login
   ```
 
 - [x] Add a concise mental-model section in `README.md`:
@@ -721,23 +721,23 @@ INPUT
 
   `workbranch` derives:
 
-  - task folder: `feat+login`
+  - task folder: `feat-login`
   - default Git branch: `feat/login`
 
-  Folder names and branch names stay separate because folders must be path-safe while Git branches normally use `/`. `workbranch` uses `+` as the folder-safe slash escape, so `feat+login` is the task-folder form of `feat/login`. Repo-specific branch prompts still let you override the default per repo.
+  Folder names and branch names stay separate because folders must be path-safe while Git branches normally use `/`. `workbranch` uses `-` as the folder-safe type/detail separator, so `feat-login` is the task-folder form of `feat/login`. Repo-specific branch prompts still let you override the default per repo.
   ```
 
 - [x] Document compatibility:
 
   ```markdown
-  Interactive `workbranch add <detail>` enters the same creation flow, using `<detail>` as the default Task detail name. `workbranch add feat+login` remains a direct shorthand for the conventional task key. Non-interactive scripts can still pass task keys without `+`; those legacy explicit keys keep branch-prefix defaults for compatibility.
+  Interactive `workbranch add <detail>` enters the same creation flow, using `<detail>` as the default Task detail name. `workbranch add feat-login` remains a direct shorthand for the conventional task key. Non-interactive scripts can still pass task keys without the conventional `type-` prefix; those legacy explicit keys keep branch-prefix defaults for compatibility.
   ```
 
 - [x] Mirror the same contract in `README.ko.md`.
 
 - [x] Update `docs/specs/0001-workbranch-mvp.md`:
   - Config rules: `BRANCH_PREFIX` is retained for compatibility, not a setup-time mental model.
-  - Branch names section: replace primary examples with `feat+login -> feat/login`.
+  - Branch names section: replace primary examples with `feat-login -> feat/login`.
   - `workbranch init`: remove the step that asks for default task branch prefix.
   - `workbranch add`: update usage to `workbranch add [<task>] [--from <ref>]`.
   - Add explicit zero-arg prompt behavior.
@@ -772,10 +772,10 @@ INPUT
     new_fixture
     cd "$project" || fail "cd project failed"
 
-    printf '\n\n' | "$WORKBRANCH" add feat+branch-name >/dev/null 2>&1 || fail "add failed"
+    printf '\n\n' | "$WORKBRANCH" add feat-branch-name >/dev/null 2>&1 || fail "add failed"
     out=$("$WORKBRANCH" list 2>&1)
 
-    assert_contains "$out" "feat+branch-name"
+    assert_contains "$out" "feat-branch-name"
     assert_contains "$out" "feat/branch-name"
   }
   ```
@@ -842,18 +842,18 @@ INPUT
 
   ```bash
   workbranch add
-  workbranch path feat+branch-name
+  workbranch path feat-branch-name
   workbranch list
-  workbranch remove feat+branch-name --force
+  workbranch remove feat-branch-name --force
   ```
 
   Expected observable behavior:
 
   - `workbranch add` asks for task type and detail name.
-  - It creates `feat+branch-name/<repo>` folders.
+  - It creates `feat-branch-name/<repo>` folders.
   - Task worktrees are on `feat/branch-name` for main/master-style bases and `<base-branch>-branch-name` for parent feature bases unless overridden.
   - `path`, `list`, and `remove` use the folder identity and show/use the branch metadata correctly.
-  - `workbranch path feat+branch-name/` and `workbranch remove feat+branch-name/ --force` tolerate the completion-added trailing slash.
+  - `workbranch path feat-branch-name/` and `workbranch remove feat-branch-name/ --force` tolerate the completion-added trailing slash.
 
 ## Completion Evidence
 
@@ -861,15 +861,15 @@ INPUT
 - Syntax: `/bin/bash -n bin/workbranch install.sh tests/run.sh` exited 0.
 - Full integration suite: `./tests/run.sh` exited 0 with `Tests passed: 138`.
 - Whitespace: `git diff --check` exited 0.
-- Manual CLI smoke: temporary project verified `workbranch add` zero-arg prompts, `feat+branch-name` branches, `workbranch path feat+branch-name/`, `workbranch list`, and `workbranch remove feat+branch-name/ --force`.
+- Manual CLI smoke: temporary project verified `workbranch add` zero-arg prompts, `feat-branch-name` branches, `workbranch path feat-branch-name/`, `workbranch list`, and `workbranch remove feat-branch-name/ --force`.
 - Follow-up evidence after interactive `add <detail>` correction: `./tests/run.sh` exited 0 with `Tests passed: 140`; added PTY coverage for `workbranch add implement-login` prompting `Task type [feat]` and `Task detail name [implement-login]`; added forced-color coverage for add repo/branch logs.
-- Follow-up evidence after repo base-aware branch defaults: `./tests/run.sh` exited 0 with `Tests passed: 141`; added coverage for `feat+task1` on `feature/cpq` deriving `feature/cpq-task1`; removed the global `Default task branch` line in favor of repo-specific branch prompts.
+- Follow-up evidence after repo base-aware branch defaults: `./tests/run.sh` exited 0 with `Tests passed: 141`; added coverage for `feat-task1` on `feature/cpq` deriving `feature/cpq-task1`; removed the global `Default task branch` line in favor of repo-specific branch prompts.
 
 ## Acceptance Criteria
 
 - New recommended task creation requires no config-time branch prefix knowledge.
 - `workbranch add` with no positional task asks for task type and detail name.
-- `feat+branch-name` folder identity derives `feat/branch-name` on main/master-style bases and `<base-branch>-branch-name` on parent feature bases.
+- `feat-branch-name` folder identity derives `feat/branch-name` on main/master-style bases and `<base-branch>-branch-name` on parent feature bases.
 - Task-taking commands tolerate completion-added trailing `/` on task keys without accepting nested paths as task names.
 - Folder and branch remain separate; `.workbranch.task` remains the later-command branch source of truth.
 - Base repo branch settings remain under `workbranch config`, not `workbranch add`.
