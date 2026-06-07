@@ -62,7 +62,7 @@ collect_prune_tasks() {
   tasks_to_skip=()
   prune_skip_reasons=()
   for path in "$PROJECT_ROOT"/*; do
-    is_task_workspace_path "$path" || continue
+    doctor_task_candidate_path "$path" || continue
     task=${path##*/}
     if reason=$(prune_task_is_fully_merged "$task"); then
       tasks_to_prune[${#tasks_to_prune[@]}]="$task"
@@ -77,11 +77,12 @@ cmd_prune() {
   require_project
   [ $# -eq 0 ] || die "usage: workbranch prune"
   collect_prune_tasks
+  prune_had_failure=0
 
-  i=0
-  while [ $i -lt ${#tasks_to_skip[@]} ]; do
-    info "Skipped: ${tasks_to_skip[$i]} (${prune_skip_reasons[$i]})"
-    i=$((i + 1))
+  prune_skip_i=0
+  while [ $prune_skip_i -lt ${#tasks_to_skip[@]} ]; do
+    info "Skipped: ${tasks_to_skip[$prune_skip_i]} (${prune_skip_reasons[$prune_skip_i]})"
+    prune_skip_i=$((prune_skip_i + 1))
   done
 
   if [ ${#tasks_to_prune[@]} -eq 0 ]; then
@@ -89,11 +90,14 @@ cmd_prune() {
     return 0
   fi
 
-  i=0
-  while [ $i -lt ${#tasks_to_prune[@]} ]; do
-    task=${tasks_to_prune[$i]}
-    info "Pruning merged task: $task"
-    cmd_remove "$task" --force
-    i=$((i + 1))
+  prune_i=0
+  while [ $prune_i -lt ${#tasks_to_prune[@]} ]; do
+    prune_task=${tasks_to_prune[$prune_i]}
+    info "Pruning merged task: $prune_task"
+    if ! cmd_remove "$prune_task" --force; then
+      prune_had_failure=1
+    fi
+    prune_i=$((prune_i + 1))
   done
+  [ "$prune_had_failure" -eq 0 ]
 }

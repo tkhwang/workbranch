@@ -36,7 +36,19 @@ cmd_config() {
     fi
     if [ "$rewrite_only" -eq 0 ]; then
       case "$config_target" in
-        all|base) apply_configured_base_branches ;;
+        all)
+          if [ ${#CONFIG_BRANCH_CHANGE_REPOS[@]} -gt 0 ]; then
+            apply_configured_base_branches changed
+            CONFIG_BASE_BRANCHES_AUTO_APPLIED=1
+          fi
+          ;;
+        base)
+          if [ ${#CONFIG_BRANCH_CHANGE_REPOS[@]} -gt 0 ]; then
+            apply_configured_base_branches changed
+          else
+            apply_configured_base_branches all
+          fi
+          ;;
       esac
     fi
     write_config "$CONFIG_FILE"
@@ -60,6 +72,7 @@ CONFIG_BRANCH_CHANGE_OLD=()
 CONFIG_BRANCH_CHANGE_NEW=()
 CONFIG_BASE_DIR_OLD=""
 CONFIG_BASE_DIR_NEW=""
+CONFIG_BASE_BRANCHES_AUTO_APPLIED=0
 
 record_config_branch_change() {
   name=$1
@@ -70,6 +83,17 @@ record_config_branch_change() {
   CONFIG_BRANCH_CHANGE_NEW[${#CONFIG_BRANCH_CHANGE_NEW[@]}]=$new
 }
 
+config_repo_branch_changed() {
+  local target config_change_i
+  target=$1
+  config_change_i=0
+  while [ $config_change_i -lt ${#CONFIG_BRANCH_CHANGE_REPOS[@]} ]; do
+    [ "${CONFIG_BRANCH_CHANGE_REPOS[$config_change_i]}" = "$target" ] && return 0
+    config_change_i=$((config_change_i + 1))
+  done
+  return 1
+}
+
 print_config_next_steps() {
   if [ -n "$CONFIG_BASE_DIR_OLD" ]; then
     info "Main worktrees dir change was saved in config only."
@@ -78,6 +102,7 @@ print_config_next_steps() {
   fi
 
   [ ${#CONFIG_BRANCH_CHANGE_REPOS[@]} -gt 0 ] || return 0
+  [ "$CONFIG_BASE_BRANCHES_AUTO_APPLIED" -eq 0 ] || return 0
 
   info "Base branch changes were saved in config only."
   info "Existing cloned base worktrees are not checked out automatically."
@@ -162,10 +187,16 @@ configure_base_branches() {
 }
 
 apply_configured_base_branches() {
+  local apply_scope
+  apply_scope=${1:-all}
   reset_preflight
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
+    if [ "$apply_scope" = "changed" ] && ! config_repo_branch_changed "$name"; then
+      i=$((i + 1))
+      continue
+    fi
     base_path=$(base_repo_path "$name")
     branch=$(repo_base_branch_at "$i")
     label="$BASE_DIR/$name"
@@ -177,6 +208,7 @@ apply_configured_base_branches() {
     preflight_require_no_rebase "$label" "$base_path"
     preflight_fetch_origin "$label" "$base_path"
     preflight_remote_branch_exists "$label" "$base_path" "$branch"
+    preflight_pull_ref_fast_forwardable "$label" "$base_path" "$branch" "origin/$branch" "$branch" "origin/$branch"
     i=$((i + 1))
   done
   preflight_die_if_errors "config base"
@@ -184,6 +216,10 @@ apply_configured_base_branches() {
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
+    if [ "$apply_scope" = "changed" ] && ! config_repo_branch_changed "$name"; then
+      i=$((i + 1))
+      continue
+    fi
     base_path=$(base_repo_path "$name")
     branch=$(repo_base_branch_at "$i")
     label="$BASE_DIR/$name"
@@ -194,9 +230,9 @@ apply_configured_base_branches() {
     checked_out=$(git -C "$base_path" branch --show-current 2>/dev/null || printf '')
     if [ "$checked_out" != "$branch" ]; then
       workbranch_git_checkout_base_branch "$name" "$base_path" "$branch"
-      workbranch_git_pull_base "$name" "$base_path" "$branch"
-      success "Base branch ready: $label -> $(color_branch_name "$branch")"
     fi
+    workbranch_git_pull_base "$name" "$base_path" "$branch"
+    success "Base branch ready: $label -> $(color_branch_name "$branch")"
     i=$((i + 1))
   done
 }

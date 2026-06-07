@@ -144,11 +144,23 @@ preflight_pull_fast_forwardable() {
   path=$2
   branch=$3
   remote="origin/$branch"
-  git_ref_exists "$path" "$remote" || return 0
-  if git_is_ancestor "$path" HEAD "$remote" || git_is_ancestor "$path" "$remote" HEAD; then
+  preflight_pull_ref_fast_forwardable "$label" "$path" HEAD "$remote" HEAD "$remote"
+}
+
+preflight_pull_ref_fast_forwardable() {
+  local label path local_ref remote_ref local_display remote_display
+  label=$1
+  path=$2
+  local_ref=$3
+  remote_ref=$4
+  local_display=$5
+  remote_display=$6
+  git_ref_exists "$path" "$local_ref" || return 0
+  git_ref_exists "$path" "$remote_ref" || return 0
+  if git_is_ancestor "$path" "$local_ref" "$remote_ref" || git_is_ancestor "$path" "$remote_ref" "$local_ref"; then
     return 0
   fi
-  preflight_error "$label cannot fast-forward pull: HEAD and $remote diverged"
+  preflight_error "$label cannot fast-forward pull: $local_display and $remote_display diverged"
 }
 
 preflight_push_fast_forwardable() {

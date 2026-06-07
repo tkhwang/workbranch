@@ -11,6 +11,7 @@ cmd_refresh() {
   else
     collect_update_all_tasks
     preflight_update_all_tasks
+    preflight_die_if_errors "update"
   fi
   section "Pulling base branches"
   run_pull
