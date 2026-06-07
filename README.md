@@ -116,6 +116,7 @@ macOS-only: `finder`, `ide`, `terminal`, `config ide`, and `config terminal`. On
 | `workbranch add [<task>] [--from <ref>]` | Create a task workspace |
 | `workbranch list` | Show repos and task workspaces |
 | `workbranch remove <task>` | Remove task worktrees and local task branches |
+| `workbranch doctor [--fix]` | Diagnose project health; `--fix` prunes stale worktree registrations only |
 
 ### Branch workflow
 
@@ -159,6 +160,12 @@ WORKBRANCH_COLOR=always workbranch help # force enhanced display
 ```
 
 `workbranch path <task>` and `workbranch path <task> --repo <repo>` remain plain path-only outputs for scripting.
+
+## Project health
+
+Run `workbranch doctor` to diagnose base worktree drift, partial task workspaces, stale task directories, and stale Git worktree registrations. It is read-only by default and exits non-zero when it finds issues, so it can be used in local checks or CI.
+
+Use `workbranch doctor --fix` for the safe repair path. It only runs `git worktree prune` for in-scope base repos; it never deletes task directories or branches. For destructive cleanup, follow the printed `workbranch remove <task>` or `workbranch remove <task> --force` hint yourself. Add `--repo <repo>` to scope diagnosis and pruning to one repo.
 
 ## Shell completion
 

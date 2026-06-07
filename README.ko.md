@@ -116,6 +116,7 @@ macOS 전용: `finder`, `ide`, `terminal`, `config ide`, `config terminal`. Linu
 | `workbranch add [<task>] [--from <ref>]` | task workspace 생성 |
 | `workbranch list` | repo와 task workspace 목록 확인 |
 | `workbranch remove <task>` | task worktree와 local task branch 제거 |
+| `workbranch doctor [--fix]` | project health 진단; `--fix`는 stale worktree registration만 prune |
 
 ### Branch workflow
 
@@ -159,6 +160,12 @@ WORKBRANCH_COLOR=always workbranch help # enhanced display 강제
 ```
 
 `workbranch path <task>`와 `workbranch path <task> --repo <repo>`는 scripting을 위해 계속 plain path만 stdout에 출력합니다.
+
+## Project health
+
+`workbranch doctor`는 base worktree drift, partial task workspace, stale task directory, stale Git worktree registration을 진단합니다. 기본 동작은 read-only이고 issue가 있으면 non-zero로 종료하므로 local check나 CI에서 사용할 수 있습니다.
+
+안전한 자동 복구만 원하면 `workbranch doctor --fix`를 사용하세요. 이 명령은 in-scope base repo에 대해 `git worktree prune`만 실행하며 task directory나 branch는 삭제하지 않습니다. 삭제가 필요한 정리는 출력되는 `workbranch remove <task>` 또는 `workbranch remove <task> --force` 안내를 사용자가 직접 실행해야 합니다. `--repo <repo>`를 붙이면 특정 repo만 진단하고 prune합니다.
 
 ## Shell completion
 

@@ -21,6 +21,9 @@ Horizontal:
 Composite:
   sync        remote base -> local base, then local base -> task
 
+Maintenance:
+  doctor      inspect project health; --fix prunes stale worktree registrations
+
 Optional:
   push <task> task        -> remote task branch
 ```
@@ -149,6 +152,26 @@ Safety:
 - Fails before running if the task worktree or local base worktree is dirty.
 - Uses `--ff-only`; no merge commit is created.
 - Updates the local base from remote before landing the task.
+
+### `workbranch doctor [--fix]`
+
+Direction: inspect local filesystem and Git worktree metadata. With `--fix`, prune stale worktree registrations only.
+
+`workbranch doctor` reports base worktree issues, partial task workspaces, stale task directories, and prunable worktree registrations. It is read-only by default and exits `0` only when no issues are found.
+
+With `--fix`, for each in-scope base repo:
+
+```bash
+cd _base/<repo>
+git worktree prune
+```
+
+Safety:
+
+- `--fix` never deletes task directories or branches.
+- Stale task directories are reported with `workbranch remove <task>` guidance.
+- Base branch drift, dirty worktrees, rebases in progress, and partial workspaces are reported only.
+- `--repo <repo>` scopes both diagnosis and pruning to that repo.
 
 ### `workbranch push`
 

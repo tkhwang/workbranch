@@ -48,6 +48,7 @@ Config:
 Completion:
   completion <shell>   Print a shell completion script (bash, zsh, fish)
 Other:
+  doctor            Diagnose project health; --fix applies safe repairs
   help              Show this help
   -v, --version     Show the installed workbranch version
   version           Show the installed workbranch version
@@ -90,6 +91,7 @@ usage_enhanced() {
   section "Completion"
   printf '  completion <shell>   Print a shell completion script (bash, zsh, fish)\n'
   section "Other"
+  printf '  doctor            Diagnose project health; --fix applies safe repairs\n'
   printf '  help              Show this help\n'
   printf '  -v, --version     Show the installed workbranch version\n'
   printf '  version           Show the installed workbranch version\n'

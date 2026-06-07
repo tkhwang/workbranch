@@ -229,6 +229,32 @@ is_registered_worktree_path() {
   return 1
 }
 
+
+doctor_task_candidate_path() {
+  local path dir_name i name
+  path=$1
+  [ -d "$path" ] || return 1
+  dir_name=${path##*/}
+  [ "$dir_name" = "$BASE_DIR" ] && return 1
+  case "$dir_name" in .*) return 1 ;; esac
+  [ -f "$path/.workbranch.task" ] && return 0
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    [ -e "$path/$name" ] && return 0
+    i=$((i + 1))
+  done
+  return 1
+}
+
+doctor_prunable_worktree_count() {
+  local base_path count
+  base_path=$1
+  [ -d "$base_path/.git" ] || [ -f "$base_path/.git" ] || { printf '0'; return 0; }
+  count=$(git -C "$base_path" worktree list --porcelain 2>/dev/null | grep -c '^prunable' || true)
+  printf '%s' "$count"
+}
+
 is_stale_task_directory_path() {
   local path
   path=$1

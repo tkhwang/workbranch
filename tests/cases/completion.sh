@@ -18,6 +18,7 @@ test_complete_helpers_list_tasks_repos_and_commands() {
   assert_contains "$commands" "completion"
   assert_contains "$commands" "update"
   assert_contains "$commands" "sync"
+  assert_contains "$commands" "doctor"
 }
 
 test_complete_helpers_are_silent_outside_project() {
@@ -94,6 +95,18 @@ test_completion_bash_uses_command_specific_flags() {
   assert_contains "${COMPREPLY[*]}" "--repo"
   assert_not_contains "${COMPREPLY[*]}" "--from"
 
+  COMP_WORDS=(workbranch doctor --)
+  COMP_CWORD=2
+  _workbranch
+  assert_contains "${COMPREPLY[*]}" "--repo"
+  assert_contains "${COMPREPLY[*]}" "--fix"
+  assert_not_contains "${COMPREPLY[*]}" "--all"
+
+  COMP_WORDS=(workbranch doctor "")
+  COMP_CWORD=2
+  _workbranch
+  assert_not_contains "${COMPREPLY[*]-}" "feat-login"
+
   COMP_WORDS=(workbranch sync --)
   COMP_CWORD=2
   _workbranch
@@ -117,6 +130,8 @@ test_completion_fish_emits_complete_command() {
   assert_contains "$out" "complete -c workbranch"
   assert_contains "$out" "__complete-tasks"
   assert_contains "$out" "__workbranch_seen_command sync' -l repo"
+  assert_contains "$out" "__workbranch_seen_command doctor' -l repo"
+  assert_contains "$out" "__workbranch_seen_command doctor' -l fix"
 }
 
 test_completion_fish_completes_partial_subcommands() {

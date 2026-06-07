@@ -189,6 +189,7 @@ test_help_groups_commands() {
   assert_contains "$out" "config --rewrite  Rewrite config to current format without prompts"
   assert_contains "$out" "completion <shell>   Print a shell completion script (bash, zsh, fish)"
   assert_contains "$out" "Other:"
+  assert_contains "$out" "doctor            Diagnose project health; --fix applies safe repairs"
   assert_contains "$out" "help              Show this help"
   assert_contains "$out" "-v, --version     Show the installed workbranch version"
   assert_contains "$out" "version           Show the installed workbranch version"
@@ -201,7 +202,7 @@ test_help_groups_commands() {
 '*) fail "expected compact help without blank lines; got: $out" ;;
   esac
   case "$out" in
-    *"Workspace:"*"init              Initialize a workbranch project"*"list              List configured repos and task workspaces"*"add [<task>] [--from <ref>]  Create a task workspace"*"remove <task>     Remove task worktrees and local task branches"*"Git:"*"status            Show remote diff, task diff, and dirty state"*"  vertical"*"Tool:"*"path <task>       Print a task workspace path"*"finder <task>     Open a task workspace in Finder"*"ide <task>        Open task repo worktrees in the configured IDE"*"terminal <task>   Open task repo worktrees in the configured terminal"*"Config:"*"config            Create or update .workbranch.config without cloning repos"*"config ide        Update only the configured IDE command"*"config terminal   Update only the configured terminal command"*"config --rewrite  Rewrite config to current format without prompts"*"Completion:"*"completion <shell>   Print a shell completion script (bash, zsh, fish)"*"Other:"*) ;;
+    *"Workspace:"*"init              Initialize a workbranch project"*"list              List configured repos and task workspaces"*"add [<task>] [--from <ref>]  Create a task workspace"*"remove <task>     Remove task worktrees and local task branches"*"Git:"*"status            Show remote diff, task diff, and dirty state"*"  vertical"*"Tool:"*"path <task>       Print a task workspace path"*"finder <task>     Open a task workspace in Finder"*"ide <task>        Open task repo worktrees in the configured IDE"*"terminal <task>   Open task repo worktrees in the configured terminal"*"Config:"*"config            Create or update .workbranch.config without cloning repos"*"config ide        Update only the configured IDE command"*"config terminal   Update only the configured terminal command"*"config --rewrite  Rewrite config to current format without prompts"*"Completion:"*"completion <shell>   Print a shell completion script (bash, zsh, fish)"*"Other:"*"doctor            Diagnose project health; --fix applies safe repairs"*) ;;
     *) fail "expected workspace, git, tool, config, and other group ordering; got: $out" ;;
   esac
 }
