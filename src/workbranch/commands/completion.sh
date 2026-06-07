@@ -161,7 +161,14 @@ function __workbranch_seen_command
     test (count $tokens) -ge 2; and test $tokens[2] = $cmd
 end
 
-complete -c workbranch -f -n 'test (count (commandline -opc)) -le 1' -a '(__workbranch_complete_commands)'
+function __workbranch_completing_command
+    set -l tokens (commandline -opc)
+    set -l current (commandline -ct)
+    test (count $tokens) -le 1; and return 0
+    test (count $tokens) -eq 2; and test -n "$current"
+end
+
+complete -c workbranch -f -n '__workbranch_completing_command' -a '(__workbranch_complete_commands)'
 complete -c workbranch -f -n '__workbranch_seen_command update' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command remove' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command push' -a '(__workbranch_complete_tasks)'
@@ -170,7 +177,7 @@ complete -c workbranch -f -n '__workbranch_seen_command path' -a '(__workbranch_
 complete -c workbranch -f -n '__workbranch_seen_command finder' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command ide' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command terminal' -a '(__workbranch_complete_tasks)'
-complete -c workbranch -f -n '__fish_seen_argument --repo' -a '(__workbranch_complete_repos)'
+complete -c workbranch -f -n '__fish_seen_argument -l repo' -a '(__workbranch_complete_repos)'
 complete -c workbranch -n '__workbranch_seen_command add' -l from -d 'Seed task branches from a source ref'
 complete -c workbranch -n '__workbranch_seen_command config' -l rewrite -d 'Rewrite config to current format'
 complete -c workbranch -n '__workbranch_seen_command remove' -l force -d 'Force removal'

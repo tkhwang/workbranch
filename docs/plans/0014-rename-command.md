@@ -12,11 +12,11 @@
 
 ## Problem Statement
 
-Task identity (`feat+login`) is chosen at `add` time and is effectively permanent: to "rename" a task today a user must `remove` it (losing local work unless pushed) and `add` it again under a new name. There is no in-place rename of the folder + branches. `rename` makes task identity editable without destroying work.
+Task identity (`feat-login`) is chosen at `add` time and is effectively permanent: to "rename" a task today a user must `remove` it (losing local work unless pushed) and `add` it again under a new name. There is no in-place rename of the folder + branches. `rename` makes task identity editable without destroying work.
 
 ## Current Repo Evidence
 
-- Task folder ↔ branch derivation: `src/workbranch/lib/task-identity.sh` (`task_folder_from_identity`, `task_branch_from_folder_identity`, delimiter is `+`, e.g. `feat+login` ↔ `feat/login`), `src/workbranch/lib/project.sh` (`default_repo_task_branch_at`, `repo_task_branch_at`).
+- Task folder ↔ branch derivation: `src/workbranch/lib/task-identity.sh` (`task_folder_from_identity`, `task_branch_from_folder_identity`, delimiter is `-`, e.g. `feat-login` ↔ `feat/login`), `src/workbranch/lib/project.sh` (`default_repo_task_branch_at`, `repo_task_branch_at`).
 - Per-repo task branch source of truth: `.workbranch.task` via `src/workbranch/lib/task-metadata.sh` (`load_task_metadata`, `metadata_task_branch_for_repo`, `write_task_metadata`, `set_task_metadata_branch`, `reset_task_metadata_cache`).
 - Worktree creation/branch ops: `src/workbranch/git-ops.sh` (`workbranch_git_add_new_task_worktree`, `workbranch_git_delete_task_branch`, `workbranch_git_prune_stale_worktrees`).
 - Preflight predicates: `src/workbranch/lib/preflight.sh` (`preflight_require_current_branch`, `preflight_require_clean`, `preflight_require_no_rebase`, `branch_exists`, `git_ref_exists`).
@@ -64,18 +64,18 @@ Task identity (`feat+login`) is chosen at `add` time and is effectively permanen
 ## Target UX
 
 ```bash
-$ workbranch rename feat+login feat+auth
-[*] Renaming feat+login -> feat+auth
+$ workbranch rename feat-login feat-auth
+[*] Renaming feat-login -> feat-auth
 [*] Repo frontend
 [*]   branch feat/login -> [feat/auth]:
 [*] Repo backend
 [*]   branch feature/cpq-login -> [feature/cpq-auth]:
-[+] Moved worktree: feat+auth/frontend
+[+] Moved worktree: feat-auth/frontend
 [+] Renamed branch: feat/login -> feat/auth
-[+] Moved worktree: feat+auth/backend
+[+] Moved worktree: feat-auth/backend
 [+] Renamed branch: feature/cpq-login -> feature/cpq-auth
 [*] Note: origin/feat/login still exists; re-push as feat/auth when ready.
-[+] Renamed: feat+login -> feat+auth
+[+] Renamed: feat-login -> feat-auth
 ```
 
 Usage line:
@@ -210,17 +210,17 @@ bin/workbranch                       # regenerated only by scripts/build-workbra
     new_fixture
     cd "$FIXTURE_PROJECT" || fail "cd project failed"
     run_expect_success "$WORKBRANCH" init >/dev/null
-    printf '\n\n' | "$WORKBRANCH" add feat+login >/dev/null 2>&1 || fail "add failed"
+    printf '\n\n' | "$WORKBRANCH" add feat-login >/dev/null 2>&1 || fail "add failed"
 
-    printf '\n\n' | "$WORKBRANCH" rename feat+login feat+auth >/dev/null 2>&1 || fail "rename failed"
+    printf '\n\n' | "$WORKBRANCH" rename feat-login feat-auth >/dev/null 2>&1 || fail "rename failed"
 
-    [ ! -e "$FIXTURE_PROJECT/feat+login" ] || fail "old task dir still exists"
-    assert_branch "$FIXTURE_PROJECT/feat+auth/frontend" "feat/auth"
-    assert_branch "$FIXTURE_PROJECT/feat+auth/backend" "feat/auth"
-    meta=$(cat "$FIXTURE_PROJECT/feat+auth/.workbranch.task")
+    [ ! -e "$FIXTURE_PROJECT/feat-login" ] || fail "old task dir still exists"
+    assert_branch "$FIXTURE_PROJECT/feat-auth/frontend" "feat/auth"
+    assert_branch "$FIXTURE_PROJECT/feat-auth/backend" "feat/auth"
+    meta=$(cat "$FIXTURE_PROJECT/feat-auth/.workbranch.task")
     assert_contains "$meta" "REPO_BRANCH frontend feat/auth"
     # downstream command works with the new key
-    "$WORKBRANCH" path feat+auth >/dev/null || fail "path failed for renamed task"
+    "$WORKBRANCH" path feat-auth >/dev/null || fail "path failed for renamed task"
   }
   ```
 
@@ -246,7 +246,7 @@ bin/workbranch                       # regenerated only by scripts/build-workbra
 
 - [ ] Whitespace: `git diff --check`.
 
-- [ ] Manual smoke: create `feat+login`, `rename` to `feat+auth`, verify folder/branches/metadata and that `status`/`path`/`remove` operate on the new key; verify a simulated mid-rename failure rolls back cleanly.
+- [ ] Manual smoke: create `feat-login`, `rename` to `feat-auth`, verify folder/branches/metadata and that `status`/`path`/`remove` operate on the new key; verify a simulated mid-rename failure rolls back cleanly.
 
 ## Acceptance Criteria
 

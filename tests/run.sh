@@ -65,6 +65,8 @@ main() {
   run_test test_completion_bash_completes_tasks_and_repos
   run_test test_completion_bash_uses_command_specific_flags
   run_test test_completion_fish_emits_complete_command
+  run_test test_completion_fish_completes_partial_subcommands
+  run_test test_completion_fish_uses_long_option_condition_for_repo_values
   run_test test_safe_names_reject_dot_and_dotdot
   run_test test_invalid_config_rejected_without_execution
   run_test test_init_existing_config_clones_base_repos

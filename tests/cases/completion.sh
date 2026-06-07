@@ -99,3 +99,17 @@ test_completion_fish_emits_complete_command() {
   assert_contains "$out" "complete -c workbranch"
   assert_contains "$out" "__complete-tasks"
 }
+
+test_completion_fish_completes_partial_subcommands() {
+  out=$("$WORKBRANCH" completion fish)
+  assert_contains "$out" "__workbranch_completing_command"
+  assert_contains "$out" 'test (count $tokens) -eq 2; and test -n "$current"'
+  assert_not_contains "$out" "test (count (commandline -opc)) -le 1"
+}
+
+test_completion_fish_uses_long_option_condition_for_repo_values() {
+  out=$("$WORKBRANCH" completion fish)
+  assert_contains "$out" "__fish_seen_argument -l repo"
+  assert_not_contains "$out" "__fish_seen_argument --repo"
+  assert_contains "$out" "-a '(__workbranch_complete_repos)'"
+}

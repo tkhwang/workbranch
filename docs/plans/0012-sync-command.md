@@ -48,8 +48,8 @@ $ workbranch sync
 [*] Pulling frontend (main)
 [+] ...
 # --- Updating task workspaces ---
-[*] Updating feat+login/frontend ...
-[+] Updated: feat+login/frontend
+[*] Updating feat-login/frontend ...
+[+] Updated: feat-login/frontend
 
 $ workbranch sync --repo backend   # scope both phases to one repo
 ```
@@ -146,7 +146,7 @@ bin/workbranch                      # regenerated only by scripts/build-workbran
     # base worktree now at remote head
     assert_commit_equals "$base_frontend" "$remote_base_head"
     # task worktree rebased onto the new base head (contains the base commit)
-    assert_task_contains_base_commit "$project/feat+login/frontend" "$remote_base_head"
+    assert_task_contains_base_commit "$project/feat-login/frontend" "$remote_base_head"
   }
   ```
 

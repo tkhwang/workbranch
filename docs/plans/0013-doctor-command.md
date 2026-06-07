@@ -53,8 +53,8 @@ $ workbranch doctor
     [-] backend   not on configured branch (expected master, got hotfix)
 
 [*] Task workspaces
-    [+] feat+login  healthy
-    [-] feat+wip    partial: backend worktree not registered
+    [+] feat-login  healthy
+    [-] feat-wip    partial: backend worktree not registered
 
 [*] Stale directories
     [-] old-task    task-shaped directory but no registered worktrees
@@ -70,7 +70,7 @@ $ workbranch doctor --fix
 [+] Pruned stale worktree registrations: frontend
 [*] Remaining issues require manual action:
     backend not on configured branch (expected master, got hotfix)
-    feat+wip partial workspace
+    feat-wip partial workspace
     old-task stale directory -> workbranch remove old-task
 [-] doctor fixed 1 issue(s); 3 require manual action
 ```
@@ -110,12 +110,12 @@ bin/workbranch                      # regenerated only by scripts/build-workbran
     new_fixture
     cd "$FIXTURE_PROJECT" || fail "cd project failed"
     run_expect_success "$WORKBRANCH" init >/dev/null
-    printf '\n\n' | "$WORKBRANCH" add feat+login >/dev/null 2>&1 || fail "add failed"
+    printf '\n\n' | "$WORKBRANCH" add feat-login >/dev/null 2>&1 || fail "add failed"
     # remove one repo worktree out-of-band to create a partial workspace
-    git -C "$FIXTURE_PROJECT/_base/backend" worktree remove --force "$FIXTURE_PROJECT/feat+login/backend"
+    git -C "$FIXTURE_PROJECT/_base/backend" worktree remove --force "$FIXTURE_PROJECT/feat-login/backend"
 
     out=$("$WORKBRANCH" doctor 2>&1; echo "status=$?")
-    assert_contains "$out" "feat+login"
+    assert_contains "$out" "feat-login"
     assert_contains "$out" "partial"
     assert_contains "$out" "status=1"
   }
@@ -159,7 +159,7 @@ bin/workbranch                      # regenerated only by scripts/build-workbran
     new_fixture
     cd "$FIXTURE_PROJECT" || fail "cd project failed"
     run_expect_success "$WORKBRANCH" init >/dev/null
-    printf '\n\n' | "$WORKBRANCH" add feat+login >/dev/null 2>&1 || fail "add failed"
+    printf '\n\n' | "$WORKBRANCH" add feat-login >/dev/null 2>&1 || fail "add failed"
     out=$("$WORKBRANCH" doctor 2>&1; echo "status=$?")
     assert_contains "$out" "status=0"
   }
