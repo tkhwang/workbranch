@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.7.0](https://github.com/tkhwang/workbranch/compare/v1.6.0...v1.7.0) (2026-06-07)
+
+
+### Features
+
+* change branch rule and implement auto-completion ([3e5419b](https://github.com/tkhwang/workbranch/commit/3e5419bdebf22e993519b11dd42c84f26860c71b))
+* **completion:** add shell completion for workbranch ([d67e581](https://github.com/tkhwang/workbranch/commit/d67e581c921ea94c6520e958f373e7a8a306978b))
+
+
+### Bug Fixes
+
+* **completion:** improve workbranch command completion ([2e41da4](https://github.com/tkhwang/workbranch/commit/2e41da497ea15c05340577e50391cb6990394390))
+
 ## [1.6.0](https://github.com/tkhwang/workbranch/compare/v1.5.0...v1.6.0) (2026-06-07)
 
 
