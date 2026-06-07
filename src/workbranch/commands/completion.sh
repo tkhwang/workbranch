@@ -19,7 +19,7 @@ cmd_complete_repos() {
 }
 
 cmd_complete_commands() {
-  printf '%s\n' add completion config finder help ide init land list path pull push remove status terminal update version
+  printf '%s\n' add completion config doctor finder help ide init land list path pull push remove status sync terminal update version
 }
 
 print_completion_bash() {
@@ -60,8 +60,9 @@ _workbranch() {
         add) words='--from' ;;
         config) words='--rewrite' ;;
         remove) words='--force' ;;
+        doctor) words='--fix --repo' ;;
         update) words='--all --repo' ;;
-        status|pull|push|land|path|finder|ide|terminal) words='--repo' ;;
+        status|pull|push|land|sync|path|finder|ide|terminal) words='--repo' ;;
         *) words='' ;;
       esac
       COMPREPLY=( $(compgen -W "$words" -- "$cur") )
@@ -112,8 +113,9 @@ _workbranch() {
       add) flags=(--from) ;;
       config) flags=(--rewrite) ;;
       remove) flags=(--force) ;;
+      doctor) flags=(--fix --repo) ;;
       update) flags=(--all --repo) ;;
-      status|pull|push|land|path|finder|ide|terminal) flags=(--repo) ;;
+      status|pull|push|land|sync|path|finder|ide|terminal) flags=(--repo) ;;
       *) flags=() ;;
     esac
     _describe 'option' flags
@@ -181,12 +183,15 @@ complete -c workbranch -f -n '__fish_seen_argument -l repo' -a '(__workbranch_co
 complete -c workbranch -n '__workbranch_seen_command add' -l from -d 'Seed task branches from a source ref'
 complete -c workbranch -n '__workbranch_seen_command config' -l rewrite -d 'Rewrite config to current format'
 complete -c workbranch -n '__workbranch_seen_command remove' -l force -d 'Force removal'
+complete -c workbranch -n '__workbranch_seen_command doctor' -l fix -d 'Apply safe repairs'
 complete -c workbranch -n '__workbranch_seen_command update' -l all -d 'Update every task workspace'
 complete -c workbranch -n '__workbranch_seen_command update' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command status' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command pull' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command push' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command land' -l repo -d 'Limit operation to one repo'
+complete -c workbranch -n '__workbranch_seen_command sync' -l repo -d 'Limit operation to one repo'
+complete -c workbranch -n '__workbranch_seen_command doctor' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command path' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command finder' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command ide' -l repo -d 'Limit operation to one repo'

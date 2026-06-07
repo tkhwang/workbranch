@@ -15,8 +15,10 @@ main() {
     finder) cmd_finder "$@" ;;
     terminal) cmd_terminal "$@" ;;
     status) cmd_status "$@" ;;
+    doctor) cmd_doctor "$@" ;;
     pull) cmd_pull "$@" ;;
     update) cmd_update "$@" ;;
+    sync) cmd_sync "$@" ;;
     push) cmd_push "$@" ;;
     land) cmd_land "$@" ;;
     remove) cmd_remove "$@" ;;

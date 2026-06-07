@@ -18,6 +18,12 @@ Horizontal:
   update      local base  -> task
   land        task        -> local base
 
+Composite:
+  sync        remote base -> local base, then local base -> task
+
+Maintenance:
+  doctor      inspect project health; --fix prunes stale worktree registrations
+
 Optional:
   push <task> task        -> remote task branch
 ```
@@ -89,6 +95,32 @@ Safety:
 - Fails before running if `_base/<repo>` has a rebase in progress.
 - Conflict resolution is left to Git and the user.
 
+### `workbranch sync`
+
+Direction: remote base -> local base, then local base -> every task.
+
+For each repo, `workbranch sync` first validates that every target task workspace can be updated. If there are no task workspaces, or any target task worktree is dirty, missing, on the wrong branch, or has a rebase in progress, the command fails before pulling base branches.
+
+After update preflight passes, sync runs the same base pull behavior as `workbranch pull`:
+
+```bash
+cd _base/<repo>
+git pull --ff-only origin <base-branch>
+```
+
+Then it runs the same task rebase behavior as `workbranch update` for the task set collected before the pull:
+
+```bash
+cd <task>/<repo>
+git rebase <_base/<repo> HEAD>
+```
+
+Safety:
+
+- Fails before pulling if task updates cannot run.
+- Pull failures abort before any task update.
+- Uses existing pull and update Git operations; sync does not introduce a separate Git primitive.
+
 ### `workbranch update <task>`
 
 Direction: local base -> one task.
@@ -120,6 +152,26 @@ Safety:
 - Fails before running if the task worktree or local base worktree is dirty.
 - Uses `--ff-only`; no merge commit is created.
 - Updates the local base from remote before landing the task.
+
+### `workbranch doctor [--fix]`
+
+Direction: inspect local filesystem and Git worktree metadata. With `--fix`, prune stale worktree registrations only.
+
+`workbranch doctor` reports base worktree issues, partial task workspaces, stale task directories, and prunable worktree registrations. It is read-only by default and exits `0` only when no issues are found.
+
+With `--fix`, for each in-scope base repo:
+
+```bash
+cd _base/<repo>
+git worktree prune
+```
+
+Safety:
+
+- `--fix` never deletes task directories or branches.
+- Stale task directories are reported with `workbranch remove <task>` guidance.
+- Base branch drift, dirty worktrees, rebases in progress, and partial workspaces are reported only.
+- `--repo <repo>` scopes both diagnosis and pruning to that repo.
 
 ### `workbranch push`
 

@@ -20,8 +20,10 @@ src/workbranch/commands/list.sh
 src/workbranch/commands/path.sh
 src/workbranch/commands/tool-launcher.sh
 src/workbranch/commands/status.sh
+src/workbranch/commands/doctor.sh
 src/workbranch/commands/pull.sh
 src/workbranch/commands/update.sh
+src/workbranch/commands/sync.sh
 src/workbranch/commands/push.sh
 src/workbranch/commands/land.sh
 src/workbranch/commands/remove.sh

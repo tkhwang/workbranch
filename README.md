@@ -40,7 +40,7 @@ workbranch init
 workbranch add
 cd feat-login/<repo>
 # work on the task
-workbranch update feat-login
+workbranch sync
 workbranch push feat-login
 workbranch remove feat-login
 ```
@@ -73,6 +73,8 @@ workbranch add
 ```
 
 Use `workbranch add [<task>] --from <ref>` to seed the new task branches from another source ref. For example, `workbranch add task1 --from feat/XXX` fetches origin, prefers `origin/feat/XXX` when it exists, and creates the linked task worktrees from that ref while still using the prompted task branch names. Later `workbranch status` still compares the task branch to the current local base; the source ref is creation context, not a persistent status baseline.
+
+During active work, run `workbranch sync` to pull remote base branches into `_base/<repo>` and then update every task workspace from those refreshed local bases. `sync` first checks that task worktrees are updateable; dirty or otherwise blocked tasks stop the command before base branches are pulled.
 
 Use `workbranch config` when you want to update project settings, base branches, IDE/terminal launch commands, or per-repo setup commands without cloning repos again.
 
@@ -114,6 +116,7 @@ macOS-only: `finder`, `ide`, `terminal`, `config ide`, and `config terminal`. On
 | `workbranch add [<task>] [--from <ref>]` | Create a task workspace |
 | `workbranch list` | Show repos and task workspaces |
 | `workbranch remove <task>` | Remove task worktrees and local task branches |
+| `workbranch doctor [--fix]` | Diagnose project health; `--fix` prunes stale worktree registrations only |
 
 ### Branch workflow
 
@@ -122,6 +125,7 @@ macOS-only: `finder`, `ide`, `terminal`, `config ide`, and `config terminal`. On
 | `workbranch status` | Show base remote diff, task diff, and dirty state |
 | `workbranch pull` | Pull remote base branches into `_base/<repo>` |
 | `workbranch update [task]` | Merge local base changes into task worktrees |
+| `workbranch sync` | Pull base branches, then update every task workspace |
 | `workbranch push` | Push base branches |
 | `workbranch push <task>` | Push task branches |
 | `workbranch land <task>` | Fast-forward task work back into local base branches |
@@ -156,6 +160,12 @@ WORKBRANCH_COLOR=always workbranch help # force enhanced display
 ```
 
 `workbranch path <task>` and `workbranch path <task> --repo <repo>` remain plain path-only outputs for scripting.
+
+## Project health
+
+Run `workbranch doctor` to diagnose base worktree drift, partial task workspaces, stale task directories, and stale Git worktree registrations. It is read-only by default and exits non-zero when it finds issues, so it can be used in local checks or CI.
+
+Use `workbranch doctor --fix` for the safe repair path. It only runs `git worktree prune` for in-scope base repos; it never deletes task directories or branches. For destructive cleanup, follow the printed `workbranch remove <task>` or `workbranch remove <task> --force` hint yourself. Add `--repo <repo>` to scope diagnosis and pruning to one repo.
 
 ## Shell completion
 

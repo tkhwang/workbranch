@@ -40,7 +40,7 @@ workbranch init
 workbranch add
 cd feat-login/<repo>
 # task 작업
-workbranch update feat-login
+workbranch sync
 workbranch push feat-login
 workbranch remove feat-login
 ```
@@ -73,6 +73,8 @@ workbranch add
 ```
 
 다른 source ref에서 새 task branch를 시작하려면 `workbranch add [<task>] --from <ref>`를 사용하세요. 예를 들어 `workbranch add task1 --from feat/XXX`는 origin을 fetch한 뒤 `origin/feat/XXX`가 있으면 그것을 우선 사용하고, prompt로 정한 task branch 이름은 그대로 유지한 채 linked task worktree를 만듭니다. 이후 `workbranch status`는 여전히 task branch를 현재 local base와 비교하며, source ref는 생성 시점 정보일 뿐 지속적인 status 기준이 아닙니다.
+
+작업 중에는 `workbranch sync`로 remote base branch를 `_base/<repo>`에 pull한 다음, 갱신된 local base 기준으로 모든 task workspace를 update할 수 있습니다. `sync`는 먼저 task worktree들이 update 가능한지 확인하므로, dirty 상태이거나 막힌 task가 있으면 base branch를 pull하기 전에 중단합니다.
 
 repo를 다시 clone하지 않고 project 설정, base branch, IDE/terminal 실행 명령, repo별 setup command를 수정하려면 `workbranch config`를 사용합니다.
 
@@ -114,6 +116,7 @@ macOS 전용: `finder`, `ide`, `terminal`, `config ide`, `config terminal`. Linu
 | `workbranch add [<task>] [--from <ref>]` | task workspace 생성 |
 | `workbranch list` | repo와 task workspace 목록 확인 |
 | `workbranch remove <task>` | task worktree와 local task branch 제거 |
+| `workbranch doctor [--fix]` | project health 진단; `--fix`는 stale worktree registration만 prune |
 
 ### Branch workflow
 
@@ -122,6 +125,7 @@ macOS 전용: `finder`, `ide`, `terminal`, `config ide`, `config terminal`. Linu
 | `workbranch status` | base remote diff, task diff, dirty state 확인 |
 | `workbranch pull` | remote base branch를 `_base/<repo>`로 pull |
 | `workbranch update [task]` | local base 변경사항을 task worktree에 merge |
+| `workbranch sync` | base branch를 pull한 뒤 모든 task workspace update |
 | `workbranch push` | base branch push |
 | `workbranch push <task>` | task branch push |
 | `workbranch land <task>` | task 작업을 local base branch로 fast-forward 반영 |
@@ -156,6 +160,12 @@ WORKBRANCH_COLOR=always workbranch help # enhanced display 강제
 ```
 
 `workbranch path <task>`와 `workbranch path <task> --repo <repo>`는 scripting을 위해 계속 plain path만 stdout에 출력합니다.
+
+## Project health
+
+`workbranch doctor`는 base worktree drift, partial task workspace, stale task directory, stale Git worktree registration을 진단합니다. 기본 동작은 read-only이고 issue가 있으면 non-zero로 종료하므로 local check나 CI에서 사용할 수 있습니다.
+
+안전한 자동 복구만 원하면 `workbranch doctor --fix`를 사용하세요. 이 명령은 in-scope base repo에 대해 `git worktree prune`만 실행하며 task directory나 branch는 삭제하지 않습니다. 삭제가 필요한 정리는 출력되는 `workbranch remove <task>` 또는 `workbranch remove <task> --force` 안내를 사용자가 직접 실행해야 합니다. `--repo <repo>`를 붙이면 특정 repo만 진단하고 prune합니다.
 
 ## Shell completion
 
