@@ -101,6 +101,8 @@ main() {
   run_test test_doctor_fix_does_not_delete_stale_task_directory
   run_test test_repo_scope_limits_git_commands_to_one_repo
   run_test test_land_preflight_blocks_all_repos_before_partial_land
+  run_test test_finalize_pulls_updates_and_lands_without_push_or_remove
+  run_test test_finalize_preflight_blocks_pull_before_dirty_task_update
   run_test test_push_supports_task_and_base_branches_after_fast_forward_merge
   run_test test_add_uses_feat_parent_branch_as_default
   run_test test_add_derives_branch_from_conventional_task_folder
@@ -161,6 +163,7 @@ main() {
   run_test test_config_tool_preset_names_are_colored
   run_test test_config_terminal_can_clear_without_removing_ide
   run_test test_config_tool_targets_are_macos_only
+  run_test test_config_base_checks_out_changed_base_branches_before_add
   run_test test_full_config_skips_tool_prompts_on_linux
   run_test test_config_writes_config_without_cloning
   run_test test_config_rewrites_legacy_config_without_cloning
@@ -173,7 +176,7 @@ main() {
   run_test test_config_preserves_task_setup_while_prompting_repo_setup
   run_test test_config_preserves_existing_branch_prefix_without_prompting
   run_test test_config_rejects_main_worktrees_dir_change_when_base_worktrees_exist
-  run_test test_config_guides_base_branch_change_for_cloned_repo
+  run_test test_config_checks_out_configured_base_branch_for_cloned_repo
   run_test test_repo_setup_can_be_configured_and_run_per_repo
   run_test test_repo_setup_suppresses_legacy_task_setup_fallback
   run_test test_task_setup_failure_reports_directory_and_command

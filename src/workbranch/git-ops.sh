@@ -61,6 +61,17 @@ workbranch_git_pull_base() {
   git -C "$base_path" pull --ff-only origin "$base_branch" || die "failed to pull repo '$repo_name'"
 }
 
+workbranch_git_checkout_base_branch() {
+  repo_name=$1
+  base_path=$2
+  base_branch=$3
+  if branch_exists "$base_path" "$base_branch"; then
+    git -C "$base_path" checkout "$base_branch" >/dev/null 2>&1 || die "failed to checkout base branch for repo '$repo_name': $base_branch"
+  else
+    git -C "$base_path" checkout -b "$base_branch" "origin/$base_branch" >/dev/null 2>&1 || die "failed to checkout base branch for repo '$repo_name': $base_branch"
+  fi
+}
+
 workbranch_git_update_task() {
   task_path=$1
   local_base_head=$2

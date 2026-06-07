@@ -144,6 +144,55 @@ test_land_preflight_blocks_all_repos_before_partial_land() {
   assert_not_exists "$project/_base/backend/backend-task.txt"
 }
 
+test_finalize_pulls_updates_and_lands_without_push_or_remove() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add feat-login >/dev/null
+
+  commit_to_remote_master frontend finalize-upstream
+
+  git -C "$project/feat-login/frontend" config user.name "Workbranch Test"
+  git -C "$project/feat-login/frontend" config user.email "workbranch-test@example.com"
+  git -C "$project/feat-login/backend" config user.name "Workbranch Test"
+  git -C "$project/feat-login/backend" config user.email "workbranch-test@example.com"
+  printf '%s\n' "finalize frontend" > "$project/feat-login/frontend/finalize-task.txt"
+  git -C "$project/feat-login/frontend" add finalize-task.txt
+  git -C "$project/feat-login/frontend" commit -m "finalize frontend" >/dev/null
+  printf '%s\n' "finalize backend" > "$project/feat-login/backend/finalize-task.txt"
+  git -C "$project/feat-login/backend" add finalize-task.txt
+  git -C "$project/feat-login/backend" commit -m "finalize backend" >/dev/null
+
+  out=$(run_expect_success "$WORKBRANCH" finalize feat-login)
+  assert_contains "$out" "Pulling base branches"
+  assert_contains "$out" "Updating task workspace"
+  assert_contains "$out" "Landing task"
+  assert_file "$project/_base/frontend/finalize-upstream.txt"
+  assert_file "$project/_base/frontend/finalize-task.txt"
+  assert_file "$project/_base/backend/finalize-task.txt"
+  assert_file "$project/feat-login/frontend/finalize-task.txt"
+  assert_remote_missing_file "$TMP_ROOT/remotes/frontend.git" master finalize-task.txt
+  assert_remote_missing_file "$TMP_ROOT/remotes/backend.git" master finalize-task.txt
+}
+
+test_finalize_preflight_blocks_pull_before_dirty_task_update() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add feat-login >/dev/null
+  before_head=$(git -C "$project/_base/frontend" rev-parse HEAD)
+  commit_to_remote_master frontend finalize-should-not-pull
+  printf '%s\n' "dirty task" > "$project/feat-login/backend/dirty.txt"
+
+  out=$(run_expect_fail "$WORKBRANCH" finalize feat-login)
+  assert_contains "$out" "Cannot finalize: preflight failed"
+  assert_contains "$out" "feat-login/backend dirty worktree"
+  [ "$(git -C "$project/_base/frontend" rev-parse HEAD)" = "$before_head" ] || fail "base advanced before finalize preflight failure"
+  assert_not_exists "$project/_base/frontend/finalize-should-not-pull.txt"
+}
+
 test_push_supports_task_and_base_branches_after_fast_forward_merge() {
   new_fixture
   project="$FIXTURE_PROJECT"
@@ -207,4 +256,3 @@ test_pull_preflight_requires_base_worktree_on_configured_branch() {
   assert_contains "$out" "_base/frontend expected branch master, got unrelated"
   assert_not_exists "$project/_base/frontend/pull-should-not-touch-unrelated.txt"
 }
-

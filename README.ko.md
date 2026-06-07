@@ -76,7 +76,7 @@ workbranch add
 
 작업 중에는 `workbranch sync`로 remote base branch를 `_base/<repo>`에 pull한 다음, 갱신된 local base 기준으로 모든 task workspace를 update할 수 있습니다. `sync`는 먼저 task worktree들이 update 가능한지 확인하므로, dirty 상태이거나 막힌 task가 있으면 base branch를 pull하기 전에 중단합니다.
 
-repo를 다시 clone하지 않고 project 설정, base branch, IDE/terminal 실행 명령, repo별 setup command를 수정하려면 `workbranch config`를 사용합니다.
+repo를 다시 clone하지 않고 project 설정, base branch, IDE/terminal 실행 명령, repo별 setup command를 수정하려면 `workbranch config`를 사용합니다. base branch가 바뀌면 기존 `_base/<repo>` worktree를 fetch, checkout, fast-forward pull까지 해서 해당 branch로 맞춥니다. base branch만 수정하려면 `workbranch config base`를 사용합니다.
 
 ## 생성되는 구조
 
@@ -111,6 +111,7 @@ macOS 전용: `finder`, `ide`, `terminal`, `config ide`, `config terminal`. Linu
 | --- | --- |
 | `workbranch init` | config 기준으로 base worktree 생성 또는 clone |
 | `workbranch config` | project 설정, base branch, tool command, repo setup command 수정 |
+| `workbranch config base` | base branch 설정만 수정하고 base worktree checkout |
 | `workbranch config ide` | IDE 명령만 수정 |
 | `workbranch config terminal` | terminal 명령만 수정 |
 | `workbranch add [<task>] [--from <ref>]` | task workspace 생성 |
@@ -129,6 +130,7 @@ macOS 전용: `finder`, `ide`, `terminal`, `config ide`, `config terminal`. Linu
 | `workbranch push` | base branch push |
 | `workbranch push <task>` | task branch push |
 | `workbranch land <task>` | task 작업을 local base branch로 fast-forward 반영 |
+| `workbranch finalize <task>` | base branch를 pull하고 하나의 task를 update한 뒤 local base branch로 반영 |
 
 ### Tool commands
 

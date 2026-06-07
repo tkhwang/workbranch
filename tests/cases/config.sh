@@ -123,6 +123,34 @@ test_config_tool_targets_are_macos_only() {
   assert_not_contains "$out" "no enclosing workbranch project found"
 }
 
+test_config_base_checks_out_changed_base_branches_before_add() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  commit_to_remote_branch frontend feature/cpq parent-frontend
+  commit_to_remote_branch backend feature/cpq parent-backend
+
+  out=$(printf '%s\n%s\n' "feature/cpq" "feature/cpq" | run_expect_success "$WORKBRANCH" config base)
+  assert_contains "$out" "[*] Base branches"
+  assert_contains "$out" "[*] _base/frontend current branch: master"
+  assert_contains "$out" "[+] Base branch ready: _base/frontend -> feature/cpq"
+  assert_contains "$out" "[+] Config updated:"
+  assert_not_contains "$out" "Existing cloned base worktrees are not checked out automatically."
+  assert_contains "$(cat "$project/.workbranch.config")" "REPO frontend $TMP_ROOT/remotes/frontend.git feature/cpq"
+  assert_contains "$(cat "$project/.workbranch.config")" "REPO backend $TMP_ROOT/remotes/backend.git feature/cpq"
+  assert_branch "$project/_base/frontend" "feature/cpq"
+  assert_branch "$project/_base/backend" "feature/cpq"
+
+  out=$(printf '\n\n' | "$WORKBRANCH" add feat-task1 2>&1)
+  status=$?
+  [ "$status" -eq 0 ] || fail "add after config base failed: $out"
+  assert_contains "$out" "  base branch: feature/cpq"
+  assert_contains "$out" "  task repo branch [feature/cpq-task1]"
+  assert_branch "$project/feat-task1/frontend" "feature/cpq-task1"
+  assert_branch "$project/feat-task1/backend" "feature/cpq-task1"
+}
+
 test_full_config_skips_tool_prompts_on_linux() {
   new_fixture
   project="$FIXTURE_PROJECT"
@@ -344,19 +372,25 @@ test_config_rejects_main_worktrees_dir_change_when_base_worktrees_exist() {
   assert_not_contains "$out" "[*] _base"
 }
 
-test_config_guides_base_branch_change_for_cloned_repo() {
+test_config_checks_out_configured_base_branch_for_cloned_repo() {
   new_fixture
   project="$FIXTURE_PROJECT"
   cd "$project" || return 1
   run_expect_success "$WORKBRANCH" init >/dev/null
+  commit_to_remote_branch frontend feature/cpq parent-frontend
+  commit_to_remote_branch backend feature/cpq parent-backend
+  sed -i.bak 's/ master$/ feature\/cpq/' "$project/.workbranch.config"
+  rm -f "$project/.workbranch.config.bak"
 
-  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "" "" "" "" "develop" "" "" "" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" config)
+  out=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "" "" "" "" "" "" "" "" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" config)
   assert_contains "$out" "[*] _base/frontend current branch: master"
   assert_contains "$out" "[+] Config updated:"
-  assert_contains "$out" "[*] Base branch changes were saved in config only."
-  assert_contains "$out" "_base/frontend"
-  assert_contains "$out" "git checkout develop"
-  assert_contains "$(cat "$project/.workbranch.config")" "REPO frontend $TMP_ROOT/remotes/frontend.git develop"
+  assert_contains "$out" "[+] Base branch ready: _base/frontend -> feature/cpq"
+  assert_contains "$out" "[+] Base branch ready: _base/backend -> feature/cpq"
+  assert_not_contains "$out" "Existing cloned base worktrees are not checked out automatically."
+  assert_contains "$(cat "$project/.workbranch.config")" "REPO frontend $TMP_ROOT/remotes/frontend.git feature/cpq"
+  assert_branch "$project/_base/frontend" "feature/cpq"
+  assert_branch "$project/_base/backend" "feature/cpq"
 }
 
 test_repo_setup_can_be_configured_and_run_per_repo() {

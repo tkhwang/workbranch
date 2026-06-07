@@ -33,6 +33,7 @@ Git:
   update <task>     Update one task workspace from local base worktrees
   sync              Pull base branches, then update every task workspace
   land <task>       Land task branches into base branches
+  finalize <task>   Pull base, update task, then land task
   common
   --repo <repo>     Limit operation to one repo; otherwise all repos
 Tool:
@@ -42,6 +43,7 @@ Tool:
   terminal <task>   Open task repo worktrees in the configured terminal
 Config:
   config            Create or update .workbranch.config without cloning repos
+  config base       Update base branch settings and checkout base worktrees
   config ide        Update only the configured IDE command
   config terminal   Update only the configured terminal command
   config --rewrite  Rewrite config to current format without prompts
@@ -76,6 +78,7 @@ usage_enhanced() {
   printf '  update <task>     Update one task workspace from local base worktrees\n'
   printf '  sync              Pull base branches, then update every task workspace\n'
   printf '  land <task>       Land task branches into base branches\n'
+  printf '  finalize <task>   Pull base, update task, then land task\n'
   printf '%s  common%s\n' "$WB_GRAY" "$WB_RESET"
   printf '  --repo <repo>     Limit operation to one repo; otherwise all repos\n'
   section "Tool"
@@ -85,6 +88,7 @@ usage_enhanced() {
   printf '  terminal <task>   Open task repo worktrees in the configured terminal\n'
   section "Config"
   printf '  config            Create or update .workbranch.config without cloning repos\n'
+  printf '  config base       Update base branch settings and checkout base worktrees\n'
   printf '  config ide        Update only the configured IDE command\n'
   printf '  config terminal   Update only the configured terminal command\n'
   printf '  config --rewrite  Rewrite config to current format without prompts\n'

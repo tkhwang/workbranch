@@ -384,6 +384,7 @@ Git:
   update <task>     Update one task workspace from local base worktrees
   sync              Pull base branches, then update every task workspace
   land <task>       Land task branches into base branches
+  finalize <task>   Pull base, update task, then land task
   common
   --repo <repo>     Limit operation to one repo; otherwise all repos
 Tool:
@@ -393,6 +394,7 @@ Tool:
   terminal <task>   Open task repo worktrees in the configured terminal
 Config:
   config            Create or update .workbranch.config without cloning repos
+  config base       Update base branch settings and checkout base worktrees
   config ide        Update only the configured IDE command
   config terminal   Update only the configured terminal command
   config --rewrite  Rewrite config to current format without prompts
@@ -427,6 +429,7 @@ usage_enhanced() {
   printf '  update <task>     Update one task workspace from local base worktrees\n'
   printf '  sync              Pull base branches, then update every task workspace\n'
   printf '  land <task>       Land task branches into base branches\n'
+  printf '  finalize <task>   Pull base, update task, then land task\n'
   printf '%s  common%s\n' "$WB_GRAY" "$WB_RESET"
   printf '  --repo <repo>     Limit operation to one repo; otherwise all repos\n'
   section "Tool"
@@ -436,6 +439,7 @@ usage_enhanced() {
   printf '  terminal <task>   Open task repo worktrees in the configured terminal\n'
   section "Config"
   printf '  config            Create or update .workbranch.config without cloning repos\n'
+  printf '  config base       Update base branch settings and checkout base worktrees\n'
   printf '  config ide        Update only the configured IDE command\n'
   printf '  config terminal   Update only the configured terminal command\n'
   printf '  config --rewrite  Rewrite config to current format without prompts\n'
@@ -2088,12 +2092,13 @@ cmd_config() {
     1)
       case "$1" in
         --rewrite) rewrite_only=1 ;;
+        base) config_target="base" ;;
         ide) config_target="ide" ;;
         terminal) config_target="terminal" ;;
-        *) die "usage: workbranch config [ide|terminal|--rewrite]" ;;
+        *) die "usage: workbranch config [base|ide|terminal|--rewrite]" ;;
       esac
       ;;
-    *) die "usage: workbranch config [ide|terminal|--rewrite]" ;;
+    *) die "usage: workbranch config [base|ide|terminal|--rewrite]" ;;
   esac
   case "$config_target" in
     ide|terminal) require_macos_tool_platform "config $config_target" ;;
@@ -2110,8 +2115,14 @@ cmd_config() {
     if [ "$rewrite_only" -eq 0 ]; then
       case "$config_target" in
         all) configure_existing_project ;;
+        base) configure_base_branches ;;
         ide) configure_ide_prompt ;;
         terminal) configure_terminal_prompt ;;
+      esac
+    fi
+    if [ "$rewrite_only" -eq 0 ]; then
+      case "$config_target" in
+        all|base) apply_configured_base_branches ;;
       esac
     fi
     write_config "$CONFIG_FILE"
@@ -2119,7 +2130,9 @@ cmd_config() {
       success "Config rewritten: $CONFIG_FILE"
     else
       success "Config updated: $CONFIG_FILE"
-      print_config_next_steps
+      if [ "$config_target" = "all" ]; then
+        print_config_next_steps
+      fi
     fi
   else
     [ "$rewrite_only" -eq 0 ] || die "no enclosing workbranch project found"
@@ -2205,6 +2218,73 @@ configure_terminal_prompt() {
     6|--clear) clear_terminal_command ;;
     *) die "invalid terminal choice: $value" ;;
   esac
+}
+
+configure_base_branches() {
+  info "Base branches"
+  CONFIG_BRANCH_CHANGE_REPOS=()
+  CONFIG_BRANCH_CHANGE_OLD=()
+  CONFIG_BRANCH_CHANGE_NEW=()
+  CONFIG_BASE_DIR_OLD=""
+  CONFIG_BASE_DIR_NEW=""
+
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    current_branch=$(repo_base_branch_at "$i")
+    base_path=$(base_repo_path "$name")
+    if [ -d "$base_path/.git" ] || [ -f "$base_path/.git" ]; then
+      checked_out=$(git -C "$base_path" branch --show-current 2>/dev/null || printf '?')
+      info "$BASE_DIR/$name current branch: $checked_out"
+    fi
+    branch=$(prompt_with_default "Base repo branch for $name" "$current_branch")
+    if [ "$branch" != "$current_branch" ]; then
+      record_config_branch_change "$name" "$current_branch" "$branch"
+    fi
+    update_repo_base_branch "$name" "$branch"
+    printf '\n'
+    i=$((i + 1))
+  done
+}
+
+apply_configured_base_branches() {
+  reset_preflight
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    base_path=$(base_repo_path "$name")
+    branch=$(repo_base_branch_at "$i")
+    label="$BASE_DIR/$name"
+    if [ ! -d "$base_path/.git" ] && [ ! -f "$base_path/.git" ]; then
+      i=$((i + 1))
+      continue
+    fi
+    preflight_require_clean "$label" "$base_path"
+    preflight_require_no_rebase "$label" "$base_path"
+    preflight_fetch_origin "$label" "$base_path"
+    preflight_remote_branch_exists "$label" "$base_path" "$branch"
+    i=$((i + 1))
+  done
+  preflight_die_if_errors "config base"
+
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    base_path=$(base_repo_path "$name")
+    branch=$(repo_base_branch_at "$i")
+    label="$BASE_DIR/$name"
+    if [ ! -d "$base_path/.git" ] && [ ! -f "$base_path/.git" ]; then
+      i=$((i + 1))
+      continue
+    fi
+    checked_out=$(git -C "$base_path" branch --show-current 2>/dev/null || printf '')
+    if [ "$checked_out" != "$branch" ]; then
+      workbranch_git_checkout_base_branch "$name" "$base_path" "$branch"
+      workbranch_git_pull_base "$name" "$base_path" "$branch"
+      success "Base branch ready: $label -> $(color_branch_name "$branch")"
+    fi
+    i=$((i + 1))
+  done
 }
 
 configure_tool_prompts_if_macos() {
@@ -3192,8 +3272,7 @@ cmd_doctor() {
 }
 
 # ----- src/workbranch/commands/pull.sh -----
-run_pull() {
-  reset_preflight
+preflight_pull_repos() {
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
@@ -3214,8 +3293,9 @@ run_pull() {
     preflight_pull_fast_forwardable "$label" "$base" "$branch"
     i=$((i + 1))
   done
-  preflight_die_if_errors "pull"
+}
 
+execute_pull_repos() {
   i=0
   repo_log_seen=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
@@ -3230,6 +3310,13 @@ run_pull() {
     repo_log_seen=1
     i=$((i + 1))
   done
+}
+
+run_pull() {
+  reset_preflight
+  preflight_pull_repos
+  preflight_die_if_errors "pull"
+  execute_pull_repos
 }
 
 cmd_pull() {
@@ -3475,14 +3562,8 @@ cmd_push() {
 }
 
 # ----- src/workbranch/commands/land.sh -----
-cmd_land() {
-  require_project
-  parse_repo_option "$@"
-  [ ${#ARGS[@]} -eq 1 ] || die "usage: workbranch land <task> [--repo <repo>]"
-  task=$(normalize_task_argument "${ARGS[0]}")
-  validate_task_folder_name "$task"
-
-  reset_preflight
+preflight_land_task() {
+  task=$1
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
@@ -3517,8 +3598,10 @@ cmd_land() {
     preflight_land_fast_forwardable "$land_label" "$base" "$base_branch" "$task_branch_for_land"
     i=$((i + 1))
   done
-  preflight_die_if_errors "land"
+}
 
+execute_land_task() {
+  task=$1
   i=0
   repo_log_seen=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
@@ -3537,6 +3620,48 @@ cmd_land() {
     repo_log_seen=1
     i=$((i + 1))
   done
+}
+
+cmd_land() {
+  require_project
+  parse_repo_option "$@"
+  [ ${#ARGS[@]} -eq 1 ] || die "usage: workbranch land <task> [--repo <repo>]"
+  task=$(normalize_task_argument "${ARGS[0]}")
+  validate_task_folder_name "$task"
+
+  reset_preflight
+  preflight_land_task "$task"
+  preflight_die_if_errors "land"
+  execute_land_task "$task"
+}
+
+# ----- src/workbranch/commands/finalize.sh -----
+cmd_finalize() {
+  require_project
+  parse_repo_option "$@"
+  [ ${#ARGS[@]} -eq 1 ] || die "usage: workbranch finalize <task> [--repo <repo>]"
+  task=$(normalize_task_argument "${ARGS[0]}")
+  validate_task_folder_name "$task"
+
+  reset_preflight
+  preflight_pull_repos
+  preflight_update_task "$task"
+  preflight_die_if_errors "finalize"
+
+  section "Pulling base branches"
+  execute_pull_repos
+  printf '\n'
+
+  section "Updating task workspace"
+  update_task "$task"
+  printf '\n'
+
+  reset_preflight
+  preflight_land_task "$task"
+  preflight_die_if_errors "finalize"
+
+  section "Landing task"
+  execute_land_task "$task"
 }
 
 # ----- src/workbranch/commands/remove.sh -----
@@ -3702,6 +3827,17 @@ workbranch_git_pull_base() {
   git -C "$base_path" pull --ff-only origin "$base_branch" || die "failed to pull repo '$repo_name'"
 }
 
+workbranch_git_checkout_base_branch() {
+  repo_name=$1
+  base_path=$2
+  base_branch=$3
+  if branch_exists "$base_path" "$base_branch"; then
+    git -C "$base_path" checkout "$base_branch" >/dev/null 2>&1 || die "failed to checkout base branch for repo '$repo_name': $base_branch"
+  else
+    git -C "$base_path" checkout -b "$base_branch" "origin/$base_branch" >/dev/null 2>&1 || die "failed to checkout base branch for repo '$repo_name': $base_branch"
+  fi
+}
+
 workbranch_git_update_task() {
   task_path=$1
   local_base_head=$2
@@ -3766,7 +3902,7 @@ cmd_complete_repos() {
 }
 
 cmd_complete_commands() {
-  printf '%s\n' add completion config doctor finder help ide init land list path pull push remove status sync terminal update version
+  printf '%s\n' add completion config doctor finalize finder help ide init land list path pull push remove status sync terminal update version
 }
 
 print_completion_bash() {
@@ -3809,7 +3945,7 @@ _workbranch() {
         remove) words='--force' ;;
         doctor) words='--fix --repo' ;;
         update) words='--all --repo' ;;
-        status|pull|push|land|sync|path|finder|ide|terminal) words='--repo' ;;
+        status|pull|push|land|finalize|sync|path|finder|ide|terminal) words='--repo' ;;
         *) words='' ;;
       esac
       COMPREPLY=( $(compgen -W "$words" -- "$cur") )
@@ -3818,7 +3954,7 @@ _workbranch() {
   esac
 
   case "$cmd" in
-    remove|update|push|land|path|finder|ide|terminal)
+    remove|update|push|land|finalize|path|finder|ide|terminal)
       words=$($wb_bin __complete-tasks 2>/dev/null || true)
       COMPREPLY=( $(compgen -W "$words" -- "$cur") )
       return 0
@@ -3862,7 +3998,7 @@ _workbranch() {
       remove) flags=(--force) ;;
       doctor) flags=(--fix --repo) ;;
       update) flags=(--all --repo) ;;
-      status|pull|push|land|sync|path|finder|ide|terminal) flags=(--repo) ;;
+      status|pull|push|land|finalize|sync|path|finder|ide|terminal) flags=(--repo) ;;
       *) flags=() ;;
     esac
     _describe 'option' flags
@@ -3870,7 +4006,7 @@ _workbranch() {
   fi
 
   case "$cmd" in
-    remove|update|push|land|path|finder|ide|terminal)
+    remove|update|push|land|finalize|path|finder|ide|terminal)
       tasks=(${(f)"$($wb_bin __complete-tasks 2>/dev/null)"})
       _describe 'task' tasks
       return
@@ -3922,6 +4058,7 @@ complete -c workbranch -f -n '__workbranch_seen_command update' -a '(__workbranc
 complete -c workbranch -f -n '__workbranch_seen_command remove' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command push' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command land' -a '(__workbranch_complete_tasks)'
+complete -c workbranch -f -n '__workbranch_seen_command finalize' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command path' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command finder' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command ide' -a '(__workbranch_complete_tasks)'
@@ -3937,6 +4074,7 @@ complete -c workbranch -n '__workbranch_seen_command status' -l repo -d 'Limit o
 complete -c workbranch -n '__workbranch_seen_command pull' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command push' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command land' -l repo -d 'Limit operation to one repo'
+complete -c workbranch -n '__workbranch_seen_command finalize' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command sync' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command doctor' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command path' -l repo -d 'Limit operation to one repo'
@@ -3978,6 +4116,7 @@ main() {
     pull) cmd_pull "$@" ;;
     update) cmd_update "$@" ;;
     sync) cmd_sync "$@" ;;
+    finalize) cmd_finalize "$@" ;;
     push) cmd_push "$@" ;;
     land) cmd_land "$@" ;;
     remove) cmd_remove "$@" ;;

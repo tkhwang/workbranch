@@ -6,12 +6,13 @@ cmd_config() {
     1)
       case "$1" in
         --rewrite) rewrite_only=1 ;;
+        base) config_target="base" ;;
         ide) config_target="ide" ;;
         terminal) config_target="terminal" ;;
-        *) die "usage: workbranch config [ide|terminal|--rewrite]" ;;
+        *) die "usage: workbranch config [base|ide|terminal|--rewrite]" ;;
       esac
       ;;
-    *) die "usage: workbranch config [ide|terminal|--rewrite]" ;;
+    *) die "usage: workbranch config [base|ide|terminal|--rewrite]" ;;
   esac
   case "$config_target" in
     ide|terminal) require_macos_tool_platform "config $config_target" ;;
@@ -28,8 +29,14 @@ cmd_config() {
     if [ "$rewrite_only" -eq 0 ]; then
       case "$config_target" in
         all) configure_existing_project ;;
+        base) configure_base_branches ;;
         ide) configure_ide_prompt ;;
         terminal) configure_terminal_prompt ;;
+      esac
+    fi
+    if [ "$rewrite_only" -eq 0 ]; then
+      case "$config_target" in
+        all|base) apply_configured_base_branches ;;
       esac
     fi
     write_config "$CONFIG_FILE"
@@ -37,7 +44,9 @@ cmd_config() {
       success "Config rewritten: $CONFIG_FILE"
     else
       success "Config updated: $CONFIG_FILE"
-      print_config_next_steps
+      if [ "$config_target" = "all" ]; then
+        print_config_next_steps
+      fi
     fi
   else
     [ "$rewrite_only" -eq 0 ] || die "no enclosing workbranch project found"
@@ -123,6 +132,73 @@ configure_terminal_prompt() {
     6|--clear) clear_terminal_command ;;
     *) die "invalid terminal choice: $value" ;;
   esac
+}
+
+configure_base_branches() {
+  info "Base branches"
+  CONFIG_BRANCH_CHANGE_REPOS=()
+  CONFIG_BRANCH_CHANGE_OLD=()
+  CONFIG_BRANCH_CHANGE_NEW=()
+  CONFIG_BASE_DIR_OLD=""
+  CONFIG_BASE_DIR_NEW=""
+
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    current_branch=$(repo_base_branch_at "$i")
+    base_path=$(base_repo_path "$name")
+    if [ -d "$base_path/.git" ] || [ -f "$base_path/.git" ]; then
+      checked_out=$(git -C "$base_path" branch --show-current 2>/dev/null || printf '?')
+      info "$BASE_DIR/$name current branch: $checked_out"
+    fi
+    branch=$(prompt_with_default "Base repo branch for $name" "$current_branch")
+    if [ "$branch" != "$current_branch" ]; then
+      record_config_branch_change "$name" "$current_branch" "$branch"
+    fi
+    update_repo_base_branch "$name" "$branch"
+    printf '\n'
+    i=$((i + 1))
+  done
+}
+
+apply_configured_base_branches() {
+  reset_preflight
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    base_path=$(base_repo_path "$name")
+    branch=$(repo_base_branch_at "$i")
+    label="$BASE_DIR/$name"
+    if [ ! -d "$base_path/.git" ] && [ ! -f "$base_path/.git" ]; then
+      i=$((i + 1))
+      continue
+    fi
+    preflight_require_clean "$label" "$base_path"
+    preflight_require_no_rebase "$label" "$base_path"
+    preflight_fetch_origin "$label" "$base_path"
+    preflight_remote_branch_exists "$label" "$base_path" "$branch"
+    i=$((i + 1))
+  done
+  preflight_die_if_errors "config base"
+
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    base_path=$(base_repo_path "$name")
+    branch=$(repo_base_branch_at "$i")
+    label="$BASE_DIR/$name"
+    if [ ! -d "$base_path/.git" ] && [ ! -f "$base_path/.git" ]; then
+      i=$((i + 1))
+      continue
+    fi
+    checked_out=$(git -C "$base_path" branch --show-current 2>/dev/null || printf '')
+    if [ "$checked_out" != "$branch" ]; then
+      workbranch_git_checkout_base_branch "$name" "$base_path" "$branch"
+      workbranch_git_pull_base "$name" "$base_path" "$branch"
+      success "Base branch ready: $label -> $(color_branch_name "$branch")"
+    fi
+    i=$((i + 1))
+  done
 }
 
 configure_tool_prompts_if_macos() {

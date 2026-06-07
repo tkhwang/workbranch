@@ -19,6 +19,7 @@ main() {
     pull) cmd_pull "$@" ;;
     update) cmd_update "$@" ;;
     sync) cmd_sync "$@" ;;
+    finalize) cmd_finalize "$@" ;;
     push) cmd_push "$@" ;;
     land) cmd_land "$@" ;;
     remove) cmd_remove "$@" ;;

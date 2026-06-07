@@ -76,7 +76,7 @@ Use `workbranch add [<task>] --from <ref>` to seed the new task branches from an
 
 During active work, run `workbranch sync` to pull remote base branches into `_base/<repo>` and then update every task workspace from those refreshed local bases. `sync` first checks that task worktrees are updateable; dirty or otherwise blocked tasks stop the command before base branches are pulled.
 
-Use `workbranch config` when you want to update project settings, base branches, IDE/terminal launch commands, or per-repo setup commands without cloning repos again.
+Use `workbranch config` when you want to update project settings, base branches, IDE/terminal launch commands, or per-repo setup commands without cloning repos again. If base branches change, existing `_base/<repo>` worktrees are fetched, checked out, and fast-forward pulled to those branches. Use `workbranch config base` when you only want to update base branches.
 
 ## What it creates
 
@@ -111,6 +111,7 @@ macOS-only: `finder`, `ide`, `terminal`, `config ide`, and `config terminal`. On
 | --- | --- |
 | `workbranch init` | Create or clone base worktrees from config |
 | `workbranch config` | Edit project settings, base branches, tool commands, and repo setup commands |
+| `workbranch config base` | Update only base branch settings and checkout base worktrees |
 | `workbranch config ide` | Update only the configured IDE command |
 | `workbranch config terminal` | Update only the configured terminal command |
 | `workbranch add [<task>] [--from <ref>]` | Create a task workspace |
@@ -129,6 +130,7 @@ macOS-only: `finder`, `ide`, `terminal`, `config ide`, and `config terminal`. On
 | `workbranch push` | Push base branches |
 | `workbranch push <task>` | Push task branches |
 | `workbranch land <task>` | Fast-forward task work back into local base branches |
+| `workbranch finalize <task>` | Pull base branches, update one task, then land it into local base branches |
 
 ### Tool commands
 
