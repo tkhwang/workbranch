@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.6.0](https://github.com/tkhwang/workbranch/compare/v1.5.0...v1.6.0) (2026-06-07)
+
+
+### Features
+
+* **git:** enhance branch name handling ([757cfc5](https://github.com/tkhwang/workbranch/commit/757cfc5a75ed35246cbb1434e41550ee7433ca22))
+* **git:** enhance branch name handling ([1839df5](https://github.com/tkhwang/workbranch/commit/1839df56310cd232a755d9dcfc875e2dc5936401))
+
+
+### Bug Fixes
+
+* **add:** validate task detail name against branch format ([5d3c0c0](https://github.com/tkhwang/workbranch/commit/5d3c0c0a8012c2fd9fe4bed61651c3ec769d70c9))
+
 ## [1.5.0](https://github.com/tkhwang/workbranch/compare/v1.4.0...v1.5.0) (2026-06-06)
 
 
