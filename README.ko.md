@@ -38,11 +38,11 @@ Homebrew는 published release를 설치하고, curl installer는 `main`을 따�
 ```bash
 workbranch init
 workbranch add
-cd feat+login/<repo>
+cd feat-login/<repo>
 # task 작업
-workbranch update feat+login
-workbranch push feat+login
-workbranch remove feat+login
+workbranch update feat-login
+workbranch push feat-login
+workbranch remove feat-login
 ```
 
 ## Task identity와 branch 이름
@@ -56,14 +56,14 @@ workbranch remove feat+login
 
 `workbranch`는 다음 값을 파생합니다.
 
-- task folder: `feat+login`
+- task folder: `feat-login`
 - repo별 default Git branch:
   - base `main` 또는 `master` -> `feat/login`
   - base `feature/cpq` -> `feature/cpq-login`
 
-Folder 이름과 branch 이름은 분리됩니다. folder는 path-safe해야 하고 Git branch는 보통 `/`를 사용하기 때문입니다. `workbranch`는 folder-safe slash escape로 `+`를 사용하므로 `feat+login`은 `feat/login`의 task-folder 형태입니다. Repo별 task branch prompt에서 기본값은 여전히 overwrite할 수 있습니다.
+Folder 이름과 branch 이름은 분리됩니다. folder는 path-safe해야 하고 Git branch는 보통 `/`를 사용하기 때문입니다. `workbranch`는 folder-safe type/detail separator로 `-`를 사용하므로 `feat-login`은 `feat/login`의 task-folder 형태입니다. Repo별 task branch prompt에서 기본값은 여전히 overwrite할 수 있습니다.
 
-Interactive `workbranch add <detail>`도 같은 생성 flow로 들어가며, `<detail>`을 Task detail name의 기본값으로 사용합니다. 예를 들어 `workbranch add login`은 Task type을 묻고 `login`을 수정 가능한 detail 기본값으로 보여주며 folder `feat+login`을 추천합니다. 이후 각 repo가 configured base branch 기준으로 task branch를 제안합니다. `workbranch add feat+login`은 conventional task key의 direct shorthand로 계속 동작합니다. Non-interactive script에서는 `+` 없는 task key도 계속 넘길 수 있고, 이 legacy explicit key는 compatibility를 위해 branch-prefix default를 유지합니다.
+Interactive `workbranch add <detail>`도 같은 생성 flow로 들어가며, `<detail>`을 Task detail name의 기본값으로 사용합니다. 예를 들어 `workbranch add login`은 Task type을 묻고 `login`을 수정 가능한 detail 기본값으로 보여주며 folder `feat-login`을 추천합니다. 이후 각 repo가 configured base branch 기준으로 task branch를 제안합니다. `workbranch add feat-login`은 conventional task key의 direct shorthand로 계속 동작합니다. Non-interactive script에서는 conventional `type-` prefix가 없는 task key도 계속 넘길 수 있고, 이 legacy explicit key는 compatibility를 위해 branch-prefix default를 유지합니다.
 
 기본적으로 `workbranch add`는 local `_base/<repo>` worktree의 현재 HEAD에서 task branch를 만듭니다. remote base branch를 자동으로 pull하지 않습니다. 최신 remote base에서 시작하려면 다음 순서로 실행하세요.
 
@@ -156,6 +156,21 @@ WORKBRANCH_COLOR=always workbranch help # enhanced display 강제
 ```
 
 `workbranch path <task>`와 `workbranch path <task> --repo <repo>`는 scripting을 위해 계속 plain path만 stdout에 출력합니다.
+
+## Shell completion
+
+`workbranch completion <shell>`로 shell completion script를 생성합니다. 이 script는 shell을 통해 command, task key, repo, option completion을 제공합니다. 후보 표시 색상이나 흐린 preview 스타일은 shell, completion framework, terminal theme이 담당합니다.
+
+```bash
+# bash
+workbranch completion bash > ~/.local/share/bash-completion/completions/workbranch
+
+# zsh: fpath에 포함된 directory에 저장
+workbranch completion zsh > "${fpath[1]}/_workbranch"
+
+# fish
+workbranch completion fish > ~/.config/fish/completions/workbranch.fish
+```
 
 ## 작업 workspace 열기
 

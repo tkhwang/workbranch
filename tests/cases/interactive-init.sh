@@ -51,7 +51,7 @@ INPUT
   assert_not_contains "$out" "[base repo] feature/XXX -> task1 -> [task repo] feature/XXX-task1"
   assert_contains "$out" "[*] Task identity:"
   assert_contains "$out" "New tasks can be created with workbranch add."
-  assert_contains "$out" "folder type+detail"
+  assert_contains "$out" "folder type-detail"
   assert_contains "$out" "Each repo suggests a task branch from its base branch"
   assert_not_contains "$out" "frontend: base=master task=feature/<task>"
   assert_not_contains "$out" "backend: base=master task=feature/<task>"
@@ -107,7 +107,7 @@ INPUT
   out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" init)
   assert_not_contains "$out" "Default task branch prefix"
   assert_contains "$out" "[*] Task identity:"
-  assert_contains "$out" "folder type+detail"
+  assert_contains "$out" "folder type-detail"
   assert_contains "$out" "Each repo suggests a task branch from its base branch"
   assert_contains "$(cat "$TMP_ROOT/work/fullstack/.workbranch.config")" "BRANCH_PREFIX feature"
 }

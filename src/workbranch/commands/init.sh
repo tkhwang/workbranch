@@ -97,7 +97,7 @@ AFTER
   done
   info "Task identity:"
   info "  - New tasks can be created with workbranch add."
-  info "  - workbranch asks for task type and detail name, then derives folder type+detail."
+  info "  - workbranch asks for task type and detail name, then derives folder type-detail."
   info "  - Each repo suggests a task branch from its base branch, and you can override it."
   printf '
 ' >&2

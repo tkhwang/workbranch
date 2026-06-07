@@ -57,6 +57,16 @@ main() {
   run_test test_help_and_version_work_on_unsupported_platform
   run_test test_core_commands_reject_unsupported_platform
   run_test test_core_commands_allow_linux_and_wsl
+  run_test test_complete_helpers_list_tasks_repos_and_commands
+  run_test test_complete_helpers_are_silent_outside_project
+  run_test test_completion_bash_emits_complete_directive
+  run_test test_completion_zsh_emits_compdef
+  run_test test_completion_requires_known_shell
+  run_test test_completion_bash_completes_tasks_and_repos
+  run_test test_completion_bash_uses_command_specific_flags
+  run_test test_completion_fish_emits_complete_command
+  run_test test_completion_fish_completes_partial_subcommands
+  run_test test_completion_fish_uses_long_option_condition_for_repo_values
   run_test test_safe_names_reject_dot_and_dotdot
   run_test test_invalid_config_rejected_without_execution
   run_test test_init_existing_config_clones_base_repos
@@ -82,8 +92,8 @@ main() {
   run_test test_add_prompts_for_task_type_and_detail_without_task_argument
   run_test test_add_task_argument_prefills_interactive_task_detail
   run_test test_add_without_task_argument_supports_from_ref
-  run_test test_add_explicit_task_without_plus_keeps_legacy_default
-  run_test test_add_rejects_unknown_conventional_task_type
+  run_test test_add_explicit_task_without_conventional_prefix_keeps_legacy_default
+  run_test test_add_rejects_legacy_plus_task_folder
   run_test test_add_rejects_conventional_detail_that_builds_invalid_branch
   run_test test_add_rejects_empty_from_equals
   run_test test_add_from_remote_ref_seeds_task_branch_from_origin_ref
@@ -176,4 +186,6 @@ main() {
   fi
 }
 
-main "$@"
+# Detach stdin from any TTY so non-interactive tests see EOF (as in CI) instead
+# of blocking on terminal input. Tests that need input pipe their own stdin.
+main "$@" </dev/null

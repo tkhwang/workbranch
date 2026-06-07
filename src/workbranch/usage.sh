@@ -44,6 +44,8 @@ Config:
   config ide        Update only the configured IDE command
   config terminal   Update only the configured terminal command
   config --rewrite  Rewrite config to current format without prompts
+Completion:
+  completion <shell>   Print a shell completion script (bash, zsh, fish)
 Other:
   help              Show this help
   -v, --version     Show the installed workbranch version
@@ -83,6 +85,8 @@ usage_enhanced() {
   printf '  config ide        Update only the configured IDE command\n'
   printf '  config terminal   Update only the configured terminal command\n'
   printf '  config --rewrite  Rewrite config to current format without prompts\n'
+  section "Completion"
+  printf '  completion <shell>   Print a shell completion script (bash, zsh, fish)\n'
   section "Other"
   printf '  help              Show this help\n'
   printf '  -v, --version     Show the installed workbranch version\n'

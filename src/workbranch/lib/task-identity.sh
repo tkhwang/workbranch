@@ -6,18 +6,22 @@ conventional_task_type_is_known() {
 }
 
 task_identity_has_delimiter() {
+  local type
   case "$1" in
-    *+*) return 0 ;;
+    *-*)
+      type=${1%%-*}
+      conventional_task_type_is_known "$type"
+      ;;
     *) return 1 ;;
   esac
 }
 
 task_identity_type_from_folder() {
-  printf '%s' "${1%%+*}"
+  printf '%s' "${1%%-*}"
 }
 
 task_identity_detail_from_folder() {
-  printf '%s' "${1#*+}"
+  printf '%s' "${1#*-}"
 }
 
 normalize_task_argument() {
@@ -30,16 +34,6 @@ normalize_task_argument() {
     esac
   done
   printf '%s' "$value"
-}
-
-task_identity_has_multiple_delimiters() {
-  local rest
-  task_identity_has_delimiter "$1" || return 1
-  rest=${1#*+}
-  case "$rest" in
-    *+*) return 0 ;;
-    *) return 1 ;;
-  esac
 }
 
 validate_task_type() {
@@ -66,7 +60,6 @@ validate_task_folder_name() {
     */*) die "invalid task '$value'" ;;
   esac
   if task_identity_has_delimiter "$value"; then
-    task_identity_has_multiple_delimiters "$value" && die "invalid task '$value' (expected exactly one + delimiter)"
     type=$(task_identity_type_from_folder "$value")
     detail=$(task_identity_detail_from_folder "$value")
     validate_task_type "$type"
@@ -82,7 +75,7 @@ task_folder_from_identity() {
   detail=$2
   validate_task_type "$type"
   validate_task_detail_name "$detail" "$type"
-  printf '%s+%s' "$type" "$detail"
+  printf '%s-%s' "$type" "$detail"
 }
 
 task_branch_from_identity() {
@@ -98,7 +91,6 @@ task_branch_from_folder_identity() {
   local task type detail
   task=$(normalize_task_argument "$1")
   task_identity_has_delimiter "$task" || return 1
-  task_identity_has_multiple_delimiters "$task" && die "invalid task '$task' (expected exactly one + delimiter)"
   type=$(task_identity_type_from_folder "$task")
   detail=$(task_identity_detail_from_folder "$task")
   conventional_task_type_is_known "$type" || return 1

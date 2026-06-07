@@ -395,6 +395,8 @@ Config:
   config ide        Update only the configured IDE command
   config terminal   Update only the configured terminal command
   config --rewrite  Rewrite config to current format without prompts
+Completion:
+  completion <shell>   Print a shell completion script (bash, zsh, fish)
 Other:
   help              Show this help
   -v, --version     Show the installed workbranch version
@@ -434,6 +436,8 @@ usage_enhanced() {
   printf '  config ide        Update only the configured IDE command\n'
   printf '  config terminal   Update only the configured terminal command\n'
   printf '  config --rewrite  Rewrite config to current format without prompts\n'
+  section "Completion"
+  printf '  completion <shell>   Print a shell completion script (bash, zsh, fish)\n'
   section "Other"
   printf '  help              Show this help\n'
   printf '  -v, --version     Show the installed workbranch version\n'
@@ -874,18 +878,22 @@ conventional_task_type_is_known() {
 }
 
 task_identity_has_delimiter() {
+  local type
   case "$1" in
-    *+*) return 0 ;;
+    *-*)
+      type=${1%%-*}
+      conventional_task_type_is_known "$type"
+      ;;
     *) return 1 ;;
   esac
 }
 
 task_identity_type_from_folder() {
-  printf '%s' "${1%%+*}"
+  printf '%s' "${1%%-*}"
 }
 
 task_identity_detail_from_folder() {
-  printf '%s' "${1#*+}"
+  printf '%s' "${1#*-}"
 }
 
 normalize_task_argument() {
@@ -898,16 +906,6 @@ normalize_task_argument() {
     esac
   done
   printf '%s' "$value"
-}
-
-task_identity_has_multiple_delimiters() {
-  local rest
-  task_identity_has_delimiter "$1" || return 1
-  rest=${1#*+}
-  case "$rest" in
-    *+*) return 0 ;;
-    *) return 1 ;;
-  esac
 }
 
 validate_task_type() {
@@ -934,7 +932,6 @@ validate_task_folder_name() {
     */*) die "invalid task '$value'" ;;
   esac
   if task_identity_has_delimiter "$value"; then
-    task_identity_has_multiple_delimiters "$value" && die "invalid task '$value' (expected exactly one + delimiter)"
     type=$(task_identity_type_from_folder "$value")
     detail=$(task_identity_detail_from_folder "$value")
     validate_task_type "$type"
@@ -950,7 +947,7 @@ task_folder_from_identity() {
   detail=$2
   validate_task_type "$type"
   validate_task_detail_name "$detail" "$type"
-  printf '%s+%s' "$type" "$detail"
+  printf '%s-%s' "$type" "$detail"
 }
 
 task_branch_from_identity() {
@@ -966,7 +963,6 @@ task_branch_from_folder_identity() {
   local task type detail
   task=$(normalize_task_argument "$1")
   task_identity_has_delimiter "$task" || return 1
-  task_identity_has_multiple_delimiters "$task" && die "invalid task '$task' (expected exactly one + delimiter)"
   type=$(task_identity_type_from_folder "$task")
   detail=$(task_identity_detail_from_folder "$task")
   conventional_task_type_is_known "$type" || return 1
@@ -2398,7 +2394,7 @@ AFTER
   done
   info "Task identity:"
   info "  - New tasks can be created with workbranch add."
-  info "  - workbranch asks for task type and detail name, then derives folder type+detail."
+  info "  - workbranch asks for task type and detail name, then derives folder type-detail."
   info "  - Each repo suggests a task branch from its base branch, and you can override it."
   printf '
 ' >&2
@@ -3416,12 +3412,219 @@ workbranch_git_land_task() {
   git -C "$base_path" merge --ff-only "$task_branch" || die "failed to land repo '$repo_name'; run workbranch update $task and resolve conflicts first"
 }
 
+# ----- src/workbranch/commands/completion.sh -----
+cmd_complete_tasks() {
+  find_project_root || return 0
+  parse_project_config 2>/dev/null || return 0
+  for path in "$PROJECT_ROOT"/*; do
+    is_task_workspace_path "$path" || continue
+    printf '%s\n' "${path##*/}"
+  done
+}
+
+cmd_complete_repos() {
+  find_project_root || return 0
+  parse_project_config 2>/dev/null || return 0
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    repo_name_at "$i"
+    printf '\n'
+    i=$((i + 1))
+  done
+}
+
+cmd_complete_commands() {
+  printf '%s\n' add completion config finder help ide init land list path pull push remove status terminal update version
+}
+
+print_completion_bash() {
+  cat <<'BASH'
+# bash completion for workbranch
+_workbranch() {
+  local cur prev cmd wb_bin words
+  wb_bin=${WORKBRANCH:-workbranch}
+  COMPREPLY=()
+  cur=${COMP_WORDS[COMP_CWORD]:-}
+  if [ "$COMP_CWORD" -gt 0 ]; then
+    prev=${COMP_WORDS[COMP_CWORD-1]}
+  else
+    prev=
+  fi
+  cmd=${COMP_WORDS[1]:-}
+
+  if [ "$COMP_CWORD" -eq 1 ]; then
+    words=$($wb_bin __complete-commands 2>/dev/null || true)
+    COMPREPLY=( $(compgen -W "$words" -- "$cur") )
+    return 0
+  fi
+
+  case "$prev" in
+    --repo)
+      words=$($wb_bin __complete-repos 2>/dev/null || true)
+      COMPREPLY=( $(compgen -W "$words" -- "$cur") )
+      return 0
+      ;;
+    --from)
+      return 0
+      ;;
+  esac
+
+  case "$cur" in
+    -*)
+      case "$cmd" in
+        add) words='--from' ;;
+        config) words='--rewrite' ;;
+        remove) words='--force' ;;
+        update) words='--all --repo' ;;
+        status|pull|push|land|path|finder|ide|terminal) words='--repo' ;;
+        *) words='' ;;
+      esac
+      COMPREPLY=( $(compgen -W "$words" -- "$cur") )
+      return 0
+      ;;
+  esac
+
+  case "$cmd" in
+    remove|update|push|land|path|finder|ide|terminal)
+      words=$($wb_bin __complete-tasks 2>/dev/null || true)
+      COMPREPLY=( $(compgen -W "$words" -- "$cur") )
+      return 0
+      ;;
+  esac
+
+  return 0
+}
+complete -F _workbranch workbranch
+BASH
+}
+
+print_completion_zsh() {
+  cat <<'ZSH'
+#compdef workbranch
+# zsh completion for workbranch
+_workbranch() {
+  local -a commands tasks repos flags
+  local cmd prev cur wb_bin
+  wb_bin=${WORKBRANCH:-workbranch}
+  cur=${words[CURRENT]:-}
+  prev=${words[CURRENT-1]:-}
+  cmd=${words[2]:-}
+
+  if (( CURRENT == 2 )); then
+    commands=(${(f)"$($wb_bin __complete-commands 2>/dev/null)"})
+    _describe 'workbranch command' commands
+    return
+  fi
+
+  if [[ "$prev" == "--repo" ]]; then
+    repos=(${(f)"$($wb_bin __complete-repos 2>/dev/null)"})
+    _describe 'repo' repos
+    return
+  fi
+
+  if [[ "$cur" == -* ]]; then
+    case "$cmd" in
+      add) flags=(--from) ;;
+      config) flags=(--rewrite) ;;
+      remove) flags=(--force) ;;
+      update) flags=(--all --repo) ;;
+      status|pull|push|land|path|finder|ide|terminal) flags=(--repo) ;;
+      *) flags=() ;;
+    esac
+    _describe 'option' flags
+    return
+  fi
+
+  case "$cmd" in
+    remove|update|push|land|path|finder|ide|terminal)
+      tasks=(${(f)"$($wb_bin __complete-tasks 2>/dev/null)"})
+      _describe 'task' tasks
+      return
+      ;;
+  esac
+}
+compdef _workbranch workbranch
+ZSH
+}
+
+print_completion_fish() {
+  cat <<'FISH'
+# fish completion for workbranch
+function __workbranch_bin
+    if set -q WORKBRANCH
+        echo $WORKBRANCH
+    else
+        echo workbranch
+    end
+end
+
+function __workbranch_complete_commands
+    (__workbranch_bin) __complete-commands 2>/dev/null
+end
+
+function __workbranch_complete_tasks
+    (__workbranch_bin) __complete-tasks 2>/dev/null
+end
+
+function __workbranch_complete_repos
+    (__workbranch_bin) __complete-repos 2>/dev/null
+end
+
+function __workbranch_seen_command
+    set -l cmd $argv[1]
+    set -l tokens (commandline -opc)
+    test (count $tokens) -ge 2; and test $tokens[2] = $cmd
+end
+
+function __workbranch_completing_command
+    set -l tokens (commandline -opc)
+    set -l current (commandline -ct)
+    test (count $tokens) -le 1; and return 0
+    test (count $tokens) -eq 2; and test -n "$current"
+end
+
+complete -c workbranch -f -n '__workbranch_completing_command' -a '(__workbranch_complete_commands)'
+complete -c workbranch -f -n '__workbranch_seen_command update' -a '(__workbranch_complete_tasks)'
+complete -c workbranch -f -n '__workbranch_seen_command remove' -a '(__workbranch_complete_tasks)'
+complete -c workbranch -f -n '__workbranch_seen_command push' -a '(__workbranch_complete_tasks)'
+complete -c workbranch -f -n '__workbranch_seen_command land' -a '(__workbranch_complete_tasks)'
+complete -c workbranch -f -n '__workbranch_seen_command path' -a '(__workbranch_complete_tasks)'
+complete -c workbranch -f -n '__workbranch_seen_command finder' -a '(__workbranch_complete_tasks)'
+complete -c workbranch -f -n '__workbranch_seen_command ide' -a '(__workbranch_complete_tasks)'
+complete -c workbranch -f -n '__workbranch_seen_command terminal' -a '(__workbranch_complete_tasks)'
+complete -c workbranch -f -n '__fish_seen_argument -l repo' -a '(__workbranch_complete_repos)'
+complete -c workbranch -n '__workbranch_seen_command add' -l from -d 'Seed task branches from a source ref'
+complete -c workbranch -n '__workbranch_seen_command config' -l rewrite -d 'Rewrite config to current format'
+complete -c workbranch -n '__workbranch_seen_command remove' -l force -d 'Force removal'
+complete -c workbranch -n '__workbranch_seen_command update' -l all -d 'Update every task workspace'
+complete -c workbranch -n '__workbranch_seen_command update' -l repo -d 'Limit operation to one repo'
+complete -c workbranch -n '__workbranch_seen_command status' -l repo -d 'Limit operation to one repo'
+complete -c workbranch -n '__workbranch_seen_command pull' -l repo -d 'Limit operation to one repo'
+complete -c workbranch -n '__workbranch_seen_command push' -l repo -d 'Limit operation to one repo'
+complete -c workbranch -n '__workbranch_seen_command land' -l repo -d 'Limit operation to one repo'
+complete -c workbranch -n '__workbranch_seen_command path' -l repo -d 'Limit operation to one repo'
+complete -c workbranch -n '__workbranch_seen_command finder' -l repo -d 'Limit operation to one repo'
+complete -c workbranch -n '__workbranch_seen_command ide' -l repo -d 'Limit operation to one repo'
+complete -c workbranch -n '__workbranch_seen_command terminal' -l repo -d 'Limit operation to one repo'
+FISH
+}
+
+cmd_completion() {
+  [ $# -eq 1 ] || die "usage: workbranch completion <bash|zsh|fish>"
+  case "$1" in
+    bash) print_completion_bash ;;
+    zsh) print_completion_zsh ;;
+    fish) print_completion_fish ;;
+    *) die "usage: workbranch completion <bash|zsh|fish>" ;;
+  esac
+}
+
 # ----- src/workbranch/main.sh -----
 main() {
   cmd=${1:-help}
   if [ $# -gt 0 ]; then shift; fi
   case "$cmd" in
-    help|-h|--help|version|-v|--version|config|ide|finder|terminal) ;;
+    help|-h|--help|version|-v|--version|config|ide|finder|terminal|completion|__complete-tasks|__complete-repos|__complete-commands) ;;
     *) require_core_supported_platform ;;
   esac
   case "$cmd" in
@@ -3439,6 +3642,10 @@ main() {
     push) cmd_push "$@" ;;
     land) cmd_land "$@" ;;
     remove) cmd_remove "$@" ;;
+    completion) cmd_completion "$@" ;;
+    __complete-tasks) cmd_complete_tasks ;;
+    __complete-repos) cmd_complete_repos ;;
+    __complete-commands) cmd_complete_commands ;;
     version|-v|--version) cmd_version "$@" ;;
     help|-h|--help) usage ;;
     *) usage_plain >&2; die "unknown command: $cmd" ;;
