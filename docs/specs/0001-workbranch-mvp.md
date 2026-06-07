@@ -57,7 +57,7 @@ Rules:
 
 - `PROJECT_NAME` must be a safe directory name.
 - `MAIN_WORKTREES_DIR` must be a safe directory name.
-- `BRANCH_PREFIX` is retained for compatibility and as the default branch prompt prefix. New interactive setup asks for the default task branch prefix and writes the selected value.
+- `BRANCH_PREFIX` is retained for compatibility with explicit task keys that do not use the conventional `type+detail` form. New interactive setup does not ask for it; config writing keeps `BRANCH_PREFIX feature` as an internal compatibility default.
 - `IDE` is optional. It stores one project-level IDE launch command text after the directive.
 - `TERMINAL` is optional. It stores one project-level terminal launch command text after the directive.
 - `TASK_SETUP` is optional. It stores one project-level command text after the directive.
@@ -73,19 +73,25 @@ Rules:
 
 Task folder names and Git branch names are separate values.
 
-`workbranch add <task>` uses `<task>` as the workspace folder name, then prompts for each repo's task branch. Press Enter to accept the default branch name.
+The recommended task identity is `type+detail` for the task folder. Each repo derives its default task branch from that task identity and the repo's configured base branch.
 
 ```text
-base repo branch master       + task login + default prompt      -> feature/login
-base repo branch feature/cpq  + task task1 + default prompt      -> feature/cpq-task1
-base repo branch feat/cpq     + task task1 + default prompt      -> feat/cpq-task1
-base repo branch master       + task login + override tk/login   -> tk/login
+task type feat + detail login + base master      -> task folder feat+login -> default branch feat/login
+task type feat + detail task1 + base feature/cpq -> task folder feat+task1 -> default branch feature/cpq-task1
+interactive add login         + base master      -> task folder feat+login -> default branch feat/login
+non-interactive task login    -> task folder login      -> legacy default branch feature/login
+base repo branch feature/cpq  + non-interactive task1   -> legacy default branch feature/cpq-task1
+task folder feat+login        + override tk/login       -> chosen branch tk/login
 ```
 
 Rule:
 
-- If the base repo branch starts with `feature/`, `feat/`, or the configured legacy `<BRANCH_PREFIX>/`, the default task branch is `<base-branch>-<task>`.
-- Otherwise, the default task branch is `<BRANCH_PREFIX>/<task>`, with `feature` used when no prefix is configured.
+- `workbranch add` with no positional task asks for task type and detail name, then derives task folder `<type>+<detail>`.
+- Interactive `workbranch add <detail>` enters that same task identity flow, using `<detail>` as the editable default for Task detail name.
+- `workbranch add <task>` with exactly one `+` and a known type is accepted as a direct conventional task key.
+- For conventional task keys, repos on `main`/`master`-style bases default to `<type>/<detail>`. Repos on parent feature bases such as `feature/cpq` or `feat/cpq` default to `<base-branch>-<detail>`.
+- Non-interactive `workbranch add <task>` values without `+` keep the legacy default rule for script compatibility: parent feature base branches become `<base-branch>-<task>`, otherwise the default is `<BRANCH_PREFIX>/<task>` with `feature` as the compatibility fallback.
+- Task command arguments may include a completion-added trailing `/`; commands normalize that trailing slash before validation. Embedded slashes and path-like task arguments are still invalid.
 - Chosen branches are validated with `git check-ref-format --branch`; whitespace is not supported.
 - Chosen branches are persisted in `<task>/.workbranch.task` as `REPO_BRANCH <repo> <branch>` lines so later commands use the real branch.
 - Existing task workspaces without metadata keep working by falling back to the current task worktree branch, then the default rule.
@@ -115,11 +121,10 @@ If no config exists, run interactive config setup:
 1. Ask for target directory, default `.`.
 2. Ask for project name, default `fullstack`.
 3. Ask for main worktrees directory, default `_base`.
-4. Ask for the default task branch prefix, defaulting to `feature`, and write `BRANCH_PREFIX <prefix>`.
-5. Ask for optional IDE and terminal commands from presets or custom input.
-6. Explain that each repo base repo branch is checked out in `_base/<repo>` and task branch names are prompted by `workbranch add`.
-7. Ask for one or more repos: name, Git URL, base branch for this repo, and optional repo-level setup command.
-8. Write `.workbranch.config`.
+4. Ask for optional IDE and terminal commands from presets or custom input.
+5. Explain that new tasks are created with `workbranch add`, which asks for task type and detail name, derives folder `type+detail`, then suggests each repo's task branch from that repo's configured base branch.
+6. Ask for one or more repos: name, Git URL, base branch for this repo, and optional repo-level setup command.
+7. Write `.workbranch.config` with `BRANCH_PREFIX feature` retained as a compatibility default.
 
 ### `workbranch init`
 
@@ -178,9 +183,9 @@ Show base commit position versus its cached remote-tracking branch, task commit 
     update  task is behind base: workbranch update <task>
 ```
 
-### `workbranch add <task> [--from <ref>]`
+### `workbranch add [<task>] [--from <ref>]`
 
-Create one task workspace with one linked worktree per repo.
+Create one task workspace with one linked worktree per repo. Without `<task>`, prompt for task type and detail name and derive the recommended `type+detail` task key.
 
 For each repo:
 

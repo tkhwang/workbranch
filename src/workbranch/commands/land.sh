@@ -2,8 +2,8 @@ cmd_land() {
   require_project
   parse_repo_option "$@"
   [ ${#ARGS[@]} -eq 1 ] || die "usage: workbranch land <task> [--repo <repo>]"
-  task=${ARGS[0]}
-  validate_safe_name "task" "$task"
+  task=$(normalize_task_argument "${ARGS[0]}")
+  validate_task_folder_name "$task"
 
   reset_preflight
   i=0

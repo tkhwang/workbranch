@@ -176,7 +176,7 @@ config_line_split_tokens() {
 validate_config_complete() {
   [ -n "$PROJECT_NAME" ] || die "missing PROJECT_NAME directive in config"
   [ -n "$BASE_DIR" ] || die "missing MAIN_WORKTREES_DIR directive in config"
-  [ -n "$BRANCH_PREFIX" ] || die "missing BRANCH_PREFIX directive in config"
+  [ -n "$BRANCH_PREFIX" ] || BRANCH_PREFIX="feature"
   [ ${#REPO_NAMES[@]} -gt 0 ] || die "config must define at least one repo"
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
@@ -334,12 +334,12 @@ write_config() {
 '
     printf '#
 '
-    printf '# Be careful changing MAIN_WORKTREES_DIR, BRANCH_PREFIX, or REPO after worktrees exist.
+    printf '# Be careful changing MAIN_WORKTREES_DIR or REPO after worktrees exist.
 '
     printf '\n'
     printf 'PROJECT_NAME %s\n' "$PROJECT_NAME"
     printf 'MAIN_WORKTREES_DIR %s\n' "$BASE_DIR"
-    printf 'BRANCH_PREFIX %s\n' "$BRANCH_PREFIX"
+    printf 'BRANCH_PREFIX %s\n' "${BRANCH_PREFIX:-feature}"
     if [ -n "$IDE_COMMAND" ]; then
       printf 'IDE %s\n' "$IDE_COMMAND"
     fi

@@ -370,7 +370,7 @@ Usage:
 Workspace:
   init              Initialize a workbranch project
   list              List configured repos and task workspaces
-  add <task> [--from <ref>]  Create a task workspace
+  add [<task>] [--from <ref>]  Create a task workspace
   remove <task>     Remove task worktrees and local task branches
 Git:
   status            Show remote diff, task diff, and dirty state
@@ -409,7 +409,7 @@ usage_enhanced() {
   section "Workspace"
   printf '  init              Initialize a workbranch project\n'
   printf '  list              List configured repos and task workspaces\n'
-  printf '  add <task> [--from <ref>]  Create a task workspace\n'
+  printf '  add [<task>] [--from <ref>]  Create a task workspace\n'
   printf '  remove <task>     Remove task worktrees and local task branches\n'
   section "Git"
   printf '  status            Show remote diff, task diff, and dirty state\n'
@@ -670,7 +670,7 @@ config_line_split_tokens() {
 validate_config_complete() {
   [ -n "$PROJECT_NAME" ] || die "missing PROJECT_NAME directive in config"
   [ -n "$BASE_DIR" ] || die "missing MAIN_WORKTREES_DIR directive in config"
-  [ -n "$BRANCH_PREFIX" ] || die "missing BRANCH_PREFIX directive in config"
+  [ -n "$BRANCH_PREFIX" ] || BRANCH_PREFIX="feature"
   [ ${#REPO_NAMES[@]} -gt 0 ] || die "config must define at least one repo"
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
@@ -828,12 +828,12 @@ write_config() {
 '
     printf '#
 '
-    printf '# Be careful changing MAIN_WORKTREES_DIR, BRANCH_PREFIX, or REPO after worktrees exist.
+    printf '# Be careful changing MAIN_WORKTREES_DIR or REPO after worktrees exist.
 '
     printf '\n'
     printf 'PROJECT_NAME %s\n' "$PROJECT_NAME"
     printf 'MAIN_WORKTREES_DIR %s\n' "$BASE_DIR"
-    printf 'BRANCH_PREFIX %s\n' "$BRANCH_PREFIX"
+    printf 'BRANCH_PREFIX %s\n' "${BRANCH_PREFIX:-feature}"
     if [ -n "$IDE_COMMAND" ]; then
       printf 'IDE %s\n' "$IDE_COMMAND"
     fi
@@ -863,6 +863,109 @@ write_config() {
       done
     fi
   } > "$file" || die "failed to write config: $file"
+}
+
+# ----- src/workbranch/lib/task-identity.sh -----
+conventional_task_type_is_known() {
+  case "$1" in
+    feat|fix|chore|docs|refactor|test|perf|ci|build|revert) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+task_identity_has_delimiter() {
+  case "$1" in
+    *+*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+task_identity_type_from_folder() {
+  printf '%s' "${1%%+*}"
+}
+
+task_identity_detail_from_folder() {
+  printf '%s' "${1#*+}"
+}
+
+normalize_task_argument() {
+  local value
+  value=$1
+  while [ -n "$value" ]; do
+    case "$value" in
+      */) value=${value%/} ;;
+      *) break ;;
+    esac
+  done
+  printf '%s' "$value"
+}
+
+task_identity_has_multiple_delimiters() {
+  local rest
+  task_identity_has_delimiter "$1" || return 1
+  rest=${1#*+}
+  case "$rest" in
+    *+*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+validate_task_type() {
+  local value
+  value=$1
+  validate_safe_name "task type" "$value"
+  conventional_task_type_is_known "$value" || die "invalid task type '$value' (expected feat, fix, chore, docs, refactor, test, perf, ci, build, or revert)"
+}
+
+validate_task_detail_name() {
+  validate_safe_name "task detail name" "$1"
+}
+
+validate_task_folder_name() {
+  local value type detail
+  value=$(normalize_task_argument "$1")
+  [ -n "$value" ] || die "invalid task '$1' (expected task key)"
+  case "$value" in
+    */*) die "invalid task '$value'" ;;
+  esac
+  if task_identity_has_delimiter "$value"; then
+    task_identity_has_multiple_delimiters "$value" && die "invalid task '$value' (expected exactly one + delimiter)"
+    type=$(task_identity_type_from_folder "$value")
+    detail=$(task_identity_detail_from_folder "$value")
+    validate_task_type "$type"
+    validate_task_detail_name "$detail"
+    return 0
+  fi
+  validate_safe_name "task" "$value"
+}
+
+task_folder_from_identity() {
+  local type detail
+  type=$1
+  detail=$2
+  validate_task_type "$type"
+  validate_task_detail_name "$detail"
+  printf '%s+%s' "$type" "$detail"
+}
+
+task_branch_from_identity() {
+  local type detail
+  type=$1
+  detail=$2
+  validate_task_type "$type"
+  validate_task_detail_name "$detail"
+  printf '%s/%s' "$type" "$detail"
+}
+
+task_branch_from_folder_identity() {
+  local task type detail
+  task=$(normalize_task_argument "$1")
+  task_identity_has_delimiter "$task" || return 1
+  task_identity_has_multiple_delimiters "$task" && die "invalid task '$task' (expected exactly one + delimiter)"
+  type=$(task_identity_type_from_folder "$task")
+  detail=$(task_identity_detail_from_folder "$task")
+  conventional_task_type_is_known "$type" || return 1
+  task_branch_from_identity "$type" "$detail"
 }
 
 # ----- src/workbranch/lib/project.sh -----
@@ -938,10 +1041,19 @@ base_branch_looks_like_parent_task_branch() {
 }
 
 default_repo_task_branch_at() {
-  local index task base_branch
+  local index task base_branch identity_branch task_detail
   index=$1
   task=$2
   base_branch=$(repo_base_branch_at "$index")
+  if identity_branch=$(task_branch_from_folder_identity "$task"); then
+    if base_branch_looks_like_parent_task_branch "$base_branch"; then
+      task_detail=$(task_identity_detail_from_folder "$task")
+      base_prefixed_branch_for_task "$base_branch" "$task_detail"
+    else
+      printf '%s' "$identity_branch"
+    fi
+    return 0
+  fi
   if base_branch_looks_like_parent_task_branch "$base_branch"; then
     base_prefixed_branch_for_task "$base_branch" "$task"
   else
@@ -2133,7 +2245,7 @@ configure_existing_project() {
   info "Config"
   info "Project: $PROJECT_NAME"
   info "Main worktrees dir: $BASE_DIR"
-  info "Default task branch prefix: $BRANCH_PREFIX"
+  info "Legacy branch prefix: $BRANCH_PREFIX (kept for existing shorthand defaults)"
   info "Press Enter to keep a current value. Type --clear at a setup prompt to remove it."
   printf '\n'
 
@@ -2225,8 +2337,7 @@ AFTER
   validate_safe_name "project" "$PROJECT_NAME"
   BASE_DIR=$(prompt_with_default "Main worktrees directory" "_base")
   validate_safe_name "MAIN_WORKTREES_DIR" "$BASE_DIR"
-  BRANCH_PREFIX=$(prompt_with_default "Default task branch prefix" "feature")
-  validate_nonempty_no_space "task branch prefix" "$BRANCH_PREFIX"
+  BRANCH_PREFIX="feature"
 
   printf '
 ' >&2
@@ -2262,7 +2373,6 @@ AFTER
   section "Summary"
   info "Project: $PROJECT_NAME"
   info "Main worktrees dir: $BASE_DIR"
-  info "Default task branch prefix: $BRANCH_PREFIX"
   info "IDE:"
   if [ -n "$IDE_COMMAND" ]; then
     info "  $IDE_COMMAND"
@@ -2281,10 +2391,10 @@ AFTER
     info "  - $(repo_name_at "$i") $(repo_url_at "$i") base repo branch=$(repo_base_branch_at "$i")"
     i=$((i + 1))
   done
-  info "Task branches:"
-  info "  - Chosen when running workbranch add <task>."
-  info "  - workbranch suggests defaults from each repo's base branch and the task name."
-  info "  - You can override each suggested task branch."
+  info "Task identity:"
+  info "  - New tasks can be created with workbranch add."
+  info "  - workbranch asks for task type and detail name, then derives folder type+detail."
+  info "  - Each repo suggests a task branch from its base branch, and you can override it."
   printf '
 ' >&2
   if [ "$clone_after" = "yes" ]; then
@@ -2369,12 +2479,56 @@ prompt_task_branches_for_add() {
     name=$(repo_name_at "$i")
     base_branch=$(repo_base_branch_at "$i")
     default_branch=$(default_repo_task_branch_at "$i" "$task")
-    info "Repo $name base branch: $base_branch"
-    branch=$(prompt_with_default "Task branch for $name" "$default_branch")
+    printf '\n' >&2
+    printf '%s[*]%s Repo %s\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" "$(color_repo_name "$name")" >&2
+    printf '%s[*]%s   base branch: %s\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" "$(color_branch_name "$base_branch")" >&2
+    branch=$(prompt_read "[*]   task repo branch [$(color_branch_name "$default_branch")]: ")
+    prompt_status=$?
+    [ "$prompt_status" -eq 0 ] || printf '\n' >&2
+    [ -n "$branch" ] || branch=$default_branch
     validate_branch_name "task branch" "$branch"
+    printf '%s[*]%s   task repo folder: %s\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" "$(format_repo_target "$task" "$name")" >&2
     set_task_metadata_branch "$name" "$branch"
     i=$((i + 1))
   done
+}
+
+prompt_task_identity_for_add() {
+  local default_detail type detail task
+  default_detail=${1:-}
+  printf '%s[*]%s Task type examples: feat, fix, chore, docs, refactor, test, perf, ci, build, revert\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" >&2
+  type=$(prompt_with_default "Task type" "feat")
+  validate_task_type "$type"
+  if [ -n "$default_detail" ]; then
+    detail=$(prompt_with_default "Task detail name" "$default_detail")
+  else
+    detail=$(prompt_required "Task detail name")
+  fi
+  validate_task_detail_name "$detail"
+  task=$(task_folder_from_identity "$type" "$detail")
+  printf '%s[*]%s Task folder: %s\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" "$task" >&2
+  printf '%s' "$task"
+}
+
+resolve_task_for_add() {
+  local candidate
+  if [ ${#ARGS[@]} -eq 0 ]; then
+    prompt_task_identity_for_add
+    return 0
+  fi
+
+  candidate=$(normalize_task_argument "${ARGS[0]}")
+  validate_task_folder_name "$candidate"
+  if task_identity_has_delimiter "$candidate"; then
+    printf '%s' "$candidate"
+    return 0
+  fi
+
+  if [ -t 0 ]; then
+    prompt_task_identity_for_add "$candidate"
+  else
+    printf '%s' "$candidate"
+  fi
 }
 
 parse_add_options() {
@@ -2393,7 +2547,7 @@ parse_add_options() {
         shift
         ;;
       --*)
-        die "usage: workbranch add <task> [--from <ref>]"
+        die "usage: workbranch add [<task>] [--from <ref>]"
         ;;
       *)
         ARGS[${#ARGS[@]}]=$1
@@ -2402,7 +2556,7 @@ parse_add_options() {
     esac
   done
 
-  [ ${#ARGS[@]} -eq 1 ] || die "usage: workbranch add <task> [--from <ref>]"
+  [ ${#ARGS[@]} -le 1 ] || die "usage: workbranch add [<task>] [--from <ref>]"
   if [ -n "$ADD_FROM_REF" ]; then
     validate_nonempty_no_space "source ref" "$ADD_FROM_REF"
   fi
@@ -2433,9 +2587,9 @@ resolve_add_source_ref() {
 
 cmd_add() {
   parse_add_options "$@"
-  task=${ARGS[0]}
-  validate_safe_name "task" "$task"
   require_project
+  task=$(resolve_task_for_add)
+  validate_task_folder_name "$task"
   CREATED_PATHS=()
   CREATED_WORKTREES=()
   CREATED_WORKTREE_BASES=()
@@ -2523,20 +2677,24 @@ cmd_add() {
     track_branch "$base" "$branch"
     track_worktree "$target" "$base"
     workbranch_git_add_new_task_worktree "$base" "$target" "$branch" "$source_ref" || fail_with_rollback "failed to create worktree for repo '$name'"
-    success "Created: $task/$name"
+    printf '\n'
+    success_repo_target "Created" "$task" "$name"
     if [ -n "$ADD_FROM_REF" ]; then
-      success "  [source] $source_ref -> [task repo] $branch"
+      success "  [source] $(color_branch_name "$source_ref") -> [task repo] $(color_branch_name "$branch")"
     else
-      success "  [base repo] $base_branch -> [task repo] $branch"
+      success "  [base repo] $(color_branch_name "$base_branch") -> [task repo] $(color_branch_name "$branch")"
     fi
     i=$((i + 1))
   done
-  if has_task_setups && ! run_task_setups "$task"; then
-    printf '%s[-] Error:%s task setup failed\n' "$WB_ERR_RED" "$WB_ERR_RESET" >&2
-    printf '%s[*]%s Worktrees were created. Fix setup with:\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" >&2
-    printf '    %sworkbranch config%s\n' "$WB_ERR_GRAY" "$WB_ERR_RESET" >&2
-    printf '%s[*]%s Then rerun the setup command shown above, or remove and add the task again.\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" >&2
-    return 1
+  if has_task_setups; then
+    printf '\n'
+    if ! run_task_setups "$task"; then
+      printf '%s[-] Error:%s task setup failed\n' "$WB_ERR_RED" "$WB_ERR_RESET" >&2
+      printf '%s[*]%s Worktrees were created. Fix setup with:\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" >&2
+      printf '    %sworkbranch config%s\n' "$WB_ERR_GRAY" "$WB_ERR_RESET" >&2
+      printf '%s[*]%s Then rerun the setup command shown above, or remove and add the task again.\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" >&2
+      return 1
+    fi
   fi
 }
 
@@ -2612,8 +2770,8 @@ cmd_path() {
   require_project
   parse_repo_option "$@"
   [ ${#ARGS[@]} -eq 1 ] || die "usage: workbranch path <task> [--repo <repo>]"
-  task=${ARGS[0]}
-  validate_safe_name "task" "$task"
+  task=$(normalize_task_argument "${ARGS[0]}")
+  validate_task_folder_name "$task"
 
   # Keep stdout path-only: do not call info/success in this command.
   if [ -n "$FILTER_REPO" ]; then
@@ -2641,8 +2799,8 @@ cmd_tool_launcher() {
   esac
   parse_repo_option "$@"
   [ ${#ARGS[@]} -eq 1 ] || die "usage: workbranch $tool_label <task> [--repo <repo>]"
-  task=${ARGS[0]}
-  validate_safe_name "task" "$task"
+  task=$(normalize_task_argument "${ARGS[0]}")
+  validate_task_folder_name "$task"
 
   if [ -n "$FILTER_REPO" ]; then
     resolve_task_repo_path "$task" "$FILTER_REPO"
@@ -2677,8 +2835,8 @@ cmd_finder() {
   require_project
   parse_repo_option "$@"
   [ ${#ARGS[@]} -eq 1 ] || die "usage: workbranch finder <task> [--repo <repo>]"
-  task=${ARGS[0]}
-  validate_safe_name "task" "$task"
+  task=$(normalize_task_argument "${ARGS[0]}")
+  validate_task_folder_name "$task"
 
   if [ -n "$FILTER_REPO" ]; then
     resolve_task_repo_path "$task" "$FILTER_REPO"
@@ -2864,8 +3022,8 @@ cmd_update() {
   parse_repo_option "$@"
   [ ${#ARGS[@]} -le 1 ] || die "usage: workbranch update [task] [--repo <repo>]"
   if [ ${#ARGS[@]} -eq 1 ] && [ "${ARGS[0]}" != "--all" ]; then
-    task=${ARGS[0]}
-    validate_safe_name "task" "$task"
+    task=$(normalize_task_argument "${ARGS[0]}")
+    validate_task_folder_name "$task"
     reset_preflight
     preflight_update_task "$task"
     preflight_die_if_errors "update"
@@ -2978,8 +3136,8 @@ cmd_push() {
     return 0
   fi
 
-  task=${ARGS[0]}
-  validate_safe_name "task" "$task"
+  task=$(normalize_task_argument "${ARGS[0]}")
+  validate_task_folder_name "$task"
   cmd_push_task "$task"
 }
 
@@ -2988,8 +3146,8 @@ cmd_land() {
   require_project
   parse_repo_option "$@"
   [ ${#ARGS[@]} -eq 1 ] || die "usage: workbranch land <task> [--repo <repo>]"
-  task=${ARGS[0]}
-  validate_safe_name "task" "$task"
+  task=$(normalize_task_argument "${ARGS[0]}")
+  validate_task_folder_name "$task"
 
   reset_preflight
   i=0
@@ -3051,13 +3209,13 @@ cmd_land() {
 # ----- src/workbranch/commands/remove.sh -----
 cmd_remove() {
   [ $# -eq 1 ] || [ $# -eq 2 ] || die "usage: workbranch remove <task> [--force]"
-  task=$1
+  task=$(normalize_task_argument "$1")
   force=0
   if [ $# -eq 2 ]; then
     [ "$2" = "--force" ] || die "usage: workbranch remove <task> [--force]"
     force=1
   fi
-  validate_safe_name "task" "$task"
+  validate_task_folder_name "$task"
   require_project
   reset_preflight
   task_dir="$PROJECT_ROOT/$task"

@@ -16,6 +16,20 @@ test_list_shows_overridden_task_branches() {
   assert_contains "$out" "tk/login-backend"
 }
 
+test_list_shows_conventional_task_folder_and_branch() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  printf '\n\n' | "$WORKBRANCH" add feat+branch-name >/dev/null 2>&1 || fail "add failed"
+
+  out=$("$WORKBRANCH" list 2>&1)
+  status=$?
+  [ "$status" -eq 0 ] || fail "list failed: $out"
+  assert_contains "$out" "feat+branch-name"
+  assert_contains "$out" "feat/branch-name"
+}
+
 
 test_status_reports_base_remote_diff_and_next_action() {
   new_fixture
@@ -158,4 +172,3 @@ test_status_skips_partial_task_workspaces() {
   assert_not_contains "$out" "[*] login"
   assert_not_contains "$out" "[*] Next"
 }
-

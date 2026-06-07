@@ -145,7 +145,6 @@ fullstack
 _base
 
 
-
 frontend
 $frontend_remote
 master
@@ -324,6 +323,7 @@ test_config_preserves_existing_branch_prefix_without_prompting() {
   assert_contains "$out" "[+] Config updated:"
   assert_contains "$(cat "$project/.workbranch.config")" "BRANCH_PREFIX ticket"
   assert_not_contains "$out" "Branch prefix [ticket]"
+  assert_contains "$out" "Legacy branch prefix: ticket (kept for existing shorthand defaults)"
 }
 
 test_config_rejects_main_worktrees_dir_change_when_base_worktrees_exist() {

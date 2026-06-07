@@ -6,12 +6,56 @@ prompt_task_branches_for_add() {
     name=$(repo_name_at "$i")
     base_branch=$(repo_base_branch_at "$i")
     default_branch=$(default_repo_task_branch_at "$i" "$task")
-    info "Repo $name base branch: $base_branch"
-    branch=$(prompt_with_default "Task branch for $name" "$default_branch")
+    printf '\n' >&2
+    printf '%s[*]%s Repo %s\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" "$(color_repo_name "$name")" >&2
+    printf '%s[*]%s   base branch: %s\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" "$(color_branch_name "$base_branch")" >&2
+    branch=$(prompt_read "[*]   task repo branch [$(color_branch_name "$default_branch")]: ")
+    prompt_status=$?
+    [ "$prompt_status" -eq 0 ] || printf '\n' >&2
+    [ -n "$branch" ] || branch=$default_branch
     validate_branch_name "task branch" "$branch"
+    printf '%s[*]%s   task repo folder: %s\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" "$(format_repo_target "$task" "$name")" >&2
     set_task_metadata_branch "$name" "$branch"
     i=$((i + 1))
   done
+}
+
+prompt_task_identity_for_add() {
+  local default_detail type detail task
+  default_detail=${1:-}
+  printf '%s[*]%s Task type examples: feat, fix, chore, docs, refactor, test, perf, ci, build, revert\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" >&2
+  type=$(prompt_with_default "Task type" "feat")
+  validate_task_type "$type"
+  if [ -n "$default_detail" ]; then
+    detail=$(prompt_with_default "Task detail name" "$default_detail")
+  else
+    detail=$(prompt_required "Task detail name")
+  fi
+  validate_task_detail_name "$detail"
+  task=$(task_folder_from_identity "$type" "$detail")
+  printf '%s[*]%s Task folder: %s\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" "$task" >&2
+  printf '%s' "$task"
+}
+
+resolve_task_for_add() {
+  local candidate
+  if [ ${#ARGS[@]} -eq 0 ]; then
+    prompt_task_identity_for_add
+    return 0
+  fi
+
+  candidate=$(normalize_task_argument "${ARGS[0]}")
+  validate_task_folder_name "$candidate"
+  if task_identity_has_delimiter "$candidate"; then
+    printf '%s' "$candidate"
+    return 0
+  fi
+
+  if [ -t 0 ]; then
+    prompt_task_identity_for_add "$candidate"
+  else
+    printf '%s' "$candidate"
+  fi
 }
 
 parse_add_options() {
@@ -30,7 +74,7 @@ parse_add_options() {
         shift
         ;;
       --*)
-        die "usage: workbranch add <task> [--from <ref>]"
+        die "usage: workbranch add [<task>] [--from <ref>]"
         ;;
       *)
         ARGS[${#ARGS[@]}]=$1
@@ -39,7 +83,7 @@ parse_add_options() {
     esac
   done
 
-  [ ${#ARGS[@]} -eq 1 ] || die "usage: workbranch add <task> [--from <ref>]"
+  [ ${#ARGS[@]} -le 1 ] || die "usage: workbranch add [<task>] [--from <ref>]"
   if [ -n "$ADD_FROM_REF" ]; then
     validate_nonempty_no_space "source ref" "$ADD_FROM_REF"
   fi
@@ -70,9 +114,9 @@ resolve_add_source_ref() {
 
 cmd_add() {
   parse_add_options "$@"
-  task=${ARGS[0]}
-  validate_safe_name "task" "$task"
   require_project
+  task=$(resolve_task_for_add)
+  validate_task_folder_name "$task"
   CREATED_PATHS=()
   CREATED_WORKTREES=()
   CREATED_WORKTREE_BASES=()
@@ -160,19 +204,23 @@ cmd_add() {
     track_branch "$base" "$branch"
     track_worktree "$target" "$base"
     workbranch_git_add_new_task_worktree "$base" "$target" "$branch" "$source_ref" || fail_with_rollback "failed to create worktree for repo '$name'"
-    success "Created: $task/$name"
+    printf '\n'
+    success_repo_target "Created" "$task" "$name"
     if [ -n "$ADD_FROM_REF" ]; then
-      success "  [source] $source_ref -> [task repo] $branch"
+      success "  [source] $(color_branch_name "$source_ref") -> [task repo] $(color_branch_name "$branch")"
     else
-      success "  [base repo] $base_branch -> [task repo] $branch"
+      success "  [base repo] $(color_branch_name "$base_branch") -> [task repo] $(color_branch_name "$branch")"
     fi
     i=$((i + 1))
   done
-  if has_task_setups && ! run_task_setups "$task"; then
-    printf '%s[-] Error:%s task setup failed\n' "$WB_ERR_RED" "$WB_ERR_RESET" >&2
-    printf '%s[*]%s Worktrees were created. Fix setup with:\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" >&2
-    printf '    %sworkbranch config%s\n' "$WB_ERR_GRAY" "$WB_ERR_RESET" >&2
-    printf '%s[*]%s Then rerun the setup command shown above, or remove and add the task again.\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" >&2
-    return 1
+  if has_task_setups; then
+    printf '\n'
+    if ! run_task_setups "$task"; then
+      printf '%s[-] Error:%s task setup failed\n' "$WB_ERR_RED" "$WB_ERR_RESET" >&2
+      printf '%s[*]%s Worktrees were created. Fix setup with:\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" >&2
+      printf '    %sworkbranch config%s\n' "$WB_ERR_GRAY" "$WB_ERR_RESET" >&2
+      printf '%s[*]%s Then rerun the setup command shown above, or remove and add the task again.\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" >&2
+      return 1
+    fi
   fi
 }

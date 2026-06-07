@@ -12,7 +12,6 @@ fullstack
 _base
 
 
-
 frontend
 $frontend_remote
 master
@@ -39,7 +38,7 @@ INPUT
   assert_contains "$out" "Project name      directory name for this workbranch workspace"
   assert_contains "$out" "Main worktrees    directory for each repo main worktree"
   assert_not_contains "$out" "Branch prefix     task branch prefix"
-  assert_contains "$out" "[*] Default task branch prefix [feature]:"
+  assert_not_contains "$out" "[*] Default task branch prefix [feature]:"
   assert_not_contains "$out" "Default base repo checkout branch"
   assert_not_contains "$out" "Base branch is checked out in _base/<repo>."
   assert_not_contains "$out" "Task branch examples: master + login -> feature/login, feature/cpq + task1 -> feature/cpq-task1"
@@ -50,9 +49,10 @@ INPUT
   assert_not_contains "$out" "[*] Task branch defaults:"
   assert_not_contains "$out" "[base repo] main        -> task1 -> [task repo] feature/task1"
   assert_not_contains "$out" "[base repo] feature/XXX -> task1 -> [task repo] feature/XXX-task1"
-  assert_contains "$out" "[*] Task branches:"
-  assert_contains "$out" "Chosen when running workbranch add <task>."
-  assert_contains "$out" "workbranch suggests defaults from each repo's base branch and the task name."
+  assert_contains "$out" "[*] Task identity:"
+  assert_contains "$out" "New tasks can be created with workbranch add."
+  assert_contains "$out" "folder type+detail"
+  assert_contains "$out" "Each repo suggests a task branch from its base branch"
   assert_not_contains "$out" "frontend: base=master task=feature/<task>"
   assert_not_contains "$out" "backend: base=master task=feature/<task>"
   assert_contains "$out" "[*] Main worktrees directory [_base]:"
@@ -85,7 +85,7 @@ INPUT
   assert_dir "$project/_base/backend/.git"
 }
 
-test_interactive_init_accepts_task_branch_prefix_override() {
+test_interactive_init_does_not_prompt_for_task_branch_prefix() {
   TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
   mkdir -p "$TMP_ROOT/remotes" "$TMP_ROOT/seeds" "$TMP_ROOT/work"
   frontend_remote=$(make_repo frontend)
@@ -94,7 +94,6 @@ test_interactive_init_accepts_task_branch_prefix_override() {
 .
 fullstack
 _base
-feat
 
 
 frontend
@@ -106,13 +105,11 @@ Y
 INPUT
 )
   out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" init)
-  assert_contains "$out" "[*] Default task branch prefix [feature]:"
-  assert_contains "$out" "[*] Default task branch prefix: feat"
-  assert_contains "$(cat "$TMP_ROOT/work/fullstack/.workbranch.config")" "BRANCH_PREFIX feat"
-
-  out=$(cd "$TMP_ROOT/work/fullstack" && printf '\n' | run_expect_success "$WORKBRANCH" add login)
-  assert_contains "$out" "[*] Task branch for frontend [feat/login]:"
-  assert_branch "$TMP_ROOT/work/fullstack/login/frontend" "feat/login"
+  assert_not_contains "$out" "Default task branch prefix"
+  assert_contains "$out" "[*] Task identity:"
+  assert_contains "$out" "folder type+detail"
+  assert_contains "$out" "Each repo suggests a task branch from its base branch"
+  assert_contains "$(cat "$TMP_ROOT/work/fullstack/.workbranch.config")" "BRANCH_PREFIX feature"
 }
 
 test_interactive_init_can_cancel_before_creating_project() {
@@ -124,7 +121,6 @@ test_interactive_init_can_cancel_before_creating_project() {
 .
 fullstack
 _base
-feature
 
 
 frontend
@@ -155,7 +151,6 @@ fullstack
 _base
 
 
-
 frontend
 $frontend_remote
 master
@@ -181,7 +176,6 @@ test_interactive_init_accepts_slash_repo_base_branch() {
 .
 fullstack
 _base
-
 
 
 frontend
@@ -259,7 +253,6 @@ test_interactive_init_skips_tool_prompts_on_wsl() {
 .
 fullstack
 _base
-feature
 frontend
 $frontend_remote
 master

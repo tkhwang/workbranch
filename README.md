@@ -37,24 +37,42 @@ Homebrew installs published releases. The curl installer tracks `main`.
 
 ```bash
 workbranch init
-workbranch add login
-cd login/<repo>
+workbranch add
+cd feat+login/<repo>
 # work on the task
-workbranch update login
-workbranch push login
-workbranch remove login
+workbranch update feat+login
+workbranch push feat+login
+workbranch remove feat+login
 ```
 
-`workbranch add <task>` uses `<task>` as the folder name, shows each repo's base branch, then prompts for that repo's task branch. Press Enter to accept the suggested default branch name. Defaults are `feature/<task>` from main-style base branches and `<base-branch>-<task>` from `feature/*`, `feat/*`, or the configured legacy prefix.
+## Task identity and branch names
 
-Plain `workbranch add <task>` creates task branches from the current HEAD of your local `_base/<repo>` worktrees. It does not pull remote base branches automatically. To start from the latest remote base, run:
+New task creation asks for two values:
+
+| Prompt | Example | Used for |
+| --- | --- | --- |
+| Task type | `feat` | Git branch prefix |
+| Task detail name | `login` | Folder/branch detail |
+
+`workbranch` derives:
+
+- task folder: `feat+login`
+- per-repo default Git branch:
+  - base `main` or `master` -> `feat/login`
+  - base `feature/cpq` -> `feature/cpq-login`
+
+Folder names and branch names stay separate because folders must be path-safe while Git branches normally use `/`. `workbranch` uses `+` as the folder-safe slash escape, so `feat+login` is the task-folder form of `feat/login`. Repo-specific branch prompts still let you override the default per repo.
+
+Interactive `workbranch add <detail>` enters the same creation flow, using `<detail>` as the default Task detail name. For example, `workbranch add login` asks for Task type, shows `login` as the editable detail default, and recommends the folder `feat+login`; each repo then suggests a branch from its configured base branch. `workbranch add feat+login` remains a direct shorthand for the conventional task key. Non-interactive scripts can still pass task keys without `+`; those legacy explicit keys keep branch-prefix defaults for compatibility.
+
+By default, `workbranch add` creates task branches from the current HEAD of your local `_base/<repo>` worktrees. It does not pull remote base branches automatically. To start from the latest remote base, run:
 
 ```bash
 workbranch pull
-workbranch add <task>
+workbranch add
 ```
 
-Use `workbranch add <task> --from <ref>` to seed the new task branches from another source ref. For example, `workbranch add task1 --from feat/XXX` fetches origin, prefers `origin/feat/XXX` when it exists, and creates the linked task worktrees from that ref while still using the prompted task branch names. Later `workbranch status` still compares the task branch to the current local base; the source ref is creation context, not a persistent status baseline.
+Use `workbranch add [<task>] --from <ref>` to seed the new task branches from another source ref. For example, `workbranch add task1 --from feat/XXX` fetches origin, prefers `origin/feat/XXX` when it exists, and creates the linked task worktrees from that ref while still using the prompted task branch names. Later `workbranch status` still compares the task branch to the current local base; the source ref is creation context, not a persistent status baseline.
 
 Use `workbranch config` when you want to update project settings, base branches, IDE/terminal launch commands, or per-repo setup commands without cloning repos again.
 
@@ -93,7 +111,7 @@ macOS-only: `finder`, `ide`, `terminal`, `config ide`, and `config terminal`. On
 | `workbranch config` | Edit project settings, base branches, tool commands, and repo setup commands |
 | `workbranch config ide` | Update only the configured IDE command |
 | `workbranch config terminal` | Update only the configured terminal command |
-| `workbranch add <task> [--from <ref>]` | Create a task workspace |
+| `workbranch add [<task>] [--from <ref>]` | Create a task workspace |
 | `workbranch list` | Show repos and task workspaces |
 | `workbranch remove <task>` | Remove task worktrees and local task branches |
 
