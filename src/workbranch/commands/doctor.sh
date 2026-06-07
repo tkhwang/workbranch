@@ -9,15 +9,17 @@ doctor_issue() {
 }
 
 doctor_task_state() {
-  local path task selected_count registered_count present_count missing_details unregistered_details branch_details i name repo_path base_path detail expected_branch actual_branch
+  local path task selected_count registered_count present_count selected_present_count missing_details unregistered_details branch_details i name repo_path base_path detail expected_branch actual_branch
   path=$1
   task=${path##*/}
   selected_count=0
   registered_count=0
   present_count=0
+  selected_present_count=0
   missing_details=""
   unregistered_details=""
   branch_details=""
+  load_task_metadata "$task"
 
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
@@ -26,6 +28,9 @@ doctor_task_state() {
     selected_count=$((selected_count + 1))
     repo_path="$path/$name"
     base_path=$(base_repo_path "$name")
+    if [ -d "$repo_path" ] || metadata_task_branch_for_repo "$name" >/dev/null; then
+      selected_present_count=$((selected_present_count + 1))
+    fi
     if is_registered_worktree_path "$repo_path" "$base_path"; then
       present_count=$((present_count + 1))
       expected_branch=$(repo_task_branch_at "$i" "$task")
@@ -56,6 +61,8 @@ doctor_task_state() {
 
   if [ "$selected_count" -eq 0 ]; then
     printf 'ignore|no selected repos'
+  elif [ "$selected_present_count" -eq 0 ]; then
+    printf 'ignore|no selected repo state'
   elif [ "$registered_count" -eq "$selected_count" ]; then
     printf 'healthy|healthy'
   elif [ "$registered_count" -eq 0 ] && [ -z "$branch_details" ]; then

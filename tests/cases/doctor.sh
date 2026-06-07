@@ -61,6 +61,21 @@ test_doctor_repo_scope_ignores_filtered_out_task_damage() {
   assert_contains "$out" "status=1"
 }
 
+test_doctor_repo_scope_ignores_stale_dir_with_only_filtered_out_repo() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  mkdir -p "$project/old-task/frontend"
+
+  out=$(doctor_with_status --repo backend)
+  assert_not_contains "$out" "old-task"
+  assert_not_contains "$out" "stale"
+  assert_contains "$out" "doctor found no issues"
+  assert_contains "$out" "status=0"
+}
+
 test_doctor_reports_registered_task_worktree_on_wrong_branch() {
   new_fixture
   project="$FIXTURE_PROJECT"

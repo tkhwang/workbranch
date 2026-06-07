@@ -92,6 +92,7 @@ main() {
   run_test test_doctor_healthy_project_exits_zero
   run_test test_doctor_detects_partial_workspace
   run_test test_doctor_repo_scope_ignores_filtered_out_task_damage
+  run_test test_doctor_repo_scope_ignores_stale_dir_with_only_filtered_out_repo
   run_test test_doctor_reports_registered_task_worktree_on_wrong_branch
   run_test test_doctor_reports_base_branch_drift
   run_test test_doctor_reports_stale_directory_with_remove_hint
