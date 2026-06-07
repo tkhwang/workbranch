@@ -70,10 +70,19 @@ base_branch_looks_like_parent_task_branch() {
 }
 
 default_repo_task_branch_at() {
-  local index task base_branch
+  local index task base_branch identity_branch task_detail
   index=$1
   task=$2
   base_branch=$(repo_base_branch_at "$index")
+  if identity_branch=$(task_branch_from_folder_identity "$task"); then
+    if base_branch_looks_like_parent_task_branch "$base_branch"; then
+      task_detail=$(task_identity_detail_from_folder "$task")
+      base_prefixed_branch_for_task "$base_branch" "$task_detail"
+    else
+      printf '%s' "$identity_branch"
+    fi
+    return 0
+  fi
   if base_branch_looks_like_parent_task_branch "$base_branch"; then
     base_prefixed_branch_for_task "$base_branch" "$task"
   else

@@ -160,7 +160,7 @@ test_help_groups_commands() {
   assert_contains "$out" "Workspace:"
   assert_contains "$out" "init              Initialize a workbranch project"
   assert_contains "$out" "list              List configured repos and task workspaces"
-  assert_contains "$out" "add <task> [--from <ref>]  Create a task workspace"
+  assert_contains "$out" "add [<task>] [--from <ref>]  Create a task workspace"
   assert_contains "$out" "remove <task>     Remove task worktrees and local task branches"
   assert_not_contains "$out" "resume <task>"
   assert_contains "$out" "Git:"
@@ -199,7 +199,7 @@ test_help_groups_commands() {
 '*) fail "expected compact help without blank lines; got: $out" ;;
   esac
   case "$out" in
-    *"Workspace:"*"init              Initialize a workbranch project"*"list              List configured repos and task workspaces"*"add <task> [--from <ref>]  Create a task workspace"*"remove <task>     Remove task worktrees and local task branches"*"Git:"*"status            Show remote diff, task diff, and dirty state"*"  vertical"*"Tool:"*"path <task>       Print a task workspace path"*"finder <task>     Open a task workspace in Finder"*"ide <task>        Open task repo worktrees in the configured IDE"*"terminal <task>   Open task repo worktrees in the configured terminal"*"Config:"*"config            Create or update .workbranch.config without cloning repos"*"config ide        Update only the configured IDE command"*"config terminal   Update only the configured terminal command"*"config --rewrite  Rewrite config to current format without prompts"*"Other:"*) ;;
+    *"Workspace:"*"init              Initialize a workbranch project"*"list              List configured repos and task workspaces"*"add [<task>] [--from <ref>]  Create a task workspace"*"remove <task>     Remove task worktrees and local task branches"*"Git:"*"status            Show remote diff, task diff, and dirty state"*"  vertical"*"Tool:"*"path <task>       Print a task workspace path"*"finder <task>     Open a task workspace in Finder"*"ide <task>        Open task repo worktrees in the configured IDE"*"terminal <task>   Open task repo worktrees in the configured terminal"*"Config:"*"config            Create or update .workbranch.config without cloning repos"*"config ide        Update only the configured IDE command"*"config terminal   Update only the configured terminal command"*"config --rewrite  Rewrite config to current format without prompts"*"Other:"*) ;;
     *) fail "expected workspace, git, tool, config, and other group ordering; got: $out" ;;
   esac
 }

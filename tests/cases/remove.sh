@@ -21,6 +21,22 @@ test_remove_deletes_overridden_task_branches() {
   fi
 }
 
+test_remove_accepts_completion_trailing_slash_for_task_key() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  printf '\n\n' | run_expect_success "$WORKBRANCH" add feat+branch-name >/dev/null
+
+  out=$(run_expect_success "$WORKBRANCH" remove feat+branch-name/ --force)
+  assert_contains "$out" "Removed: feat+branch-name/frontend"
+  assert_contains "$out" "Removed: feat+branch-name/backend"
+  assert_not_exists "$project/feat+branch-name"
+  if git -C "$project/_base/frontend" show-ref --verify --quiet refs/heads/feat/branch-name; then
+    fail "expected remove to delete frontend feat/branch-name branch"
+  fi
+}
+
 test_remove_deletes_overridden_task_branches_when_task_dir_missing() {
   new_fixture
   project="$FIXTURE_PROJECT"
@@ -244,4 +260,3 @@ GIT
   assert_file "$project/login/.workbranch.task"
   assert_contains "$out" "Task directory kept because it is not empty: login"
 }
-

@@ -57,8 +57,8 @@ cmd_update() {
   parse_repo_option "$@"
   [ ${#ARGS[@]} -le 1 ] || die "usage: workbranch update [task] [--repo <repo>]"
   if [ ${#ARGS[@]} -eq 1 ] && [ "${ARGS[0]}" != "--all" ]; then
-    task=${ARGS[0]}
-    validate_safe_name "task" "$task"
+    task=$(normalize_task_argument "${ARGS[0]}")
+    validate_task_folder_name "$task"
     reset_preflight
     preflight_update_task "$task"
     preflight_die_if_errors "update"

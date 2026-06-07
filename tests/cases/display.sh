@@ -146,6 +146,22 @@ test_display_forced_color_list_uses_repo_and_branch_colors() {
   assert_contains "$out" $'\033[0;35mfeature/login\033[0m'
 }
 
+test_display_forced_color_add_log_uses_repo_and_branch_colors() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+
+  out=$(env -u NO_COLOR WORKBRANCH_COLOR=always "$WORKBRANCH" add login 2>&1)
+  assert_contains "$out" $'\n\033[0;34m[*]\033[0m Repo \033[0;36mfrontend\033[0m\n\033[0;34m[*]\033[0m   base branch: \033[0;35mmaster\033[0m\n\033[0;34m[*]\033[0m   task repo branch [\033[0;35mfeature/login\033[0m]:'
+  assert_contains "$out" $'\033[0;34m[*]\033[0m   task repo folder: login/\033[0;36mfrontend\033[0m'
+  assert_contains "$out" $'\n\n\033[0;34m[*]\033[0m Repo \033[0;36mbackend\033[0m\n\033[0;34m[*]\033[0m   base branch: \033[0;35mmaster\033[0m\n\033[0;34m[*]\033[0m   task repo branch [\033[0;35mfeature/login\033[0m]:'
+  assert_contains "$out" $'\n\n\033[0;32m[+]\033[0m Created: login/\033[0;36mfrontend\033[0m'
+  assert_contains "$out" $'Created: login/\033[0;36mfrontend\033[0m'
+  assert_contains "$out" $'[base repo] \033[0;35mmaster\033[0m -> [task repo] \033[0;35mfeature/login\033[0m'
+  assert_contains "$out" $'\n\n\033[0;32m[+]\033[0m Created: login/\033[0;36mbackend\033[0m'
+}
+
 test_display_forced_color_push_log_uses_repo_and_branch_colors() {
   new_fixture
   project="$FIXTURE_PROJECT"
@@ -203,7 +219,6 @@ test_display_forced_color_init_shows_banner_and_sections() {
 .
 fullstack
 _base
-feature
 
 
 frontend

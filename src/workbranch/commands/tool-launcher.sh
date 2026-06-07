@@ -14,8 +14,8 @@ cmd_tool_launcher() {
   esac
   parse_repo_option "$@"
   [ ${#ARGS[@]} -eq 1 ] || die "usage: workbranch $tool_label <task> [--repo <repo>]"
-  task=${ARGS[0]}
-  validate_safe_name "task" "$task"
+  task=$(normalize_task_argument "${ARGS[0]}")
+  validate_task_folder_name "$task"
 
   if [ -n "$FILTER_REPO" ]; then
     resolve_task_repo_path "$task" "$FILTER_REPO"
@@ -50,8 +50,8 @@ cmd_finder() {
   require_project
   parse_repo_option "$@"
   [ ${#ARGS[@]} -eq 1 ] || die "usage: workbranch finder <task> [--repo <repo>]"
-  task=${ARGS[0]}
-  validate_safe_name "task" "$task"
+  task=$(normalize_task_argument "${ARGS[0]}")
+  validate_task_folder_name "$task"
 
   if [ -n "$FILTER_REPO" ]; then
     resolve_task_repo_path "$task" "$FILTER_REPO"

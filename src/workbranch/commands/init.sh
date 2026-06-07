@@ -41,8 +41,7 @@ AFTER
   validate_safe_name "project" "$PROJECT_NAME"
   BASE_DIR=$(prompt_with_default "Main worktrees directory" "_base")
   validate_safe_name "MAIN_WORKTREES_DIR" "$BASE_DIR"
-  BRANCH_PREFIX=$(prompt_with_default "Default task branch prefix" "feature")
-  validate_nonempty_no_space "task branch prefix" "$BRANCH_PREFIX"
+  BRANCH_PREFIX="feature"
 
   printf '
 ' >&2
@@ -78,7 +77,6 @@ AFTER
   section "Summary"
   info "Project: $PROJECT_NAME"
   info "Main worktrees dir: $BASE_DIR"
-  info "Default task branch prefix: $BRANCH_PREFIX"
   info "IDE:"
   if [ -n "$IDE_COMMAND" ]; then
     info "  $IDE_COMMAND"
@@ -97,10 +95,10 @@ AFTER
     info "  - $(repo_name_at "$i") $(repo_url_at "$i") base repo branch=$(repo_base_branch_at "$i")"
     i=$((i + 1))
   done
-  info "Task branches:"
-  info "  - Chosen when running workbranch add <task>."
-  info "  - workbranch suggests defaults from each repo's base branch and the task name."
-  info "  - You can override each suggested task branch."
+  info "Task identity:"
+  info "  - New tasks can be created with workbranch add."
+  info "  - workbranch asks for task type and detail name, then derives folder type+detail."
+  info "  - Each repo suggests a task branch from its base branch, and you can override it."
   printf '
 ' >&2
   if [ "$clone_after" = "yes" ]; then

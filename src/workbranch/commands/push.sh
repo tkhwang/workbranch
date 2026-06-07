@@ -82,7 +82,7 @@ cmd_push() {
     return 0
   fi
 
-  task=${ARGS[0]}
-  validate_safe_name "task" "$task"
+  task=$(normalize_task_argument "${ARGS[0]}")
+  validate_task_folder_name "$task"
   cmd_push_task "$task"
 }

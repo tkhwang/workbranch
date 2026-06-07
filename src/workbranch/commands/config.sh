@@ -194,7 +194,7 @@ configure_existing_project() {
   info "Config"
   info "Project: $PROJECT_NAME"
   info "Main worktrees dir: $BASE_DIR"
-  info "Default task branch prefix: $BRANCH_PREFIX"
+  info "Legacy branch prefix: $BRANCH_PREFIX (kept for existing shorthand defaults)"
   info "Press Enter to keep a current value. Type --clear at a setup prompt to remove it."
   printf '\n'
 

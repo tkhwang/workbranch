@@ -1,12 +1,12 @@
 cmd_remove() {
   [ $# -eq 1 ] || [ $# -eq 2 ] || die "usage: workbranch remove <task> [--force]"
-  task=$1
+  task=$(normalize_task_argument "$1")
   force=0
   if [ $# -eq 2 ]; then
     [ "$2" = "--force" ] || die "usage: workbranch remove <task> [--force]"
     force=1
   fi
-  validate_safe_name "task" "$task"
+  validate_task_folder_name "$task"
   require_project
   reset_preflight
   task_dir="$PROJECT_ROOT/$task"

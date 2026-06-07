@@ -4,6 +4,7 @@ src/workbranch/lib/platform.sh
 src/workbranch/usage.sh
 src/workbranch/lib/validation.sh
 src/workbranch/lib/config.sh
+src/workbranch/lib/task-identity.sh
 src/workbranch/lib/project.sh
 src/workbranch/lib/task-metadata.sh
 src/workbranch/lib/preflight.sh
