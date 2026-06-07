@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.9.0](https://github.com/tkhwang/workbranch/compare/v1.8.0...v1.9.0) (2026-06-07)
+
+
+### Features
+
+* **config:** add `config base` and `finalize` commands ([4e29cc1](https://github.com/tkhwang/workbranch/commit/4e29cc1c533bde5e36c91f3a3a1c615348ae7637))
+
+
+### Bug Fixes
+
+* **refresh:** add preflight error check for update tasks ([27140e0](https://github.com/tkhwang/workbranch/commit/27140e0fd1aa541a084ac42f9beda55fca3c7aa9))
+
 ## [1.8.0](https://github.com/tkhwang/workbranch/compare/v1.7.0...v1.8.0) (2026-06-07)
 
 
