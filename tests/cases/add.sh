@@ -197,6 +197,19 @@ test_add_rejects_unknown_conventional_task_type() {
   assert_not_exists "$project/unknown+branch-name"
 }
 
+test_add_rejects_conventional_detail_that_builds_invalid_branch() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+
+  out=$(run_expect_fail "$WORKBRANCH" add feat+bad.lock)
+  assert_contains "$out" "invalid task detail name 'bad.lock': produces invalid branch 'feat/bad.lock'"
+  assert_not_contains "$out" "invalid task ''"
+  assert_not_contains "$out" "task repo branch"
+  assert_not_exists "$project/feat+bad.lock"
+}
+
 
 
 test_add_rejects_empty_from_equals() {

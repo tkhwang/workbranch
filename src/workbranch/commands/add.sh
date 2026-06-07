@@ -31,7 +31,7 @@ prompt_task_identity_for_add() {
   else
     detail=$(prompt_required "Task detail name")
   fi
-  validate_task_detail_name "$detail"
+  validate_task_detail_name "$detail" "$type"
   task=$(task_folder_from_identity "$type" "$detail")
   printf '%s[*]%s Task folder: %s\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" "$task" >&2
   printf '%s' "$task"
@@ -115,7 +115,7 @@ resolve_add_source_ref() {
 cmd_add() {
   parse_add_options "$@"
   require_project
-  task=$(resolve_task_for_add)
+  task=$(resolve_task_for_add) || return 1
   validate_task_folder_name "$task"
   CREATED_PATHS=()
   CREATED_WORKTREES=()

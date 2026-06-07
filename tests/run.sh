@@ -84,6 +84,7 @@ main() {
   run_test test_add_without_task_argument_supports_from_ref
   run_test test_add_explicit_task_without_plus_keeps_legacy_default
   run_test test_add_rejects_unknown_conventional_task_type
+  run_test test_add_rejects_conventional_detail_that_builds_invalid_branch
   run_test test_add_rejects_empty_from_equals
   run_test test_add_from_remote_ref_seeds_task_branch_from_origin_ref
   run_test test_add_from_missing_ref_fails_before_creating_task
