@@ -85,12 +85,14 @@ main() {
   run_test test_update_preflight_blocks_base_rebase_in_progress
   run_test test_sync_pulls_base_then_updates_tasks
   run_test test_sync_repo_scope_limits_pull_and_update
+  run_test test_sync_repo_scope_collects_tasks_with_only_selected_repo_healthy
   run_test test_sync_no_tasks_fails_before_pull
   run_test test_sync_update_preflight_failure_blocks_pull
   run_test test_sync_rejects_unexpected_positional_arg
   run_test test_doctor_healthy_project_exits_zero
   run_test test_doctor_detects_partial_workspace
   run_test test_doctor_repo_scope_ignores_filtered_out_task_damage
+  run_test test_doctor_reports_registered_task_worktree_on_wrong_branch
   run_test test_doctor_reports_base_branch_drift
   run_test test_doctor_reports_stale_directory_with_remove_hint
   run_test test_doctor_rejects_unexpected_args_and_flags

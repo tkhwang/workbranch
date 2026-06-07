@@ -52,12 +52,37 @@ update_task() {
   done
 }
 
+is_update_task_workspace_path() {
+  local path dir_name i name selected_count
+  path=$1
+  if [ -z "$FILTER_REPO" ]; then
+    is_task_workspace_path "$path"
+    return $?
+  fi
+
+  [ -d "$path" ] || return 1
+  dir_name=${path##*/}
+  [ "$dir_name" = "$BASE_DIR" ] && return 1
+  case "$dir_name" in .*) return 1 ;; esac
+
+  selected_count=0
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    repo_matches_filter "$name" || { i=$((i + 1)); continue; }
+    selected_count=$((selected_count + 1))
+    is_registered_worktree_path "$path/$name" "$(base_repo_path "$name")" || return 1
+    i=$((i + 1))
+  done
+  [ "$selected_count" -gt 0 ]
+}
+
 collect_update_all_tasks() {
   tasks_to_update=()
   for path in "$PROJECT_ROOT"/*; do
-    is_task_workspace_path "$path" || continue
+    is_update_task_workspace_path "$path" || continue
     task_name=${path##*/}
-    tasks_to_update[${#tasks_to_update[@]}]=$task_name
+    tasks_to_update[${#tasks_to_update[@]}]="$task_name"
   done
   [ ${#tasks_to_update[@]} -gt 0 ] || die "no task workspaces to update"
 }

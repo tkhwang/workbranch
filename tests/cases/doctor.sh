@@ -61,6 +61,22 @@ test_doctor_repo_scope_ignores_filtered_out_task_damage() {
   assert_contains "$out" "status=1"
 }
 
+test_doctor_reports_registered_task_worktree_on_wrong_branch() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add feat-login >/dev/null
+  git -C "$project/feat-login/backend" checkout -b wrong-doctor-branch >/dev/null 2>&1
+
+  out=$(doctor_with_status)
+  assert_contains "$out" "feat-login"
+  assert_contains "$out" "partial"
+  assert_contains "$out" "backend expected branch feat/login, got wrong-doctor-branch"
+  assert_contains "$out" "status=1"
+}
+
 test_doctor_reports_base_branch_drift() {
   new_fixture
   project="$FIXTURE_PROJECT"

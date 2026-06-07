@@ -5,17 +5,19 @@ doctor_usage() {
 doctor_issue() {
   doctor_issue_count=$((doctor_issue_count + 1))
   printf '[-] %s\n' "$*"
-  doctor_manual_lines[${#doctor_manual_lines[@]}]=$*
+  doctor_manual_lines+=("$*")
 }
 
 doctor_task_state() {
-  local path selected_count registered_count present_count missing_details unregistered_details i name repo_path base_path detail
+  local path task selected_count registered_count present_count missing_details unregistered_details branch_details i name repo_path base_path detail expected_branch actual_branch
   path=$1
+  task=${path##*/}
   selected_count=0
   registered_count=0
   present_count=0
   missing_details=""
   unregistered_details=""
+  branch_details=""
 
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
@@ -25,8 +27,16 @@ doctor_task_state() {
     repo_path="$path/$name"
     base_path=$(base_repo_path "$name")
     if is_registered_worktree_path "$repo_path" "$base_path"; then
-      registered_count=$((registered_count + 1))
       present_count=$((present_count + 1))
+      expected_branch=$(repo_task_branch_at "$i" "$task")
+      actual_branch=$(branch_or_unknown "$repo_path")
+      if [ "$actual_branch" = "$expected_branch" ]; then
+        registered_count=$((registered_count + 1))
+      elif [ -z "$branch_details" ]; then
+        branch_details="$name expected branch $expected_branch, got $actual_branch"
+      else
+        branch_details="$branch_details, $name expected branch $expected_branch, got $actual_branch"
+      fi
     elif [ -d "$repo_path" ]; then
       present_count=$((present_count + 1))
       if [ -z "$unregistered_details" ]; then
@@ -48,7 +58,7 @@ doctor_task_state() {
     printf 'ignore|no selected repos'
   elif [ "$registered_count" -eq "$selected_count" ]; then
     printf 'healthy|healthy'
-  elif [ "$registered_count" -eq 0 ]; then
+  elif [ "$registered_count" -eq 0 ] && [ -z "$branch_details" ]; then
     printf 'stale|no registered worktrees'
   else
     detail=$missing_details
@@ -56,12 +66,16 @@ doctor_task_state() {
       [ -n "$detail" ] && detail="$detail, "
       detail="$detail$unregistered_details"
     fi
+    if [ -n "$branch_details" ]; then
+      [ -n "$detail" ] && detail="$detail, "
+      detail="$detail$branch_details"
+    fi
     printf 'partial|%s' "$detail"
   fi
 }
 
 doctor_report() {
-  local i name base expected actual state task_path task state_result task_state task_detail prunable_count healthy_found stale_found
+  local i name base expected actual state task_path task state_result task_state task_detail prunable_count healthy_found stale_found prunable_found
   doctor_issue_count=0
   doctor_manual_lines=()
 
@@ -190,7 +204,7 @@ cmd_doctor() {
     case "$1" in
       --fix) fix=1 ;;
       --fix=*) doctor_usage ;;
-      *) doctor_args[${#doctor_args[@]}]=$1 ;;
+      *) doctor_args[${#doctor_args[@]}]="$1" ;;
     esac
     shift
   done

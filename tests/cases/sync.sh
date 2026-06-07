@@ -45,6 +45,27 @@ test_sync_repo_scope_limits_pull_and_update() {
   assert_not_exists "$project/feat-login/backend/sync-backend.txt"
 }
 
+test_sync_repo_scope_collects_tasks_with_only_selected_repo_healthy() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add feat-login >/dev/null
+  git -C "$project/_base/backend" worktree remove --force "$project/feat-login/backend" >/dev/null 2>&1
+
+  commit_to_remote_master frontend sync-scoped-partial
+  remote_base_head=$(git --git-dir="$TMP_ROOT/remotes/frontend.git" rev-parse master)
+
+  out=$(run_expect_success "$WORKBRANCH" sync --repo frontend)
+  assert_contains "$out" "Pulling frontend"
+  assert_contains "$out" "Updating feat-login/frontend"
+  assert_not_contains "$out" "no task workspaces to update"
+  assert_not_contains "$out" "feat-login/backend"
+  [ "$(git -C "$project/_base/frontend" rev-parse HEAD)" = "$remote_base_head" ] || fail "scoped base did not advance"
+  assert_file "$project/feat-login/frontend/sync-scoped-partial.txt"
+}
+
 test_sync_no_tasks_fails_before_pull() {
   new_fixture
   project="$FIXTURE_PROJECT"
