@@ -4,7 +4,7 @@
 
 `git worktree` 명령을 매번 기억하지 않아도 task 단위 worktree를 관리할 수 있습니다.
 
-`workbranch`는 feature마다 하나의 task 폴더를 만들고, single repo와 multi-repo 프로젝트 모두에서 짧고 안전한 branch sync 명령을 제공합니다.
+`workbranch`는 feature마다 하나의 task 폴더를 만들고, single repo와 multi-repo 프로젝트 모두에서 짧고 안전한 branch refresh 명령을 제공합니다.
 
 핵심 흐름은 task workspace를 만들고 제거하는 **Workspace lifecycle**과 task branch를 update, land, push하는 **Branch workflow** 두 가지입니다.
 
@@ -40,7 +40,7 @@ workbranch init
 workbranch add
 cd feat-login/<repo>
 # task 작업
-workbranch sync
+workbranch refresh feat-login
 workbranch push feat-login
 workbranch remove feat-login
 ```
@@ -74,9 +74,9 @@ workbranch add
 
 다른 source ref에서 새 task branch를 시작하려면 `workbranch add [<task>] --from <ref>`를 사용하세요. 예를 들어 `workbranch add task1 --from feat/XXX`는 origin을 fetch한 뒤 `origin/feat/XXX`가 있으면 그것을 우선 사용하고, prompt로 정한 task branch 이름은 그대로 유지한 채 linked task worktree를 만듭니다. 이후 `workbranch status`는 여전히 task branch를 현재 local base와 비교하며, source ref는 생성 시점 정보일 뿐 지속적인 status 기준이 아닙니다.
 
-작업 중에는 `workbranch sync`로 remote base branch를 `_base/<repo>`에 pull한 다음, 갱신된 local base 기준으로 모든 task workspace를 update할 수 있습니다. `sync`는 먼저 task worktree들이 update 가능한지 확인하므로, dirty 상태이거나 막힌 task가 있으면 base branch를 pull하기 전에 중단합니다.
+작업 중에는 `workbranch refresh`로 remote base branch를 `_base/<repo>`에 pull한 다음, 갱신된 local base 기준으로 모든 task workspace를 update할 수 있습니다. 하나의 task만 갱신하려면 `workbranch refresh <task>`를 사용합니다. `refresh`는 먼저 대상 task worktree들이 update 가능한지 확인하므로, dirty 상태이거나 막힌 task가 있으면 base branch를 pull하기 전에 중단합니다.
 
-repo를 다시 clone하지 않고 project 설정, base branch, IDE/terminal 실행 명령, repo별 setup command를 수정하려면 `workbranch config`를 사용합니다.
+repo를 다시 clone하지 않고 project 설정, base branch, IDE/terminal 실행 명령, repo별 setup command를 수정하려면 `workbranch config`를 사용합니다. base branch가 바뀌면 기존 `_base/<repo>` worktree를 fetch, checkout, fast-forward pull까지 해서 해당 branch로 맞춥니다. base branch만 수정하려면 `workbranch config base`를 사용합니다.
 
 ## 생성되는 구조
 
@@ -111,6 +111,7 @@ macOS 전용: `finder`, `ide`, `terminal`, `config ide`, `config terminal`. Linu
 | --- | --- |
 | `workbranch init` | config 기준으로 base worktree 생성 또는 clone |
 | `workbranch config` | project 설정, base branch, tool command, repo setup command 수정 |
+| `workbranch config base` | base branch 설정만 수정하고 base worktree checkout |
 | `workbranch config ide` | IDE 명령만 수정 |
 | `workbranch config terminal` | terminal 명령만 수정 |
 | `workbranch add [<task>] [--from <ref>]` | task workspace 생성 |
@@ -125,10 +126,18 @@ macOS 전용: `finder`, `ide`, `terminal`, `config ide`, `config terminal`. Linu
 | `workbranch status` | base remote diff, task diff, dirty state 확인 |
 | `workbranch pull` | remote base branch를 `_base/<repo>`로 pull |
 | `workbranch update [task]` | local base 변경사항을 task worktree에 merge |
-| `workbranch sync` | base branch를 pull한 뒤 모든 task workspace update |
 | `workbranch push` | base branch push |
 | `workbranch push <task>` | task branch push |
 | `workbranch land <task>` | task 작업을 local base branch로 fast-forward 반영 |
+
+### Combined flow
+
+| Command | 용도 |
+| --- | --- |
+| `workbranch refresh` | base branch를 pull한 뒤 모든 task workspace update |
+| `workbranch refresh <task>` | base branch를 pull한 뒤 하나의 task workspace update |
+| `workbranch finalize <task>` | base branch를 pull하고 하나의 task를 update한 뒤 local base branch로 반영 |
+| `workbranch prune` | local base branch에 이미 merge된 clean task workspace 정리 |
 
 ### Tool commands
 

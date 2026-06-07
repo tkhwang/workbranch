@@ -1,11 +1,5 @@
-cmd_land() {
-  require_project
-  parse_repo_option "$@"
-  [ ${#ARGS[@]} -eq 1 ] || die "usage: workbranch land <task> [--repo <repo>]"
-  task=$(normalize_task_argument "${ARGS[0]}")
-  validate_task_folder_name "$task"
-
-  reset_preflight
+preflight_land_task() {
+  task=$1
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
@@ -40,8 +34,10 @@ cmd_land() {
     preflight_land_fast_forwardable "$land_label" "$base" "$base_branch" "$task_branch_for_land"
     i=$((i + 1))
   done
-  preflight_die_if_errors "land"
+}
 
+execute_land_task() {
+  task=$1
   i=0
   repo_log_seen=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
@@ -60,4 +56,17 @@ cmd_land() {
     repo_log_seen=1
     i=$((i + 1))
   done
+}
+
+cmd_land() {
+  require_project
+  parse_repo_option "$@"
+  [ ${#ARGS[@]} -eq 1 ] || die "usage: workbranch land <task> [--repo <repo>]"
+  task=$(normalize_task_argument "${ARGS[0]}")
+  validate_task_folder_name "$task"
+
+  reset_preflight
+  preflight_land_task "$task"
+  preflight_die_if_errors "land"
+  execute_land_task "$task"
 }

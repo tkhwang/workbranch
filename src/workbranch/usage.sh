@@ -31,10 +31,14 @@ Git:
   update            Update every task workspace from local base worktrees
   update --all      Update every task workspace from local base worktrees
   update <task>     Update one task workspace from local base worktrees
-  sync              Pull base branches, then update every task workspace
   land <task>       Land task branches into base branches
   common
   --repo <repo>     Limit operation to one repo; otherwise all repos
+Combined:
+  refresh           Pull base branches, then update every task workspace
+  refresh <task>    Pull base branches, then update one task workspace
+  finalize <task>   Pull base, update task, then land task
+  prune             Remove fully merged task workspaces
 Tool:
   path <task>       Print a task workspace path
   finder <task>     Open a task workspace in Finder
@@ -42,11 +46,10 @@ Tool:
   terminal <task>   Open task repo worktrees in the configured terminal
 Config:
   config            Create or update .workbranch.config without cloning repos
+  config base       Update base branch settings and checkout base worktrees
   config ide        Update only the configured IDE command
   config terminal   Update only the configured terminal command
   config --rewrite  Rewrite config to current format without prompts
-Completion:
-  completion <shell>   Print a shell completion script (bash, zsh, fish)
 Other:
   doctor            Diagnose project health; --fix applies safe repairs
   help              Show this help
@@ -74,10 +77,14 @@ usage_enhanced() {
   printf '  update            Update every task workspace from local base worktrees\n'
   printf '  update --all      Update every task workspace from local base worktrees\n'
   printf '  update <task>     Update one task workspace from local base worktrees\n'
-  printf '  sync              Pull base branches, then update every task workspace\n'
   printf '  land <task>       Land task branches into base branches\n'
   printf '%s  common%s\n' "$WB_GRAY" "$WB_RESET"
   printf '  --repo <repo>     Limit operation to one repo; otherwise all repos\n'
+  section "Combined"
+  printf '  refresh           Pull base branches, then update every task workspace\n'
+  printf '  refresh <task>    Pull base branches, then update one task workspace\n'
+  printf '  finalize <task>   Pull base, update task, then land task\n'
+  printf '  prune             Remove fully merged task workspaces\n'
   section "Tool"
   printf '  path <task>       Print a task workspace path\n'
   printf '  finder <task>     Open a task workspace in Finder\n'
@@ -85,11 +92,10 @@ usage_enhanced() {
   printf '  terminal <task>   Open task repo worktrees in the configured terminal\n'
   section "Config"
   printf '  config            Create or update .workbranch.config without cloning repos\n'
+  printf '  config base       Update base branch settings and checkout base worktrees\n'
   printf '  config ide        Update only the configured IDE command\n'
   printf '  config terminal   Update only the configured terminal command\n'
   printf '  config --rewrite  Rewrite config to current format without prompts\n'
-  section "Completion"
-  printf '  completion <shell>   Print a shell completion script (bash, zsh, fish)\n'
   section "Other"
   printf '  doctor            Diagnose project health; --fix applies safe repairs\n'
   printf '  help              Show this help\n'

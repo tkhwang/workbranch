@@ -106,11 +106,15 @@ Create or update config without cloning repos.
 
 If `.workbranch.config` or legacy `.tasktree.config` / `.monotree.config` already exists in the current project, load it, then prompt for the project name, main worktrees directory, IDE command, terminal command, each repo's base branch, and each repo-level setup command. Press Enter to keep the current value. Type `--clear` at a tool or repo setup prompt to remove that command.
 
-Changing a repo base branch updates config only. `workbranch config` does not clone, move, rename, or check out existing worktrees. Existing `BRANCH_PREFIX` values are preserved silently; it is no longer an interactive setting. Changing `MAIN_WORKTREES_DIR` is allowed only before base worktrees exist. Once matching base worktrees exist, `workbranch config` rejects that change.
+Changing a repo base branch in the full `workbranch config` flow updates config and, for existing `_base/<repo>` worktrees, fetches `origin`, checks out the selected base branch, and pulls it with `--ff-only`. `workbranch config` does not clone, move, or rename existing worktrees. Existing `BRANCH_PREFIX` values are preserved silently; it is no longer an interactive setting. Changing `MAIN_WORKTREES_DIR` is allowed only before base worktrees exist. Once matching base worktrees exist, `workbranch config` rejects that change.
 
 Existing project-level `TASK_SETUP` values remain supported for `workbranch add` and are preserved by `workbranch config` unless another explicit flow clears or migrates them. `workbranch config ide` and `workbranch config terminal` update only the matching tool command.
 
-When a base branch changes after repos are cloned, `workbranch config` only updates `.workbranch.config`. It then prints the checkout/fetch/pull procedure needed for the existing `_base/<repo>` worktree.
+When a base branch changes after repos are cloned, `workbranch config` preflights each existing base worktree for a clean state and no rebase in progress before changing checkout state. Missing base worktrees are still handled by later `workbranch init`.
+
+### `workbranch config base`
+
+Update only repo base branch settings. For existing `_base/<repo>` worktrees, this uses the same fetch, checkout, and `--ff-only` pull behavior as full `workbranch config`, so subsequent `workbranch add` uses the selected base branch without a preflight mismatch.
 
 ### `workbranch config --rewrite`
 
@@ -252,6 +256,26 @@ Fails if any matching base worktree has a rebase in progress.
 
 Same as `workbranch update`, but only for one task workspace.
 
+### `workbranch refresh [<task>]`
+
+Pull remote base branches into local base worktrees, then update task workspaces from those refreshed local bases.
+
+Without `<task>`, `refresh` updates every task workspace. With `<task>`, it updates only that task workspace. Before pulling, `refresh` preflights the target task worktrees the same way `workbranch update` does. If any target task worktree is dirty, missing, on the wrong branch, or has a rebase in progress, no base branch is pulled.
+
+For the pull phase:
+
+```bash
+cd _base/<repo>
+git pull --ff-only origin <base-branch>
+```
+
+For the update phase:
+
+```bash
+cd <task>/<repo>
+git rebase <_base/repo HEAD>
+```
+
 ### `workbranch push`
 
 Push base branches to origin.
@@ -289,6 +313,18 @@ git merge --ff-only <task-branch>
 
 This is useful when the base repo branch is already a parent feature branch, such as `feature/cpq`. Run `workbranch push` afterward to push the updated base repo branch.
 
+### `workbranch finalize <task>`
+
+Finalize one task into local base branches by running the safe local closeout flow:
+
+1. Pull selected base branches from origin.
+2. Update the selected task workspace from refreshed local base worktrees.
+3. Land the selected task branches into local base branches.
+
+`finalize` does not push base branches and does not remove the task workspace. Run `workbranch push` and `workbranch remove <task>` explicitly after reviewing the local result.
+
+Before pulling, `finalize` preflights both the base pull path and the task update path: selected base worktrees must exist, be on the configured branch, be clean, have no rebase in progress, be fetchable, and be fast-forwardable; selected task worktrees must exist, be on their task branches, be clean, and have no rebase in progress. If any preflight fails, no base branch is pulled. After update succeeds, `finalize` runs land preflight before any land operation so one blocked repo does not partially land another repo.
+
 ### `--repo <repo>`
 
 Git and tool operations default to every configured repo. Add `--repo <repo>` to limit the operation to one repo.
@@ -302,6 +338,7 @@ workbranch update login --repo frontend
 workbranch push --repo frontend
 workbranch push login --repo frontend
 workbranch land login --repo frontend
+workbranch finalize login --repo frontend
 ```
 
 ### `workbranch remove <task>`
@@ -313,6 +350,19 @@ If the task worktree directory was removed manually, `workbranch remove <task>` 
 
 Fails if any task worktree is dirty.
 Use `workbranch remove <task> --force` to discard dirty local task worktrees and local task branches.
+
+### `workbranch prune`
+
+Remove task workspaces that are already fully merged into the configured local base branches.
+
+For each healthy task workspace, `prune` checks every configured repo:
+
+- the base worktree exists and is checked out to its configured base branch;
+- the task worktree exists, is checked out to its task branch, is clean, and has no rebase in progress;
+- the task branch exists locally; and
+- the task branch is an ancestor of the configured local base branch.
+
+Only tasks that pass for every repo are removed. Unmerged, dirty, partial, stale, or branch-drifted tasks are skipped with a reason. `prune` removes local task worktrees and local task branches only; it does not push and does not delete remote task branches.
 
 ### `workbranch version`
 
@@ -350,8 +400,10 @@ If the user declines, print direct-run and manual PATH guidance.
 - `push` pushes base branches.
 - `push <task>` pushes task branches.
 - `land <task>` lands task branches into local base branches without merge commits.
+- `finalize <task>` pulls base branches, updates one task, and lands it locally without pushing or removing the task workspace.
 - `--repo <repo>` limits supported Git commands to one repo.
 - `remove <task>` removes linked worktrees and local task branches.
+- `prune` removes clean task workspaces already merged into local base branches.
 - `-v`, `--version`, and `version` print the manifest-backed installed CLI version.
 - Dirty worktree checks prevent unsafe operations.
 - Integration tests use temporary local bare remotes.

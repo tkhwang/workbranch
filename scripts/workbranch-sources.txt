@@ -23,10 +23,12 @@ src/workbranch/commands/status.sh
 src/workbranch/commands/doctor.sh
 src/workbranch/commands/pull.sh
 src/workbranch/commands/update.sh
-src/workbranch/commands/sync.sh
+src/workbranch/commands/refresh.sh
 src/workbranch/commands/push.sh
 src/workbranch/commands/land.sh
+src/workbranch/commands/finalize.sh
 src/workbranch/commands/remove.sh
+src/workbranch/commands/prune.sh
 src/workbranch/commands/version.sh
 src/workbranch/git-ops.sh
 src/workbranch/commands/completion.sh

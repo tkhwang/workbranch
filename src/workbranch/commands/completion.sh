@@ -19,7 +19,7 @@ cmd_complete_repos() {
 }
 
 cmd_complete_commands() {
-  printf '%s\n' add completion config doctor finder help ide init land list path pull push remove status sync terminal update version
+  printf '%s\n' add completion config doctor finalize finder help ide init land list path prune pull push refresh remove status terminal update version
 }
 
 print_completion_bash() {
@@ -62,7 +62,7 @@ _workbranch() {
         remove) words='--force' ;;
         doctor) words='--fix --repo' ;;
         update) words='--all --repo' ;;
-        status|pull|push|land|sync|path|finder|ide|terminal) words='--repo' ;;
+        status|pull|push|land|finalize|refresh|path|finder|ide|terminal) words='--repo' ;;
         *) words='' ;;
       esac
       COMPREPLY=( $(compgen -W "$words" -- "$cur") )
@@ -71,7 +71,7 @@ _workbranch() {
   esac
 
   case "$cmd" in
-    remove|update|push|land|path|finder|ide|terminal)
+    remove|update|push|land|finalize|refresh|path|finder|ide|terminal)
       words=$($wb_bin __complete-tasks 2>/dev/null || true)
       COMPREPLY=( $(compgen -W "$words" -- "$cur") )
       return 0
@@ -115,7 +115,7 @@ _workbranch() {
       remove) flags=(--force) ;;
       doctor) flags=(--fix --repo) ;;
       update) flags=(--all --repo) ;;
-      status|pull|push|land|sync|path|finder|ide|terminal) flags=(--repo) ;;
+      status|pull|push|land|finalize|refresh|path|finder|ide|terminal) flags=(--repo) ;;
       *) flags=() ;;
     esac
     _describe 'option' flags
@@ -123,7 +123,7 @@ _workbranch() {
   fi
 
   case "$cmd" in
-    remove|update|push|land|path|finder|ide|terminal)
+    remove|update|push|land|finalize|refresh|path|finder|ide|terminal)
       tasks=(${(f)"$($wb_bin __complete-tasks 2>/dev/null)"})
       _describe 'task' tasks
       return
@@ -172,9 +172,11 @@ end
 
 complete -c workbranch -f -n '__workbranch_completing_command' -a '(__workbranch_complete_commands)'
 complete -c workbranch -f -n '__workbranch_seen_command update' -a '(__workbranch_complete_tasks)'
+complete -c workbranch -f -n '__workbranch_seen_command refresh' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command remove' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command push' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command land' -a '(__workbranch_complete_tasks)'
+complete -c workbranch -f -n '__workbranch_seen_command finalize' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command path' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command finder' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command ide' -a '(__workbranch_complete_tasks)'
@@ -190,7 +192,8 @@ complete -c workbranch -n '__workbranch_seen_command status' -l repo -d 'Limit o
 complete -c workbranch -n '__workbranch_seen_command pull' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command push' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command land' -l repo -d 'Limit operation to one repo'
-complete -c workbranch -n '__workbranch_seen_command sync' -l repo -d 'Limit operation to one repo'
+complete -c workbranch -n '__workbranch_seen_command finalize' -l repo -d 'Limit operation to one repo'
+complete -c workbranch -n '__workbranch_seen_command refresh' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command doctor' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command path' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command finder' -l repo -d 'Limit operation to one repo'

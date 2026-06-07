@@ -260,3 +260,140 @@ GIT
   assert_file "$project/login/.workbranch.task"
   assert_contains "$out" "Task directory kept because it is not empty: login"
 }
+
+test_prune_removes_only_fully_merged_tasks() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  printf '\n\n' | run_expect_success "$WORKBRANCH" add feat-done >/dev/null
+  printf '\n\n' | run_expect_success "$WORKBRANCH" add feat-live >/dev/null
+
+  git -C "$project/feat-done/frontend" config user.name "Workbranch Test"
+  git -C "$project/feat-done/frontend" config user.email "workbranch-test@example.com"
+  git -C "$project/feat-done/backend" config user.name "Workbranch Test"
+  git -C "$project/feat-done/backend" config user.email "workbranch-test@example.com"
+  printf '%s\n' "done frontend" > "$project/feat-done/frontend/done-frontend.txt"
+  git -C "$project/feat-done/frontend" add done-frontend.txt
+  git -C "$project/feat-done/frontend" commit -m "done frontend" >/dev/null
+  printf '%s\n' "done backend" > "$project/feat-done/backend/done-backend.txt"
+  git -C "$project/feat-done/backend" add done-backend.txt
+  git -C "$project/feat-done/backend" commit -m "done backend" >/dev/null
+  run_expect_success "$WORKBRANCH" land feat-done >/dev/null
+
+  git -C "$project/feat-live/frontend" config user.name "Workbranch Test"
+  git -C "$project/feat-live/frontend" config user.email "workbranch-test@example.com"
+  printf '%s\n' "live frontend" > "$project/feat-live/frontend/live-frontend.txt"
+  git -C "$project/feat-live/frontend" add live-frontend.txt
+  git -C "$project/feat-live/frontend" commit -m "live frontend" >/dev/null
+
+  out=$(run_expect_success "$WORKBRANCH" prune)
+  assert_contains "$out" "Pruning merged task: feat-done"
+  assert_contains "$out" "Skipped: feat-live (feat-live/frontend not merged into master)"
+  assert_not_exists "$project/feat-done"
+  assert_dir "$project/feat-live"
+  if git -C "$project/_base/frontend" show-ref --verify --quiet refs/heads/feat/done; then
+    fail "expected prune to delete merged frontend branch"
+  fi
+  if git -C "$project/_base/backend" show-ref --verify --quiet refs/heads/feat/done; then
+    fail "expected prune to delete merged backend branch"
+  fi
+  git -C "$project/_base/frontend" show-ref --verify --quiet refs/heads/feat/live ||
+    fail "expected prune to keep unmerged frontend branch"
+}
+
+test_prune_skips_dirty_merged_task() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  printf '\n\n' | run_expect_success "$WORKBRANCH" add feat-dirty >/dev/null
+
+  git -C "$project/feat-dirty/frontend" config user.name "Workbranch Test"
+  git -C "$project/feat-dirty/frontend" config user.email "workbranch-test@example.com"
+  printf '%s\n' "dirty done" > "$project/feat-dirty/frontend/dirty-done.txt"
+  git -C "$project/feat-dirty/frontend" add dirty-done.txt
+  git -C "$project/feat-dirty/frontend" commit -m "dirty done" >/dev/null
+  run_expect_success "$WORKBRANCH" land feat-dirty >/dev/null
+  printf '%s\n' "dirty worktree" > "$project/feat-dirty/frontend/dirty.txt"
+
+  out=$(run_expect_success "$WORKBRANCH" prune)
+  assert_contains "$out" "Skipped: feat-dirty (feat-dirty/frontend dirty worktree)"
+  assert_dir "$project/feat-dirty"
+  git -C "$project/_base/frontend" show-ref --verify --quiet refs/heads/feat/dirty ||
+    fail "expected prune to keep dirty merged frontend branch"
+}
+
+test_prune_reports_partial_and_stale_task_skips() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  printf '\n\n' | run_expect_success "$WORKBRANCH" add feat-partial >/dev/null
+  printf '\n\n' | run_expect_success "$WORKBRANCH" add feat-stale >/dev/null
+
+  git -C "$project/_base/backend" worktree remove --force "$project/feat-partial/backend" >/dev/null 2>&1
+  rm -f "$project/feat-stale/frontend/.git" "$project/feat-stale/backend/.git"
+
+  out=$(run_expect_success "$WORKBRANCH" prune)
+  assert_contains "$out" "Skipped: feat-partial (feat-partial/backend missing git repo)"
+  assert_contains "$out" "Skipped: feat-stale (feat-stale/frontend missing git repo)"
+  assert_contains "$out" "No merged tasks to prune"
+  assert_dir "$project/feat-partial"
+  assert_dir "$project/feat-stale"
+}
+
+test_prune_returns_failure_after_remove_failure_and_continues() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  printf '\n\n' | run_expect_success "$WORKBRANCH" add feat-broken >/dev/null
+  printf '\n\n' | run_expect_success "$WORKBRANCH" add feat-clean >/dev/null
+  project_real=$(pwd -P)
+
+  for task in feat-broken feat-clean; do
+    git -C "$project/$task/frontend" config user.name "Workbranch Test"
+    git -C "$project/$task/frontend" config user.email "workbranch-test@example.com"
+    git -C "$project/$task/backend" config user.name "Workbranch Test"
+    git -C "$project/$task/backend" config user.email "workbranch-test@example.com"
+    printf '%s\n' "$task frontend" > "$project/$task/frontend/$task-frontend.txt"
+    git -C "$project/$task/frontend" add "$task-frontend.txt"
+    git -C "$project/$task/frontend" commit -m "$task frontend" >/dev/null
+    printf '%s\n' "$task backend" > "$project/$task/backend/$task-backend.txt"
+    git -C "$project/$task/backend" add "$task-backend.txt"
+    git -C "$project/$task/backend" commit -m "$task backend" >/dev/null
+    run_expect_success "$WORKBRANCH" update "$task" >/dev/null
+    run_expect_success "$WORKBRANCH" land "$task" >/dev/null
+  done
+
+  real_git=$(command -v git)
+  fakebin="$TMP_ROOT/fakebin"
+  mkdir -p "$fakebin"
+  cat > "$fakebin/git" <<'GIT'
+#!/usr/bin/env bash
+if [ "${1:-}" = "-C" ] && [ "${3:-}" = "worktree" ] && [ "${4:-}" = "remove" ] && [ "${5:-}" = "--force" ] && [ "${6:-}" = "$FAIL_REMOVE_PATH" ]; then
+  printf '%s
+' "fake worktree remove failure" >&2
+  exit 1
+fi
+exec "$REAL_GIT" "$@"
+GIT
+  chmod +x "$fakebin/git"
+
+  old_path=$PATH
+  export REAL_GIT=$real_git
+  export FAIL_REMOVE_PATH="$project_real/feat-broken/frontend"
+  PATH="$fakebin:$PATH"
+  out=$("$WORKBRANCH" prune 2>&1)
+  status=$?
+  PATH=$old_path
+  unset REAL_GIT FAIL_REMOVE_PATH
+  [ "$status" -ne 0 ] || fail "expected prune to return failure after remove failure"
+
+  assert_contains "$out" "Pruning merged task: feat-broken"
+  assert_contains "$out" "[-] Error: failed to remove worktree (continuing): feat-broken/frontend"
+  assert_contains "$out" "Pruning merged task: feat-clean"
+  assert_dir "$project/feat-broken/frontend"
+  assert_not_exists "$project/feat-clean"
+}

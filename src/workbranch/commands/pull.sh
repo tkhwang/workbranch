@@ -1,5 +1,4 @@
-run_pull() {
-  reset_preflight
+preflight_pull_repos() {
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
@@ -20,8 +19,9 @@ run_pull() {
     preflight_pull_fast_forwardable "$label" "$base" "$branch"
     i=$((i + 1))
   done
-  preflight_die_if_errors "pull"
+}
 
+execute_pull_repos() {
   i=0
   repo_log_seen=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
@@ -36,6 +36,13 @@ run_pull() {
     repo_log_seen=1
     i=$((i + 1))
   done
+}
+
+run_pull() {
+  reset_preflight
+  preflight_pull_repos
+  preflight_die_if_errors "pull"
+  execute_pull_repos
 }
 
 cmd_pull() {
