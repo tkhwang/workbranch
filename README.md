@@ -157,6 +157,21 @@ WORKBRANCH_COLOR=always workbranch help # force enhanced display
 
 `workbranch path <task>` and `workbranch path <task> --repo <repo>` remain plain path-only outputs for scripting.
 
+## Shell completion
+
+Generate shell completion scripts with `workbranch completion <shell>`. The script provides command, task key, repo, and option completion through your shell; display color and dimmed preview styling are controlled by your shell, completion framework, and terminal theme.
+
+```bash
+# bash
+workbranch completion bash > ~/.local/share/bash-completion/completions/workbranch
+
+# zsh: write to a directory on fpath
+workbranch completion zsh > "${fpath[1]}/_workbranch"
+
+# fish
+workbranch completion fish > ~/.config/fish/completions/workbranch.fish
+```
+
 ## Opening task workspaces
 
 Configure one IDE and one terminal command for the project:

@@ -157,6 +157,21 @@ WORKBRANCH_COLOR=always workbranch help # enhanced display 강제
 
 `workbranch path <task>`와 `workbranch path <task> --repo <repo>`는 scripting을 위해 계속 plain path만 stdout에 출력합니다.
 
+## Shell completion
+
+`workbranch completion <shell>`로 shell completion script를 생성합니다. 이 script는 shell을 통해 command, task key, repo, option completion을 제공합니다. 후보 표시 색상이나 흐린 preview 스타일은 shell, completion framework, terminal theme이 담당합니다.
+
+```bash
+# bash
+workbranch completion bash > ~/.local/share/bash-completion/completions/workbranch
+
+# zsh: fpath에 포함된 directory에 저장
+workbranch completion zsh > "${fpath[1]}/_workbranch"
+
+# fish
+workbranch completion fish > ~/.config/fish/completions/workbranch.fish
+```
+
 ## 작업 workspace 열기
 
 프로젝트에서 공통으로 사용할 IDE와 terminal 명령을 설정합니다.
