@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.8.0](https://github.com/tkhwang/workbranch/compare/v1.7.0...v1.8.0) (2026-06-07)
+
+
+### Features
+
+* **doctor:** add project health diagnosis command ([4d0b1f4](https://github.com/tkhwang/workbranch/commit/4d0b1f4422ce76ac09311a6788ff7a33d38294d6))
+* implement sync and doctor command ([cddb1f9](https://github.com/tkhwang/workbranch/commit/cddb1f9d5aefb61491c9be73de4aaabc3fc525c5))
+* **sync:** add new `workbranch sync` command ([f0835b1](https://github.com/tkhwang/workbranch/commit/f0835b14d9521dbd71e3ebb08389b12ce5cce193))
+
+
+### Bug Fixes
+
+* **doctor:** ignore stale dirs for filtered repos ([e07597a](https://github.com/tkhwang/workbranch/commit/e07597a906927c2596f9aa46bccc8c2382603fcc))
+* **doctor:** improve task state reporting ([ea95645](https://github.com/tkhwang/workbranch/commit/ea95645716c2f157462b9c56563f2fe2d2a7e2e1))
+
 ## [1.7.0](https://github.com/tkhwang/workbranch/compare/v1.6.0...v1.7.0) (2026-06-07)
 
 
