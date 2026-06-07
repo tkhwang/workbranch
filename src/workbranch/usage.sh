@@ -31,6 +31,7 @@ Git:
   update            Update every task workspace from local base worktrees
   update --all      Update every task workspace from local base worktrees
   update <task>     Update one task workspace from local base worktrees
+  sync              Pull base branches, then update every task workspace
   land <task>       Land task branches into base branches
   common
   --repo <repo>     Limit operation to one repo; otherwise all repos
@@ -72,6 +73,7 @@ usage_enhanced() {
   printf '  update            Update every task workspace from local base worktrees\n'
   printf '  update --all      Update every task workspace from local base worktrees\n'
   printf '  update <task>     Update one task workspace from local base worktrees\n'
+  printf '  sync              Pull base branches, then update every task workspace\n'
   printf '  land <task>       Land task branches into base branches\n'
   printf '%s  common%s\n' "$WB_GRAY" "$WB_RESET"
   printf '  --repo <repo>     Limit operation to one repo; otherwise all repos\n'

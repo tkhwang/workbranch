@@ -83,6 +83,11 @@ main() {
   run_test test_update_preflight_blocks_batch_before_changes
   run_test test_update_preflight_requires_base_worktree_on_configured_branch
   run_test test_update_preflight_blocks_base_rebase_in_progress
+  run_test test_sync_pulls_base_then_updates_tasks
+  run_test test_sync_repo_scope_limits_pull_and_update
+  run_test test_sync_no_tasks_fails_before_pull
+  run_test test_sync_update_preflight_failure_blocks_pull
+  run_test test_sync_rejects_unexpected_positional_arg
   run_test test_repo_scope_limits_git_commands_to_one_repo
   run_test test_land_preflight_blocks_all_repos_before_partial_land
   run_test test_push_supports_task_and_base_branches_after_fast_forward_merge

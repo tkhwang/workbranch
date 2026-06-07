@@ -17,6 +17,7 @@ main() {
     status) cmd_status "$@" ;;
     pull) cmd_pull "$@" ;;
     update) cmd_update "$@" ;;
+    sync) cmd_sync "$@" ;;
     push) cmd_push "$@" ;;
     land) cmd_land "$@" ;;
     remove) cmd_remove "$@" ;;

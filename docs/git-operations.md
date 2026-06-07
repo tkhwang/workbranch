@@ -18,6 +18,9 @@ Horizontal:
   update      local base  -> task
   land        task        -> local base
 
+Composite:
+  sync        remote base -> local base, then local base -> task
+
 Optional:
   push <task> task        -> remote task branch
 ```
@@ -88,6 +91,32 @@ Safety:
 - Fails before running if `_base/<repo>` is not checked out to the configured base branch.
 - Fails before running if `_base/<repo>` has a rebase in progress.
 - Conflict resolution is left to Git and the user.
+
+### `workbranch sync`
+
+Direction: remote base -> local base, then local base -> every task.
+
+For each repo, `workbranch sync` first validates that every target task workspace can be updated. If there are no task workspaces, or any target task worktree is dirty, missing, on the wrong branch, or has a rebase in progress, the command fails before pulling base branches.
+
+After update preflight passes, sync runs the same base pull behavior as `workbranch pull`:
+
+```bash
+cd _base/<repo>
+git pull --ff-only origin <base-branch>
+```
+
+Then it runs the same task rebase behavior as `workbranch update` for the task set collected before the pull:
+
+```bash
+cd <task>/<repo>
+git rebase <_base/<repo> HEAD>
+```
+
+Safety:
+
+- Fails before pulling if task updates cannot run.
+- Pull failures abort before any task update.
+- Uses existing pull and update Git operations; sync does not introduce a separate Git primitive.
 
 ### `workbranch update <task>`
 

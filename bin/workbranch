@@ -382,6 +382,7 @@ Git:
   update            Update every task workspace from local base worktrees
   update --all      Update every task workspace from local base worktrees
   update <task>     Update one task workspace from local base worktrees
+  sync              Pull base branches, then update every task workspace
   land <task>       Land task branches into base branches
   common
   --repo <repo>     Limit operation to one repo; otherwise all repos
@@ -423,6 +424,7 @@ usage_enhanced() {
   printf '  update            Update every task workspace from local base worktrees\n'
   printf '  update --all      Update every task workspace from local base worktrees\n'
   printf '  update <task>     Update one task workspace from local base worktrees\n'
+  printf '  sync              Pull base branches, then update every task workspace\n'
   printf '  land <task>       Land task branches into base branches\n'
   printf '%s  common%s\n' "$WB_GRAY" "$WB_RESET"
   printf '  --repo <repo>     Limit operation to one repo; otherwise all repos\n'
@@ -2920,10 +2922,7 @@ cmd_status() {
 }
 
 # ----- src/workbranch/commands/pull.sh -----
-cmd_pull() {
-  require_project
-  parse_repo_option "$@"
-  [ ${#ARGS[@]} -eq 0 ] || die "usage: workbranch pull [--repo <repo>]"
+run_pull() {
   reset_preflight
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
@@ -2961,6 +2960,13 @@ cmd_pull() {
     repo_log_seen=1
     i=$((i + 1))
   done
+}
+
+cmd_pull() {
+  require_project
+  parse_repo_option "$@"
+  [ ${#ARGS[@]} -eq 0 ] || die "usage: workbranch pull [--repo <repo>]"
+  run_pull
 }
 
 # ----- src/workbranch/commands/update.sh -----
@@ -3018,6 +3024,40 @@ update_task() {
   done
 }
 
+collect_update_all_tasks() {
+  tasks_to_update=()
+  for path in "$PROJECT_ROOT"/*; do
+    is_task_workspace_path "$path" || continue
+    task_name=${path##*/}
+    tasks_to_update[${#tasks_to_update[@]}]=$task_name
+  done
+  [ ${#tasks_to_update[@]} -gt 0 ] || die "no task workspaces to update"
+}
+
+preflight_update_all_tasks() {
+  reset_preflight
+  task_i=0
+  while [ $task_i -lt ${#tasks_to_update[@]} ]; do
+    preflight_update_task "${tasks_to_update[$task_i]}"
+    task_i=$((task_i + 1))
+  done
+  preflight_die_if_errors "update"
+}
+
+execute_update_all_tasks() {
+  task_i=0
+  while [ $task_i -lt ${#tasks_to_update[@]} ]; do
+    update_task "${tasks_to_update[$task_i]}"
+    task_i=$((task_i + 1))
+  done
+}
+
+run_update_all() {
+  collect_update_all_tasks
+  preflight_update_all_tasks
+  execute_update_all_tasks
+}
+
 cmd_update() {
   require_project
   parse_repo_option "$@"
@@ -3032,24 +3072,21 @@ cmd_update() {
     return 0
   fi
 
-  found=0
-  tasks_to_update=()
-  reset_preflight
-  for path in "$PROJECT_ROOT"/*; do
-    is_task_workspace_path "$path" || continue
-    found=1
-    task_name=${path##*/}
-    tasks_to_update[${#tasks_to_update[@]}]=$task_name
-    preflight_update_task "$task_name"
-  done
-  [ $found -eq 1 ] || die "no task workspaces to update"
-  preflight_die_if_errors "update"
+  run_update_all
+}
 
-  task_i=0
-  while [ $task_i -lt ${#tasks_to_update[@]} ]; do
-    update_task "${tasks_to_update[$task_i]}"
-    task_i=$((task_i + 1))
-  done
+# ----- src/workbranch/commands/sync.sh -----
+cmd_sync() {
+  require_project
+  parse_repo_option "$@"
+  [ ${#ARGS[@]} -eq 0 ] || die "usage: workbranch sync [--repo <repo>]"
+  collect_update_all_tasks
+  preflight_update_all_tasks
+  section "Pulling base branches"
+  run_pull
+  printf '\n'
+  section "Updating task workspaces"
+  execute_update_all_tasks
 }
 
 # ----- src/workbranch/commands/push.sh -----
@@ -3434,7 +3471,7 @@ cmd_complete_repos() {
 }
 
 cmd_complete_commands() {
-  printf '%s\n' add completion config finder help ide init land list path pull push remove status terminal update version
+  printf '%s\n' add completion config finder help ide init land list path pull push remove status sync terminal update version
 }
 
 print_completion_bash() {
@@ -3476,7 +3513,7 @@ _workbranch() {
         config) words='--rewrite' ;;
         remove) words='--force' ;;
         update) words='--all --repo' ;;
-        status|pull|push|land|path|finder|ide|terminal) words='--repo' ;;
+        status|pull|push|land|sync|path|finder|ide|terminal) words='--repo' ;;
         *) words='' ;;
       esac
       COMPREPLY=( $(compgen -W "$words" -- "$cur") )
@@ -3528,7 +3565,7 @@ _workbranch() {
       config) flags=(--rewrite) ;;
       remove) flags=(--force) ;;
       update) flags=(--all --repo) ;;
-      status|pull|push|land|path|finder|ide|terminal) flags=(--repo) ;;
+      status|pull|push|land|sync|path|finder|ide|terminal) flags=(--repo) ;;
       *) flags=() ;;
     esac
     _describe 'option' flags
@@ -3602,6 +3639,7 @@ complete -c workbranch -n '__workbranch_seen_command status' -l repo -d 'Limit o
 complete -c workbranch -n '__workbranch_seen_command pull' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command push' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command land' -l repo -d 'Limit operation to one repo'
+complete -c workbranch -n '__workbranch_seen_command sync' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command path' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command finder' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command ide' -l repo -d 'Limit operation to one repo'
@@ -3639,6 +3677,7 @@ main() {
     status) cmd_status "$@" ;;
     pull) cmd_pull "$@" ;;
     update) cmd_update "$@" ;;
+    sync) cmd_sync "$@" ;;
     push) cmd_push "$@" ;;
     land) cmd_land "$@" ;;
     remove) cmd_remove "$@" ;;

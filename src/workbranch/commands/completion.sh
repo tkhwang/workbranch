@@ -19,7 +19,7 @@ cmd_complete_repos() {
 }
 
 cmd_complete_commands() {
-  printf '%s\n' add completion config finder help ide init land list path pull push remove status terminal update version
+  printf '%s\n' add completion config finder help ide init land list path pull push remove status sync terminal update version
 }
 
 print_completion_bash() {
@@ -61,7 +61,7 @@ _workbranch() {
         config) words='--rewrite' ;;
         remove) words='--force' ;;
         update) words='--all --repo' ;;
-        status|pull|push|land|path|finder|ide|terminal) words='--repo' ;;
+        status|pull|push|land|sync|path|finder|ide|terminal) words='--repo' ;;
         *) words='' ;;
       esac
       COMPREPLY=( $(compgen -W "$words" -- "$cur") )
@@ -113,7 +113,7 @@ _workbranch() {
       config) flags=(--rewrite) ;;
       remove) flags=(--force) ;;
       update) flags=(--all --repo) ;;
-      status|pull|push|land|path|finder|ide|terminal) flags=(--repo) ;;
+      status|pull|push|land|sync|path|finder|ide|terminal) flags=(--repo) ;;
       *) flags=() ;;
     esac
     _describe 'option' flags
@@ -187,6 +187,7 @@ complete -c workbranch -n '__workbranch_seen_command status' -l repo -d 'Limit o
 complete -c workbranch -n '__workbranch_seen_command pull' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command push' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command land' -l repo -d 'Limit operation to one repo'
+complete -c workbranch -n '__workbranch_seen_command sync' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command path' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command finder' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command ide' -l repo -d 'Limit operation to one repo'

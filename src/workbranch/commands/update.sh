@@ -52,6 +52,40 @@ update_task() {
   done
 }
 
+collect_update_all_tasks() {
+  tasks_to_update=()
+  for path in "$PROJECT_ROOT"/*; do
+    is_task_workspace_path "$path" || continue
+    task_name=${path##*/}
+    tasks_to_update[${#tasks_to_update[@]}]=$task_name
+  done
+  [ ${#tasks_to_update[@]} -gt 0 ] || die "no task workspaces to update"
+}
+
+preflight_update_all_tasks() {
+  reset_preflight
+  task_i=0
+  while [ $task_i -lt ${#tasks_to_update[@]} ]; do
+    preflight_update_task "${tasks_to_update[$task_i]}"
+    task_i=$((task_i + 1))
+  done
+  preflight_die_if_errors "update"
+}
+
+execute_update_all_tasks() {
+  task_i=0
+  while [ $task_i -lt ${#tasks_to_update[@]} ]; do
+    update_task "${tasks_to_update[$task_i]}"
+    task_i=$((task_i + 1))
+  done
+}
+
+run_update_all() {
+  collect_update_all_tasks
+  preflight_update_all_tasks
+  execute_update_all_tasks
+}
+
 cmd_update() {
   require_project
   parse_repo_option "$@"
@@ -66,22 +100,5 @@ cmd_update() {
     return 0
   fi
 
-  found=0
-  tasks_to_update=()
-  reset_preflight
-  for path in "$PROJECT_ROOT"/*; do
-    is_task_workspace_path "$path" || continue
-    found=1
-    task_name=${path##*/}
-    tasks_to_update[${#tasks_to_update[@]}]=$task_name
-    preflight_update_task "$task_name"
-  done
-  [ $found -eq 1 ] || die "no task workspaces to update"
-  preflight_die_if_errors "update"
-
-  task_i=0
-  while [ $task_i -lt ${#tasks_to_update[@]} ]; do
-    update_task "${tasks_to_update[$task_i]}"
-    task_i=$((task_i + 1))
-  done
+  run_update_all
 }

@@ -173,6 +173,7 @@ test_help_groups_commands() {
   assert_contains "$out" "update            Update every task workspace from local base worktrees"
   assert_contains "$out" "update --all      Update every task workspace from local base worktrees"
   assert_contains "$out" "update <task>     Update one task workspace from local base worktrees"
+  assert_contains "$out" "sync              Pull base branches, then update every task workspace"
   assert_contains "$out" "land <task>       Land task branches into base branches"
   assert_contains "$out" "  common"
   assert_contains "$out" "--repo <repo>     Limit operation to one repo; otherwise all repos"

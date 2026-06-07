@@ -1,7 +1,4 @@
-cmd_pull() {
-  require_project
-  parse_repo_option "$@"
-  [ ${#ARGS[@]} -eq 0 ] || die "usage: workbranch pull [--repo <repo>]"
+run_pull() {
   reset_preflight
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
@@ -39,4 +36,11 @@ cmd_pull() {
     repo_log_seen=1
     i=$((i + 1))
   done
+}
+
+cmd_pull() {
+  require_project
+  parse_repo_option "$@"
+  [ ${#ARGS[@]} -eq 0 ] || die "usage: workbranch pull [--repo <repo>]"
+  run_pull
 }
