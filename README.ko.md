@@ -35,23 +35,48 @@ Homebrew는 published release를 설치하고, curl installer는 `main`을 따�
 
 ## Quick start
 
+Base worktree clone이 끝나면 `workbranch init`이 첫 task를 추가할지 묻고, `workbranch add`와 같은 prompt flow를 진행한 다음, 마지막에 IDE와 terminal tool config를 묻습니다.
+
+### Feature flow: \_base : `main` -> feature
+
 ```bash
 workbranch init
-workbranch add
-cd feat-login/<repo>
-# task 작업
-workbranch refresh feat-login
-workbranch push feat-login
-workbranch remove feat-login
+
+workbranch add login
+# develop feat-login feature
+workbranch pull              # update base
+workbranch update feat-login # apply latest update from base
+workbranch land feat-login   # apply feature commit to base
+
+workbranch push
+```
+
+### Stacked flow : \_base: `feat/AAA` -> feature `feat/AAA-XXX`
+
+```bash
+workbranch init
+
+workbranch add feat-XXX
+# develop XXX feature
+
+workbranch pull            # update base
+workbranch update feat-XXX # apply latest update from base
+workbranch land feat-XXX   # apply feature commit to base
+
+workbranch add feat-YYY
+# develop YYY  feature
+workbranch finalize feat-YYY # same as above: pull -> update-> land
+
+workbranch push
 ```
 
 ## Task identity와 branch 이름
 
 새 task 생성은 두 값을 묻습니다.
 
-| Prompt | 예시 | 사용처 |
-| --- | --- | --- |
-| Task type | `feat` | Git branch prefix |
+| Prompt           | 예시    | 사용처               |
+| ---------------- | ------- | -------------------- |
+| Task type        | `feat`  | Git branch prefix    |
 | Task detail name | `login` | folder/branch detail |
 
 `workbranch`는 다음 값을 파생합니다.
@@ -107,51 +132,51 @@ macOS 전용: `finder`, `ide`, `terminal`, `config ide`, `config terminal`. Linu
 
 ### Workspace lifecycle
 
-| Command | 용도 |
-| --- | --- |
-| `workbranch init` | config 기준으로 base worktree 생성 또는 clone |
-| `workbranch config` | project 설정, base branch, tool command, repo setup command 수정 |
-| `workbranch config base` | base branch 설정만 수정하고 base worktree checkout |
-| `workbranch config ide` | IDE 명령만 수정 |
-| `workbranch config terminal` | terminal 명령만 수정 |
-| `workbranch add [<task>] [--from <ref>]` | task workspace 생성 |
-| `workbranch list` | repo와 task workspace 목록 확인 |
-| `workbranch remove <task>` | task worktree와 local task branch 제거 |
-| `workbranch doctor [--fix]` | project health 진단; `--fix`는 stale worktree registration만 prune |
+| Command                                  | 용도                                                               |
+| ---------------------------------------- | ------------------------------------------------------------------ |
+| `workbranch init`                        | config 기준으로 base worktree 생성 또는 clone                      |
+| `workbranch config`                      | project 설정, base branch, tool command, repo setup command 수정   |
+| `workbranch config base`                 | base branch 설정만 수정하고 base worktree checkout                 |
+| `workbranch config ide`                  | IDE 명령만 수정                                                    |
+| `workbranch config terminal`             | terminal 명령만 수정                                               |
+| `workbranch add [<task>] [--from <ref>]` | task workspace 생성                                                |
+| `workbranch list`                        | repo와 task workspace 목록 확인                                    |
+| `workbranch remove <task>`               | task worktree와 local task branch 제거                             |
+| `workbranch doctor [--fix]`              | project health 진단; `--fix`는 stale worktree registration만 prune |
 
 ### Branch workflow
 
-| Command | 용도 |
-| --- | --- |
-| `workbranch status` | base remote diff, task diff, dirty state 확인 |
-| `workbranch pull` | remote base branch를 `_base/<repo>`로 pull |
-| `workbranch update [task]` | local base 변경사항을 task worktree에 merge |
-| `workbranch push` | base branch push |
-| `workbranch push <task>` | task branch push |
-| `workbranch land <task>` | task 작업을 local base branch로 fast-forward 반영 |
+| Command                    | 용도                                              |
+| -------------------------- | ------------------------------------------------- |
+| `workbranch status`        | base remote diff, task diff, dirty state 확인     |
+| `workbranch pull`          | remote base branch를 `_base/<repo>`로 pull        |
+| `workbranch update [task]` | local base 변경사항을 task worktree에 rebase (`git rebase <_base/repo HEAD>`) |
+| `workbranch push`          | base branch push                                  |
+| `workbranch push <task>`   | task branch push                                  |
+| `workbranch land <task>`   | task 작업을 local base branch로 fast-forward 반영 |
 
 ### Combined flow
 
-| Command | 용도 |
-| --- | --- |
-| `workbranch refresh` | base branch를 pull한 뒤 모든 task workspace update |
-| `workbranch refresh <task>` | base branch를 pull한 뒤 하나의 task workspace update |
+| Command                      | 용도                                                                      |
+| ---------------------------- | ------------------------------------------------------------------------- |
+| `workbranch refresh`         | base branch를 pull한 뒤 모든 task workspace update                        |
+| `workbranch refresh <task>`  | base branch를 pull한 뒤 하나의 task workspace update                      |
 | `workbranch finalize <task>` | base branch를 pull하고 하나의 task를 update한 뒤 local base branch로 반영 |
-| `workbranch prune` | local base branch에 이미 merge된 clean task workspace 정리 |
+| `workbranch prune`           | local base branch에 이미 merge된 clean task workspace 정리                |
 
 ### Tool commands
 
-| Command | 용도 |
-| --- | --- |
-| `workbranch path <task>` | task workspace 또는 repo 경로 출력 |
-| `workbranch finder <task>` | Finder로 task workspace folder 열기 |
-| `workbranch ide <task>` | 설정된 IDE로 task repo worktree 열기 |
+| Command                      | 용도                                      |
+| ---------------------------- | ----------------------------------------- |
+| `workbranch path <task>`     | task workspace 또는 repo 경로 출력        |
+| `workbranch finder <task>`   | Finder로 task workspace folder 열기       |
+| `workbranch ide <task>`      | 설정된 IDE로 task repo worktree 열기      |
 | `workbranch terminal <task>` | 설정된 terminal로 task repo worktree 열기 |
 
 ### Other
 
-| Command | 용도 |
-| --- | --- |
+| Command         | 용도                |
+| --------------- | ------------------- |
 | `workbranch -v` | 설치된 version 확인 |
 
 지원되는 Branch workflow 및 Tool 명령에 `--repo <repo>`를 붙이면 특정 repo 하나만 대상으로 실행합니다.

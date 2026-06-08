@@ -43,9 +43,11 @@ AFTER
   validate_safe_name "MAIN_WORKTREES_DIR" "$BASE_DIR"
   BRANCH_PREFIX="feature"
 
-  printf '
+  if [ "$clone_after" != "yes" ]; then
+    printf '
 ' >&2
-  configure_tool_prompts_if_macos
+    configure_tool_prompts_if_macos
+  fi
 
   printf '
 ' >&2
@@ -77,17 +79,19 @@ AFTER
   section "Summary"
   info "Project: $PROJECT_NAME"
   info "Main worktrees dir: $BASE_DIR"
-  info "IDE:"
-  if [ -n "$IDE_COMMAND" ]; then
-    info "  $IDE_COMMAND"
-  else
-    info "  (none)"
-  fi
-  info "Terminal:"
-  if [ -n "$TERMINAL_COMMAND" ]; then
-    info "  $TERMINAL_COMMAND"
-  else
-    info "  (none)"
+  if [ "$clone_after" != "yes" ]; then
+    info "IDE:"
+    if [ -n "$IDE_COMMAND" ]; then
+      info "  $IDE_COMMAND"
+    else
+      info "  (none)"
+    fi
+    info "Terminal:"
+    if [ -n "$TERMINAL_COMMAND" ]; then
+      info "  $TERMINAL_COMMAND"
+    else
+      info "  (none)"
+    fi
   fi
   info "Repositories:"
   i=0
@@ -129,9 +133,53 @@ AFTER
   if [ "$clone_after" = "yes" ]; then
     clone_base_repos
     success "Initialized workbranch project: $PROJECT_ROOT"
+    prompt_add_first_task_after_init || return 1
+    prompt_tool_config_after_init
   else
     success "Config written: $CONFIG_FILE"
   fi
+}
+
+prompt_add_first_task_after_init() {
+  local answer status
+  printf '\n' >&2
+  answer=$(prompt_read "[*] Add your first task now? [Y/n]: ")
+  status=$?
+  if [ "$status" -ne 0 ]; then
+    return 0
+  fi
+  case "$answer" in
+    n|N|no|NO|cancel|CANCEL|c|C)
+      info "Create one later with: workbranch add"
+      return 0
+      ;;
+  esac
+
+  (
+    cd "$PROJECT_ROOT" || exit 1
+    cmd_add
+  )
+}
+
+prompt_tool_config_after_init() {
+  local status
+  printf '\n' >&2
+  section "Tool config"
+  if ! is_macos_platform; then
+    info_skip_tool_prompts_for_platform
+    return 0
+  fi
+
+  configure_ide_prompt yes
+  status=$?
+  [ "$status" -eq 2 ] && return 0
+
+  configure_terminal_prompt yes
+  status=$?
+  [ "$status" -ne 0 ] && [ "$status" -ne 2 ] && return "$status"
+
+  write_config "$CONFIG_FILE"
+  success "Config updated: $CONFIG_FILE"
 }
 
 cmd_init() {

@@ -10,8 +10,6 @@ test_interactive_init_writes_config_and_clones() {
 .
 fullstack
 _base
-
-
 frontend
 $frontend_remote
 master
@@ -23,6 +21,9 @@ $backend_remote
 
 n
 Y
+n
+2
+2
 INPUT
 )
   out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" init)
@@ -71,6 +72,14 @@ INPUT
   assert_contains "$out" "[*] Project"
   assert_contains "$out" "[*] Repo #1"
   assert_contains "$out" "[*] Repo #2"
+  case "$out" in
+    *"[*] Repo #1"*"[*] IDE command:"*) ;;
+    *) fail "expected IDE prompt after repo setup; got: $out" ;;
+  esac
+  case "$out" in
+    *"[+] Initialized"*"[*] Add your first task now? [Y/n]:"*"[*] IDE command:"*"[*] Terminal command:"*) ;;
+    *) fail "expected init order: base clone, add first task prompt, then tool config; got: $out" ;;
+  esac
   assert_not_contains "$out" "[*] Task setup command"
   assert_not_contains "$out" "[*] Task setup:"
   assert_contains "$out" "[*] Summary"
@@ -79,10 +88,93 @@ INPUT
   project="$TMP_ROOT/work/fullstack"
   assert_file "$project/.workbranch.config"
   assert_contains "$(cat "$project/.workbranch.config")" "BRANCH_PREFIX feature"
+  assert_contains "$(cat "$project/.workbranch.config")" 'IDE open -na "Antigravity IDE" --args --new-window'
+  assert_contains "$(cat "$project/.workbranch.config")" "TERMINAL open -a Warp"
   assert_contains "$(cat "$project/.workbranch.config")" "REPO frontend $frontend_remote master"
   assert_contains "$(cat "$project/.workbranch.config")" "REPO backend $backend_remote master"
   assert_dir "$project/_base/frontend/.git"
   assert_dir "$project/_base/backend/.git"
+}
+
+test_interactive_init_can_add_first_task_after_cloning() {
+  TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
+  mkdir -p "$TMP_ROOT/remotes" "$TMP_ROOT/seeds" "$TMP_ROOT/work"
+  frontend_remote=$(make_repo frontend)
+  backend_remote=$(make_repo backend)
+  input=$(cat <<INPUT
+
+.
+fullstack
+_base
+frontend
+$frontend_remote
+master
+
+Y
+backend
+$backend_remote
+
+
+n
+Y
+
+feat
+login
+
+
+2
+2
+INPUT
+)
+  out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" init)
+  project="$TMP_ROOT/work/fullstack"
+
+  assert_contains "$out" "[+] Initialized"
+  assert_contains "$out" "[*] Add your first task now? [Y/n]:"
+  assert_contains "$out" "Task folder: feat-login"
+  assert_contains "$out" "Created: feat-login/frontend"
+  assert_contains "$out" "Created: feat-login/backend"
+  case "$out" in
+    *"Created: feat-login/backend"*"[*] IDE command:"*"[*] Terminal command:"*) ;;
+    *) fail "expected tool config after first task creation; got: $out" ;;
+  esac
+  assert_file "$project/.workbranch.config"
+  assert_contains "$(cat "$project/.workbranch.config")" 'IDE open -na "Antigravity IDE" --args --new-window'
+  assert_contains "$(cat "$project/.workbranch.config")" "TERMINAL open -a Warp"
+  assert_dir "$project/_base/frontend/.git"
+  assert_dir "$project/_base/backend/.git"
+  assert_branch "$project/feat-login/frontend" "feat/login"
+  assert_branch "$project/feat-login/backend" "feat/login"
+}
+
+test_interactive_init_persists_ide_when_terminal_prompt_eofs() {
+  TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
+  mkdir -p "$TMP_ROOT/remotes" "$TMP_ROOT/seeds" "$TMP_ROOT/work"
+  frontend_remote=$(make_repo frontend)
+  input=$(cat <<INPUT
+
+.
+fullstack
+_base
+frontend
+$frontend_remote
+master
+
+n
+Y
+n
+2
+INPUT
+)
+  out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" init)
+  project="$TMP_ROOT/work/fullstack"
+
+  assert_contains "$out" "[*] IDE command:"
+  assert_contains "$out" "[*] Terminal command:"
+  assert_file "$project/.workbranch.config"
+  config=$(cat "$project/.workbranch.config")
+  assert_contains "$config" 'IDE open -na "Antigravity IDE" --args --new-window'
+  assert_not_contains "$config" "TERMINAL "
 }
 
 test_interactive_init_does_not_prompt_for_task_branch_prefix() {
@@ -94,14 +186,15 @@ test_interactive_init_does_not_prompt_for_task_branch_prefix() {
 .
 fullstack
 _base
-
-
 frontend
 $frontend_remote
 master
 
 n
 Y
+n
+
+
 INPUT
 )
   out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" init)
@@ -149,14 +242,15 @@ test_interactive_init_can_create_project_in_custom_target_directory() {
 $TMP_ROOT/target
 fullstack
 _base
-
-
 frontend
 $frontend_remote
 master
 
 n
 Y
+n
+
+
 INPUT
 )
   out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" init)
@@ -176,14 +270,15 @@ test_interactive_init_accepts_slash_repo_base_branch() {
 .
 fullstack
 _base
-
-
 frontend
 $frontend_remote
 feature/cpq
 
 n
 Y
+n
+
+
 INPUT
 )
   out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" init)
@@ -259,6 +354,7 @@ master
 
 n
 Y
+n
 INPUT
 )
   out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | WORKBRANCH_TEST_PLATFORM=wsl run_expect_success "$WORKBRANCH" init)

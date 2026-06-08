@@ -127,10 +127,15 @@ print_config_next_steps() {
   done
 }
 
+# shellcheck disable=SC2120 # optional allow_eof argument is passed from init.sh in generated build
 configure_ide_prompt() {
+  allow_eof=${1:-no}
   print_ide_presets
   current=${IDE_COMMAND:-keep}
-  value=$(prompt_read "[*] Choose IDE [$current]: ") || die "input aborted"
+  if ! value=$(prompt_read "[*] Choose IDE [$current]: "); then
+    [ "$allow_eof" = "yes" ] && return 2
+    die "input aborted"
+  fi
   case "$value" in
     "") ;;
     1|2|3|4|5|6|7) set_ide_command "$(ide_preset_command "$value")" ;;
@@ -143,10 +148,15 @@ configure_ide_prompt() {
   esac
 }
 
+# shellcheck disable=SC2120 # optional allow_eof argument is passed from init.sh in generated build
 configure_terminal_prompt() {
+  allow_eof=${1:-no}
   print_terminal_presets
   current=${TERMINAL_COMMAND:-keep}
-  value=$(prompt_read "[*] Choose terminal [$current]: ") || die "input aborted"
+  if ! value=$(prompt_read "[*] Choose terminal [$current]: "); then
+    [ "$allow_eof" = "yes" ] && return 2
+    die "input aborted"
+  fi
   case "$value" in
     "") ;;
     1|2|3|4) set_terminal_command "$(terminal_preset_command "$value")" ;;
