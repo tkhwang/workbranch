@@ -71,15 +71,29 @@ Single-repo 프로젝트도 같은 구조를 사용하며, 각 task 안에 repo 
 | `workbranch add [<task>]` | task workspace 생성 |
 | `workbranch list` | repo와 task workspace 목록 확인 |
 | `workbranch status` | base remote diff, task diff, dirty state 확인 |
-| `workbranch refresh [task]` | base branch를 pull한 뒤 task workspace update |
 | `workbranch land <task>` | task 작업을 local base branch로 fast-forward 반영 |
 | `workbranch push [task]` | base 또는 task branch push |
 | `workbranch path <task>` | task workspace 또는 repo 경로 출력 |
+
+Combined flow shortcut:
+
+| Command | 용도 |
+| ------- | ---- |
+| `workbranch refresh [task]` | base branch를 pull한 뒤 task workspace update |
+| `workbranch finalize <task>` | base branch를 pull하고 하나의 task를 update한 뒤 land |
+| `workbranch prune` | local base branch에 이미 merge된 clean task workspace 정리 |
+
+## Multi-repo AI agent workflow
+
+multi-repo 제품에서는 agent가 필요한 모든 repo를 하나의 task workspace 안에 모아둘 수 있습니다. 서로 다른 clone이나 관련 없는 worktree를 오가게 하는 것보다 AI agent session을 시작하고, 확인하고, 정리하기 쉽습니다.
+
+multi-repo에서의 장점은 [AI agent workflow](docs/ai-agents.ko.md)를 참고하세요.
 
 ## More docs
 
 - [Task identity와 branch 이름](docs/task-identity.ko.md)
 - [Usage details](docs/usage.ko.md)
+- [AI agent workflow](docs/ai-agents.ko.md)
 - [Architecture](docs/architecture.md)
 - [Git operations](docs/git-operations.md)
 - [MVP spec](docs/specs/0001-workbranch-mvp.md)

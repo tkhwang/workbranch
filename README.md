@@ -71,15 +71,29 @@ Single-repo projects use the same shape with one repo directory inside each task
 | `workbranch add [<task>]` | Create a task workspace |
 | `workbranch list` | Show repos and task workspaces |
 | `workbranch status` | Show base remote diff, task diff, and dirty state |
-| `workbranch refresh [task]` | Pull base branches, then update task workspaces |
 | `workbranch land <task>` | Fast-forward task work back into local base branches |
 | `workbranch push [task]` | Push base or task branches |
 | `workbranch path <task>` | Print a task workspace or repo path |
+
+Combined flow shortcuts:
+
+| Command | Use it to |
+| ------- | --------- |
+| `workbranch refresh [task]` | Pull base branches, then update task workspaces |
+| `workbranch finalize <task>` | Pull base branches, update one task, then land it |
+| `workbranch prune` | Remove clean task workspaces already merged into local base branches |
+
+## Multi-repo AI agent workflows
+
+For multi-repo products, `workbranch` gives each task one shared workspace containing every repo the agent needs. That makes AI-agent sessions easier to start, inspect, and clean up than juggling separate clones or unrelated worktrees.
+
+See [AI agent workflows](docs/ai-agents.md) for the multi-repo benefits.
 
 ## More docs
 
 - [Task identity and branch names](docs/task-identity.md)
 - [Usage details](docs/usage.md)
+- [AI agent workflows](docs/ai-agents.md)
 - [Architecture](docs/architecture.md)
 - [Git operations](docs/git-operations.md)
 - [MVP spec](docs/specs/0001-workbranch-mvp.md)
