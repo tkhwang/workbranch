@@ -35,23 +35,48 @@ Homebrew installs published releases. The curl installer tracks `main`.
 
 ## Quick start
 
+After cloning the base worktrees, `workbranch init` asks whether to add your first task, walks through the same prompts as `workbranch add`, then finishes with IDE and terminal tool config.
+
+### Feature flow: \_base : `main` -> feature
+
 ```bash
 workbranch init
-workbranch add
-cd feat-login/<repo>
-# work on the task
-workbranch refresh feat-login
-workbranch push feat-login
-workbranch remove feat-login
+
+workbranch add login
+# develop feat-login feature
+workbranch pull              # update base
+workbranch update feat-login # apply latest update from base
+workbranch land feat-login   # apply feature commit to base
+
+workbranch push
+```
+
+### Stacked flow : \_base: `feat/AAA` -> feature `feat/AAA-XXX`
+
+```bash
+workbranch init
+
+workbranch add XXX
+# develop XXX feature
+
+workbranch pull                # update base
+workbranch update feat-AAA-XXX # apply latest update from base
+workbranch land feat-AAA-XXX   # apply feature commit to base
+
+workbranch add YYY
+# develop YYY  feature
+workbranch finalize feat-AAA-YYY # same as above: pull -> update-> land
+
+workbranch push
 ```
 
 ## Task identity and branch names
 
 New task creation asks for two values:
 
-| Prompt | Example | Used for |
-| --- | --- | --- |
-| Task type | `feat` | Git branch prefix |
+| Prompt           | Example | Used for             |
+| ---------------- | ------- | -------------------- |
+| Task type        | `feat`  | Git branch prefix    |
 | Task detail name | `login` | Folder/branch detail |
 
 `workbranch` derives:
@@ -107,51 +132,51 @@ macOS-only: `finder`, `ide`, `terminal`, `config ide`, and `config terminal`. On
 
 ### Workspace lifecycle
 
-| Command | Use it to |
-| --- | --- |
-| `workbranch init` | Create or clone base worktrees from config |
-| `workbranch config` | Edit project settings, base branches, tool commands, and repo setup commands |
-| `workbranch config base` | Update only base branch settings and checkout base worktrees |
-| `workbranch config ide` | Update only the configured IDE command |
-| `workbranch config terminal` | Update only the configured terminal command |
-| `workbranch add [<task>] [--from <ref>]` | Create a task workspace |
-| `workbranch list` | Show repos and task workspaces |
-| `workbranch remove <task>` | Remove task worktrees and local task branches |
-| `workbranch doctor [--fix]` | Diagnose project health; `--fix` prunes stale worktree registrations only |
+| Command                                  | Use it to                                                                    |
+| ---------------------------------------- | ---------------------------------------------------------------------------- |
+| `workbranch init`                        | Create or clone base worktrees from config                                   |
+| `workbranch config`                      | Edit project settings, base branches, tool commands, and repo setup commands |
+| `workbranch config base`                 | Update only base branch settings and checkout base worktrees                 |
+| `workbranch config ide`                  | Update only the configured IDE command                                       |
+| `workbranch config terminal`             | Update only the configured terminal command                                  |
+| `workbranch add [<task>] [--from <ref>]` | Create a task workspace                                                      |
+| `workbranch list`                        | Show repos and task workspaces                                               |
+| `workbranch remove <task>`               | Remove task worktrees and local task branches                                |
+| `workbranch doctor [--fix]`              | Diagnose project health; `--fix` prunes stale worktree registrations only    |
 
 ### Branch workflow
 
-| Command | Use it to |
-| --- | --- |
-| `workbranch status` | Show base remote diff, task diff, and dirty state |
-| `workbranch pull` | Pull remote base branches into `_base/<repo>` |
-| `workbranch update [task]` | Merge local base changes into task worktrees |
-| `workbranch push` | Push base branches |
-| `workbranch push <task>` | Push task branches |
-| `workbranch land <task>` | Fast-forward task work back into local base branches |
+| Command                    | Use it to                                            |
+| -------------------------- | ---------------------------------------------------- |
+| `workbranch status`        | Show base remote diff, task diff, and dirty state    |
+| `workbranch pull`          | Pull remote base branches into `_base/<repo>`        |
+| `workbranch update [task]` | Merge local base changes into task worktrees         |
+| `workbranch push`          | Push base branches                                   |
+| `workbranch push <task>`   | Push task branches                                   |
+| `workbranch land <task>`   | Fast-forward task work back into local base branches |
 
 ### Combined flow
 
-| Command | Use it to |
-| --- | --- |
-| `workbranch refresh` | Pull base branches, then update every task workspace |
-| `workbranch refresh <task>` | Pull base branches, then update one task workspace |
+| Command                      | Use it to                                                                  |
+| ---------------------------- | -------------------------------------------------------------------------- |
+| `workbranch refresh`         | Pull base branches, then update every task workspace                       |
+| `workbranch refresh <task>`  | Pull base branches, then update one task workspace                         |
 | `workbranch finalize <task>` | Pull base branches, update one task, then land it into local base branches |
-| `workbranch prune` | Remove clean task workspaces already merged into local base branches |
+| `workbranch prune`           | Remove clean task workspaces already merged into local base branches       |
 
 ### Tool commands
 
-| Command | Use it to |
-| --- | --- |
-| `workbranch path <task>` | Print a task workspace or repo path |
-| `workbranch finder <task>` | Open the task workspace folder in Finder |
-| `workbranch ide <task>` | Open task repo worktrees in the configured IDE |
+| Command                      | Use it to                                           |
+| ---------------------------- | --------------------------------------------------- |
+| `workbranch path <task>`     | Print a task workspace or repo path                 |
+| `workbranch finder <task>`   | Open the task workspace folder in Finder            |
+| `workbranch ide <task>`      | Open task repo worktrees in the configured IDE      |
 | `workbranch terminal <task>` | Open task repo worktrees in the configured terminal |
 
 ### Other
 
-| Command | Use it to |
-| --- | --- |
+| Command         | Use it to                  |
+| --------------- | -------------------------- |
 | `workbranch -v` | Show the installed version |
 
 Add `--repo <repo>` to supported Branch workflow and Tool commands when you want to operate on one repo only.

@@ -125,9 +125,9 @@ If no config exists, run interactive config setup:
 1. Ask for target directory, default `.`.
 2. Ask for project name, default `fullstack`.
 3. Ask for main worktrees directory, default `_base`.
-4. Ask for optional IDE and terminal commands from presets or custom input.
-5. Explain that new tasks are created with `workbranch add`, which asks for task type and detail name, derives folder `type-detail`, then suggests each repo's task branch from that repo's configured base branch.
-6. Ask for one or more repos: name, Git URL, base branch for this repo, and optional repo-level setup command.
+4. Explain that new tasks are created with `workbranch add`, which asks for task type and detail name, derives folder `type-detail`, then suggests each repo's task branch from that repo's configured base branch.
+5. Ask for one or more repos: name, Git URL, base branch for this repo, and optional repo-level setup command.
+6. For config-only setup, ask for optional IDE and terminal commands from presets or custom input.
 7. Write `.workbranch.config` with `BRANCH_PREFIX feature` retained as a compatibility default.
 
 ### `workbranch init`
@@ -135,7 +135,7 @@ If no config exists, run interactive config setup:
 Initialize main worktrees from config.
 
 - If `.workbranch.config` exists in the current directory, read it and clone each repo into `_base/<repo>` on its base repo branch. Legacy `.tasktree.config` / `.monotree.config` are also accepted by `workbranch init` and can be rewritten with `workbranch config`.
-- If `.workbranch.config` does not exist, run the same interactive setup as `workbranch config`, then clone repos.
+- If `.workbranch.config` does not exist, run interactive setup, then clone repos. After successful cloning from this interactive setup, ask whether to add the first task. Accepting enters the same task creation flow as `workbranch add`; EOF or a declined answer leaves the initialized project without creating a task. After the first-task prompt or task creation finishes, ask for optional IDE and terminal commands from presets or custom input and rewrite `.workbranch.config` with those tool settings.
 - If cloning fails, remove paths created by the failed command.
 
 ### `workbranch path <task>`
