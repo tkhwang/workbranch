@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.1](https://github.com/tkhwang/workbranch/compare/v1.9.0...v1.9.1) (2026-06-08)
+
+
+### Bug Fixes
+
+* **init:** handle terminal prompt EOF during init ([edd0efe](https://github.com/tkhwang/workbranch/commit/edd0efe69ec0c8b7e4849f09a7f476c9ec5caf6c)), closes [#123](https://github.com/tkhwang/workbranch/issues/123)
+
 ## [1.9.0](https://github.com/tkhwang/workbranch/compare/v1.8.0...v1.9.0) (2026-06-07)
 
 
