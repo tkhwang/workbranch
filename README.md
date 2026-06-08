@@ -65,25 +65,31 @@ Single-repo projects use the same shape with one repo directory inside each task
 
 ## Common commands
 
-| Command | Use it to |
-| ------- | --------- |
-| `workbranch init` | Create or clone base worktrees from config |
-| `workbranch add [<task>]` | Create a task workspace |
-| `workbranch list` | Show repos and task workspaces |
-| `workbranch status` | Show base remote diff, task diff, and dirty state |
-| `workbranch land <task>` | Fast-forward task work back into local base branches |
-| `workbranch push [task]` | Push base or task branches |
-| `workbranch path <task>` | Print a task workspace or repo path |
+| Command                   | Use it to                                            |
+| ------------------------- | ---------------------------------------------------- |
+| `workbranch init`         | Create or clone base worktrees from config           |
+| `workbranch add [<task>]` | Create a task workspace                              |
+| `workbranch list`         | Show repos and task workspaces                       |
+| `workbranch status`       | Show base remote diff, task diff, and dirty state    |
+| `workbranch land <task>`  | Fast-forward task work back into local base branches |
+| `workbranch push [task]`  | Push base or task branches                           |
+| `workbranch path <task>`  | Print a task workspace or repo path                  |
 
 Combined flow shortcuts:
 
-| Command | Use it to |
-| ------- | --------- |
-| `workbranch refresh [task]` | Pull base branches, then update task workspaces |
-| `workbranch finalize <task>` | Pull base branches, update one task, then land it |
-| `workbranch prune` | Remove clean task workspaces already merged into local base branches |
+| Command                      | Use it to                                                            |
+| ---------------------------- | -------------------------------------------------------------------- |
+| `workbranch refresh [task]`  | Pull base branches, then update task workspaces                      |
+| `workbranch finalize <task>` | Pull base branches, update one task, then land it                    |
+| `workbranch prune`           | Remove clean task workspaces already merged into local base branches |
 
 ## Multi-repo AI agent workflows
+
+```
+└── feat-login      // run AI agent here!!!
+    ├── frontend
+    └── backend
+```
 
 For multi-repo products, `workbranch` gives each task one shared workspace containing every repo the agent needs. That makes AI-agent sessions easier to start, inspect, and clean up than juggling separate clones or unrelated worktrees.
 

@@ -4,6 +4,12 @@
 
 `workbranch` is useful for AI-agent work when one product change spans multiple repos.
 
+```
+└── feat-login      // run AI agent here!!!
+    ├── frontend
+    └── backend
+```
+
 ## Why multi-repo workspaces help
 
 - One task folder contains every repo needed for the change, so an agent can inspect frontend, backend, shared libraries, and docs together.
