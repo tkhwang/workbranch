@@ -176,7 +176,7 @@ prompt_tool_config_after_init() {
 
   configure_terminal_prompt yes
   status=$?
-  [ "$status" -eq 2 ] && return 0
+  [ "$status" -ne 0 ] && [ "$status" -ne 2 ] && return "$status"
 
   write_config "$CONFIG_FILE"
   success "Config updated: $CONFIG_FILE"

@@ -127,6 +127,7 @@ print_config_next_steps() {
   done
 }
 
+# shellcheck disable=SC2120 # optional allow_eof argument is passed from init.sh in generated build
 configure_ide_prompt() {
   allow_eof=${1:-no}
   print_ide_presets
@@ -147,6 +148,7 @@ configure_ide_prompt() {
   esac
 }
 
+# shellcheck disable=SC2120 # optional allow_eof argument is passed from init.sh in generated build
 configure_terminal_prompt() {
   allow_eof=${1:-no}
   print_terminal_presets

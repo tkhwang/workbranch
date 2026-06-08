@@ -56,16 +56,16 @@ workbranch push
 ```bash
 workbranch init
 
-workbranch add XXX
+workbranch add feat-XXX
 # develop XXX feature
 
-workbranch pull                # update base
-workbranch update feat-AAA-XXX # apply latest update from base
-workbranch land feat-AAA-XXX   # apply feature commit to base
+workbranch pull            # update base
+workbranch update feat-XXX # apply latest update from base
+workbranch land feat-XXX   # apply feature commit to base
 
-workbranch add YYY
+workbranch add feat-YYY
 # develop YYY  feature
-workbranch finalize feat-AAA-YYY # same as above: pull -> update-> land
+workbranch finalize feat-YYY # same as above: pull -> update-> land
 
 workbranch push
 ```
@@ -150,7 +150,7 @@ macOS 전용: `finder`, `ide`, `terminal`, `config ide`, `config terminal`. Linu
 | -------------------------- | ------------------------------------------------- |
 | `workbranch status`        | base remote diff, task diff, dirty state 확인     |
 | `workbranch pull`          | remote base branch를 `_base/<repo>`로 pull        |
-| `workbranch update [task]` | local base 변경사항을 task worktree에 merge       |
+| `workbranch update [task]` | local base 변경사항을 task worktree에 rebase (`git rebase <_base/repo HEAD>`) |
 | `workbranch push`          | base branch push                                  |
 | `workbranch push <task>`   | task branch push                                  |
 | `workbranch land <task>`   | task 작업을 local base branch로 fast-forward 반영 |

@@ -56,16 +56,16 @@ workbranch push
 ```bash
 workbranch init
 
-workbranch add XXX
+workbranch add feat-XXX
 # develop XXX feature
 
-workbranch pull                # update base
-workbranch update feat-AAA-XXX # apply latest update from base
-workbranch land feat-AAA-XXX   # apply feature commit to base
+workbranch pull            # update base
+workbranch update feat-XXX # apply latest update from base
+workbranch land feat-XXX   # apply feature commit to base
 
-workbranch add YYY
+workbranch add feat-YYY
 # develop YYY  feature
-workbranch finalize feat-AAA-YYY # same as above: pull -> update-> land
+workbranch finalize feat-YYY # same as above: pull -> update-> land
 
 workbranch push
 ```
@@ -150,7 +150,7 @@ macOS-only: `finder`, `ide`, `terminal`, `config ide`, and `config terminal`. On
 | -------------------------- | ---------------------------------------------------- |
 | `workbranch status`        | Show base remote diff, task diff, and dirty state    |
 | `workbranch pull`          | Pull remote base branches into `_base/<repo>`        |
-| `workbranch update [task]` | Merge local base changes into task worktrees         |
+| `workbranch update [task]` | Rebase task worktrees onto local base (`git rebase <_base/repo HEAD>`) |
 | `workbranch push`          | Push base branches                                   |
 | `workbranch push <task>`   | Push task branches                                   |
 | `workbranch land <task>`   | Fast-forward task work back into local base branches |

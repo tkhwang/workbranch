@@ -2227,6 +2227,7 @@ print_config_next_steps() {
   done
 }
 
+# shellcheck disable=SC2120 # optional allow_eof argument is passed from init.sh in generated build
 configure_ide_prompt() {
   allow_eof=${1:-no}
   print_ide_presets
@@ -2247,6 +2248,7 @@ configure_ide_prompt() {
   esac
 }
 
+# shellcheck disable=SC2120 # optional allow_eof argument is passed from init.sh in generated build
 configure_terminal_prompt() {
   allow_eof=${1:-no}
   print_terminal_presets
@@ -2641,7 +2643,7 @@ prompt_tool_config_after_init() {
 
   configure_terminal_prompt yes
   status=$?
-  [ "$status" -eq 2 ] && return 0
+  [ "$status" -ne 0 ] && [ "$status" -ne 2 ] && return "$status"
 
   write_config "$CONFIG_FILE"
   success "Config updated: $CONFIG_FILE"

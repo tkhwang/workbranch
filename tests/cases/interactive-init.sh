@@ -147,6 +147,36 @@ INPUT
   assert_branch "$project/feat-login/backend" "feat/login"
 }
 
+test_interactive_init_persists_ide_when_terminal_prompt_eofs() {
+  TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
+  mkdir -p "$TMP_ROOT/remotes" "$TMP_ROOT/seeds" "$TMP_ROOT/work"
+  frontend_remote=$(make_repo frontend)
+  input=$(cat <<INPUT
+
+.
+fullstack
+_base
+frontend
+$frontend_remote
+master
+
+n
+Y
+n
+2
+INPUT
+)
+  out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" init)
+  project="$TMP_ROOT/work/fullstack"
+
+  assert_contains "$out" "[*] IDE command:"
+  assert_contains "$out" "[*] Terminal command:"
+  assert_file "$project/.workbranch.config"
+  config=$(cat "$project/.workbranch.config")
+  assert_contains "$config" 'IDE open -na "Antigravity IDE" --args --new-window'
+  assert_not_contains "$config" "TERMINAL "
+}
+
 test_interactive_init_does_not_prompt_for_task_branch_prefix() {
   TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
   mkdir -p "$TMP_ROOT/remotes" "$TMP_ROOT/seeds" "$TMP_ROOT/work"
