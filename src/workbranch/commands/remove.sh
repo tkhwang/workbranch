@@ -23,6 +23,11 @@ cmd_remove() {
     branch=$(repo_task_branch_at "$i" "$task")
     base=$(base_repo_path "$name")
     label="$task/$name"
+    if [ ! -d "$base/.git" ] && [ ! -f "$base/.git" ]; then
+      preflight_error "$BASE_DIR/$name missing git repo"
+      i=$((i + 1))
+      continue
+    fi
     if [ -d "$path/.git" ] || [ -f "$path/.git" ]; then
       preflight_require_current_branch "$label" "$path" "$branch"
       if [ "$force" -ne 1 ]; then
