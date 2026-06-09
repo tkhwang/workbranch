@@ -2,6 +2,11 @@
 
 **한국어** | [English](README.md)
 
+[![CI](https://github.com/tkhwang/workbranch/actions/workflows/ci.yml/badge.svg)](https://github.com/tkhwang/workbranch/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/tkhwang/workbranch?sort=semver)](https://github.com/tkhwang/workbranch/releases)
+[![License: MIT](https://img.shields.io/github/license/tkhwang/workbranch)](LICENSE)
+![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-informational)
+
 `git worktree` 명령을 매번 기억하지 않아도 task 단위 worktree를 관리할 수 있습니다.
 
 `workbranch`는 feature마다 하나의 task 폴더를 만들고, single repo와 multi-repo 프로젝트 모두에서 짧고 안전한 branch refresh 명령을 제공합니다.
@@ -33,18 +38,26 @@ Homebrew는 published release를 설치하고, curl installer는 `main`을 따�
 
 ## Quick start
 
-`workbranch init`은 base repo를 clone하고, setup 중 첫 task를 만들지 물어봅니다.
+repo 하나로 시작하세요. `workbranch init`이 설정을 안내하고, 첫 task까지 바로 만들어 줍니다.
 
 ```bash
 workbranch init
-# 첫 task 추가 선택: login
-
-# feat-login/<repo>에서 작업
-
-workbranch refresh feat-login
-workbranch land feat-login
-workbranch push
+# 프로젝트 이름 입력 후 repo 하나 등록 (이름 + Git URL + base branch)
+# "Add another repo?"    -> N       # 시작은 repo 하나면 충분합니다
+# "Add your first task?" -> login   # feat-login workspace 생성
 ```
+
+이제 task workspace에서 작업하고 반영하세요.
+
+```bash
+# feat-login/<repo>에서 코드 작업
+
+workbranch refresh feat-login   # base branch를 pull한 뒤 task update
+workbranch land feat-login      # task 작업을 base branch로 fast-forward 반영
+workbranch push                 # base branch push
+```
+
+repo가 여러 개인 제품인가요? `workbranch`는 그 repo들을 하나의 task 폴더에 모아줍니다 — [생성되는 구조](#생성되는-구조) 참고.
 
 ## 생성되는 구조
 

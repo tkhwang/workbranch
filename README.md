@@ -2,6 +2,11 @@
 
 **English** | [한국어](README.ko.md)
 
+[![CI](https://github.com/tkhwang/workbranch/actions/workflows/ci.yml/badge.svg)](https://github.com/tkhwang/workbranch/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/tkhwang/workbranch?sort=semver)](https://github.com/tkhwang/workbranch/releases)
+[![License: MIT](https://img.shields.io/github/license/tkhwang/workbranch)](LICENSE)
+![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-informational)
+
 Manage Git worktree task spaces without memorizing `git worktree` commands.
 
 `workbranch` creates one task folder per feature, works with one repo or many repos, and keeps branch refresh commands short and safe.
@@ -33,18 +38,26 @@ Homebrew installs published releases. The curl installer tracks `main`.
 
 ## Quick start
 
-`workbranch init` clones base repos and can create your first task during setup.
+Start with a single repo — `workbranch init` walks you through setup and can create your first task on the spot.
 
 ```bash
 workbranch init
-# choose to add the first task: login
-
-# work in feat-login/<repo>
-
-workbranch refresh feat-login
-workbranch land feat-login
-workbranch push
+# Project name, then register one repo (name + Git URL + base branch)
+# "Add another repo?"    -> N       # one repo is all you need to start
+# "Add your first task?" -> login   # creates the feat-login workspace
 ```
+
+Then work inside the task workspace and ship it:
+
+```bash
+# edit code in feat-login/<repo>
+
+workbranch refresh feat-login   # pull base branches, then update the task
+workbranch land feat-login      # fast-forward the task work into your base branch
+workbranch push                 # push the base branch
+```
+
+Working across more than one repo? `workbranch` groups them all in one task folder — see [What it creates](#what-it-creates).
 
 ## What it creates
 
