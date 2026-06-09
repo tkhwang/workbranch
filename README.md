@@ -11,7 +11,7 @@ Manage Git worktree task spaces without memorizing `git worktree` commands.
 
 `workbranch` creates one task folder per feature, works with one repo or many repos, and keeps branch refresh commands short and safe.
 
-![img](./docs/figs/workbranch-git-flow.png)
+![workbranch demo](./docs/figs/workbranch-demo.gif)
 
 ## Install
 
@@ -38,7 +38,7 @@ Homebrew installs published releases. The curl installer tracks `main`.
 
 ## Quick start
 
-Start with a single repo — `workbranch init` walks you through setup and can create your first task on the spot.
+`workbranch init` walks you through setup and can create your first task on the spot.
 
 ```bash
 workbranch init
@@ -47,31 +47,12 @@ workbranch init
 # "Add your first task?" -> login   # creates the feat-login workspace
 ```
 
-Then work inside the task workspace and ship it:
+Need another task later? Create one anytime with `workbranch add`.
 
 ```bash
-# edit code in feat-login/<repo>
-
-workbranch pull                # pull remote base branches
-workbranch update feat-login   # update the task from local base
-workbranch land feat-login     # land the task into base
-workbranch push                # push the base branch
+workbranch add login # (branch) feat/login
+                     # (folder) feat-login/<repo>
 ```
-
-Or do it all with one combined command:
-
-```bash
-workbranch refresh feat-login   # pull + update
-workbranch land feat-login
-
-workbranch finalize feat-login  # pull + update + land
-```
-
-```bash
-workbranch push
-```
-
-Working across more than one repo? `workbranch` groups them all in one task folder — see [What it creates](#what-it-creates).
 
 ## What it creates
 
@@ -83,24 +64,101 @@ my-app-workspace
 ├── _base
 │   ├── frontend
 │   └── backend
-└── feat-login
+└── feat-login          // run your AI agent here!
     ├── frontend
     └── backend
 ```
 
-Single-repo projects use the same shape with one repo directory inside each task.
+For multi-repo products, `workbranch` gathers every repo an agent needs into one task folder. That makes AI-agent sessions easier to start, inspect, and clean up than juggling separate clones or unrelated worktrees.
 
-## Common commands
+Before an agent starts, `workbranch refresh <task>` brings every repo in the task up to the latest base in one command — no per-repo pulling or rebasing.
 
-| Command                   | Use it to                                            |
-| ------------------------- | ---------------------------------------------------- |
-| `workbranch init`         | Create or clone base worktrees from config           |
-| `workbranch add [<task>]` | Create a task workspace                              |
-| `workbranch list`         | Show repos and task workspaces                       |
-| `workbranch status`       | Show base remote diff, task diff, and dirty state    |
-| `workbranch land <task>`  | Fast-forward task work back into local base branches |
-| `workbranch push [task]`  | Push base or task branches                           |
-| `workbranch path <task>`  | Print a task workspace or repo path                  |
+See [AI agent workflows](docs/ai-agents.md) for the multi-repo benefits.
+
+## Working on a task
+
+Now work inside the task workspace. On macOS, open it directly with `workbranch ide` / `workbranch terminal`; elsewhere, just `cd` in.
+
+```bash
+# macOS: open the task workspace in your configured IDE / terminal
+workbranch ide feat-login
+workbranch terminal feat-login
+
+# or anywhere
+cd feat-login/<repo>
+# edit code in repo
+```
+
+Need the latest base while you work? See [Staying up to date](#staying-up-to-date). When the work is done, [ship it](#two-ways-to-ship).
+
+## Staying up to date
+
+To bring a single task up to the latest base, `pull` the base from its remote and `update <task>` to apply it to the task.
+
+```bash
+workbranch pull               # pull every base from its remote
+workbranch update feat-login  # apply local base to every repo in the task
+
+# combined: pull + update in one step
+workbranch refresh feat-login
+```
+
+Working in several tasks at once? Run them without a task name to refresh every task in one go.
+
+```bash
+workbranch pull      # pull every base from its remote
+workbranch update    # apply local base to every repo in every task
+
+# combined
+workbranch refresh   # pull every base, then update every task
+```
+
+To refresh the base, apply it to a task, and land in one step, use `finalize`.
+
+```bash
+workbranch finalize feat-login   # base pull → feat-login update → land
+```
+
+## Two ways to ship
+
+What `push` publishes depends on your base branch.
+
+|                      | Feature flow                    | Stacked flow                                            |
+| -------------------- | ------------------------------- | ------------------------------------------------------- |
+| Base branch          | `main` / `master`               | a feature branch, e.g. `feat/login`                     |
+| Task branch (folder) | `feat/login` (`feat-login`)     | `feat/login-part1` (`feat-login-part1`)                 |
+| Ship                 | push the task branch, open a PR | land into base, then push the base                      |
+| Command              | `workbranch push feat-login`    | `workbranch land feat-login-part1`<br>`workbranch push` |
+| Pushes               | task branch                     | base branch                                             |
+
+### Feature flow
+
+```bash
+# edit code in feat-login/<repo>
+
+workbranch push feat-login   # local feat/login -> origin/feat/login
+```
+
+### Stacked flow
+
+```bash
+# edit code in feat-login-part1/<repo>
+
+workbranch land feat-login-part1   # fast-forward feat/login-part1 into local base (feat/login)
+workbranch push                    # local feat/login -> origin/feat/login
+```
+
+## Commands
+
+| Command                    | Use it to                                               |
+| -------------------------- | ------------------------------------------------------- |
+| `workbranch init`          | Create or clone base worktrees from config              |
+| `workbranch add [<task>]`  | Create a task workspace                                 |
+| `workbranch list`          | Show repos and task workspaces                          |
+| `workbranch status`        | Show base remote diff, task diff, and dirty state       |
+| `workbranch update [task]` | Update every repo in the task from local base (no pull) |
+| `workbranch land <task>`   | Fast-forward task work into local base branches         |
+| `workbranch push [task]`   | Push base or task branches                              |
 
 Combined flow shortcuts:
 
@@ -110,17 +168,7 @@ Combined flow shortcuts:
 | `workbranch finalize <task>` | Pull base branches, update one task, then land it                    |
 | `workbranch prune`           | Remove clean task workspaces already merged into local base branches |
 
-## Multi-repo AI agent workflows
-
-```
-└── feat-login      // run AI agent here!!!
-    ├── frontend
-    └── backend
-```
-
-For multi-repo products, `workbranch` gives each task one shared workspace containing every repo the agent needs. That makes AI-agent sessions easier to start, inspect, and clean up than juggling separate clones or unrelated worktrees.
-
-See [AI agent workflows](docs/ai-agents.md) for the multi-repo benefits.
+![img](./docs/figs/workbranch-git-flow.png)
 
 ## More docs
 
