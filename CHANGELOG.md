@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.0](https://github.com/tkhwang/workbranch/compare/v1.9.1...v1.10.0) (2026-06-09)
+
+
+### Features
+
+* **preflight:** harden init and remove base repo checks ([d463ed1](https://github.com/tkhwang/workbranch/commit/d463ed16c2c209b8456563c1290526e02682230a))
+
 ## [1.9.1](https://github.com/tkhwang/workbranch/compare/v1.9.0...v1.9.1) (2026-06-08)
 
 
