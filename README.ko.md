@@ -52,9 +52,23 @@ workbranch init
 ```bash
 # feat-login/<repo>에서 코드 작업
 
-workbranch refresh feat-login   # base branch를 pull한 뒤 task update
-workbranch land feat-login      # task 작업을 base branch로 fast-forward 반영
-workbranch push                 # base branch push
+workbranch pull                # pull remote base branches
+workbranch update feat-login   # update the task from local base
+workbranch land feat-login     # land the task into base
+workbranch push                # push the base branch
+```
+
+또는 combined command 하나로 처리할 수 있습니다.
+
+```bash
+workbranch refresh feat-login   # pull + update
+workbranch land feat-login
+
+workbranch finalize feat-login  # pull + update + land
+```
+
+```bash
+workbranch push
 ```
 
 repo가 여러 개인 제품인가요? `workbranch`는 그 repo들을 하나의 task 폴더에 모아줍니다 — [생성되는 구조](#생성되는-구조) 참고.

@@ -52,9 +52,23 @@ Then work inside the task workspace and ship it:
 ```bash
 # edit code in feat-login/<repo>
 
-workbranch refresh feat-login   # pull base branches, then update the task
-workbranch land feat-login      # fast-forward the task work into your base branch
-workbranch push                 # push the base branch
+workbranch pull                # pull remote base branches
+workbranch update feat-login   # update the task from local base
+workbranch land feat-login     # land the task into base
+workbranch push                # push the base branch
+```
+
+Or do it all with one combined command:
+
+```bash
+workbranch refresh feat-login   # pull + update
+workbranch land feat-login
+
+workbranch finalize feat-login  # pull + update + land
+```
+
+```bash
+workbranch push
 ```
 
 Working across more than one repo? `workbranch` groups them all in one task folder — see [What it creates](#what-it-creates).
