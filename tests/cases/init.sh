@@ -28,6 +28,53 @@ test_init_completes_partial_base_clones() {
   assert_branch "$project/_base/backend" "master"
 }
 
+test_init_rejects_existing_base_repo_on_wrong_branch_during_recovery() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  (cd "$project" && run_expect_success "$WORKBRANCH" init >/dev/null)
+
+  git -C "$project/_base/frontend" checkout -b wrong-base >/dev/null 2>&1
+  rm -rf "$project/_base/backend"
+
+  out=$(cd "$project" && run_expect_fail "$WORKBRANCH" init)
+  assert_contains "$out" "base repo _base/frontend expected branch master, got wrong-base"
+  assert_not_exists "$project/_base/backend"
+  assert_branch "$project/_base/frontend" "wrong-base"
+}
+
+test_init_validates_existing_base_repos_before_cloning_missing_repos() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  (cd "$project" && run_expect_success "$WORKBRANCH" init >/dev/null)
+
+  rm -rf "$project/_base/frontend"
+  git -C "$project/_base/backend" checkout -b wrong-base >/dev/null 2>&1
+
+  out=$(cd "$project" && run_expect_fail "$WORKBRANCH" init)
+  assert_contains "$out" "base repo _base/backend expected branch master, got wrong-base"
+  assert_not_exists "$project/_base/frontend"
+  assert_branch "$project/_base/backend" "wrong-base"
+}
+
+test_init_rejects_existing_base_repo_rebase_in_progress_during_recovery() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  (cd "$project" && run_expect_success "$WORKBRANCH" init >/dev/null)
+
+  git_dir=$(cd "$project/_base/frontend" && git rev-parse --git-dir)
+  case "$git_dir" in
+    /*) ;;
+    *) git_dir="$project/_base/frontend/$git_dir" ;;
+  esac
+  mkdir -p "$git_dir/rebase-merge"
+  rm -rf "$project/_base/backend"
+
+  out=$(cd "$project" && run_expect_fail "$WORKBRANCH" init)
+  assert_contains "$out" "base repo _base/frontend rebase in progress"
+  assert_not_exists "$project/_base/backend"
+  rm -rf "$git_dir/rebase-merge"
+}
+
 test_init_rejects_already_initialized_workbranch_project() {
   new_fixture
   project="$FIXTURE_PROJECT"
@@ -150,4 +197,3 @@ CONFIG
   assert_branch "$project/_base/backend" "master"
   assert_not_exists "$project/.workbranch.config"
 }
-

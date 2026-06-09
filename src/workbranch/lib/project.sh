@@ -150,6 +150,35 @@ repo_task_branch_at() {
   default_repo_task_branch_at "$index" "$task"
 }
 
+validate_existing_base_repo_for_init() {
+  local name target branch actual
+  name=$1
+  target=$2
+  branch=$3
+  git -C "$target" rev-parse --git-dir >/dev/null 2>&1 || die "base repo path exists but is not a git repo: $BASE_DIR/$name"
+  actual=$(branch_or_unknown "$target")
+  [ "$actual" = "$branch" ] || die "base repo $BASE_DIR/$name expected branch $branch, got $actual"
+  if is_rebase_in_progress "$target"; then
+    die "base repo $BASE_DIR/$name rebase in progress"
+  fi
+}
+
+preflight_existing_base_repos_for_init() {
+  local i name branch target
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    branch=$(repo_base_branch_at "$i")
+    target=$(base_repo_path "$name")
+    if [ -d "$target" ]; then
+      validate_existing_base_repo_for_init "$name" "$target" "$branch"
+    elif [ -e "$target" ] || [ -L "$target" ]; then
+      die "base repo path exists but is not a directory: $BASE_DIR/$name"
+    fi
+    i=$((i + 1))
+  done
+}
+
 clone_base_repos() {
   base_root="$PROJECT_ROOT/$BASE_DIR"
   if [ ! -e "$base_root" ]; then
@@ -158,6 +187,7 @@ clone_base_repos() {
   else
     [ -d "$base_root" ] || die "base path exists but is not a directory: $base_root"
   fi
+  preflight_existing_base_repos_for_init
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
@@ -165,7 +195,6 @@ clone_base_repos() {
     branch=$(repo_base_branch_at "$i")
     target=$(base_repo_path "$name")
     if [ -d "$target" ]; then
-      git -C "$target" rev-parse --git-dir >/dev/null 2>&1 || die "base repo path exists but is not a git repo: $BASE_DIR/$name"
       info "Base repo exists: $BASE_DIR/$name"
     elif [ -e "$target" ] || [ -L "$target" ]; then
       die "base repo path exists but is not a directory: $BASE_DIR/$name"

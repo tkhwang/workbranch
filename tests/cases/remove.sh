@@ -153,6 +153,40 @@ test_remove_rejects_task_repo_on_unexpected_branch() {
     fail "expected remove to keep backend feature/login branch"
 }
 
+test_remove_rejects_missing_base_repo_before_partial_cleanup() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  rm -rf "$project/login/frontend"
+  rm -rf "$project/_base/frontend"
+
+  out=$(run_expect_fail "$WORKBRANCH" remove login)
+  assert_contains "$out" "Cannot remove: preflight failed"
+  assert_contains "$out" "_base/frontend missing git repo"
+  assert_dir "$project/login/backend"
+  assert_dir "$project/_base/backend/.git"
+}
+
+test_remove_force_rejects_missing_base_repo_before_partial_cleanup() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  rm -rf "$project/login/frontend"
+  rm -rf "$project/_base/frontend"
+
+  out=$(run_expect_fail "$WORKBRANCH" remove login --force)
+  assert_contains "$out" "Cannot remove: preflight failed"
+  assert_contains "$out" "_base/frontend missing git repo"
+  assert_dir "$project/login/backend"
+  assert_dir "$project/_base/backend/.git"
+}
+
 test_dirty_worktree_safety() {
   new_fixture
   project="$FIXTURE_PROJECT"
