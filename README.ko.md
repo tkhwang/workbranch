@@ -106,11 +106,11 @@ workbranch refresh feat-login
 동시에 여러 task에서 작업 중이라면, task 이름 없이 실행해 모든 task를 한 번에 최신화할 수 있습니다.
 
 ```bash
-workbranch pull      # 모든 base를 remote에서 pull
-workbranch update    # local base를 모든 task의 모든 repo에 반영
+workbranch pull      # base 최신 update
+workbranch update    # local base를 모든 task에 반영
 
 # combined
-workbranch refresh   # 모든 base를 pull한 뒤 모든 task update
+workbranch refresh   # base를 pull한 뒤 모든 task update
 ```
 
 base를 최신화하고 task에 반영한 뒤 land까지 한 번에 하려면 `finalize`를 씁니다.

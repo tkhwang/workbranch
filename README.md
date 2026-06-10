@@ -96,8 +96,8 @@ Need the latest base while you work? See [Staying up to date](#staying-up-to-dat
 To bring a single task up to the latest base, `pull` the base from its remote and `update <task>` to apply it to the task.
 
 ```bash
-workbranch pull               # pull every base from its remote
-workbranch update feat-login  # apply local base to every repo in the task
+workbranch pull               # pull base latest update
+workbranch update feat-login  # apply local base update to feat-login task 
 
 # combined: pull + update in one step
 workbranch refresh feat-login
@@ -106,11 +106,11 @@ workbranch refresh feat-login
 Working in several tasks at once? Run them without a task name to refresh every task in one go.
 
 ```bash
-workbranch pull      # pull every base from its remote
-workbranch update    # apply local base to every repo in every task
+workbranch pull      # pull base latest update
+workbranch update    # apply local base to every task
 
 # combined
-workbranch refresh   # pull every base, then update every task
+workbranch refresh   # pull base latest update, then update all tasks
 ```
 
 To refresh the base, apply it to a task, and land in one step, use `finalize`.
