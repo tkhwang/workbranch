@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.11.0](https://github.com/tkhwang/workbranch/compare/v1.10.0...v1.11.0) (2026-06-10)
+
+
+### Features
+
+* **preflight:** add rebase conflict check for update/finalize ([bcb1c59](https://github.com/tkhwang/workbranch/commit/bcb1c59ed8466550ef9858fcb58829a274d20c22))
+* **preflight:** add rebase conflict check for update/finalize ([a0e7750](https://github.com/tkhwang/workbranch/commit/a0e7750f0f21e6879ef74b65ec79804b39f6d456))
+
 ## [1.10.0](https://github.com/tkhwang/workbranch/compare/v1.9.1...v1.10.0) (2026-06-09)
 
 
