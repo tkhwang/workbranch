@@ -24,6 +24,10 @@ preflight_update_task() {
     preflight_require_current_branch "$label" "$task_path" "$branch"
     preflight_require_clean "$label" "$task_path"
     preflight_require_no_rebase "$label" "$task_path"
+    base_head=$(git -C "$base" rev-parse HEAD 2>/dev/null) || base_head=""
+    if [ -n "$base_head" ] &&       [ "$(branch_or_unknown "$base")" = "$base_branch" ] &&       [ "$(branch_or_unknown "$task_path")" = "$branch" ] &&       ! is_rebase_in_progress "$base" &&       ! is_rebase_in_progress "$task_path" &&       ! is_git_dirty "$task_path"; then
+      preflight_update_rebase_clean "$label" "$task_path" "$base_label" "$base_head"
+    fi
     i=$((i + 1))
   done
 }

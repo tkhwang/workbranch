@@ -151,3 +151,38 @@ test_sync_command_is_removed() {
   out=$(run_expect_fail "$WORKBRANCH" sync)
   assert_contains "$out" "unknown command: sync"
 }
+
+test_refresh_preflight_blocks_rebase_conflict_after_pull_without_touching_task() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  git -C "$project/login/frontend" config user.name "Workbranch Test"
+  git -C "$project/login/frontend" config user.email "workbranch-test@example.com"
+  printf '%s\n' "task change" > "$project/login/frontend/README.md"
+  git -C "$project/login/frontend" add README.md
+  git -C "$project/login/frontend" commit -m "task edits readme" >/dev/null
+  task_head_before=$(git -C "$project/login/frontend" rev-parse HEAD)
+
+  clone="$TMP_ROOT/upstream-refresh-conflict"
+  git clone "$TMP_ROOT/remotes/frontend.git" "$clone" >/dev/null 2>&1
+  git -C "$clone" config user.name "Workbranch Test"
+  git -C "$clone" config user.email "workbranch-test@example.com"
+  printf '%s\n' "base change" > "$clone/README.md"
+  git -C "$clone" add README.md
+  git -C "$clone" commit -m "base edits readme" >/dev/null
+  git -C "$clone" push origin master >/dev/null 2>&1
+  remote_head=$(git --git-dir="$TMP_ROOT/remotes/frontend.git" rev-parse master)
+
+  out=$(run_expect_fail "$WORKBRANCH" refresh login --repo frontend)
+  assert_contains "$out" "Pulling base branches"
+  assert_contains "$out" "Cannot update: preflight failed"
+  assert_contains "$out" "login/frontend cannot rebase onto _base/frontend"
+  assert_not_contains "$out" "Updating task workspace"
+  [ "$(git -C "$project/_base/frontend" rev-parse HEAD)" = "$remote_head" ] || fail "base did not pull before refresh conflict preflight"
+  [ "$(git -C "$project/login/frontend" rev-parse HEAD)" = "$task_head_before" ] || fail "task HEAD changed after refresh conflict preflight"
+  assert_clean "$project/login/frontend"
+}

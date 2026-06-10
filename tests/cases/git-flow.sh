@@ -256,3 +256,38 @@ test_pull_preflight_requires_base_worktree_on_configured_branch() {
   assert_contains "$out" "_base/frontend expected branch master, got unrelated"
   assert_not_exists "$project/_base/frontend/pull-should-not-touch-unrelated.txt"
 }
+
+test_finalize_preflight_blocks_rebase_conflict_after_pull_without_touching_task() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add feat-conflict >/dev/null
+
+  git -C "$project/feat-conflict/frontend" config user.name "Workbranch Test"
+  git -C "$project/feat-conflict/frontend" config user.email "workbranch-test@example.com"
+  printf '%s\n' "task change" > "$project/feat-conflict/frontend/README.md"
+  git -C "$project/feat-conflict/frontend" add README.md
+  git -C "$project/feat-conflict/frontend" commit -m "task edits readme" >/dev/null
+  task_head_before=$(git -C "$project/feat-conflict/frontend" rev-parse HEAD)
+
+  clone="$TMP_ROOT/upstream-conflict"
+  git clone "$TMP_ROOT/remotes/frontend.git" "$clone" >/dev/null 2>&1
+  git -C "$clone" config user.name "Workbranch Test"
+  git -C "$clone" config user.email "workbranch-test@example.com"
+  printf '%s\n' "base change" > "$clone/README.md"
+  git -C "$clone" add README.md
+  git -C "$clone" commit -m "base edits readme" >/dev/null
+  git -C "$clone" push origin master >/dev/null 2>&1
+
+  out=$(run_expect_fail "$WORKBRANCH" finalize feat-conflict --repo frontend)
+  assert_contains "$out" "Pulling base branches"
+  assert_contains "$out" "Cannot finalize: preflight failed"
+  assert_contains "$out" "feat-conflict/frontend cannot rebase onto _base/frontend"
+  assert_not_contains "$out" "Updating task workspace"
+  [ "$(git -C "$project/feat-conflict/frontend" rev-parse HEAD)" = "$task_head_before" ] || fail "task HEAD changed after conflict preflight"
+  assert_clean "$project/feat-conflict/frontend"
+  if git -C "$project/feat-conflict/frontend" status --porcelain=v1 -uno | grep -q '^UU '; then
+    fail "task worktree was left with conflicts"
+  fi
+}

@@ -124,3 +124,31 @@ test_update_preflight_blocks_base_rebase_in_progress() {
   assert_contains "$out" "_base/frontend rebase in progress"
 }
 
+
+test_update_preflight_blocks_rebase_conflict_without_touching_task() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  git -C "$project/login/frontend" config user.name "Workbranch Test"
+  git -C "$project/login/frontend" config user.email "workbranch-test@example.com"
+  printf '%s\n' "task change" > "$project/login/frontend/README.md"
+  git -C "$project/login/frontend" add README.md
+  git -C "$project/login/frontend" commit -m "task edits readme" >/dev/null
+  task_head_before=$(git -C "$project/login/frontend" rev-parse HEAD)
+
+  git -C "$project/_base/frontend" config user.name "Workbranch Test"
+  git -C "$project/_base/frontend" config user.email "workbranch-test@example.com"
+  printf '%s\n' "base change" > "$project/_base/frontend/README.md"
+  git -C "$project/_base/frontend" add README.md
+  git -C "$project/_base/frontend" commit -m "base edits readme" >/dev/null
+
+  out=$(run_expect_fail "$WORKBRANCH" update login --repo frontend)
+  assert_contains "$out" "Cannot update: preflight failed"
+  assert_contains "$out" "login/frontend cannot rebase onto _base/frontend"
+  [ "$(git -C "$project/login/frontend" rev-parse HEAD)" = "$task_head_before" ] || fail "task HEAD changed after update conflict preflight"
+  assert_clean "$project/login/frontend"
+}
