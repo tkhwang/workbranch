@@ -375,7 +375,7 @@ Print the installed CLI version as `workbranch <version>`. `workbranch -v` and `
 - Fail before destructive operations if a target worktree is dirty.
 - Use `--ff-only` for pull and merge operations.
 - On command-local creation failure, roll back paths and branches created by that command.
-- Leave conflict resolution to Git and the user.
+- Leave conflict resolution to Git and the user. When preflight detects a rebase conflict, diverged pull path, or non-fast-forward land path, fail before mutating the target worktree and print the manual command sequence for that repo.
 
 ## Installer
 

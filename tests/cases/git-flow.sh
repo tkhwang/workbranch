@@ -140,6 +140,7 @@ test_land_preflight_blocks_all_repos_before_partial_land() {
   assert_contains "$out" "Cannot land: preflight failed"
   assert_contains "$out" "login/backend cannot fast-forward land"
   assert_contains "$out" "workbranch update login --repo backend"
+  assert_contains "$out" "If update reports a rebase conflict, resolve it manually with the shown rebase guidance, then retry land."
   assert_not_exists "$project/_base/frontend/frontend-task.txt"
   assert_not_exists "$project/_base/backend/backend-task.txt"
 }
@@ -257,9 +258,54 @@ test_pull_preflight_requires_base_worktree_on_configured_branch() {
   assert_not_exists "$project/_base/frontend/pull-should-not-touch-unrelated.txt"
 }
 
+test_pull_preflight_guides_diverged_base_branch() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  project_root=$(cd "$project" && pwd -P) || return 1
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+
+  git -C "$project/_base/frontend" config user.name "Workbranch Test"
+  git -C "$project/_base/frontend" config user.email "workbranch-test@example.com"
+  printf '%s\n' "local frontend divergence" > "$project/_base/frontend/local-divergence.txt"
+  git -C "$project/_base/frontend" add local-divergence.txt
+  git -C "$project/_base/frontend" commit -m "local frontend divergence" >/dev/null
+  commit_to_remote_master frontend remote-frontend-divergence
+
+  out=$(run_expect_fail "$WORKBRANCH" pull --repo frontend)
+  assert_contains "$out" "Cannot pull: preflight failed"
+  assert_contains "$out" "_base/frontend cannot fast-forward pull: HEAD and origin/master diverged"
+  assert_contains "$out" "Inspect manually:"
+  assert_contains "$out" "git -C $project_root/_base/frontend fetch origin"
+  assert_contains "$out" "git -C $project_root/_base/frontend log --oneline --left-right HEAD...origin/master"
+}
+
+test_pull_preflight_guidance_uses_project_root_from_subdirectory() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  project_root=$(cd "$project" && pwd -P) || return 1
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  git -C "$project/_base/frontend" config user.name "Workbranch Test"
+  git -C "$project/_base/frontend" config user.email "workbranch-test@example.com"
+  printf '%s\n' "local frontend divergence" > "$project/_base/frontend/local-divergence.txt"
+  git -C "$project/_base/frontend" add local-divergence.txt
+  git -C "$project/_base/frontend" commit -m "local frontend divergence" >/dev/null
+  commit_to_remote_master frontend remote-frontend-divergence
+
+  cd "$project/login/frontend" || return 1
+  out=$(run_expect_fail "$WORKBRANCH" pull --repo frontend)
+  assert_contains "$out" "Cannot pull: preflight failed"
+  assert_contains "$out" "git -C $project_root/_base/frontend fetch origin"
+  assert_not_contains "$out" "git -C _base/frontend fetch origin"
+}
+
 test_finalize_preflight_blocks_rebase_conflict_after_pull_without_touching_task() {
   new_fixture
   project="$FIXTURE_PROJECT"
+  project_root=$(cd "$project" && pwd -P) || return 1
   cd "$project" || return 1
   run_expect_success "$WORKBRANCH" init >/dev/null
   run_expect_success "$WORKBRANCH" add feat-conflict >/dev/null
@@ -284,6 +330,9 @@ test_finalize_preflight_blocks_rebase_conflict_after_pull_without_touching_task(
   assert_contains "$out" "Pulling base branches"
   assert_contains "$out" "Cannot finalize: preflight failed"
   assert_contains "$out" "feat-conflict/frontend cannot rebase onto _base/frontend"
+  assert_contains "$out" "Resolve manually:"
+  assert_contains "$out" "git -C $project_root/feat-conflict/frontend rebase \"\$(git -C $project_root/_base/frontend rev-parse HEAD)\""
+  assert_contains "$out" "workbranch update feat-conflict --repo frontend"
   assert_not_contains "$out" "Updating task workspace"
   [ "$(git -C "$project/feat-conflict/frontend" rev-parse HEAD)" = "$task_head_before" ] || fail "task HEAD changed after conflict preflight"
   assert_clean "$project/feat-conflict/frontend"

@@ -1305,7 +1305,7 @@ preflight_error() {
 }
 
 preflight_die_if_errors() {
-  local operation i
+  local operation i line
   operation=$1
   if [ ${#PREFLIGHT_ERRORS[@]} -eq 0 ]; then
     return 0
@@ -1315,7 +1315,9 @@ preflight_die_if_errors() {
   printf '%s[*]%s Fix these worktrees, then retry:\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" >&2
   i=0
   while [ $i -lt ${#PREFLIGHT_ERRORS[@]} ]; do
-    printf '    %s%s%s\n' "$WB_ERR_GRAY" "${PREFLIGHT_ERRORS[$i]}" "$WB_ERR_RESET" >&2
+    printf '%s\n' "${PREFLIGHT_ERRORS[$i]}" | while IFS= read -r line || [ -n "$line" ]; do
+      printf '    %s%s%s\n' "$WB_ERR_GRAY" "$line" "$WB_ERR_RESET" >&2
+    done
     i=$((i + 1))
   done
   exit 1
@@ -1357,6 +1359,23 @@ preflight_require_no_rebase() {
 }
 
 
+preflight_rebase_conflict_message() {
+  local label base_label task repo task_path base_path
+  label=$1
+  base_label=$2
+  task=${label%%/*}
+  repo=${label#*/}
+  task_path="$PROJECT_ROOT/$label"
+  base_path="$PROJECT_ROOT/$base_label"
+  printf '%s\n' \
+    "$label cannot rebase onto $base_label without conflicts" \
+    "Resolve manually:" \
+    "  git -C $task_path rebase \"\$(git -C $base_path rev-parse HEAD)\"" \
+    "  git -C $task_path add <resolved-files>" \
+    "  git -C $task_path rebase --continue" \
+    "  workbranch update $task --repo $repo"
+}
+
 preflight_update_rebase_clean() {
   local label task_path base_label base_ref tmp_parent tmp_path
   label=$1
@@ -1383,7 +1402,7 @@ preflight_update_rebase_clean() {
   fi
 
   if ! git -C "$tmp_path" rebase "$base_ref" >/dev/null 2>&1; then
-    preflight_error "$label cannot rebase onto $base_label without conflicts"
+    preflight_error "$(preflight_rebase_conflict_message "$label" "$base_label")"
   fi
 
   git -C "$tmp_path" rebase --abort >/dev/null 2>&1 || true
@@ -1477,7 +1496,7 @@ preflight_pull_ref_fast_forwardable() {
   if git_is_ancestor "$path" "$local_ref" "$remote_ref" || git_is_ancestor "$path" "$remote_ref" "$local_ref"; then
     return 0
   fi
-  preflight_error "$label cannot fast-forward pull: $local_display and $remote_display diverged"
+  preflight_error "$(preflight_pull_diverged_message "$label" "$local_display" "$remote_display")"
 }
 
 preflight_push_fast_forwardable() {
@@ -1513,7 +1532,32 @@ preflight_land_fast_forwardable() {
   if git_is_ancestor "$path" "$base_ref" "$task_branch"; then
     return 0
   fi
-  preflight_error "$label cannot fast-forward land; run workbranch update ${label%%/*} --repo ${label#*/} first"
+  preflight_error "$(preflight_land_not_fast_forward_message "$label")"
+}
+
+preflight_pull_diverged_message() {
+  local label local_display remote_display path
+  label=$1
+  local_display=$2
+  remote_display=$3
+  path="$PROJECT_ROOT/$label"
+  printf '%s\n' \
+    "$label cannot fast-forward pull: $local_display and $remote_display diverged" \
+    "Inspect manually:" \
+    "  git -C $path fetch origin" \
+    "  git -C $path log --oneline --left-right $local_display...$remote_display"
+}
+
+preflight_land_not_fast_forward_message() {
+  local label task repo
+  label=$1
+  task=${label%%/*}
+  repo=${label#*/}
+  printf '%s\n' \
+    "$label cannot fast-forward land; run workbranch update $task --repo $repo first" \
+    "Update task first:" \
+    "  workbranch update $task --repo $repo" \
+    "If update reports a rebase conflict, resolve it manually with the shown rebase guidance, then retry land."
 }
 
 branch_exists() {
