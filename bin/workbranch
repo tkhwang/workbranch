@@ -1360,17 +1360,19 @@ preflight_require_no_rebase() {
 
 
 preflight_rebase_conflict_message() {
-  local label base_label task repo
+  local label base_label task repo task_path base_path
   label=$1
   base_label=$2
   task=${label%%/*}
   repo=${label#*/}
+  task_path="$PROJECT_ROOT/$label"
+  base_path="$PROJECT_ROOT/$base_label"
   printf '%s\n' \
     "$label cannot rebase onto $base_label without conflicts" \
     "Resolve manually:" \
-    "  git -C $label rebase \"\$(git -C $base_label rev-parse HEAD)\"" \
-    "  git -C $label add <resolved-files>" \
-    "  git -C $label rebase --continue" \
+    "  git -C $task_path rebase \"\$(git -C $base_path rev-parse HEAD)\"" \
+    "  git -C $task_path add <resolved-files>" \
+    "  git -C $task_path rebase --continue" \
     "  workbranch update $task --repo $repo"
 }
 
@@ -1534,15 +1536,16 @@ preflight_land_fast_forwardable() {
 }
 
 preflight_pull_diverged_message() {
-  local label local_display remote_display
+  local label local_display remote_display path
   label=$1
   local_display=$2
   remote_display=$3
+  path="$PROJECT_ROOT/$label"
   printf '%s\n' \
     "$label cannot fast-forward pull: $local_display and $remote_display diverged" \
     "Inspect manually:" \
-    "  git -C $label fetch origin" \
-    "  git -C $label log --oneline --left-right $local_display...$remote_display"
+    "  git -C $path fetch origin" \
+    "  git -C $path log --oneline --left-right $local_display...$remote_display"
 }
 
 preflight_land_not_fast_forward_message() {
