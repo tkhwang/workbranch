@@ -16,6 +16,15 @@ cmd_refresh() {
   section "Pulling base branches"
   run_pull
   printf '\n'
+
+  reset_preflight
+  if [ ${#ARGS[@]} -eq 1 ]; then
+    preflight_update_task "$task"
+  else
+    preflight_update_all_tasks
+  fi
+  preflight_die_if_errors "update"
+
   if [ ${#ARGS[@]} -eq 1 ]; then
     section "Updating task workspace"
     update_task "$task"

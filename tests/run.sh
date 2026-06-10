@@ -86,6 +86,7 @@ main() {
   run_test test_update_preflight_blocks_batch_before_changes
   run_test test_update_preflight_requires_base_worktree_on_configured_branch
   run_test test_update_preflight_blocks_base_rebase_in_progress
+  run_test test_update_preflight_blocks_rebase_conflict_without_touching_task
   run_test test_refresh_pulls_base_then_updates_tasks
   run_test test_refresh_repo_scope_limits_pull_and_update
   run_test test_refresh_repo_scope_collects_tasks_with_only_selected_repo_healthy
@@ -93,6 +94,7 @@ main() {
   run_test test_refresh_no_tasks_fails_before_pull
   run_test test_refresh_update_preflight_failure_blocks_pull
   run_test test_refresh_task_update_preflight_failure_blocks_pull
+  run_test test_refresh_preflight_blocks_rebase_conflict_after_pull_without_touching_task
   run_test test_sync_command_is_removed
   run_test test_doctor_healthy_project_exits_zero
   run_test test_doctor_detects_partial_workspace
@@ -108,6 +110,7 @@ main() {
   run_test test_land_preflight_blocks_all_repos_before_partial_land
   run_test test_finalize_pulls_updates_and_lands_without_push_or_remove
   run_test test_finalize_preflight_blocks_pull_before_dirty_task_update
+  run_test test_finalize_preflight_blocks_rebase_conflict_after_pull_without_touching_task
   run_test test_push_supports_task_and_base_branches_after_fast_forward_merge
   run_test test_add_uses_feat_parent_branch_as_default
   run_test test_add_derives_branch_from_conventional_task_folder

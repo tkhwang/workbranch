@@ -74,6 +74,41 @@ preflight_require_no_rebase() {
   fi
 }
 
+
+preflight_update_rebase_clean() {
+  local label task_path base_label base_ref tmp_parent tmp_path
+  label=$1
+  task_path=$2
+  base_label=$3
+  base_ref=$4
+
+  git_ref_exists "$task_path" HEAD || return 0
+  git_ref_exists "$task_path" "$base_ref" || return 0
+  if git_is_ancestor "$task_path" "$base_ref" HEAD; then
+    return 0
+  fi
+
+  tmp_parent=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-rebase-check) || {
+    preflight_error "$label cannot prepare rebase preflight"
+    return 0
+  }
+  tmp_path="$tmp_parent/worktree"
+
+  if ! git -C "$task_path" worktree add --quiet --detach "$tmp_path" HEAD >/dev/null 2>&1; then
+    rm -rf "$tmp_parent"
+    preflight_error "$label cannot prepare rebase preflight"
+    return 0
+  fi
+
+  if ! git -C "$tmp_path" rebase "$base_ref" >/dev/null 2>&1; then
+    preflight_error "$label cannot rebase onto $base_label without conflicts"
+  fi
+
+  git -C "$tmp_path" rebase --abort >/dev/null 2>&1 || true
+  git -C "$task_path" worktree remove --force "$tmp_path" >/dev/null 2>&1 || rm -rf "$tmp_path"
+  rm -rf "$tmp_parent"
+}
+
 preflight_require_current_branch() {
   local label path expected actual
   label=$1

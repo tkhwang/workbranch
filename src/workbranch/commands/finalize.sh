@@ -14,6 +14,10 @@ cmd_finalize() {
   execute_pull_repos
   printf '\n'
 
+  reset_preflight
+  preflight_update_task "$task"
+  preflight_die_if_errors "finalize"
+
   section "Updating task workspace"
   update_task "$task"
   printf '\n'
