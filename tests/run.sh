@@ -170,6 +170,7 @@ main() {
   run_test test_prune_reports_partial_and_stale_task_skips
   run_test test_prune_returns_failure_after_remove_failure_and_continues
   run_test test_pull_preflight_requires_base_worktree_on_configured_branch
+  run_test test_pull_preflight_guides_diverged_base_branch
   run_test test_add_preflight_requires_clean_base_on_configured_branch
   run_test test_config_reads_and_writes_ide_terminal_commands
   run_test test_config_ide_can_set_custom_command_without_prompting_repos

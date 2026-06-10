@@ -142,3 +142,5 @@ See the [MVP spec](specs/0001-workbranch-mvp.md) for the config format and setup
 ## Safety
 
 Before changing worktrees, `workbranch` checks for dirty worktrees, wrong branches, rebase state, missing repos, and non-fast-forward Git paths.
+
+When a preflight detects a rebase conflict or diverged pull path, it stops before changing the target worktree and prints the manual Git commands to inspect or resolve that exact repo. Resolve the conflict outside `workbranch`, then rerun the original `workbranch` command.

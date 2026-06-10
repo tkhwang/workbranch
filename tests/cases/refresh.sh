@@ -181,6 +181,9 @@ test_refresh_preflight_blocks_rebase_conflict_after_pull_without_touching_task()
   assert_contains "$out" "Pulling base branches"
   assert_contains "$out" "Cannot update: preflight failed"
   assert_contains "$out" "login/frontend cannot rebase onto _base/frontend"
+  assert_contains "$out" "Resolve manually:"
+  assert_contains "$out" 'git -C login/frontend rebase "$(git -C _base/frontend rev-parse HEAD)"'
+  assert_contains "$out" "workbranch update login --repo frontend"
   assert_not_contains "$out" "Updating task workspace"
   [ "$(git -C "$project/_base/frontend" rev-parse HEAD)" = "$remote_head" ] || fail "base did not pull before refresh conflict preflight"
   [ "$(git -C "$project/login/frontend" rev-parse HEAD)" = "$task_head_before" ] || fail "task HEAD changed after refresh conflict preflight"

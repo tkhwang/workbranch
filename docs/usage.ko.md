@@ -142,3 +142,5 @@ config format과 setup 환경변수는 [MVP spec](specs/0001-workbranch-mvp.md)�
 ## Safety
 
 `workbranch`는 worktree를 변경하기 전에 dirty worktree, 잘못된 branch, rebase 상태, 누락된 repo, fast-forward가 아닌 Git 경로를 확인합니다.
+
+preflight에서 rebase conflict나 diverged pull 경로를 감지하면 대상 worktree를 변경하기 전에 중단하고, 해당 repo에서 확인하거나 해결할 수 있는 수동 Git command를 출력합니다. conflict를 `workbranch` 밖에서 해결한 뒤 원래 `workbranch` command를 다시 실행하세요.

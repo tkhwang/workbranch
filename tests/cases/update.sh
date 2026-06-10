@@ -149,6 +149,11 @@ test_update_preflight_blocks_rebase_conflict_without_touching_task() {
   out=$(run_expect_fail "$WORKBRANCH" update login --repo frontend)
   assert_contains "$out" "Cannot update: preflight failed"
   assert_contains "$out" "login/frontend cannot rebase onto _base/frontend"
+  assert_contains "$out" "Resolve manually:"
+  assert_contains "$out" 'git -C login/frontend rebase "$(git -C _base/frontend rev-parse HEAD)"'
+  assert_contains "$out" "git -C login/frontend add <resolved-files>"
+  assert_contains "$out" "git -C login/frontend rebase --continue"
+  assert_contains "$out" "workbranch update login --repo frontend"
   [ "$(git -C "$project/login/frontend" rev-parse HEAD)" = "$task_head_before" ] || fail "task HEAD changed after update conflict preflight"
   assert_clean "$project/login/frontend"
 }
