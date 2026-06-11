@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.12.0](https://github.com/tkhwang/workbranch/compare/v1.11.0...v1.12.0) (2026-06-10)
+
+
+### Features
+
+* **preflight:** improve conflict messages ([9d4fd04](https://github.com/tkhwang/workbranch/commit/9d4fd04fd5726cb495b72a9d6e07c0f97b4751eb))
+* **preflight:** improve conflict messages ([7a1c5a2](https://github.com/tkhwang/workbranch/commit/7a1c5a2df0b6a5aafe6e63dcda6f55e560e38357))
+
+
+### Bug Fixes
+
+* **preflight:** use absolute paths in guidance messages ([31d2add](https://github.com/tkhwang/workbranch/commit/31d2addea2a5ba297207fae40fdfceaaa6b6a430))
+
 ## [1.11.0](https://github.com/tkhwang/workbranch/compare/v1.10.0...v1.11.0) (2026-06-10)
 
 
