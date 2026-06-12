@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.13.0](https://github.com/tkhwang/workbranch/compare/v1.12.0...v1.13.0) (2026-06-12)
+
+
+### Features
+
+* **companion:** add task brief and notification commands ([58ca382](https://github.com/tkhwang/workbranch/commit/58ca382114dce701b61bace1ce519474288b4157)), closes [#123](https://github.com/tkhwang/workbranch/issues/123)
+* implement data sharing for  menu bar companion integration ([cf5915b](https://github.com/tkhwang/workbranch/commit/cf5915b4279136264f0d82535280bf889e6690ec))
+* **memo:** improve memo command and json escaping ([666b17e](https://github.com/tkhwang/workbranch/commit/666b17e28c22e0dc9b949a8b82847dbea55345ac))
+
+
+### Bug Fixes
+
+* **paths:** correct task notification path ([28287d1](https://github.com/tkhwang/workbranch/commit/28287d1349d72eb45882458c5351f7994c08dd53))
+
 ## [1.12.0](https://github.com/tkhwang/workbranch/compare/v1.11.0...v1.12.0) (2026-06-10)
 
 
