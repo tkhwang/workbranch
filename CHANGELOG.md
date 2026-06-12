@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.15.0](https://github.com/tkhwang/workbranch/compare/v1.14.0...v1.15.0) (2026-06-12)
+
+
+### Features
+
+* implement companion app release cipeline ([a657142](https://github.com/tkhwang/workbranch/commit/a657142454e004a82c3c3f0fb85727c93e35401d))
+
 ## [1.14.0](https://github.com/tkhwang/workbranch/compare/v1.13.0...v1.14.0) (2026-06-12)
 
 
