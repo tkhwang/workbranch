@@ -1,5 +1,8 @@
 # 0017 메모 우선 Companion SwiftBar Plugin 계획
 
+> **상태: [0019](0019-companion-native-menubar-app.md)로 대체됨 (superseded). 이 계획을 실행하지 않는다.**
+> SwiftBar/TypeScript/polling 스택 결정은 폐기되었다. 이유: SwiftBar 일반 plugin은 polling이 강제되고, 이를 피하는 streamable 구성은 native app과 아키텍처가 같으면서 SwiftBar/Node 의존만 남는다. memo-first UI, CLI contract(`list --json`), action execution boundary, multi-root config 등 제품 결정은 0019가 계승한다. 이 문서는 결정 이력 보존용이다.
+
 > **agentic worker 지침:** 실행 시 `superpowers:subagent-driven-development` 또는 `superpowers:executing-plans`를 사용한다. renderer, config loading, action arg-building, command execution boundary는 TDD로 구현한다. companion 코드는 `companion/**`에만 둔다. Bash CLI 코드(`src/workbranch/**`)를 수정하지 않는다. unit test는 `osascript`나 SwiftBar를 직접 실행하지 않는다.
 >
 > **시리즈 위치:** menu bar companion의 핵심 제품 단계다. 현재 순서: 0015 memo/noti/json → **0017 local 메모 우선 companion** → 0018 배포 배관. hard dependency는 0015의 `workbranch list --json`, `workbranch memo`, `workbranch noti`뿐이다. focus/open-warp와 release plumbing은 dependency가 아니다.

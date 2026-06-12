@@ -1,0 +1,265 @@
+import AppKit
+import Combine
+import Foundation
+import UserNotifications
+import CompanionCore
+
+@MainActor
+final class StateStore: ObservableObject {
+    @Published private(set) var menuState: MenuState
+    @Published private(set) var statusMessage: String = ""
+
+    private(set) var configURL: URL
+    private var config: CompanionConfig
+    private var previous: [String: WorkbranchListDocument] = [:]
+    private var notificationTracker = NotificationTracker()
+    private var debounceScheduler = DebounceScheduler(delay: 2.0)
+    private var refreshCoordinator = RefreshCoordinator()
+    private var debounceTimer: Timer?
+    private var heartbeatTimer: Timer?
+    private var rootWatcher: RootWatcher?
+    var configuredRoots: [String] { config.roots }
+
+    init(configURL: URL = StateStore.defaultConfigURL()) {
+        self.configURL = configURL
+        self.config = (try? CompanionConfig.load(from: configURL)) ?? (try! CompanionConfig(roots: []))
+        var tracker = NotificationTracker()
+        self.menuState = MenuState.make(configuredRoots: config.roots, results: [], previous: nil, tracker: &tracker, isBaseline: true)
+        self.notificationTracker = tracker
+        configureWatchers()
+        startHeartbeat()
+    }
+
+    static func defaultConfigURL() -> URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".config")
+            .appendingPathComponent("workbranch-companion")
+            .appendingPathComponent("config.json")
+    }
+
+    func reloadConfig() {
+        do {
+            config = try CompanionConfig.load(from: configURL)
+            statusMessage = "Config loaded"
+        } catch {
+            statusMessage = "Config error: \(error)"
+            config = (try? CompanionConfig(roots: [])) ?? config
+        }
+        configureWatchers()
+        refreshAll(isBaseline: true)
+    }
+
+    func refreshAll(isBaseline: Bool = false) {
+        let roots = config.roots
+        guard !roots.isEmpty else {
+            menuState = MenuState.make(configuredRoots: roots, results: [], previous: previous, tracker: &notificationTracker, isBaseline: true)
+            return
+        }
+        var results: [RootResult] = []
+        for root in roots {
+            results.append(refreshResult(root: root))
+        }
+        apply(results: results, isBaseline: isBaseline)
+    }
+
+    func refresh(root: String, isBaseline: Bool = false) {
+        apply(results: [refreshResult(root: root)], isBaseline: isBaseline)
+    }
+
+    func noteFilesystemChange(root: String) {
+        debounceScheduler.record(root: root, at: Date().timeIntervalSinceReferenceDate)
+        scheduleDebounceDrain()
+    }
+
+    private func scheduleDebounceDrain() {
+        debounceTimer?.invalidate()
+        debounceTimer = Timer.scheduledTimer(withTimeInterval: 2.05, repeats: false) { [weak self] _ in
+            Task { @MainActor in self?.drainDebouncedRoots() }
+        }
+    }
+
+    private func drainDebouncedRoots() {
+        let roots = debounceScheduler.dueRoots(at: Date().timeIntervalSinceReferenceDate)
+        for root in roots { refreshFromWatcher(root: root) }
+    }
+
+    private func refreshFromWatcher(root: String) {
+        guard refreshCoordinator.begin(root: root) else { return }
+        DispatchQueue.global(qos: .utility).async { [config] in
+            let result: RootResult
+            do {
+                let client = try CLIClient(config: config)
+                result = try .success(client.listJSON(root: root))
+            } catch {
+                result = .failure(root: root, message: String(describing: error))
+            }
+            Task { @MainActor in
+                self.apply(results: [result], isBaseline: false)
+                if self.refreshCoordinator.finish(root: root) == .runAgain {
+                    self.noteFilesystemChange(root: root)
+                }
+            }
+        }
+    }
+
+    func apply(results: [RootResult], isBaseline: Bool) {
+        for result in results {
+            if case .success(let document) = result {
+                previous[document.root] = document
+            }
+        }
+        menuState = MenuState.make(
+            configuredRoots: config.roots,
+            results: results,
+            previous: previous,
+            tracker: &notificationTracker,
+            isBaseline: isBaseline
+        )
+        for notification in menuState.notificationsToSend {
+            sendNotification(title: "Workbranch notification", body: "\(notification.task): \(notification.count) unread")
+        }
+    }
+
+    func saveMemo(root: String, task: String, text: String) {
+        runWorkbranchAction(root: root) { builder in builder.editMemo(root: root, task: task, text: text) }
+        refresh(root: root)
+    }
+
+    func perform(_ action: MenuAction) {
+        switch action {
+        case .editMemo:
+            break
+        case .clearNotifications(let root, let task):
+            runWorkbranchAction(root: root) { $0.clearNotifications(root: root, task: task) }
+            refresh(root: root)
+        case .openTerminal(let root, let task):
+            runWorkbranchAction(root: root) { $0.openTerminal(root: root, task: task) }
+        case .openIDE(let root, let task):
+            runWorkbranchAction(root: root) { $0.openIDE(root: root, task: task) }
+        case .revealFinder(let root, let task):
+            runWorkbranchAction(root: root) { $0.revealFinder(root: root, task: task) }
+        case .copyPath(let path):
+            runExternal(ActionBuilder(workbranchBin: "workbranch").copyPath(path))
+        case .openConfig:
+            openConfig()
+        case .refresh:
+            refreshAll()
+        case .newWorkspace:
+            break
+        case .quit:
+            quit()
+        }
+    }
+
+    func addWorkspace(root: String, task: String) {
+        do {
+            let client = try CLIClient(config: config)
+            let builder = ActionBuilder(workbranchBin: client.workbranchBin)
+            let command = try builder.validatedAdd(root: root, task: task)
+            runExternal(command)
+            sendNotification(title: "Workbranch add started", body: "\(task) is being created. Check /tmp/workbranch-add logs if it fails.")
+            noteFilesystemChange(root: root)
+        } catch {
+            statusMessage = "New workspace failed: \(error)"
+            sendNotification(title: "Workbranch add failed", body: String(describing: error))
+        }
+    }
+
+    func openConfig() {
+        do {
+            _ = try CompanionConfig.ensureGUIConfig(at: configURL)
+            NSWorkspace.shared.open(configURL)
+        } catch {
+            statusMessage = "Open config failed: \(error)"
+        }
+    }
+
+    func quit() {
+        rootWatcher?.stop()
+        heartbeatTimer?.invalidate()
+        NSApplication.shared.terminate(nil)
+    }
+
+    private func runWorkbranchAction(root: String, build: (ActionBuilder) -> ExternalCommand) {
+        do {
+            let client = try CLIClient(config: config)
+            runExternal(build(ActionBuilder(workbranchBin: client.workbranchBin)))
+        } catch {
+            statusMessage = "Action failed: \(error)"
+        }
+    }
+
+    private func runExternal(_ command: ExternalCommand) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: command.executable)
+        process.arguments = command.arguments
+        process.currentDirectoryURL = URL(fileURLWithPath: command.cwd ?? FileManager.default.currentDirectoryPath)
+        var env = ProcessInfo.processInfo.environment
+        let additions = ["/opt/homebrew/bin", "/usr/local/bin", NSString(string: "~/.local/bin").expandingTildeInPath]
+        env["PATH"] = (additions + [env["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"]).joined(separator: ":")
+        process.environment = env
+        if let standardInput = command.standardInput {
+            let input = Pipe()
+            process.standardInput = input
+            do {
+                try process.run()
+                if let data = standardInput.data(using: .utf8) { input.fileHandleForWriting.write(data) }
+                try? input.fileHandleForWriting.close()
+                process.waitUntilExit()
+                statusMessage = process.terminationStatus == 0 ? "Action complete" : "Action failed"
+            } catch {
+                statusMessage = "Action failed: \(error)"
+            }
+            return
+        }
+        do {
+            try process.run()
+            if command.detached {
+                statusMessage = "Action started"
+            } else {
+                process.waitUntilExit()
+                statusMessage = process.terminationStatus == 0 ? "Action complete" : "Action failed"
+            }
+        } catch {
+            statusMessage = "Action failed: \(error)"
+        }
+    }
+
+    private func sendNotification(title: String, body: String) {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.body = body
+            let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+            UNUserNotificationCenter.current().add(request)
+        }
+    }
+
+    private func configureWatchers() {
+        rootWatcher?.stop()
+        rootWatcher = RootWatcher(roots: config.roots, configURL: configURL, onRootChange: { [weak self] root in
+            self?.noteFilesystemChange(root: root)
+        }, onConfigChange: { [weak self] in
+            self?.reloadConfig()
+        })
+        rootWatcher?.start()
+    }
+
+    private func startHeartbeat() {
+        heartbeatTimer?.invalidate()
+        heartbeatTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.refreshAll() }
+        }
+    }
+
+    private func refreshResult(root: String) -> RootResult {
+        do {
+            let client = try CLIClient(config: config)
+            let document = try client.listJSON(root: root)
+            return .success(document)
+        } catch {
+            return .failure(root: root, message: String(describing: error))
+        }
+    }
+}

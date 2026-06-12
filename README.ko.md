@@ -182,6 +182,22 @@ Combined flow shortcut:
 
 `workbranch remove <task>`는 workspace 제거가 성공한 뒤 workbranch-managed task state만 삭제합니다. task root의 unrelated 파일은 보존됩니다.
 
+## Native menu bar companion preview
+
+`companion/`에는 local native macOS menu bar app인 `WorkbranchCompanion.app`이 있습니다. 이 app은 `workbranch list --json`을 소비해서 task memo title, notification count, dirty marker를 보여주고, inline memo edit, notification clear, 기존 Finder/IDE/terminal launch action을 제공합니다.
+
+Local build:
+
+```bash
+cd companion
+swift build
+swift run CompanionCoreTestRunner
+./scripts/build-app.sh
+open dist/WorkbranchCompanion.app
+```
+
+Root 설정은 `~/.config/workbranch-companion/config.json`에서 합니다. 현재는 local preview이며 public cask 배포는 별도 release-plumbing 계획에서 다룹니다.
+
 ## More docs
 
 - [Task identity와 branch 이름](docs/task-identity.ko.md)

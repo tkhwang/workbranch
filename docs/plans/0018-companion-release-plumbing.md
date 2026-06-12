@@ -1,5 +1,8 @@
 # 0018 Companion 배포 배관 계획
 
+> **상태: 재작성 필요. 이 계획을 현재 형태로 실행하지 않는다.**
+> 0017(SwiftBar/TypeScript)이 [0019](0019-companion-native-menubar-app.md)(native SwiftUI app)로 대체되면서 이 계획의 npm/`package.json`/SwiftBar bundle/formula 전제가 stale해졌다. public 배포 전 "GitHub release에 `.app` zip + 개인 tap `Casks/workbranch-companion.rb` + `swift build` CI + Developer ID 서명/notarization" 기준으로 재작성한다. release-please two-package 구성과 tag 분리(`workbranch-companion-v*`) 방향 자체는 유효하다.
+
 > **agentic worker 지침:** 이 계획은 release automation만 수정한다. `src/workbranch/**` 동작 변경과 `bin/workbranch` 재생성은 하지 않는다. 실행 시 `superpowers:subagent-driven-development` 또는 `superpowers:executing-plans`를 사용하고, workflow/config 검증과 실제 `v*` CLI release 관찰을 acceptance gate로 삼는다.
 >
 > **시리즈 위치:** companion 공개 배포 직전에 실행하는 deferred distribution step이다. 현재 순서: 0015 memo/noti/json → 0017 메모 우선 local companion → **0018 배포 배관**. 이 계획은 companion을 local로 만들거나 설치하는 데 필요하지 않다.
