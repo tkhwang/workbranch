@@ -2,7 +2,7 @@
 
 > **agentic worker 지침:** 실행 시 `superpowers:subagent-driven-development` 또는 `superpowers:executing-plans`를 사용한다. CompanionCore(menu model 파생, JSON decode, argv builder, config 검증, debounce 정책)는 TDD로 구현하고 `swift test`로 검증한다. unit test에서 FSEvents, `Process` 실행, SwiftUI rendering을 직접 수행하지 않는다. companion 코드는 `companion/**`에만 둔다. Bash CLI 코드(`src/workbranch/**`)와 `bin/workbranch`를 수정하지 않는다.
 >
-> **시리즈 위치:** menu bar companion의 핵심 제품 단계다. **이 계획은 0017(SwiftBar plugin)을 대체한다(supersede).** 0017의 제품 결정(memo-first UI, CLI contract, action execution boundary, multi-root config)은 계승하고, 기술 스택 결정(SwiftBar, TypeScript/Node, polling)은 폐기한다. 현재 순서: 0015 memo/noti/json(완료) → **0019 native menu bar companion** → 0018 배포 배관(cask 기준으로 재작성 필요). hard dependency는 0015의 `workbranch list --json`, `workbranch memo`, `workbranch noti`뿐이다.
+> **시리즈 위치:** menu bar companion의 핵심 제품 단계다. **이 계획은 0017(SwiftBar plugin)을 대체한다(supersede).** 0017의 제품 결정(memo-first UI, CLI contract, action execution boundary, multi-root config)은 계승하고, 기술 스택 결정(SwiftBar, TypeScript/Node, polling)은 폐기한다. 현재 순서: 0015 memo/noti/json(완료) → **0019 native menu bar companion** → 0020 brew cask 배포. hard dependency는 0015의 `workbranch list --json`, `workbranch memo`, `workbranch noti`뿐이다.
 
 **목표:** native SwiftUI menu bar app(`WorkbranchCompanion.app`)을 local로 제공한다. menu bar에서 task workspace 목록, memo title, notification count, dirty 상태를 보여주고, popover에서 memo inline 수정, notification clear, 새 workspace 생성, 기존 `workbranch finder` / `ide` / `terminal` launch action을 제공한다. polling 없이 FSEvents 기반 event-driven으로 갱신한다.
 
@@ -53,10 +53,10 @@
   - companion 통합 테스트는 repo 안의 실제 `bin/workbranch`를 temp project에 실행해 `list --json` 출력을 fixture로 쓸 수 있다. 분리 repo에서는 fixture 복제본이 조용히 drift한다.
   - nx/turborepo 같은 monorepo 도구는 도입하지 않는다. "한 repo + 패키지 두 개"이며 추가 tooling이 필요한 규모가 아니다.
   - **배포까지 고려해도 분리가 불필요하다:**
-    - release cadence 분리는 release-please component tag로 해결한다 — root는 plain `v*`(CLI formula), companion은 `workbranch-companion-v*`(app cask). 0018의 two-package 방향을 그대로 사용한다.
+    - release cadence 분리는 release-please component tag로 해결한다 — root는 plain `v*`(CLI formula), companion은 `workbranch-companion-v*`(app cask). 0020의 two-package 방향을 그대로 사용한다.
     - changelog/commit 분리는 `feat(companion): ...` scope와 `companion/CHANGELOG.md`로 한다.
     - Homebrew 채널은 어차피 별도 repo인 `tkhwang/homebrew-tap`이 `Formula/workbranch.rb`(CLI)와 `Casks/workbranch-companion.rb`(app)를 나란히 담는다. 소스 repo 분리를 요구하지 않는다.
-    - CI는 path-filtered workflow로 분리한다: 기존 `ci.yml`은 Bash suite 전용 유지, `companion-ci.yml`(`companion/**` trigger, macOS runner, `swift build`/`swift test`)을 추가한다. 구체 wiring은 재작성될 0018 범위다.
+    - CI는 path-filtered workflow로 분리한다: 기존 `ci.yml`은 Bash suite 전용 유지, `companion-ci.yml`(`companion/**` trigger, macOS runner, `swift build`/`swift test`)을 추가한다. 구체 wiring은 0020 범위다.
   - 분리 재검토 신호(그 전까지는 유지): companion에 별도 기여자/이슈 트래커/권한 분리가 필요해질 때, 서명·공증 secrets와 macOS 파이프라인이 CLI repo CI를 무겁게 만들 때, companion이 workbranch 외 대상을 다루는 독립 제품이 될 때. 분리는 `git filter-repo`로 `companion/` 히스토리만 추출하면 되므로 나중에 해도 비용이 낮다.
 
 - [x] **polling 제거: FSEvents + debounce + per-root re-pull + heartbeat.**
@@ -106,10 +106,10 @@
   - log path: `/tmp/workbranch-add-<root-hash>-<name>.log`
   - 완료/실패는 `UserNotifications`로 알린다.
 
-- [x] **배포는 Homebrew cask. 0018은 재작성 필요.**
+- [x] **배포는 Homebrew cask. 0020이 배포 배관을 담당한다.**
   - 이 계획은 local build/install만 다룬다.
-  - 0018의 npm/SwiftBar/formula 전제는 stale하다. public 배포 전 0018을 "GitHub release에 `.app` zip + 개인 tap `Casks/workbranch-companion.rb` + `swift build` CI" 기준으로 재작성한다.
-  - 서명: local 단계는 ad-hoc codesign으로 충분하다. 공개 배포 시 Developer ID + notarization은 재작성된 0018 범위다.
+  - 0020은 GitHub release에 `.app` zip을 올리고 개인 tap `Casks/workbranch-companion.rb`로 배포하는 cask 배관을 담당한다.
+  - 서명: local 단계는 ad-hoc codesign으로 충분하다. 공개 배포 시 Developer ID + notarization은 0020의 guarded release workflow 범위다.
 
 - [ ] **notification producer hook은 follow-up.** (0017 계승)
   - 이 계획은 existing/manual notification을 표시/clear한다. Claude Code hook → `workbranch noti add` 자동 연결은 별도 계획이다.
@@ -177,7 +177,7 @@ companion/README.md                               # local build/install/troubles
 README.md
 README.ko.md
 docs/plans/0017-companion-swiftbar-plugin.md      # superseded 표기
-docs/plans/0018-companion-release-plumbing.md     # 재작성 필요 표기
+docs/plans/0020-companion-brew-distribution.md     # stale 배포 계획을 대체한 brew cask 배포 계획
 ```
 
 ## 구현 작업
@@ -240,7 +240,7 @@ docs/plans/0018-companion-release-plumbing.md     # 재작성 필요 표기
 
 - [x] `companion/README.md`: build, local install(`build-app.sh` + `/Applications` 복사 또는 `open dist/...`), 로그인 시 자동 시작 안내, config(`Open config`는 없으면 빈 `roots: []` skeleton 생성), troubleshooting(Gatekeeper 우회 포함), known limits, release status.
 - [x] root `README.md` / `README.ko.md`에 companion preview section 추가.
-- [x] `0017` 상단에 superseded 표기, `0018` 상단에 재작성 필요 표기.
+- [x] `0017` 상단에 superseded 표기, stale 배포 계획 삭제 후 `0020` 대체 계획 작성.
 - [x] plan에 manual QA evidence 기록.
 
 ## 검증
@@ -282,9 +282,9 @@ open companion/dist/WorkbranchCompanion.app
 ## 위험과 완화
 
 - **SPM-only `.app` 조립:** Xcode project 없이 bundle을 만드는 build script가 초기 비용이다. Info.plist/서명 문제가 생기면 script를 고치면 되고, 정 안 되면 최소 Xcode project로 전환할 수 있다(코드는 그대로 이식).
-- **Gatekeeper:** local 단계는 ad-hoc sign + 직접 빌드라 문제없다. cask 배포 시 quarantine 차단은 재작성된 0018에서 Developer ID + notarization으로 해결한다(과도기는 `--no-quarantine` 안내).
+- **Gatekeeper:** local 단계는 ad-hoc sign + 직접 빌드라 문제없다. cask 배포 시 quarantine 차단은 0020에서 Developer ID + notarization으로 해결한다(과도기는 `--no-quarantine` 안내).
 - **FSEvents 이벤트 폭주:** agent가 활발히 작업하면 repo 쓰기 이벤트가 쏟아진다. `.git/` 내부 이벤트는 초기 구현부터 refresh trigger에서 제외하고, root별 debounce/coalesce + in-flight refresh 1개 제한을 1차 방어선으로 둔다. `list --json`이 fetch 없는 가벼운 명령이라(0015 결정) 재실행 비용은 낮고, `.git/` 필터로 놓치는 edge는 5분 heartbeat가 보완한다.
 - **GUI app의 PATH 부재:** binary 탐색을 config + 알려진 경로로 해결하고, launch action에 PATH를 보강해 넘긴다. `doctor` 성격의 안내 row로 미발견 상태를 노출한다.
 - **macOS 13+ 요구:** `MenuBarExtra` 최소 버전. 대상 사용자에게 현실적 제약이 아니다.
 - **old CLI contract:** `schemaVersion` + parse 실패 feature detection으로 명확한 error row를 보여준다.
-- **0018 drift:** npm/formula 전제가 stale하다. public 배포 전 재작성을 이 계획의 Task 6 표기로 강제한다.
+- **배포 계획 drift:** npm/formula 전제의 stale 배포 계획은 삭제하고 0020 brew cask 배포 계획으로 대체한다.

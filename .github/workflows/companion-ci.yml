@@ -1,0 +1,41 @@
+name: Companion CI
+
+on:
+  pull_request:
+    paths:
+      - "companion/**"
+      - ".github/workflows/companion-ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "companion/**"
+      - ".github/workflows/companion-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Build and test companion
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: companion
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test
+
+      - name: Core test runner
+        run: swift run CompanionCoreTestRunner
+
+      - name: App bundle smoke
+        run: ./scripts/build-app.sh

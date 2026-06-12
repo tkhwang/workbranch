@@ -182,9 +182,18 @@ Combined flow shortcuts:
 
 `workbranch remove <task>` deletes only workbranch-managed task state after successful workspace removal; unrelated files in the task root are preserved.
 
-## Native menu bar companion preview
+## Native menu bar companion
 
 `companion/` contains a local native macOS menu bar app, `WorkbranchCompanion.app`, that consumes `workbranch list --json` and provides a task cockpit for memo titles, notification counts, dirty markers, inline memo edits, notification clearing, and existing Finder/IDE/terminal launch actions.
+
+Install published releases with Homebrew:
+
+```bash
+brew tap tkhwang/tap
+brew install --cask --no-quarantine tkhwang/tap/workbranch-companion
+```
+
+`--no-quarantine` is required while companion releases are ad-hoc signed. Developer ID signing and notarization are enabled by the release workflow once Apple credentials are registered.
 
 Build it locally:
 
@@ -196,7 +205,7 @@ swift run CompanionCoreTestRunner
 open dist/WorkbranchCompanion.app
 ```
 
-Configure roots in `~/.config/workbranch-companion/config.json`. The app is a local preview; public cask distribution is planned separately.
+Configure roots in `~/.config/workbranch-companion/config.json`.
 
 ## More docs
 

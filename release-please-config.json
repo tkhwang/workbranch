@@ -5,10 +5,31 @@
   "packages": {
     ".": {
       "package-name": "workbranch",
+      "exclude-paths": [
+        "companion",
+        ".github",
+        "docs",
+        "README.md",
+        "README.ko.md",
+        "release-please-config.json",
+        ".release-please-manifest.json"
+      ],
       "extra-files": [
         {
           "type": "generic",
           "path": "bin/workbranch"
+        }
+      ]
+    },
+    "companion": {
+      "package-name": "workbranch-companion",
+      "component": "workbranch-companion",
+      "release-type": "simple",
+      "include-component-in-tag": true,
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "scripts/build-app.sh"
         }
       ]
     }
