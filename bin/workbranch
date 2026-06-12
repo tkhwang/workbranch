@@ -1286,7 +1286,7 @@ task_brief_path() { printf '%s/%s/TASK-WORKBRANCH.md' "$PROJECT_ROOT" "$1"; }
 
 task_agents_path() { printf '%s/%s/AGENTS.md' "$PROJECT_ROOT" "$1"; }
 
-task_noti_path() { printf '%s/%s/notifications.jsonl' "$(task_state_dir_path "$1")"; }
+task_noti_path() { printf '%s/notifications.jsonl' "$(task_state_dir_path "$1")"; }
 
 task_brief_title() {
   local file line
