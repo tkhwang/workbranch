@@ -27,6 +27,7 @@ final class StateStore: ObservableObject {
         self.menuState = MenuState.make(configuredRoots: config.roots, results: [], previous: nil, tracker: &tracker, isBaseline: true)
         self.notificationTracker = tracker
         configureWatchers()
+        refreshAll(isBaseline: true)
         startHeartbeat()
     }
 
@@ -55,15 +56,23 @@ final class StateStore: ObservableObject {
             menuState = MenuState.make(configuredRoots: roots, results: [], previous: previous, tracker: &notificationTracker, isBaseline: true)
             return
         }
-        var results: [RootResult] = []
-        for root in roots {
-            results.append(refreshResult(root: root))
+        let refreshConfig = config
+        Task { [weak self, roots, refreshConfig] in
+            let results = await Self.refreshResultsAsync(roots: roots, config: refreshConfig)
+            await MainActor.run {
+                self?.apply(results: results, isBaseline: isBaseline)
+            }
         }
-        apply(results: results, isBaseline: isBaseline)
     }
 
     func refresh(root: String, isBaseline: Bool = false) {
-        apply(results: [refreshResult(root: root)], isBaseline: isBaseline)
+        let refreshConfig = config
+        Task { [weak self, root, refreshConfig] in
+            let result = await Self.refreshResultAsync(root: root, config: refreshConfig)
+            await MainActor.run {
+                self?.apply(results: [result], isBaseline: isBaseline)
+            }
+        }
     }
 
     func noteFilesystemChange(root: String) {
@@ -85,15 +94,11 @@ final class StateStore: ObservableObject {
 
     private func refreshFromWatcher(root: String) {
         guard refreshCoordinator.begin(root: root) else { return }
-        DispatchQueue.global(qos: .utility).async { [config] in
-            let result: RootResult
-            do {
-                let client = try CLIClient(config: config)
-                result = try .success(client.listJSON(root: root))
-            } catch {
-                result = .failure(root: root, message: String(describing: error))
-            }
-            Task { @MainActor in
+        let refreshConfig = config
+        Task { [weak self, root, refreshConfig] in
+            let result = await Self.refreshResultAsync(root: root, config: refreshConfig)
+            await MainActor.run {
+                guard let self else { return }
                 self.apply(results: [result], isBaseline: false)
                 if self.refreshCoordinator.finish(root: root) == .runAgain {
                     self.noteFilesystemChange(root: root)
@@ -168,6 +173,7 @@ final class StateStore: ObservableObject {
     func openConfig() {
         do {
             _ = try CompanionConfig.ensureGUIConfig(at: configURL)
+            configureWatchers()
             NSWorkspace.shared.open(configURL)
         } catch {
             statusMessage = "Open config failed: \(error)"
@@ -190,28 +196,15 @@ final class StateStore: ObservableObject {
     }
 
     private func runExternal(_ command: ExternalCommand) {
+        if let standardInput = command.standardInput {
+            runStandardInputExternal(command, standardInput: standardInput)
+            return
+        }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: command.executable)
         process.arguments = command.arguments
         process.currentDirectoryURL = URL(fileURLWithPath: command.cwd ?? FileManager.default.currentDirectoryPath)
-        var env = ProcessInfo.processInfo.environment
-        let additions = ["/opt/homebrew/bin", "/usr/local/bin", NSString(string: "~/.local/bin").expandingTildeInPath]
-        env["PATH"] = (additions + [env["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"]).joined(separator: ":")
-        process.environment = env
-        if let standardInput = command.standardInput {
-            let input = Pipe()
-            process.standardInput = input
-            do {
-                try process.run()
-                if let data = standardInput.data(using: .utf8) { input.fileHandleForWriting.write(data) }
-                try? input.fileHandleForWriting.close()
-                process.waitUntilExit()
-                statusMessage = process.terminationStatus == 0 ? "Action complete" : "Action failed"
-            } catch {
-                statusMessage = "Action failed: \(error)"
-            }
-            return
-        }
+        process.environment = Self.augmentedEnvironment()
         do {
             try process.run()
             if command.detached {
@@ -223,6 +216,44 @@ final class StateStore: ObservableObject {
         } catch {
             statusMessage = "Action failed: \(error)"
         }
+    }
+
+    private func runStandardInputExternal(_ command: ExternalCommand, standardInput: String) {
+        let environment = Self.augmentedEnvironment()
+        Task { [weak self, command, standardInput, environment] in
+            let message = await Task.detached(priority: .utility) {
+                Self.runStandardInputProcess(command: command, standardInput: standardInput, environment: environment)
+            }.value
+            await MainActor.run {
+                self?.statusMessage = message
+            }
+        }
+    }
+
+    private nonisolated static func runStandardInputProcess(command: ExternalCommand, standardInput: String, environment: [String: String]) -> String {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: command.executable)
+        process.arguments = command.arguments
+        process.currentDirectoryURL = URL(fileURLWithPath: command.cwd ?? FileManager.default.currentDirectoryPath)
+        process.environment = environment
+        let input = Pipe()
+        process.standardInput = input
+        do {
+            try process.run()
+            if let data = standardInput.data(using: .utf8) { input.fileHandleForWriting.write(data) }
+            try? input.fileHandleForWriting.close()
+            process.waitUntilExit()
+            return process.terminationStatus == 0 ? "Action complete" : "Action failed"
+        } catch {
+            return "Action failed: \(error)"
+        }
+    }
+
+    private nonisolated static func augmentedEnvironment() -> [String: String] {
+        var env = ProcessInfo.processInfo.environment
+        let additions = ["/opt/homebrew/bin", "/usr/local/bin", NSString(string: "~/.local/bin").expandingTildeInPath]
+        env["PATH"] = (additions + [env["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"]).joined(separator: ":")
+        return env
     }
 
     private func sendNotification(title: String, body: String) {
@@ -238,6 +269,12 @@ final class StateStore: ObservableObject {
 
     private func configureWatchers() {
         rootWatcher?.stop()
+        let configDirectory = configURL.deletingLastPathComponent()
+        do {
+            try FileManager.default.createDirectory(at: configDirectory, withIntermediateDirectories: true)
+        } catch {
+            statusMessage = "Config watcher failed: \(error)"
+        }
         rootWatcher = RootWatcher(roots: config.roots, configURL: configURL, onRootChange: { [weak self] root in
             self?.noteFilesystemChange(root: root)
         }, onConfigChange: { [weak self] in
@@ -253,7 +290,28 @@ final class StateStore: ObservableObject {
         }
     }
 
-    private func refreshResult(root: String) -> RootResult {
+    private nonisolated static func refreshResultsAsync(roots: [String], config: CompanionConfig) async -> [RootResult] {
+        await withTaskGroup(of: (Int, RootResult).self) { group in
+            for (index, root) in roots.enumerated() {
+                group.addTask {
+                    (index, await refreshResultAsync(root: root, config: config))
+                }
+            }
+            var indexedResults: [(Int, RootResult)] = []
+            for await result in group {
+                indexedResults.append(result)
+            }
+            return indexedResults.sorted { $0.0 < $1.0 }.map { $0.1 }
+        }
+    }
+
+    private nonisolated static func refreshResultAsync(root: String, config: CompanionConfig) async -> RootResult {
+        await Task.detached(priority: .utility) {
+            refreshResult(root: root, config: config)
+        }.value
+    }
+
+    private nonisolated static func refreshResult(root: String, config: CompanionConfig) -> RootResult {
         do {
             let client = try CLIClient(config: config)
             let document = try client.listJSON(root: root)

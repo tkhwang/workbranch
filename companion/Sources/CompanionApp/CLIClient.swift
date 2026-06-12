@@ -1,16 +1,6 @@
 import Foundation
 import CompanionCore
 
-struct CommandResult: Equatable, Sendable {
-    let exitCode: Int32
-    let stdout: Data
-    let stderr: Data
-    let timedOut: Bool
-
-    var stdoutText: String { String(data: stdout, encoding: .utf8) ?? "" }
-    var stderrText: String { String(data: stderr, encoding: .utf8) ?? "" }
-}
-
 struct CLIClient: Sendable {
     let workbranchBin: String
     let timeout: TimeInterval
@@ -61,50 +51,12 @@ struct CLIClient: Sendable {
     }
 
     private func run(executable: String, arguments: [String], cwd: String, standardInput: String?, detached: Bool) throws -> CommandResult {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
-        process.currentDirectoryURL = URL(fileURLWithPath: cwd)
-        process.environment = augmentedEnvironment()
-
-        if detached {
-            process.standardOutput = nil
-            process.standardError = nil
-            try process.run()
-            return CommandResult(exitCode: 0, stdout: Data(), stderr: Data(), timedOut: false)
-        }
-
-        let stdout = Pipe()
-        let stderr = Pipe()
-        process.standardOutput = stdout
-        process.standardError = stderr
-        if let standardInput {
-            let input = Pipe()
-            process.standardInput = input
-            try process.run()
-            if let data = standardInput.data(using: .utf8) {
-                input.fileHandleForWriting.write(data)
-            }
-            try? input.fileHandleForWriting.close()
-        } else {
-            try process.run()
-        }
-
-        let deadline = Date().addingTimeInterval(timeout)
-        while process.isRunning && Date() < deadline {
-            Thread.sleep(forTimeInterval: 0.02)
-        }
-        var timedOut = false
-        if process.isRunning {
-            timedOut = true
-            process.terminate()
-        }
-        process.waitUntilExit()
-        return CommandResult(
-            exitCode: process.terminationStatus,
-            stdout: stdout.fileHandleForReading.readDataToEndOfFile(),
-            stderr: stderr.fileHandleForReading.readDataToEndOfFile(),
-            timedOut: timedOut
+        try ProcessRunner(timeout: timeout, environment: augmentedEnvironment()).run(
+            executable: executable,
+            arguments: arguments,
+            cwd: cwd,
+            standardInput: standardInput,
+            detached: detached
         )
     }
 

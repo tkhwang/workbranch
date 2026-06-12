@@ -31,7 +31,7 @@ public enum MenuAction: Equatable, Sendable {
     case quit
 }
 
-public struct MenuRow: Equatable, Sendable {
+public struct MenuRow: Equatable, Identifiable, Sendable {
     public let kind: MenuRowKind
     public let title: String
     public let subtitle: String?
@@ -40,6 +40,16 @@ public struct MenuRow: Equatable, Sendable {
     public let taskName: String?
     public let memoTitle: String?
     public let notificationCount: Int
+
+    public var id: String {
+        if let primaryAction {
+            return "primary:\(MenuRow.actionID(primaryAction))"
+        }
+        if let taskName, let subtitle {
+            return "task:\(subtitle)\u{0}\(taskName)"
+        }
+        return "\(kind):\(title)\u{0}\(subtitle ?? "")"
+    }
 
     public init(
         kind: MenuRowKind,
@@ -60,12 +70,31 @@ public struct MenuRow: Equatable, Sendable {
         self.memoTitle = memoTitle
         self.notificationCount = notificationCount
     }
+
+    private static func actionID(_ action: MenuAction) -> String {
+        switch action {
+        case .editMemo(let root, let task): return "editMemo:\(root)\u{0}\(task)"
+        case .clearNotifications(let root, let task): return "clearNotifications:\(root)\u{0}\(task)"
+        case .openTerminal(let root, let task): return "openTerminal:\(root)\u{0}\(task)"
+        case .openIDE(let root, let task): return "openIDE:\(root)\u{0}\(task)"
+        case .revealFinder(let root, let task): return "revealFinder:\(root)\u{0}\(task)"
+        case .copyPath(let path): return "copyPath:\(path)"
+        case .openConfig: return "openConfig"
+        case .refresh: return "refresh"
+        case .newWorkspace(let root): return "newWorkspace:\(root ?? "")"
+        case .quit: return "quit"
+        }
+    }
 }
 
-public struct MenuSection: Equatable, Sendable {
+public struct MenuSection: Equatable, Identifiable, Sendable {
     public let root: String?
     public let title: String
     public let rows: [MenuRow]
+
+    public var id: String {
+        root.map { "root:\($0)" } ?? "companion:\(title)"
+    }
 }
 
 public struct TaskNotification: Equatable, Sendable {
@@ -118,13 +147,17 @@ public struct MenuState: Equatable, Sendable {
             )
         }
 
-        let resultByRoot = Dictionary(uniqueKeysWithValues: results.map { ($0.root, $0) })
+        let roots = orderedUnique(configuredRoots)
+        var resultByRoot: [String: RootResult] = [:]
+        for result in results {
+            resultByRoot[result.root] = result
+        }
         var sections: [MenuSection] = []
         var taskCount = 0
         var rootsWithNotifications = Set<String>()
         var notifications: [TaskNotification] = []
 
-        for root in configuredRoots {
+        for root in roots {
             let result = resultByRoot[root]
             let document: WorkbranchListDocument?
             let errorMessage: String?
@@ -137,7 +170,7 @@ public struct MenuState: Equatable, Sendable {
                 errorMessage = message
             case nil:
                 document = previous?[root]
-                errorMessage = "No refresh result for root"
+                errorMessage = document == nil ? "No refresh result for root" : nil
             }
 
             var rows: [MenuRow] = []
@@ -171,6 +204,15 @@ public struct MenuState: Equatable, Sendable {
             title += " 🔔\(rootsWithNotifications.count)"
         }
         return MenuState(title: title, sections: sections, notificationsToSend: notifications)
+    }
+
+    private static func orderedUnique(_ roots: [String]) -> [String] {
+        var seen = Set<String>()
+        var uniqueRoots: [String] = []
+        for root in roots where seen.insert(root).inserted {
+            uniqueRoots.append(root)
+        }
+        return uniqueRoots
     }
 
     private static func row(for task: WorkbranchTask, root: String) -> MenuRow {

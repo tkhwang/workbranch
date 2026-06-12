@@ -16,13 +16,16 @@ public struct TaskNameValidator: Sendable {
 
     public static func isValid(_ value: String) -> Bool {
         guard !value.isEmpty, value != ".", value != ".." else { return false }
+        guard value.first != "-" else { return false }
         guard !value.contains("/") else { return false }
         guard value.rangeOfCharacter(from: safeScalars.inverted) == nil else { return false }
         if let dash = value.firstIndex(of: "-") {
             let prefix = String(value[..<dash])
             if conventionalPrefixes.contains(prefix) {
                 let detail = String(value[value.index(after: dash)...])
-                return !detail.isEmpty && detail.rangeOfCharacter(from: safeScalars.inverted) == nil
+                return !detail.isEmpty &&
+                    detail.rangeOfCharacter(from: safeScalars.inverted) == nil &&
+                    isValidBranchRef("\(prefix)/\(detail)")
             }
         }
         return true
@@ -30,6 +33,21 @@ public struct TaskNameValidator: Sendable {
 
     public static func validate(_ value: String) throws {
         guard isValid(value) else { throw ActionError.invalidTaskName(value) }
+    }
+
+    private static func isValidBranchRef(_ value: String) -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        process.arguments = ["check-ref-format", "--branch", value]
+        process.standardOutput = Pipe()
+        process.standardError = Pipe()
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus == 0
+        } catch {
+            return false
+        }
     }
 }
 
@@ -81,12 +99,12 @@ public struct ActionBuilder: Sendable {
         ExternalCommand(executable: "/usr/bin/pbcopy", arguments: [], standardInput: path)
     }
 
-    public func add(root: String, task: String) -> ExternalCommand {
-        ExternalCommand(executable: workbranchBin, arguments: ["add", task], cwd: root, detached: true)
+    public func add(root: String, task: String) throws -> ExternalCommand {
+        try TaskNameValidator.validate(task)
+        return ExternalCommand(executable: workbranchBin, arguments: ["add", task], cwd: root, detached: true)
     }
 
     public func validatedAdd(root: String, task: String) throws -> ExternalCommand {
-        try TaskNameValidator.validate(task)
-        return add(root: root, task: task)
+        try add(root: root, task: task)
     }
 }

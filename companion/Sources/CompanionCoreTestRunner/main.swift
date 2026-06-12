@@ -14,10 +14,21 @@ func expectThrows(_ message: String, _ body: () throws -> Void) throws {
     do {
         try body()
         throw TestFailure(message: "Expected throw: \(message)")
-    } catch is TestFailure {
-        throw TestFailure(message: "Expected throw: \(message)")
+    } catch let error as TestFailure {
+        throw error
     } catch {
         return
+    }
+}
+
+func runHarnessHelperTests() throws {
+    do {
+        try expectThrows("outer expectation") {
+            throw TestFailure(message: "inner assertion")
+        }
+        throw TestFailure(message: "expectThrows should rethrow body TestFailure")
+    } catch let error as TestFailure {
+        try expect(error.message == "inner assertion", "expectThrows preserves TestFailure from body")
     }
 }
 
@@ -112,6 +123,36 @@ func runModelsAndMenuStateTests() throws {
     try expect(failedWithPrevious.sections[0].rows[0].title.contains("timeout"), "last success error row")
     try expect(failedWithPrevious.sections[0].rows[1].title.contains("task3"), "last success task row")
 
+    let otherPreviousDocument = try WorkbranchListDocument.decode(Data("""
+    {"schemaVersion":1,"project":"other","root":"/tmp/other","tasks":[
+      {"name":"other-task","path":"/tmp/other/other-task","memoTitle":"","notiCount":0,"repos":[]}
+    ]}
+    """.utf8))
+    let singleRootRefresh = MenuState.make(
+        configuredRoots: ["/tmp/fullstack", "/tmp/other"],
+        results: [.success(stateDoc)],
+        previous: [
+            "/tmp/fullstack": previousDocument,
+            "/tmp/other": otherPreviousDocument,
+        ],
+        tracker: &tracker,
+        isBaseline: false
+    )
+    try expect(singleRootRefresh.sections.count == 2, "single-root refresh keeps all sections")
+    try expect(singleRootRefresh.sections[1].rows.allSatisfy { $0.kind != .error }, "cached omitted root should not become an error row")
+    try expect(singleRootRefresh.sections[1].rows[0].title.contains("other-task"), "cached omitted root keeps previous task")
+
+    let duplicateRootRefresh = MenuState.make(
+        configuredRoots: ["/tmp/fullstack", "/tmp/fullstack"],
+        results: [.success(stateDoc), .success(stateDoc)],
+        previous: nil,
+        tracker: &tracker,
+        isBaseline: false
+    )
+    try expect(duplicateRootRefresh.title == "⎇ 2 🔔1", "duplicate root does not double-count tasks")
+    try expect(duplicateRootRefresh.sections.count == 1, "duplicate configured root is coalesced")
+    try expect(duplicateRootRefresh.sections[0].root == "/tmp/fullstack", "duplicate root keeps first section")
+
     let root = "/tmp/fullstack"
     let initial = try WorkbranchListDocument.decode(Data("""
     {"schemaVersion":1,"project":"fullstack","root":"/tmp/fullstack","tasks":[
@@ -173,6 +214,9 @@ func runConfigActionsDebounceTests() throws {
 
     try expect(TaskNameValidator.isValid("Task_1.2"), "allows CLI safe name")
     try expect(TaskNameValidator.isValid("feat-branch-name"), "allows conventional task folder")
+    try expect(!TaskNameValidator.isValid("feat-.hidden"), "rejects conventional task folder that derives hidden branch component")
+    try expect(!TaskNameValidator.isValid("feat-bad.lock"), "rejects conventional task folder that derives .lock branch")
+    try expect(!TaskNameValidator.isValid("-bad"), "rejects task folder that can be parsed as an option")
     try expect(!TaskNameValidator.isValid(""), "rejects empty")
     try expect(!TaskNameValidator.isValid("."), "rejects dot")
     try expect(!TaskNameValidator.isValid(".."), "rejects dotdot")
@@ -188,8 +232,12 @@ func runConfigActionsDebounceTests() throws {
     try expect(actions.revealFinder(root: "/tmp/fullstack", task: "task3").arguments == ["finder", "task3"], "finder argv")
     try expect(actions.copyPath("/tmp/fullstack/task3").executable == "/usr/bin/pbcopy", "copy path executable")
     try expect(actions.copyPath("/tmp/fullstack/task3").standardInput == "/tmp/fullstack/task3", "copy path stdin")
-    try expect(actions.add(root: "/tmp/fullstack", task: "Task_1").arguments == ["add", "Task_1"], "add argv")
+    let addCommand = try actions.add(root: "/tmp/fullstack", task: "Task_1")
+    try expect(addCommand.arguments == ["add", "Task_1"], "add argv")
+    try expectThrows("unsafe add rejected") { _ = try actions.add(root: "/tmp/fullstack", task: "-bad") }
     try expectThrows("invalid task rejected") { _ = try actions.validatedAdd(root: "/tmp/fullstack", task: "bad/name") }
+    try expectThrows("invalid conventional branch rejected") { _ = try actions.validatedAdd(root: "/tmp/fullstack", task: "feat-.hidden") }
+    try expectThrows("option-looking task rejected") { _ = try actions.validatedAdd(root: "/tmp/fullstack", task: "-bad") }
 
     let policy = EventFilter()
     try expect(policy.shouldRefresh(forPath: "/tmp/fullstack/task3/TASK-WORKBRANCH.md", root: "/tmp/fullstack"), "task state event refreshes")
@@ -212,9 +260,139 @@ func runConfigActionsDebounceTests() throws {
     try expect(coordinator.finish(root: "/a") == .idle, "no pending after follow-up")
 }
 
+func runProcessRunnerTests() throws {
+    let fm = FileManager.default
+    let temp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("workbranch-companion-process-tests-\(UUID().uuidString)")
+    try fm.createDirectory(at: temp, withIntermediateDirectories: true)
+    defer { try? fm.removeItem(at: temp) }
+
+    let bytes = 1024 * 1024
+    let script = """
+    import sys
+    sys.stdout.write("O" * \(bytes))
+    sys.stdout.flush()
+    sys.stderr.write("E" * \(bytes))
+    sys.stderr.flush()
+    """
+    let result = try ProcessRunner(timeout: 2).run(
+        executable: "/usr/bin/python3",
+        arguments: ["-c", script],
+        cwd: temp.path
+    )
+    try expect(!result.timedOut, "large stdout/stderr child should finish without timeout")
+    try expect(result.exitCode == 0, "large output child exits cleanly")
+    try expect(result.stdout.count == bytes, "large stdout drained while running")
+    try expect(result.stderr.count == bytes, "large stderr drained while running")
+
+    let stubbornScript = """
+    import signal
+    import sys
+    import time
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    sys.stdout.write("started\\n")
+    sys.stdout.flush()
+    sys.stderr.write("still running\\n")
+    sys.stderr.flush()
+    time.sleep(2)
+    """
+    let timeoutStart = Date()
+    let stubborn = try ProcessRunner(timeout: 0.1).run(
+        executable: "/usr/bin/python3",
+        arguments: ["-c", stubbornScript],
+        cwd: temp.path
+    )
+    let elapsed = Date().timeIntervalSince(timeoutStart)
+    try expect(stubborn.timedOut, "stubborn child reports timeout")
+    try expect(elapsed < 1.2, "stubborn child is force-killed after a short graceful timeout")
+    try expect(stubborn.exitCode != 0, "force-killed child does not report clean exit")
+    try expect(stubborn.stdoutText.contains("started"), "stubborn child stdout is preserved")
+    try expect(stubborn.stderrText.contains("still running"), "stubborn child stderr is preserved")
+}
+
+func runAppSourceInvariantTests() throws {
+    let fm = FileManager.default
+    let stateStorePath = "Sources/CompanionApp/StateStore.swift"
+    let popoverPath = "Sources/CompanionApp/Views/CompanionPopoverView.swift"
+    let stateStore = try String(contentsOfFile: stateStorePath, encoding: .utf8)
+    let popover = try String(contentsOfFile: popoverPath, encoding: .utf8)
+    try expect(fm.fileExists(atPath: stateStorePath), "StateStore source exists")
+    try expect(fm.fileExists(atPath: popoverPath), "popover source exists")
+    guard
+        let initStart = stateStore.range(of: "init(configURL:"),
+        let initEnd = stateStore[initStart.lowerBound...].range(of: "static func defaultConfigURL")
+    else {
+        throw TestFailure(message: "StateStore init body not found")
+    }
+    let initBody = String(stateStore[initStart.lowerBound..<initEnd.lowerBound])
+    try expect(initBody.contains("refreshAll(isBaseline: true)"), "StateStore init triggers initial baseline refresh")
+    try expect(!popover.contains("store.refreshAll(isBaseline: true)"), "popover appearance does not own startup baseline refresh")
+    guard
+        let configureStart = stateStore.range(of: "private func configureWatchers()"),
+        let configureEnd = stateStore[configureStart.lowerBound...].range(of: "private func startHeartbeat()")
+    else {
+        throw TestFailure(message: "StateStore configureWatchers body not found")
+    }
+    let configureBody = String(stateStore[configureStart.lowerBound..<configureEnd.lowerBound])
+    try expect(configureBody.contains("configURL.deletingLastPathComponent()"), "config watcher derives config directory")
+    guard
+        let createDirectoryRange = configureBody.range(of: "createDirectory"),
+        let rootWatcherRange = configureBody.range(of: "RootWatcher")
+    else {
+        throw TestFailure(message: "config watcher creates config directory before installing RootWatcher")
+    }
+    try expect(createDirectoryRange.lowerBound < rootWatcherRange.lowerBound, "config directory is created before RootWatcher")
+    guard
+        let refreshAllStart = stateStore.range(of: "func refreshAll(isBaseline:"),
+        let refreshAllEnd = stateStore[refreshAllStart.lowerBound...].range(of: "func refresh(root:")
+    else {
+        throw TestFailure(message: "StateStore refreshAll body not found")
+    }
+    let refreshAllBody = String(stateStore[refreshAllStart.lowerBound..<refreshAllEnd.lowerBound])
+    try expect(!refreshAllBody.contains("refreshResult(root:"), "refreshAll does not run CLI refresh synchronously on MainActor")
+    try expect(refreshAllBody.contains("Task {"), "refreshAll schedules async refresh work")
+    guard
+        let refreshStart = stateStore.range(of: "func refresh(root:"),
+        let refreshEnd = stateStore[refreshStart.lowerBound...].range(of: "func noteFilesystemChange")
+    else {
+        throw TestFailure(message: "StateStore refresh body not found")
+    }
+    let refreshBody = String(stateStore[refreshStart.lowerBound..<refreshEnd.lowerBound])
+    try expect(!refreshBody.contains("refreshResult(root:"), "refresh(root:) does not run CLI refresh synchronously on MainActor")
+    try expect(refreshBody.contains("Task {"), "refresh(root:) schedules async refresh work")
+    try expect(stateStore.contains("withTaskGroup"), "multi-root refresh runs roots concurrently")
+    try expect(stateStore.contains("Task.detached"), "CLI listJSON work is detached from MainActor")
+    guard
+        let stdinBranchStart = stateStore.range(of: "if let standardInput = command.standardInput"),
+        let stdinBranchEnd = stateStore[stdinBranchStart.lowerBound...].range(of: "return")
+    else {
+        throw TestFailure(message: "StateStore stdin runExternal branch not found")
+    }
+    let stdinBranch = String(stateStore[stdinBranchStart.lowerBound..<stdinBranchEnd.lowerBound])
+    try expect(stdinBranch.contains("runStandardInputExternal"), "stdin branch delegates process work off MainActor")
+    try expect(!stdinBranch.contains("waitUntilExit()"), "stdin branch does not wait for process on MainActor")
+    try expect(!stdinBranch.contains("fileHandleForWriting.write"), "stdin branch does not write stdin on MainActor")
+    try expect(!stdinBranch.contains("process.run()"), "stdin branch does not run process on MainActor")
+    try expect(stateStore.contains("private func runStandardInputExternal"), "StateStore has async stdin external runner")
+    guard
+        let sectionForEachStart = popover.range(of: "ForEach(store.menuState.sections"),
+        let rowForEachStart = popover.range(of: "ForEach(section.rows")
+    else {
+        throw TestFailure(message: "popover uses stable model ids for section and row ForEach")
+    }
+    let sectionPrefix = String(popover[..<sectionForEachStart.lowerBound])
+    let rowPrefix = String(popover[..<rowForEachStart.lowerBound])
+    try expect(!sectionPrefix.contains("store.menuState.sections.enumerated()"), "section ForEach does not use offset ids")
+    try expect(!rowPrefix.contains("section.rows.enumerated()"), "row ForEach does not use offset ids")
+    try expect(popover.contains("ForEach(store.menuState.sections)"), "section ForEach uses Identifiable sections")
+    try expect(popover.contains("ForEach(section.rows)"), "row ForEach uses Identifiable rows")
+}
+
 do {
+    try runHarnessHelperTests()
     try runModelsAndMenuStateTests()
     try runConfigActionsDebounceTests()
+    try runProcessRunnerTests()
+    try runAppSourceInvariantTests()
     print("CompanionCoreTestRunner: PASS")
 } catch {
     fputs("CompanionCoreTestRunner: FAIL: \(error)\n", stderr)

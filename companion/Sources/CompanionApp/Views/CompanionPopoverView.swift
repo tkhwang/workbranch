@@ -12,7 +12,7 @@ struct CompanionPopoverView: View {
             header
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
-                    ForEach(Array(store.menuState.sections.enumerated()), id: \.offset) { _, section in
+                    ForEach(store.menuState.sections) { section in
                         sectionView(section)
                     }
                 }
@@ -30,7 +30,6 @@ struct CompanionPopoverView: View {
         .frame(width: 480, height: 560)
         .onAppear {
             if selectedRoot.isEmpty { selectedRoot = store.configuredRoots.first ?? "" }
-            store.refreshAll(isBaseline: true)
         }
         .sheet(isPresented: $showingNewWorkspace) { newWorkspaceSheet }
     }
@@ -50,7 +49,7 @@ struct CompanionPopoverView: View {
             Text(section.title)
                 .font(.subheadline)
                 .fontWeight(.semibold)
-            ForEach(Array(section.rows.enumerated()), id: \.offset) { _, row in
+            ForEach(section.rows) { row in
                 RowView(row: row, store: store)
             }
         }
