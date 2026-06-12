@@ -8,7 +8,7 @@
 
 **아키텍처:** release-please manifest mode를 two-package로 구성한다(root `.` = `workbranch`, plain `v*` 보존 / `companion/` = `workbranch-companion`, component tag). companion release가 publish되면 전용 `companion-release.yml`이 macOS runner에서 universal `.app`을 조립하고, Apple secrets가 있으면 Developer ID 서명 + notarization, 없으면 ad-hoc 그대로 zip을 release asset으로 업로드한 뒤 **같은 job에서** tap의 `Casks/workbranch-companion.rb`를 bump한다(asset 업로드 후 같은 job에서 sha256을 계산하므로 race가 없다). 지금 단계는 ad-hoc + `--no-quarantine`으로 배포하고, Developer ID는 secrets 등록만으로 활성화되는 guarded 단계로 둔다.
 
-**기술 스택:** release-please manifest config, GitHub Actions(macOS runner — public repo라 무료), `ditto`/`codesign`/`notarytool`, Homebrew cask, 기존 `tkhwang/homebrew-tap`.
+**기술 스택:** release-please manifest config, GitHub Actions(macOS 15 runner — public repo라 무료), `ditto`/`codesign`/`notarytool`, Homebrew cask, 기존 `tkhwang/homebrew-tap`.
 
 **제품 관점:** companion 제품 기능이 아니라 배포 배관이다. 사용자 경험 목표는 CLI와 동일한 한 줄 설치다: `brew install --cask tkhwang/tap/workbranch-companion` (ad-hoc 과도기에는 `--no-quarantine` 추가).
 
@@ -59,7 +59,7 @@
   - cask 파일이 tap에 아직 없으면 "tap cask not present yet — skipping" log 후 exit 0 한다(첫 release 시점).
 
 - [x] **companion CI는 별도 path-filtered workflow.** (0018 계승)
-  - `companion-ci.yml`: `companion/**` trigger, macOS runner, `swift build` + `swift test` + `swift run CompanionCoreTestRunner` + `build-app.sh` smoke. 기존 `ci.yml`은 수정하지 않는다.
+  - `companion-ci.yml`: `companion/**` trigger, macOS 15 runner, `swift build` + `swift test` + `swift run CompanionCoreTestRunner` + `build-app.sh` smoke. 기존 `ci.yml`은 수정하지 않는다.
 
 - [x] **commit discipline.** (0018 계승)
   - companion source 변경은 `feat(companion):`/`fix(companion):` scope로 두고 `companion/**` 안에만 담아 companion release만 만든다.
@@ -93,7 +93,7 @@
 release-please-config.json                       # root + companion two-package
 .release-please-manifest.json                    # "." + "companion" version
 .github/workflows/homebrew-bump.yml              # companion tag skip guard 추가
-.github/workflows/companion-ci.yml               # 신규: swift build/test, macOS runner
+.github/workflows/companion-ci.yml               # 신규: swift build/test, macOS 15 runner
 .github/workflows/companion-release.yml          # 신규: app 조립/서명(guarded)/zip/asset/cask bump
 companion/scripts/build-app.sh                   # version marker + universal build 분기
 companion/CHANGELOG.md                           # seed
@@ -351,7 +351,7 @@ permissions:
 jobs:
   test:
     name: Build and test companion
-    runs-on: macos-14
+    runs-on: macos-15
     defaults:
       run:
         working-directory: companion
@@ -380,7 +380,7 @@ ruby -ryaml -e "YAML.load_file('.github/workflows/companion-ci.yml'); puts 'OK'"
 
 Expected: `OK`. PR을 열면 이 workflow가 `companion/**` 변경(Task 1)에 의해 실제로 트리거되어 green인지가 최종 acceptance다.
 
-검증 결과(2026-06-13): `.github/workflows/companion-ci.yml` 생성, `ruby -ryaml` parse OK(로컬 Ruby PATH warning은 비차단).
+검증 결과(2026-06-13): `.github/workflows/companion-ci.yml` 생성, `runs-on: macos-15`로 Swift tools 6.0 호환 runner 사용, `ruby -ryaml` parse OK(로컬 Ruby PATH warning은 비차단).
 
 - [ ] **Step 3: Commit**
 
@@ -417,7 +417,7 @@ permissions:
 jobs:
   build-and-publish:
     name: Build, package, and publish companion app
-    runs-on: macos-14
+    runs-on: macos-15
     if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'workbranch-companion-v') }}
     env:
       TAG_NAME: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}
@@ -578,7 +578,7 @@ ruby -ryaml -e "YAML.load_file('.github/workflows/companion-release.yml'); puts 
 
 Expected: `OK`. 추가로 서명/공증 step의 shell 부분만 로컬에서 `bash -n` 가능하도록 임시 파일로 추출해 syntax check해도 좋다. 실제 동작 검증은 Task 7의 첫 release에서 한다.
 
-검증 결과(2026-06-13): `.github/workflows/companion-release.yml` 생성, `ruby -ryaml` parse OK, workflow의 모든 `run:` shell block `bash -n` OK(로컬 Ruby PATH warning은 비차단).
+검증 결과(2026-06-13): `.github/workflows/companion-release.yml` 생성, `runs-on: macos-15`로 Swift tools 6.0 호환 runner 사용, `ruby -ryaml` parse OK, workflow의 모든 `run:` shell block `bash -n` OK(로컬 Ruby PATH warning은 비차단).
 
 - [ ] **Step 3: Commit**
 
@@ -685,7 +685,7 @@ grep -rn "0018" docs/plans/ companion/README.md README.md README.ko.md | grep -v
 
 - `cd companion && swift build && swift test && swift run CompanionCoreTestRunner` 통과.
 - `bash -n companion/scripts/build-app.sh`, native `./scripts/build-app.sh`, `PlistBuddy` version 확인 통과.
-- `WORKBRANCH_COMPANION_UNIVERSAL=1 ./scripts/build-app.sh`는 이 machine의 selected developer dir가 Command Line Tools(`/Library/Developer/CommandLineTools`)이고 `xcrun --find xcbuild`가 실패해서 로컬 검증 불가. 단일 arch `swift build -c release --product WorkbranchCompanion --arch $(uname -m)`은 통과했고, universal path의 실제 검증은 Xcode가 있는 GitHub macOS runner의 `companion-release.yml` acceptance로 둔다.
+- `WORKBRANCH_COMPANION_UNIVERSAL=1 ./scripts/build-app.sh`는 이 machine의 selected developer dir가 Command Line Tools(`/Library/Developer/CommandLineTools`)이고 `xcrun --find xcbuild`가 실패해서 로컬 검증 불가. 단일 arch `swift build -c release --product WorkbranchCompanion --arch $(uname -m)`은 통과했고, universal path의 실제 검증은 Xcode 16 계열이 기본인 GitHub `macos-15` runner의 `companion-release.yml` acceptance로 둔다.
 - release JSON parse, workflow YAML parse, `companion-release.yml` 모든 `run:` shell block `bash -n`, stale doc grep, `/bin/bash -n bin/workbranch install.sh tests/run.sh scripts/build-workbranch.sh companion/scripts/build-app.sh`, `git diff --check` 통과.
 - `./tests/run.sh` 통과: `Tests passed: 208`.
 
@@ -801,6 +801,6 @@ merge 후 acceptance (Task 7):
 - **release-please two-package 전환 surprise:** manifest seed `0.0.0` + 기존 `feat(companion)` history 조합이 첫 PR에서 의도(0.1.0)와 다른 버전을 제안할 수 있다. release PR 검토 단계(Task 7 Step 2)를 acceptance gate로 두고, 어긋나면 config의 `release-as`로 한 번 고정한다.
 - **sha256 race:** cask bump를 zip asset 업로드와 같은 job에서 순서대로 수행해 구조적으로 제거한다.
 - **Gatekeeper (ad-hoc 과도기):** cask caveats + README로 `--no-quarantine`을 안내한다. Developer ID secrets 등록 후 자동으로 서명/공증되며, 그 시점에 caveats 제거 tap PR을 만든다.
-- **macOS runner 명령 차이:** `base64 -w0` 미지원 → `base64 | tr -d '\n'`. workflow 작성 시 ubuntu용 homebrew-bump.yml을 그대로 복사하지 않는다.
+- **macOS 15 runner 명령 차이:** `base64 -w0` 미지원 → `base64 | tr -d '\n'`. workflow 작성 시 ubuntu용 homebrew-bump.yml을 그대로 복사하지 않는다.
 - **universal build 경로:** `--arch` 동시 지정 시 SPM 출력 경로가 `.build/apple/Products/Release/`로 바뀐다. build-app.sh가 분기로 처리하고, CI smoke(companion-ci.yml은 native, companion-release.yml은 universal)로 양쪽을 커버한다.
 - **첫 release에서 cask 부재:** guarded skip으로 workflow 실패를 막고, cask 추가를 Task 7의 명시 단계로 둔다. 자동 bump 경로는 두 번째 release에서 검증한다.

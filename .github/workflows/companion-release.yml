@@ -16,7 +16,7 @@ permissions:
 jobs:
   build-and-publish:
     name: Build, package, and publish companion app
-    runs-on: macos-14
+    runs-on: macos-15
     if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'workbranch-companion-v') }}
     env:
       TAG_NAME: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}
