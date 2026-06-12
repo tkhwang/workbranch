@@ -192,6 +192,7 @@ cmd_add() {
   mkdir -p "$task_dir" || die "failed to create task directory: $task_dir"
   track_path "$task_dir"
   write_task_metadata "$task"
+  write_default_task_state "$task"
 
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do

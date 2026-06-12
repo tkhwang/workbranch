@@ -6,7 +6,7 @@
 
 Core workbranch commands are supported on macOS, Linux, and WSL. Tool app launchers are macOS-only because the built-in app presets use macOS `open` and macOS app names.
 
-Supported everywhere: Git/worktree commands, `path`, `list`, `status`, `config`, `init`, and generated CLI distribution checks.
+Supported everywhere: Git/worktree commands, `path`, `list`, `memo`, `noti`, `status`, `config`, `init`, and generated CLI distribution checks.
 
 macOS-only: `finder`, `ide`, `terminal`, `config ide`, and `config terminal`. On Linux/WSL, full `workbranch config` and `workbranch init` stay available and skip tool app prompts.
 
@@ -22,7 +22,7 @@ macOS-only: `finder`, `ide`, `terminal`, `config ide`, and `config terminal`. On
 | `workbranch config ide`                  | Update only the configured IDE command                                       |
 | `workbranch config terminal`             | Update only the configured terminal command                                  |
 | `workbranch add [<task>] [--from <ref>]` | Create a task workspace                                                      |
-| `workbranch list`                        | Show repos and task workspaces                                               |
+| `workbranch list [--json]`               | Show repos and task workspaces; `--json` emits the companion-facing contract |
 | `workbranch remove <task>`               | Remove task worktrees and local task branches                                |
 | `workbranch doctor [--fix]`              | Diagnose project health; `--fix` prunes stale worktree registrations only    |
 
@@ -76,6 +76,14 @@ WORKBRANCH_COLOR=always workbranch help # force enhanced display
 ```
 
 `workbranch path <task>` and `workbranch path <task> --repo <repo>` remain plain path-only outputs for scripting.
+
+## Task brief and notifications
+
+`workbranch add <task>` creates `<task>/TASK-WORKBRANCH.md` and generated `<task>/AGENTS.md` at the task root, outside repo worktrees. Users and agents may run from either `<task>` or `<task>/<repo>`; the generated guidance points both cases at the same task brief. Workbranch does not edit repo `.gitignore` for this state.
+
+Use `workbranch memo <task>` to print the task brief, `workbranch memo <task> "text"` to overwrite it, and `workbranch memo <task> --clear` to remove it. From inside a registered task workspace, the task may be omitted only for reading: `workbranch memo` prints the current task brief. Writes and clears require an explicit task argument.
+
+Notifications are append-only JSON Lines at `<task>/.workbranch/notifications.jsonl`. `workbranch noti add <task> "text"` appends one event, `workbranch noti list <task>` prints notification text oldest-first, and `workbranch noti clear <task>` clears the inbox. Companion apps should read `notiCount` from `workbranch list --json` and may call `noti list` / `noti clear` for details and acknowledgement.
 
 ## Project health
 

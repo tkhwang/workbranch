@@ -154,7 +154,9 @@ workbranch push                  # local feat/login -> origin/feat/login
 | -------------------------- | ------------------------------------------------------- |
 | `workbranch init`          | config 기준으로 base worktree 생성 또는 clone           |
 | `workbranch add [<task>]`  | task workspace 생성                                     |
-| `workbranch list`          | repo와 task workspace 목록 확인                         |
+| `workbranch list [--json]` | repo와 task workspace 목록 확인; `--json`은 machine-readable 출력 |
+| `workbranch memo [task]`   | `TASK-WORKBRANCH.md` task brief 확인/작성/삭제          |
+| `workbranch noti ...`       | task notification 추가/목록/삭제                        |
 | `workbranch status`        | base remote diff, task diff, dirty state 확인           |
 | `workbranch update [task]` | local base 기준으로 task의 모든 repo update (pull 없음) |
 | `workbranch land <task>`   | task 작업을 local base branch로 fast-forward 반영       |
@@ -169,6 +171,16 @@ Combined flow shortcut:
 | `workbranch prune`           | local base branch에 이미 merge된 clean task workspace 정리 |
 
 ![img](./docs/figs/workbranch-git-flow.png)
+
+## Task brief & notifications
+
+`workbranch add <task>`는 repo worktree 밖의 task root에 workbranch-managed state를 생성합니다.
+
+- `<task>/TASK-WORKBRANCH.md`는 사람/AI agent가 함께 갱신하는 task brief입니다. `workbranch memo <task> [text]`로 읽거나 덮어쓰고, `workbranch memo <task> --clear`로 삭제합니다. Task workspace 안에서는 읽기일 때만 `workbranch memo`처럼 `<task>`를 생략할 수 있습니다.
+- `<task>/AGENTS.md`는 `<task>` 또는 `<task>/<repo>`에서 실행되는 AI agent가 같은 task brief를 갱신하도록 안내합니다.
+- `<task>/.workbranch/notifications.jsonl`은 append-only local inbox입니다. `workbranch noti add/list/clear`가 관리하고, `workbranch list --json`은 companion app용 `notiCount`를 노출합니다.
+
+`workbranch remove <task>`는 workspace 제거가 성공한 뒤 workbranch-managed task state만 삭제합니다. task root의 unrelated 파일은 보존됩니다.
 
 ## More docs
 

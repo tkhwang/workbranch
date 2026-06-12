@@ -19,7 +19,7 @@ cmd_complete_repos() {
 }
 
 cmd_complete_commands() {
-  printf '%s\n' add completion config doctor finalize finder help ide init land list path prune pull push refresh remove status terminal update version
+  printf '%s\n' add completion config doctor finalize finder help ide init land list memo noti path prune pull push refresh remove status terminal update version
 }
 
 print_completion_bash() {
@@ -54,10 +54,23 @@ _workbranch() {
       ;;
   esac
 
+  if [ "$cmd" = "noti" ] && [ "$COMP_CWORD" -eq 2 ]; then
+    words='add list clear'
+    COMPREPLY=( $(compgen -W "$words" -- "$cur") )
+    return 0
+  fi
+  if [ "$cmd" = "noti" ] && [ "$COMP_CWORD" -eq 3 ]; then
+    words=$($wb_bin __complete-tasks 2>/dev/null || true)
+    COMPREPLY=( $(compgen -W "$words" -- "$cur") )
+    return 0
+  fi
+
   case "$cur" in
     -*)
       case "$cmd" in
         add) words='--from' ;;
+        list) words='--json' ;;
+        memo) words='--clear' ;;
         config) words='--rewrite' ;;
         remove) words='--force' ;;
         doctor) words='--fix --repo' ;;
@@ -71,7 +84,7 @@ _workbranch() {
   esac
 
   case "$cmd" in
-    remove|update|push|land|finalize|refresh|path|finder|ide|terminal)
+    memo|remove|update|push|land|finalize|refresh|path|finder|ide|terminal)
       words=$($wb_bin __complete-tasks 2>/dev/null || true)
       COMPREPLY=( $(compgen -W "$words" -- "$cur") )
       return 0
@@ -89,7 +102,7 @@ print_completion_zsh() {
 #compdef workbranch
 # zsh completion for workbranch
 _workbranch() {
-  local -a commands tasks repos flags
+  local -a commands tasks repos flags noti_commands
   local cmd prev cur wb_bin
   wb_bin=${WORKBRANCH:-workbranch}
   cur=${words[CURRENT]:-}
@@ -108,9 +121,23 @@ _workbranch() {
     return
   fi
 
+  if [[ "$cmd" == "noti" && $CURRENT == 3 ]]; then
+    noti_commands=(add list clear)
+    _describe 'noti command' noti_commands
+    return
+  fi
+
+  if [[ "$cmd" == "noti" && $CURRENT == 4 ]]; then
+    tasks=(${(f)"$($wb_bin __complete-tasks 2>/dev/null)"})
+    _describe 'task' tasks
+    return
+  fi
+
   if [[ "$cur" == -* ]]; then
     case "$cmd" in
       add) flags=(--from) ;;
+      list) flags=(--json) ;;
+      memo) flags=(--clear) ;;
       config) flags=(--rewrite) ;;
       remove) flags=(--force) ;;
       doctor) flags=(--fix --repo) ;;
@@ -123,7 +150,7 @@ _workbranch() {
   fi
 
   case "$cmd" in
-    remove|update|push|land|finalize|refresh|path|finder|ide|terminal)
+    memo|remove|update|push|land|finalize|refresh|path|finder|ide|terminal)
       tasks=(${(f)"$($wb_bin __complete-tasks 2>/dev/null)"})
       _describe 'task' tasks
       return
@@ -163,6 +190,16 @@ function __workbranch_seen_command
     test (count $tokens) -ge 2; and test $tokens[2] = $cmd
 end
 
+function __workbranch_completing_noti_subcommand
+    set -l tokens (commandline -opc)
+    test (count $tokens) -ge 2; and test $tokens[2] = noti; and test (count $tokens) -le 3
+end
+
+function __workbranch_completing_noti_task
+    set -l tokens (commandline -opc)
+    test (count $tokens) -ge 3; and test $tokens[2] = noti; and contains -- $tokens[3] add list clear
+end
+
 function __workbranch_completing_command
     set -l tokens (commandline -opc)
     set -l current (commandline -ct)
@@ -172,6 +209,9 @@ end
 
 complete -c workbranch -f -n '__workbranch_completing_command' -a '(__workbranch_complete_commands)'
 complete -c workbranch -f -n '__workbranch_seen_command update' -a '(__workbranch_complete_tasks)'
+complete -c workbranch -f -n '__workbranch_seen_command memo' -a '(__workbranch_complete_tasks)'
+complete -c workbranch -f -n '__workbranch_completing_noti_subcommand' -a 'add list clear'
+complete -c workbranch -f -n '__workbranch_completing_noti_task' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command refresh' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command remove' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command push' -a '(__workbranch_complete_tasks)'
@@ -183,6 +223,8 @@ complete -c workbranch -f -n '__workbranch_seen_command ide' -a '(__workbranch_c
 complete -c workbranch -f -n '__workbranch_seen_command terminal' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__fish_seen_argument -l repo' -a '(__workbranch_complete_repos)'
 complete -c workbranch -n '__workbranch_seen_command add' -l from -d 'Seed task branches from a source ref'
+complete -c workbranch -n '__workbranch_seen_command list' -l json -d 'Print machine-readable JSON'
+complete -c workbranch -n '__workbranch_seen_command memo' -l clear -d 'Clear the task brief'
 complete -c workbranch -n '__workbranch_seen_command config' -l rewrite -d 'Rewrite config to current format'
 complete -c workbranch -n '__workbranch_seen_command remove' -l force -d 'Force removal'
 complete -c workbranch -n '__workbranch_seen_command doctor' -l fix -d 'Apply safe repairs'

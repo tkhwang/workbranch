@@ -1,5 +1,66 @@
+cmd_list_json() {
+  local first_task first_repo path task name repo_path branch title dirty
+  printf '{'
+  printf '"schemaVersion":1,'
+  printf '"project":'
+  json_string "$PROJECT_NAME"
+  printf ',"root":'
+  json_string "$PROJECT_ROOT"
+  printf ',"tasks":['
+  first_task=1
+  for path in "$PROJECT_ROOT"/*; do
+    is_task_workspace_path "$path" || continue
+    task=${path##*/}
+    if [ $first_task -eq 1 ]; then
+      first_task=0
+    else
+      printf ','
+    fi
+    title=$(task_brief_title "$task")
+    printf '{"name":'
+    json_string "$task"
+    printf ',"path":'
+    json_string "$path"
+    printf ',"memoTitle":'
+    json_string "$title"
+    printf ',"notiCount":%s' "$(noti_count "$task")"
+    printf ',"repos":['
+    first_repo=1
+    i=0
+    while [ $i -lt ${#REPO_NAMES[@]} ]; do
+      name=$(repo_name_at "$i")
+      repo_path="$path/$name"
+      branch=$(branch_or_unknown "$repo_path")
+      if is_git_dirty "$repo_path"; then
+        dirty=true
+      else
+        dirty=false
+      fi
+      if [ $first_repo -eq 1 ]; then
+        first_repo=0
+      else
+        printf ','
+      fi
+      printf '{"name":'
+      json_string "$name"
+      printf ',"branch":'
+      json_string "$branch"
+      printf ',"dirty":%s}' "$dirty"
+      i=$((i + 1))
+    done
+    printf ']}'
+  done
+  printf ']}'
+  printf '\n'
+}
+
 cmd_list() {
   require_project
+  if [ $# -eq 1 ] && [ "$1" = "--json" ]; then
+    cmd_list_json
+    return 0
+  fi
+  [ $# -eq 0 ] || die "usage: workbranch list [--json]"
   info "Project: $PROJECT_NAME"
   info "Base: $BASE_DIR"
   section "IDE"

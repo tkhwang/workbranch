@@ -7,6 +7,7 @@ src/workbranch/lib/config.sh
 src/workbranch/lib/task-identity.sh
 src/workbranch/lib/project.sh
 src/workbranch/lib/task-metadata.sh
+src/workbranch/lib/task-state.sh
 src/workbranch/lib/preflight.sh
 src/workbranch/lib/rollback.sh
 src/workbranch/lib/prompts.sh
@@ -16,6 +17,8 @@ src/workbranch/lib/status-format.sh
 src/workbranch/commands/config.sh
 src/workbranch/commands/init.sh
 src/workbranch/commands/add.sh
+src/workbranch/commands/memo.sh
+src/workbranch/commands/noti.sh
 src/workbranch/commands/list.sh
 src/workbranch/commands/path.sh
 src/workbranch/commands/tool-launcher.sh

@@ -9,6 +9,8 @@ main() {
     config) cmd_config "$@" ;;
     init) cmd_init "$@" ;;
     add) cmd_add "$@" ;;
+    memo) cmd_memo "$@" ;;
+    noti) cmd_noti "$@" ;;
     list) cmd_list "$@" ;;
     path) cmd_path "$@" ;;
     ide) cmd_ide "$@" ;;

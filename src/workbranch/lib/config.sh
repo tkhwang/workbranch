@@ -53,11 +53,16 @@ repo_matches_filter() {
   [ -z "$FILTER_REPO" ] || [ "$1" = "$FILTER_REPO" ]
 }
 
+validate_repo_name() {
+  validate_safe_name "repo name" "$1"
+  [ "$1" != ".workbranch" ] || die "invalid repo name '.workbranch' (reserved for task state)"
+}
+
 add_repo_config() {
   name=$1
   url=$2
   base_branch=${3:-}
-  validate_safe_name "repo name" "$name"
+  validate_repo_name "$name"
   validate_nonempty_no_space "git-url" "$url"
   if [ -n "$base_branch" ]; then
     validate_nonempty_no_space "base-branch" "$base_branch"

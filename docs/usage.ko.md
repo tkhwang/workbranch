@@ -6,7 +6,7 @@
 
 기본 workbranch 명령은 macOS, Linux, WSL에서 지원합니다. Tool app launcher는 macOS 전용입니다. 내장 app preset이 macOS `open`과 macOS app 이름을 사용하기 때문입니다.
 
-공통 지원: Git/worktree 명령, `path`, `list`, `status`, `config`, `init`, generated CLI 검증.
+공통 지원: Git/worktree 명령, `path`, `list`, `memo`, `noti`, `status`, `config`, `init`, generated CLI 검증.
 
 macOS 전용: `finder`, `ide`, `terminal`, `config ide`, `config terminal`. Linux/WSL에서 전체 `workbranch config`와 `workbranch init`은 계속 사용할 수 있으며 tool app prompt를 건너뜁니다.
 
@@ -22,7 +22,7 @@ macOS 전용: `finder`, `ide`, `terminal`, `config ide`, `config terminal`. Linu
 | `workbranch config ide`                  | IDE 명령만 수정                                                    |
 | `workbranch config terminal`             | terminal 명령만 수정                                               |
 | `workbranch add [<task>] [--from <ref>]` | task workspace 생성                                                |
-| `workbranch list`                        | repo와 task workspace 목록 확인                                    |
+| `workbranch list [--json]`               | repo와 task workspace 목록 확인; `--json`은 companion용 contract 출력 |
 | `workbranch remove <task>`               | task worktree와 local task branch 제거                             |
 | `workbranch doctor [--fix]`              | project health 진단; `--fix`는 stale worktree registration만 prune |
 
@@ -76,6 +76,14 @@ WORKBRANCH_COLOR=always workbranch help # enhanced display 강제
 ```
 
 `workbranch path <task>`와 `workbranch path <task> --repo <repo>`는 scripting을 위해 계속 plain path만 stdout에 출력합니다.
+
+## Task brief와 notifications
+
+`workbranch add <task>`는 repo worktree 밖 task root에 `<task>/TASK-WORKBRANCH.md`와 generated `<task>/AGENTS.md`를 생성합니다. 사용자와 agent는 `<task>` 또는 `<task>/<repo>` 어디서 실행해도 되며, generated guidance는 두 경우 모두 같은 task brief를 갱신하도록 안내합니다. 이 state를 위해 repo `.gitignore`는 수정하지 않습니다.
+
+`workbranch memo <task>`는 task brief를 출력하고, `workbranch memo <task> "text"`는 덮어쓰며, `workbranch memo <task> --clear`는 삭제합니다. Registered task workspace 안에서는 읽기일 때만 task를 생략할 수 있습니다. `workbranch memo`는 현재 task brief를 출력합니다. 쓰기와 삭제는 명시적인 task 인자가 필요합니다.
+
+Notification은 `<task>/.workbranch/notifications.jsonl`의 append-only JSON Lines입니다. `workbranch noti add <task> "text"`는 event를 추가하고, `workbranch noti list <task>`는 오래된 순서대로 text를 출력하며, `workbranch noti clear <task>`는 inbox를 비웁니다. Companion app은 `workbranch list --json`의 `notiCount`를 읽고, 상세/확인은 `noti list` / `noti clear`를 호출할 수 있습니다.
 
 ## Project health
 
