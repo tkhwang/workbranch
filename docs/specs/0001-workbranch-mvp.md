@@ -160,9 +160,19 @@ Tool app launcher commands are macOS-only: `finder`, `ide`, and `terminal`. Tool
 
 Built-in macOS IDE app presets use `open -n` plus `--args --new-window` for VS Code-like apps so each matching repo path opens in a separate IDE window instead of being folded into an existing workspace. `IDE open -a Cursor`, `IDE open -a "Antigravity IDE"`, `IDE open -a "Visual Studio Code"`, and `IDE open -a Windsurf` are normalized to the matching `open -na ... --args --new-window` command at launch time. Zed remains `open -na Zed` until its CLI contract is verified.
 
-### `workbranch list`
+### `workbranch list` / `workbranch list --json`
 
-Show configured repos, base branches, current branches, and task workspaces.
+Show configured repos, base branches, current branches, and task workspaces. `--json` emits a single machine-readable document with `schemaVersion`, `project`, `root`, and registered task workspaces only. Stale or partial task-shaped directories are excluded from JSON and remain diagnostic concerns for `doctor`/status-style flows.
+
+### `workbranch memo` / `workbranch noti`
+
+`workbranch add <task>` creates workbranch-managed task-root state outside repo worktrees: `<task>/TASK-WORKBRANCH.md`, generated `<task>/AGENTS.md`, and `<task>/.workbranch/` as needed. Workbranch does not create repo-local task-state files and does not edit repo `.gitignore`.
+
+`workbranch memo <task>` prints the task brief, `workbranch memo <task> "text"` overwrites it, and `workbranch memo <task> --clear` removes it. From inside a registered task workspace, the task may be omitted; `workbranch memo` reads the current task and `workbranch memo "text"` writes the current task.
+
+`workbranch noti add <task> "text"` appends a JSON Lines event with UTC `ts` and `text`; `workbranch noti list <task>` prints notification text oldest-first; `workbranch noti clear <task>` clears the inbox. Missing notification files behave as empty inboxes.
+
+`workbranch remove <task>` deletes workbranch-managed task state after successful worktree/branch removal, while preserving unrelated files in the task root.
 
 ### `workbranch status`
 

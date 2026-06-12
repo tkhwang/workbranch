@@ -88,6 +88,7 @@ cmd_remove() {
   if [ -f "$metadata_file" ]; then
     rm -f "$metadata_file" || die "failed to remove task metadata: $metadata_file"
   fi
+  remove_task_state_files "$task"
   if rmdir "$PROJECT_ROOT/$task" 2>/dev/null; then
     :
   elif [ -d "$PROJECT_ROOT/$task" ]; then

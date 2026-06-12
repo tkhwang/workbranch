@@ -154,7 +154,9 @@ workbranch push                    # local feat/login -> origin/feat/login
 | -------------------------- | ------------------------------------------------------- |
 | `workbranch init`          | Create or clone base worktrees from config              |
 | `workbranch add [<task>]`  | Create a task workspace                                 |
-| `workbranch list`          | Show repos and task workspaces                          |
+| `workbranch list [--json]` | Show repos and task workspaces; `--json` is machine-readable |
+| `workbranch memo [task]`   | Show, write, or clear the task brief in `TASK-WORKBRANCH.md` |
+| `workbranch noti ...`       | Add, list, or clear task notifications                  |
 | `workbranch status`        | Show base remote diff, task diff, and dirty state       |
 | `workbranch update [task]` | Update every repo in the task from local base (no pull) |
 | `workbranch land <task>`   | Fast-forward task work into local base branches         |
@@ -169,6 +171,16 @@ Combined flow shortcuts:
 | `workbranch prune`           | Remove clean task workspaces already merged into local base branches |
 
 ![img](./docs/figs/workbranch-git-flow.png)
+
+## Task brief & notifications
+
+`workbranch add <task>` creates task-root state outside the repo worktrees:
+
+- `<task>/TASK-WORKBRANCH.md` is the human/agent-editable task brief. `workbranch memo [<task>] [text]` reads or overwrites it, and `--clear` removes it.
+- `<task>/AGENTS.md` tells AI agents running from either `<task>` or `<task>/<repo>` to keep the task brief current.
+- `<task>/.workbranch/notifications.jsonl` is an append-only local inbox. `workbranch noti add/list/clear` manages it, and `workbranch list --json` exposes `notiCount` for companion apps.
+
+`workbranch remove <task>` deletes only workbranch-managed task state after successful workspace removal; unrelated files in the task root are preserved.
 
 ## More docs
 
