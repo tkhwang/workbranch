@@ -41,8 +41,9 @@
   - secrets 발급/등록 step-by-step 가이드를 `companion/README.md`에 둔다(Task 6).
 
 - [x] **release-please two-package. root 동작 보존이 최우선.**
-  - root `.`: 기존 그대로 — plain `v*` tag(`include-component-in-tag: false`), `bin/workbranch` extra-file.
-  - `companion`: `package-name: workbranch-companion`, `release-type: simple`, `include-component-in-tag: true` → tag `workbranch-companion-vX.Y.Z`, changelog `companion/CHANGELOG.md`, extra-file `scripts/build-app.sh`(package 상대 경로).
+  - root `.`: plain `v*` tag(`include-component-in-tag: false`)와 `bin/workbranch` extra-file은 보존하되, `exclude-paths`로 `companion/`, `.github/`, `docs/`만 건드린 배포/문서/companion commit은 CLI release 후보에서 제외한다.
+  - `companion`: `package-name`과 `component`를 모두 `workbranch-companion`으로 명시하고, `include-component-in-tag: true` → tag `workbranch-companion-vX.Y.Z`, changelog `companion/CHANGELOG.md`, extra-file `scripts/build-app.sh`(package 상대 경로).
+  - root-level `release-please-config.json` / `.release-please-manifest.json`은 release-please의 directory 기반 `exclude-paths`로 제외할 수 없으므로, 해당 설정 변경 commit은 `chore(release): ...`처럼 non-releasing type으로 둔다. companion source 변경 commit(`feat(companion): ...`)과 섞지 않는다.
   - manifest seed는 `"companion": "0.0.0"` — 기존 `feat(companion)` history가 첫 release PR을 0.1.0으로 제안하게 한다.
 
 - [x] **버전 single source는 release-please. `build-app.sh`가 Info.plist에 주입한다.**
@@ -61,7 +62,9 @@
   - `companion-ci.yml`: `companion/**` trigger, macOS runner, `swift build` + `swift test` + `swift run CompanionCoreTestRunner` + `build-app.sh` smoke. 기존 `ci.yml`은 수정하지 않는다.
 
 - [x] **commit discipline.** (0018 계승)
-  - companion-only 변경은 `feat(companion):`/`fix(companion):` scope. CLI와 companion을 동시 release할 의도가 아니면 mixed commit 금지.
+  - companion source 변경은 `feat(companion):`/`fix(companion):` scope로 두고 `companion/**` 안에만 담아 companion release만 만든다.
+  - release plumbing/config/docs/workflow 변경은 `chore(release):`, `chore(ci):`, `docs(companion):`처럼 root CLI release를 만들지 않는 type으로 둔다.
+  - CLI와 companion을 동시 release할 의도가 아니면 mixed commit 금지. 특히 `release-please-config.json` / `.release-please-manifest.json` 변경을 `feat(companion):` commit에 섞지 않는다.
 
 - [x] **0018 문서는 삭제한다.**
   - 0018은 한 번도 실행되지 않았고 전제가 stale하다. 결정 이력은 git history와 이 문서의 계승 표기로 충분하다. 0015/0019의 0018 참조는 0020으로 갱신한다(superseded 문서인 0017은 역사 보존을 위해 그대로 둔다).
@@ -108,7 +111,7 @@ docs/plans/0019-companion-native-menubar-app.md     # 시리즈 참조 0018 → 
 **Files:**
 - Modify: `companion/scripts/build-app.sh`
 
-- [ ] **Step 1: version 변수와 universal 분기 추가**
+- [x] **Step 1: version 변수와 universal 분기 추가**
 
 `build-app.sh`를 다음 내용으로 교체한다(변경점: `APP_VERSION` marker, `WORKBRANCH_COMPANION_UNIVERSAL` 분기, Info.plist heredoc unquote + 버전 interpolate):
 
@@ -173,7 +176,7 @@ PLIST
 printf '[+] Built %s (v%s)\n' "$APP_DIR" "$APP_VERSION"
 ```
 
-- [ ] **Step 2: 검증**
+- [x] **Step 2: 검증**
 
 ```bash
 bash -n companion/scripts/build-app.sh
@@ -183,7 +186,11 @@ cd companion && ./scripts/build-app.sh
 
 Expected: 마지막 명령이 `0.1.0` 출력. app launch smoke: `open companion/dist/WorkbranchCompanion.app` 후 `pgrep -fl WorkbranchCompanion`.
 
+검증 결과(2026-06-13): `bash -n companion/scripts/build-app.sh`, `cd companion && ./scripts/build-app.sh`, `PlistBuddy` `CFBundleShortVersionString=0.1.0` / `CFBundleVersion=0.1.0`, `open -n` 후 현재 checkout의 `WorkbranchCompanion` process 확인.
+
 - [ ] **Step 3: Commit**
+
+plan-execute 안전 게이트에 따라 이 실행에서는 commit하지 않는다. 적용 시 아래 커밋을 별도로 수행한다.
 
 ```bash
 git add companion/scripts/build-app.sh
@@ -197,7 +204,7 @@ git commit -m "feat(companion): stamp app version from release-please marker and
 - Modify: `.release-please-manifest.json`
 - Create: `companion/CHANGELOG.md`
 
-- [ ] **Step 1: config에 companion package 추가**
+- [x] **Step 1: config에 companion package 추가**
 
 `release-please-config.json` 전체:
 
@@ -209,6 +216,11 @@ git commit -m "feat(companion): stamp app version from release-please marker and
   "packages": {
     ".": {
       "package-name": "workbranch",
+      "exclude-paths": [
+        "companion",
+        ".github",
+        "docs"
+      ],
       "extra-files": [
         {
           "type": "generic",
@@ -218,6 +230,7 @@ git commit -m "feat(companion): stamp app version from release-please marker and
     },
     "companion": {
       "package-name": "workbranch-companion",
+      "component": "workbranch-companion",
       "release-type": "simple",
       "include-component-in-tag": true,
       "extra-files": [
@@ -231,9 +244,9 @@ git commit -m "feat(companion): stamp app version from release-please marker and
 }
 ```
 
-주의: `extra-files`의 `path`는 package 디렉토리 기준 상대 경로다(`companion/scripts/build-app.sh`가 아니라 `scripts/build-app.sh`).
+주의: `extra-files`의 `path`는 package 디렉토리 기준 상대 경로다(`companion/scripts/build-app.sh`가 아니라 `scripts/build-app.sh`). `exclude-paths`는 directory path 기준으로 commit의 relevant files가 모두 제외 경로 아래 있을 때 root package에서 제외한다. root-level file(`release-please-config.json`, `.release-please-manifest.json`)은 여기에 잡히지 않으므로 commit type discipline으로 release를 막는다.
 
-- [ ] **Step 2: manifest seed**
+- [x] **Step 2: manifest seed**
 
 `.release-please-manifest.json` 전체(root 버전은 그 시점의 실제 값 유지 — 아래는 작성 시점 값):
 
@@ -244,7 +257,7 @@ git commit -m "feat(companion): stamp app version from release-please marker and
 }
 ```
 
-- [ ] **Step 3: changelog seed**
+- [x] **Step 3: changelog seed**
 
 `companion/CHANGELOG.md` 생성:
 
@@ -252,19 +265,23 @@ git commit -m "feat(companion): stamp app version from release-please marker and
 # Changelog
 ```
 
-- [ ] **Step 4: 검증**
+- [x] **Step 4: 검증**
 
 ```bash
 python3 -c "import json; json.load(open('release-please-config.json')); json.load(open('.release-please-manifest.json'))" && echo OK
 ```
 
-Expected: `OK`. root package block이 기존과 byte-level 동일한지 `git diff release-please-config.json`으로 육안 확인(`.` entry 무변경, top-level key 무변경).
+Expected: `OK`. `git diff release-please-config.json`으로 root package가 `include-component-in-tag: false`, `bin/workbranch` extra-file, `exclude-paths: ["companion", ".github", "docs"]`를 갖고 companion package가 `component: "workbranch-companion"`를 명시하는지 확인한다.
+
+검증 결과(2026-06-13): `python3` JSON parse OK, diff에서 root `exclude-paths`, companion `component`, manifest `"companion": "0.0.0"` 확인.
 
 - [ ] **Step 5: Commit**
 
+plan-execute 안전 게이트에 따라 이 실행에서는 commit하지 않는다. 적용 시 아래 커밋을 별도로 수행한다.
+
 ```bash
 git add release-please-config.json .release-please-manifest.json companion/CHANGELOG.md
-git commit -m "feat(companion): add release-please component package for companion releases"
+git commit -m "chore(release): add companion package to release-please manifest"
 ```
 
 ### Task 3: homebrew-bump.yml companion tag skip guard
@@ -272,7 +289,7 @@ git commit -m "feat(companion): add release-please component package for compani
 **Files:**
 - Modify: `.github/workflows/homebrew-bump.yml`
 
-- [ ] **Step 1: job-level if 추가**
+- [x] **Step 1: job-level if 추가**
 
 `jobs.bump-homebrew-formula`에 한 줄 추가(기존 step 무변경 — `v*` 경로 동작 보존):
 
@@ -286,7 +303,7 @@ jobs:
 
 기존 step 내부의 `case "$TAG_NAME" in v*)` guard는 그대로 둔다(그 외 tag hard fail 유지 — companion tag는 job 자체가 안 돌므로 도달하지 않는다).
 
-- [ ] **Step 2: 검증**
+- [x] **Step 2: 검증**
 
 ```bash
 ruby -ryaml -e "YAML.load_file('.github/workflows/homebrew-bump.yml'); puts 'OK'"
@@ -295,7 +312,11 @@ git diff .github/workflows/homebrew-bump.yml
 
 Expected: `OK`, diff가 `if:` 한 줄 추가뿐.
 
+검증 결과(2026-06-13): `ruby -ryaml` parse OK(로컬 Ruby PATH warning은 비차단), diff는 `if: ${{ !startsWith(github.event.release.tag_name, 'workbranch-companion-') }}` 한 줄 추가뿐.
+
 - [ ] **Step 3: Commit**
+
+plan-execute 안전 게이트에 따라 이 실행에서는 commit하지 않는다. 적용 시 아래 커밋을 별도로 수행한다.
 
 ```bash
 git add .github/workflows/homebrew-bump.yml
@@ -307,7 +328,7 @@ git commit -m "fix(ci): skip formula bump for companion release tags"
 **Files:**
 - Create: `.github/workflows/companion-ci.yml`
 
-- [ ] **Step 1: workflow 작성**
+- [x] **Step 1: workflow 작성**
 
 ```yaml
 name: Companion CI
@@ -351,7 +372,7 @@ jobs:
         run: ./scripts/build-app.sh
 ```
 
-- [ ] **Step 2: 검증**
+- [x] **Step 2: 검증**
 
 ```bash
 ruby -ryaml -e "YAML.load_file('.github/workflows/companion-ci.yml'); puts 'OK'"
@@ -359,11 +380,15 @@ ruby -ryaml -e "YAML.load_file('.github/workflows/companion-ci.yml'); puts 'OK'"
 
 Expected: `OK`. PR을 열면 이 workflow가 `companion/**` 변경(Task 1)에 의해 실제로 트리거되어 green인지가 최종 acceptance다.
 
+검증 결과(2026-06-13): `.github/workflows/companion-ci.yml` 생성, `ruby -ryaml` parse OK(로컬 Ruby PATH warning은 비차단).
+
 - [ ] **Step 3: Commit**
+
+plan-execute 안전 게이트에 따라 이 실행에서는 commit하지 않는다. 적용 시 아래 커밋을 별도로 수행한다.
 
 ```bash
 git add .github/workflows/companion-ci.yml
-git commit -m "feat(ci): add path-filtered companion CI on macOS"
+git commit -m "chore(ci): add path-filtered companion CI on macOS"
 ```
 
 ### Task 5: companion-release.yml (조립 → guarded 서명/공증 → zip → asset → cask bump)
@@ -371,7 +396,7 @@ git commit -m "feat(ci): add path-filtered companion CI on macOS"
 **Files:**
 - Create: `.github/workflows/companion-release.yml`
 
-- [ ] **Step 1: workflow 작성**
+- [x] **Step 1: workflow 작성**
 
 ```yaml
 name: Companion Release
@@ -545,7 +570,7 @@ jobs:
 
 주의 (macOS runner 차이): `base64 -w0`은 GNU 전용이라 macOS에서 동작하지 않는다 — push auth header는 `base64 | tr -d '\n'`을 쓴다. `shasum -a 256`은 macOS 기본 제공이다.
 
-- [ ] **Step 2: 검증**
+- [x] **Step 2: 검증**
 
 ```bash
 ruby -ryaml -e "YAML.load_file('.github/workflows/companion-release.yml'); puts 'OK'"
@@ -553,22 +578,28 @@ ruby -ryaml -e "YAML.load_file('.github/workflows/companion-release.yml'); puts 
 
 Expected: `OK`. 추가로 서명/공증 step의 shell 부분만 로컬에서 `bash -n` 가능하도록 임시 파일로 추출해 syntax check해도 좋다. 실제 동작 검증은 Task 7의 첫 release에서 한다.
 
+검증 결과(2026-06-13): `.github/workflows/companion-release.yml` 생성, `ruby -ryaml` parse OK, workflow의 모든 `run:` shell block `bash -n` OK(로컬 Ruby PATH warning은 비차단).
+
 - [ ] **Step 3: Commit**
+
+plan-execute 안전 게이트에 따라 이 실행에서는 commit하지 않는다. 적용 시 아래 커밋을 별도로 수행한다.
 
 ```bash
 git add .github/workflows/companion-release.yml
-git commit -m "feat(ci): add companion release pipeline with guarded signing and cask bump"
+git commit -m "chore(ci): add companion release pipeline with guarded signing and cask bump"
 ```
 
 ### Task 6: 문서 — brew 설치 섹션, Apple secrets 가이드, plan 참조 정리
 
 **Files:**
 - Modify: `companion/README.md`
+- Modify: `README.md`
+- Modify: `README.ko.md`
 - Modify: `docs/plans/0015-task-memo-noti-and-json-listing.md` (시리즈 참조 1곳)
 - Modify: `docs/plans/0019-companion-native-menubar-app.md` (시리즈/결정 참조)
 - Delete: `docs/plans/0018-companion-release-plumbing.md` — **이 계획 작성 시점에 이미 삭제됨.** 파일이 없으면 이 항목은 완료된 것이다.
 
-- [ ] **Step 1: companion/README.md에 Homebrew 설치 섹션 추가**
+- [x] **Step 1: companion/README.md에 Homebrew 설치 섹션 추가**
 
 기존 local build 안내 위에 추가:
 
@@ -636,25 +667,38 @@ Developer ID signing + notarization:
 
 기존 README 하단의 "deferred to the rewritten 0018 release-plumbing plan" 문장은 "release automation is implemented by plan 0020"으로 교체한다.
 
-- [ ] **Step 2: plan 참조 정리**
+- [x] **Step 2: plan 참조 정리**
 
 - `docs/plans/0015-task-memo-noti-and-json-listing.md:5`: `0018 (re-written with cask/native assumptions)` → `0020 (brew cask distribution)`.
 - `docs/plans/0019-companion-native-menubar-app.md`: 시리즈 위치(line 5)의 `0018 배포 배관(cask 기준으로 재작성 필요)` → `0020 brew cask 배포`, 본문 내 "재작성될 0018" 계열 표현은 `0020`으로 치환(파일 구조 항의 `0018 ... 재작성 필요 표기` 라인은 `0018 삭제(0020이 대체)`로 수정).
+- `README.md` / `README.ko.md`: companion section의 local preview/public cask planned 문구를 Homebrew cask 설치 안내로 갱신한다.
 - `docs/plans/0018-companion-release-plumbing.md`가 남아 있으면 `git rm`으로 삭제한다(plan 작성 시점에 이미 삭제되어 보통은 불필요).
-- 0017은 superseded 역사 문서이므로 내부의 0018 언급을 수정하지 않는다.
+- 0017과 0020은 superseded/대체 이력을 설명하는 문서이므로 내부의 0018 언급을 유지할 수 있다.
 
-- [ ] **Step 3: 검증**
+- [x] **Step 3: 검증**
 
 ```bash
-grep -rn "0018" docs/plans/ companion/README.md | grep -v "0017-companion-swiftbar-plugin.md"
+grep -rn "0018" docs/plans/ companion/README.md README.md README.ko.md | grep -v -E "0017-companion-swiftbar-plugin.md|0020-companion-brew-distribution.md"
 ```
 
-Expected: 출력 없음(0017 내부 역사 언급 제외).
+로컬 검증 결과(2026-06-13):
+
+- `cd companion && swift build && swift test && swift run CompanionCoreTestRunner` 통과.
+- `bash -n companion/scripts/build-app.sh`, native `./scripts/build-app.sh`, `PlistBuddy` version 확인 통과.
+- `WORKBRANCH_COMPANION_UNIVERSAL=1 ./scripts/build-app.sh`는 이 machine의 selected developer dir가 Command Line Tools(`/Library/Developer/CommandLineTools`)이고 `xcrun --find xcbuild`가 실패해서 로컬 검증 불가. 단일 arch `swift build -c release --product WorkbranchCompanion --arch $(uname -m)`은 통과했고, universal path의 실제 검증은 Xcode가 있는 GitHub macOS runner의 `companion-release.yml` acceptance로 둔다.
+- release JSON parse, workflow YAML parse, `companion-release.yml` 모든 `run:` shell block `bash -n`, stale doc grep, `/bin/bash -n bin/workbranch install.sh tests/run.sh scripts/build-workbranch.sh companion/scripts/build-app.sh`, `git diff --check` 통과.
+- `./tests/run.sh` 통과: `Tests passed: 208`.
+
+Expected: 출력 없음(0017/0020 내부 역사 언급 제외).
+
+검증 결과(2026-06-13): 0017/0020 이력 문서 제외 후 `0018` grep 출력 없음. `README.md`, `README.ko.md`, `companion/README.md`, `0015`, `0019`에서 `local preview`, `public cask distribution is planned separately`, `release-plumbing plan`, `재작성 필요`, `별도 release-plumbing` stale 문구 grep 출력 없음.
 
 - [ ] **Step 4: Commit**
 
+plan-execute 안전 게이트에 따라 이 실행에서는 commit하지 않는다. 적용 시 아래 커밋을 별도로 수행한다.
+
 ```bash
-git add companion/README.md docs/plans/
+git add companion/README.md README.md README.ko.md docs/plans/
 git commit -m "docs(companion): add brew install and signing guide, replace plan 0018 with 0020"
 ```
 
@@ -664,13 +708,13 @@ git commit -m "docs(companion): add brew install and signing guide, replace plan
 
 - [ ] **Step 1: 0020 PR 단독 merge**
 
-mixed commit 없이 이 계획의 변경만 담은 PR을 merge한다. merge 직후 release-please workflow가 두 release PR을 만들 수 있다(root는 pending CLI 변경이 있을 때만). companion release PR(`release: workbranch-companion 0.1.0`)이 생성되는지 확인한다.
+mixed commit 없이 이 계획의 변경만 담은 PR을 merge한다. 0020의 release-plumbing/docs/workflow commit은 non-releasing type이어야 하며, root `exclude-paths`와 commit discipline 때문에 CLI root release PR은 새로 생기면 안 된다(이미 pending CLI 변경이 있던 경우는 별도). companion release PR(`release: workbranch-companion 0.1.0`)이 생성되는지 확인한다.
 
 - [ ] **Step 2: companion release PR 검토/merge**
 
 - PR이 `companion/CHANGELOG.md`에 기존 `feat(companion)` history를 채우는지 확인.
 - PR이 `companion/scripts/build-app.sh`의 `APP_VERSION`을 `0.1.0`으로 유지/갱신하는지 확인.
-- **root(`.`) 버전과 `bin/workbranch`를 건드리지 않는지 확인** — 건드린다면 merge하지 말고 config를 점검한다.
+- PR이 companion source/history만 release 대상으로 삼고, root(`.`) version / `bin/workbranch` / `CHANGELOG.md`를 건드리지 않는지 확인 — 건드린다면 merge하지 말고 root `exclude-paths`와 commit type을 점검한다.
 - merge → tag `workbranch-companion-v0.1.0` + GitHub release 생성 확인.
 
 - [ ] **Step 3: companion-release.yml 동작 확인**
@@ -740,7 +784,7 @@ bash -n companion/scripts/build-app.sh
 cd companion && ./scripts/build-app.sh && /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" dist/WorkbranchCompanion.app/Contents/Info.plist
 python3 -c "import json; json.load(open('release-please-config.json')); json.load(open('.release-please-manifest.json'))"
 ruby -ryaml -e "%w[.github/workflows/companion-ci.yml .github/workflows/companion-release.yml .github/workflows/homebrew-bump.yml].each { |f| YAML.load_file(f) }; puts 'OK'"
-grep -rn "0018" docs/plans/ companion/README.md | grep -v 0017-companion-swiftbar-plugin.md
+grep -rn "0018" docs/plans/ companion/README.md README.md README.ko.md | grep -v -E "0017-companion-swiftbar-plugin.md|0020-companion-brew-distribution.md"
 ```
 
 merge 후 acceptance (Task 7):
@@ -753,7 +797,7 @@ merge 후 acceptance (Task 7):
 
 ## 위험과 완화
 
-- **기존 CLI release 파손:** root config block을 byte-level 보존하고, 0020을 단독 merge하며, Task 7 Step 7에서 실제 CLI release를 관찰한다. companion release PR이 root 버전을 건드리면 merge하지 않는다.
+- **기존 CLI release 파손:** root는 plain `v*` tag와 `bin/workbranch` extra-file을 보존하고, `exclude-paths`로 `companion`/`.github`/`docs`만 건드린 commit을 root release에서 제외한다. root-level release config 파일은 directory exclude가 불가능하므로 non-releasing commit type으로 관리한다. companion release PR이 root 버전을 건드리면 merge하지 않는다.
 - **release-please two-package 전환 surprise:** manifest seed `0.0.0` + 기존 `feat(companion)` history 조합이 첫 PR에서 의도(0.1.0)와 다른 버전을 제안할 수 있다. release PR 검토 단계(Task 7 Step 2)를 acceptance gate로 두고, 어긋나면 config의 `release-as`로 한 번 고정한다.
 - **sha256 race:** cask bump를 zip asset 업로드와 같은 job에서 순서대로 수행해 구조적으로 제거한다.
 - **Gatekeeper (ad-hoc 과도기):** cask caveats + README로 `--no-quarantine`을 안내한다. Developer ID secrets 등록 후 자동으로 서명/공증되며, 그 시점에 caveats 제거 tap PR을 만든다.

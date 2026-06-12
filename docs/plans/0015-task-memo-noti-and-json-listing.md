@@ -2,7 +2,7 @@
 
 > **agentic worker 지침:** 이 계획을 실행할 때는 `superpowers:subagent-driven-development` 또는 `superpowers:executing-plans`를 사용한다. 동작 변경 전에는 `superpowers:test-driven-development` 흐름을 따른다. 코드는 `src/workbranch/**`를 먼저 수정하고 `scripts/build-workbranch.sh`로 `bin/workbranch`를 재생성한다. 검증은 syntax check, targeted tests, `./tests/run.sh`, `git diff --check` 순서로 한다. `bin/workbranch`를 직접 수정하지 않는다.
 >
-> **시리즈 위치:** menu bar companion initiative의 첫 번째 핵심 CLI 계약이다. 0016 focus/open-warp 계획은 제거되었고, 현재 실행 순서는 **0015 → 0019 (native app, superseding 0017) → 0018 (re-written with cask/native assumptions)**이다. 0018은 companion 공개 배포가 필요할 때만 실행하며, 이제 cask/native 변경을 전제로 한다.
+> **시리즈 위치:** menu bar companion initiative의 첫 번째 핵심 CLI 계약이다. 0016 focus/open-warp 계획은 제거되었고, 현재 실행 순서는 **0015 → 0019 (native app, superseding 0017) → 0020 (brew cask distribution)**이다. 0020은 companion 공개 배포를 기존 tap + cask/native 변경 기준으로 다룬다.
 
 **목표:** task별 사람이 읽고 고칠 수 있는 작업 메모(`workbranch memo`, `<task>/TASK-WORKBRANCH.md`), task 알림 inbox(`workbranch noti`, `<task>/.workbranch/notifications.jsonl`), 그리고 companion이 소비할 안정적인 `workbranch list --json` 출력을 추가한다.
 

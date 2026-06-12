@@ -12,6 +12,7 @@ jobs:
   bump-homebrew-formula:
     name: Update tkhwang/homebrew-tap
     runs-on: ubuntu-latest
+    if: ${{ !startsWith(github.event.release.tag_name, 'workbranch-companion-') }}
 
     steps:
       - name: Checkout Homebrew tap

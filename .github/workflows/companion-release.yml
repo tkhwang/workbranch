@@ -1,0 +1,167 @@
+name: Companion Release
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Companion release tag (workbranch-companion-vX.Y.Z)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    name: Build, package, and publish companion app
+    runs-on: macos-14
+    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'workbranch-companion-v') }}
+    env:
+      TAG_NAME: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}
+
+    steps:
+      - name: Validate tag
+        run: |
+          set -euo pipefail
+          case "$TAG_NAME" in
+            workbranch-companion-v*) ;;
+            *)
+              echo "not a companion release tag: $TAG_NAME" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG_NAME }}
+
+      - name: Build universal app bundle
+        run: WORKBRANCH_COMPANION_UNIVERSAL=1 ./companion/scripts/build-app.sh
+
+      - name: Sign with Developer ID (skipped until secrets are set)
+        env:
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APPLE_CERTIFICATE_P12:-}" ]; then
+            echo "[skip] APPLE_CERTIFICATE_P12 not set — keeping ad-hoc signature"
+            exit 0
+          fi
+          KEYCHAIN_PATH="$RUNNER_TEMP/companion-signing.keychain-db"
+          KEYCHAIN_PASSWORD=$(uuidgen)
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 1800 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          printf '%s' "$APPLE_CERTIFICATE_P12" | base64 -d > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN_PATH" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S "apple-tool:,apple:" -s \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+          /usr/bin/codesign --force --options runtime --timestamp \
+            --sign "$APPLE_SIGNING_IDENTITY" companion/dist/WorkbranchCompanion.app
+
+      - name: Package zip
+        run: |
+          set -euo pipefail
+          VERSION="${TAG_NAME#workbranch-companion-v}"
+          ZIP_NAME="WorkbranchCompanion-${VERSION}.zip"
+          ditto -c -k --keepParent companion/dist/WorkbranchCompanion.app "$ZIP_NAME"
+          {
+            echo "VERSION=$VERSION"
+            echo "ZIP_NAME=$ZIP_NAME"
+          } >> "$GITHUB_ENV"
+
+      - name: Notarize and staple (skipped until secrets are set)
+        env:
+          APPLE_NOTARY_KEY: ${{ secrets.APPLE_NOTARY_KEY }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APPLE_NOTARY_KEY:-}" ]; then
+            echo "[skip] APPLE_NOTARY_KEY not set — publishing without notarization"
+            exit 0
+          fi
+          printf '%s' "$APPLE_NOTARY_KEY" | base64 -d > "$RUNNER_TEMP/notary-key.p8"
+          xcrun notarytool submit "$ZIP_NAME" \
+            --key "$RUNNER_TEMP/notary-key.p8" \
+            --key-id "$APPLE_NOTARY_KEY_ID" \
+            --issuer "$APPLE_NOTARY_ISSUER_ID" \
+            --wait
+          xcrun stapler staple companion/dist/WorkbranchCompanion.app
+          ditto -c -k --keepParent companion/dist/WorkbranchCompanion.app "$ZIP_NAME"
+
+      - name: Upload release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG_NAME" "$ZIP_NAME" --clobber --repo "$GITHUB_REPOSITORY"
+
+      - name: Checkout Homebrew tap
+        uses: actions/checkout@v4
+        with:
+          repository: tkhwang/homebrew-tap
+          token: ${{ secrets.TAP_GITHUB_TOKEN }}
+          path: homebrew-tap
+          persist-credentials: false
+
+      - name: Update cask version and sha256
+        run: |
+          set -euo pipefail
+          CASK_PATH="homebrew-tap/Casks/workbranch-companion.rb"
+          if [ ! -f "$CASK_PATH" ]; then
+            echo "tap cask not present yet — skipping bump"
+            echo "CASK_CHANGED=0" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          ZIP_SHA=$(shasum -a 256 "$ZIP_NAME" | awk '{print $1}')
+          CASK_PATH="$CASK_PATH" CASK_VERSION="$VERSION" CASK_SHA="$ZIP_SHA" python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          cask = Path(os.environ["CASK_PATH"])
+          text = cask.read_text()
+          text, version_count = re.subn(
+              r'^  version ".*"$',
+              f'  version "{os.environ["CASK_VERSION"]}"',
+              text,
+              count=1,
+              flags=re.MULTILINE,
+          )
+          text, sha_count = re.subn(
+              r'^  sha256 ".*"$',
+              f'  sha256 "{os.environ["CASK_SHA"]}"',
+              text,
+              count=1,
+              flags=re.MULTILINE,
+          )
+          if version_count != 1 or sha_count != 1:
+              raise SystemExit("expected exactly one version and one sha256 line in cask")
+          cask.write_text(text)
+          PY
+          echo "CASK_CHANGED=1" >> "$GITHUB_ENV"
+
+      - name: Commit and push cask update
+        if: ${{ env.CASK_CHANGED == '1' }}
+        working-directory: homebrew-tap
+        env:
+          TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- Casks/workbranch-companion.rb; then
+            echo "Casks/workbranch-companion.rb is already up to date for ${TAG_NAME}"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/workbranch-companion.rb
+          git commit -m "chore(workbranch-companion): update cask for ${TAG_NAME}"
+          auth_header=$(printf 'x-access-token:%s' "$TAP_GITHUB_TOKEN" | base64 | tr -d '\n')
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth_header}" \
+            push https://github.com/tkhwang/homebrew-tap.git HEAD:main
