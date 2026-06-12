@@ -41,9 +41,9 @@
   - secrets 발급/등록 step-by-step 가이드를 `companion/README.md`에 둔다(Task 6).
 
 - [x] **release-please two-package. root 동작 보존이 최우선.**
-  - root `.`: plain `v*` tag(`include-component-in-tag: false`)와 `bin/workbranch` extra-file은 보존하되, `exclude-paths`로 `companion/`, `.github/`, `docs/`만 건드린 배포/문서/companion commit은 CLI release 후보에서 제외한다.
+  - root `.`: plain `v*` tag(`include-component-in-tag: false`)와 `bin/workbranch` extra-file은 보존하되, `exclude-paths`로 `companion/`, `.github/`, `docs/`, root companion docs(`README.md`, `README.ko.md`), release-please metadata만 건드린 배포/문서/companion commit은 CLI release 후보에서 제외한다.
   - `companion`: `package-name`과 `component`를 모두 `workbranch-companion`으로 명시하고, `include-component-in-tag: true` → tag `workbranch-companion-vX.Y.Z`, changelog `companion/CHANGELOG.md`, extra-file `scripts/build-app.sh`(package 상대 경로).
-  - root-level `release-please-config.json` / `.release-please-manifest.json`은 release-please의 directory 기반 `exclude-paths`로 제외할 수 없으므로, 해당 설정 변경 commit은 `chore(release): ...`처럼 non-releasing type으로 둔다. companion source 변경 commit(`feat(companion): ...`)과 섞지 않는다.
+  - `release-please-config.json` / `.release-please-manifest.json`도 exact file path로 root exclude에 넣는다. 그래도 release plumbing/config/docs/workflow commit은 `chore(release): ...`처럼 non-releasing type으로 둔다. companion source 변경 commit(`feat(companion): ...`)과 섞지 않는다.
   - manifest seed는 `"companion": "0.0.0"` — 기존 `feat(companion)` history가 첫 release PR을 0.1.0으로 제안하게 한다.
 
 - [x] **버전 single source는 release-please. `build-app.sh`가 Info.plist에 주입한다.**
@@ -56,7 +56,7 @@
 - [x] **cask bump는 `companion-release.yml` 안에서 수행한다. `homebrew-bump.yml`에 넣지 않는다.**
   - 두 workflow가 같은 release published 이벤트에 트리거되면 zip asset 업로드 전에 cask가 sha256을 계산하려는 race가 생긴다. asset 업로드 직후 같은 job에서 bump하면 순서가 보장된다.
   - `homebrew-bump.yml`은 `workbranch-companion-*` tag에서 조용히 skip하도록 job-level `if`만 추가한다(현재는 hard fail). `v*` 경로 동작은 무변경.
-  - cask 파일이 tap에 아직 없으면 "tap cask not present yet — skipping" log 후 exit 0 한다(첫 release 시점).
+  - cask 파일이 tap에 아직 없으면 `Casks/workbranch-companion.rb`를 같은 job에서 생성한다. 첫 companion release부터 문서화된 `brew install --cask tkhwang/tap/workbranch-companion` 경로가 실제로 생겨야 하므로 silent skip은 금지한다.
 
 - [x] **companion CI는 별도 path-filtered workflow.** (0018 계승)
   - `companion-ci.yml`: `companion/**` trigger, macOS 15 runner, `swift build` + `swift test` + `swift run CompanionCoreTestRunner` + `build-app.sh` smoke. 기존 `ci.yml`은 수정하지 않는다.
@@ -219,7 +219,11 @@ git commit -m "feat(companion): stamp app version from release-please marker and
       "exclude-paths": [
         "companion",
         ".github",
-        "docs"
+        "docs",
+        "README.md",
+        "README.ko.md",
+        "release-please-config.json",
+        ".release-please-manifest.json"
       ],
       "extra-files": [
         {
@@ -244,7 +248,7 @@ git commit -m "feat(companion): stamp app version from release-please marker and
 }
 ```
 
-주의: `extra-files`의 `path`는 package 디렉토리 기준 상대 경로다(`companion/scripts/build-app.sh`가 아니라 `scripts/build-app.sh`). `exclude-paths`는 directory path 기준으로 commit의 relevant files가 모두 제외 경로 아래 있을 때 root package에서 제외한다. root-level file(`release-please-config.json`, `.release-please-manifest.json`)은 여기에 잡히지 않으므로 commit type discipline으로 release를 막는다.
+주의: `extra-files`의 `path`는 package 디렉토리 기준 상대 경로다(`companion/scripts/build-app.sh`가 아니라 `scripts/build-app.sh`). `exclude-paths`는 commit의 relevant files가 모두 지정 path에 속할 때 해당 package parsing에서 제외한다. companion-only 배포/문서 commit이 root README나 release-please metadata를 같이 건드릴 수 있으므로 이 root-level 파일들도 exact path로 root package exclude에 포함한다.
 
 - [x] **Step 2: manifest seed**
 
@@ -271,7 +275,7 @@ git commit -m "feat(companion): stamp app version from release-please marker and
 python3 -c "import json; json.load(open('release-please-config.json')); json.load(open('.release-please-manifest.json'))" && echo OK
 ```
 
-Expected: `OK`. `git diff release-please-config.json`으로 root package가 `include-component-in-tag: false`, `bin/workbranch` extra-file, `exclude-paths: ["companion", ".github", "docs"]`를 갖고 companion package가 `component: "workbranch-companion"`를 명시하는지 확인한다.
+Expected: `OK`. `git diff release-please-config.json`으로 root package가 `include-component-in-tag: false`, `bin/workbranch` extra-file, `exclude-paths`에 `companion`, `.github`, `docs`, `README.md`, `README.ko.md`, `release-please-config.json`, `.release-please-manifest.json`을 갖고 companion package가 `component: "workbranch-companion"`를 명시하는지 확인한다.
 
 검증 결과(2026-06-13): `python3` JSON parse OK, diff에서 root `exclude-paths`, companion `component`, manifest `"companion": "0.0.0"` 확인.
 
@@ -515,11 +519,6 @@ jobs:
         run: |
           set -euo pipefail
           CASK_PATH="homebrew-tap/Casks/workbranch-companion.rb"
-          if [ ! -f "$CASK_PATH" ]; then
-            echo "tap cask not present yet — skipping bump"
-            echo "CASK_CHANGED=0" >> "$GITHUB_ENV"
-            exit 0
-          fi
           ZIP_SHA=$(shasum -a 256 "$ZIP_NAME" | awk '{print $1}')
           CASK_PATH="$CASK_PATH" CASK_VERSION="$VERSION" CASK_SHA="$ZIP_SHA" python3 - <<'PY'
           import os
@@ -527,23 +526,49 @@ jobs:
           from pathlib import Path
 
           cask = Path(os.environ["CASK_PATH"])
-          text = cask.read_text()
-          text, version_count = re.subn(
-              r'^  version ".*"$',
-              f'  version "{os.environ["CASK_VERSION"]}"',
-              text,
-              count=1,
-              flags=re.MULTILINE,
-          )
-          text, sha_count = re.subn(
-              r'^  sha256 ".*"$',
-              f'  sha256 "{os.environ["CASK_SHA"]}"',
-              text,
-              count=1,
-              flags=re.MULTILINE,
-          )
-          if version_count != 1 or sha_count != 1:
-              raise SystemExit("expected exactly one version and one sha256 line in cask")
+          version = os.environ["CASK_VERSION"]
+          sha = os.environ["CASK_SHA"]
+          if cask.exists():
+              text = cask.read_text()
+              text, version_count = re.subn(
+                  r'^  version ".*"$',
+                  f'  version "{version}"',
+                  text,
+                  count=1,
+                  flags=re.MULTILINE,
+              )
+              text, sha_count = re.subn(
+                  r'^  sha256 ".*"$',
+                  f'  sha256 "{sha}"',
+                  text,
+                  count=1,
+                  flags=re.MULTILINE,
+              )
+              if version_count != 1 or sha_count != 1:
+                  raise SystemExit("expected exactly one version and one sha256 line in cask")
+          else:
+              cask.parent.mkdir(parents=True, exist_ok=True)
+              text = f'''cask "workbranch-companion" do
+            version "{version}"
+            sha256 "{sha}"
+
+            url "https://github.com/tkhwang/workbranch/releases/download/workbranch-companion-v#{{version}}/WorkbranchCompanion-#{{version}}.zip"
+            name "Workbranch Companion"
+            desc "Menu bar companion for the workbranch CLI"
+            homepage "https://github.com/tkhwang/workbranch"
+
+            depends_on macos: ">= :ventura"
+
+            app "WorkbranchCompanion.app"
+
+            caveats <<~EOS
+              This app is currently ad-hoc signed. Install with --no-quarantine:
+                brew install --cask --no-quarantine tkhwang/tap/workbranch-companion
+              If already installed and blocked by Gatekeeper:
+                xattr -dr com.apple.quarantine "/Applications/WorkbranchCompanion.app"
+            EOS
+          end
+          '''
           cask.write_text(text)
           PY
           echo "CASK_CHANGED=1" >> "$GITHUB_ENV"
@@ -555,7 +580,7 @@ jobs:
           TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          if git diff --quiet -- Casks/workbranch-companion.rb; then
+          if [ -z "$(git status --porcelain -- Casks/workbranch-companion.rb)" ]; then
             echo "Casks/workbranch-companion.rb is already up to date for ${TAG_NAME}"
             exit 0
           fi
@@ -603,7 +628,7 @@ git commit -m "chore(ci): add companion release pipeline with guarded signing an
 
 기존 local build 안내 위에 추가:
 
-```markdown
+````markdown
 ## Install via Homebrew (recommended)
 
 ```bash
@@ -663,7 +688,7 @@ Developer ID signing + notarization:
 7. The next companion release is signed and notarized automatically. Then send
    a tap PR removing the `--no-quarantine` caveat from
    `Casks/workbranch-companion.rb`.
-```
+````
 
 기존 README 하단의 "deferred to the rewritten 0018 release-plumbing plan" 문장은 "release automation is implemented by plan 0020"으로 교체한다.
 
@@ -721,12 +746,12 @@ mixed commit 없이 이 계획의 변경만 담은 PR을 merge한다. 0020의 re
 
 - Actions에서 run이 green인지 확인.
 - release에 `WorkbranchCompanion-0.1.0.zip` asset이 붙었는지 확인.
-- "tap cask not present yet — skipping" log 확인(아직 cask가 없으므로 정상).
+- tap에 `Casks/workbranch-companion.rb`가 생성되거나 기존 cask가 version/sha256 bump되었는지 확인.
 - `homebrew-bump.yml`이 companion tag에서 skip되었는지 확인(job이 실행 안 됨).
 
-- [ ] **Step 4: tap에 cask 추가**
+- [ ] **Step 4: tap cask 내용 확인**
 
-asset sha256을 계산해 `tkhwang/homebrew-tap`에 `Casks/workbranch-companion.rb`를 추가한다(PR 또는 직접 push):
+workflow가 생성/갱신한 `tkhwang/homebrew-tap`의 `Casks/workbranch-companion.rb`가 release asset sha256과 일치하는지 확인한다:
 
 ```bash
 curl -fsSL -o /tmp/WorkbranchCompanion-0.1.0.zip \
@@ -770,7 +795,7 @@ Expected: 설치 성공, app process 확인, menu bar에 icon 표시. `brew unin
 
 - [ ] **Step 6: 차기 companion release에서 cask 자동 bump 확인**
 
-다음 `workbranch-companion-v*` release에서 `companion-release.yml`이 cask version/sha256을 자동 갱신하고 tap에 push하는지 확인한다(첫 release에서는 cask가 없어 skip했으므로 자동화 경로는 두 번째 release가 첫 검증이다).
+다음 `workbranch-companion-v*` release에서 `companion-release.yml`이 기존 cask의 version/sha256을 자동 갱신하고 tap에 push하는지 확인한다.
 
 - [ ] **Step 7: CLI release 무손상 확인**
 
@@ -791,16 +816,16 @@ merge 후 acceptance (Task 7):
 
 - companion release PR 생성 → merge → `workbranch-companion-v0.1.0` release + zip asset
 - `homebrew-bump.yml` companion tag skip
-- tap cask 추가 후 `brew install --cask --no-quarantine` + app 실행
-- 두 번째 companion release에서 cask 자동 bump
+- 첫 companion release에서 cask 생성 후 `brew install --cask --no-quarantine` + app 실행
+- 두 번째 companion release에서 기존 cask 자동 bump
 - 첫 CLI `v*` release 무손상 관찰
 
 ## 위험과 완화
 
-- **기존 CLI release 파손:** root는 plain `v*` tag와 `bin/workbranch` extra-file을 보존하고, `exclude-paths`로 `companion`/`.github`/`docs`만 건드린 commit을 root release에서 제외한다. root-level release config 파일은 directory exclude가 불가능하므로 non-releasing commit type으로 관리한다. companion release PR이 root 버전을 건드리면 merge하지 않는다.
+- **기존 CLI release 파손:** root는 plain `v*` tag와 `bin/workbranch` extra-file을 보존하고, `exclude-paths`로 `companion`/`.github`/`docs`와 root companion docs/metadata-only commit을 root release에서 제외한다. release plumbing/config/docs/workflow commit은 계속 non-releasing commit type으로 관리한다. companion release PR이 root 버전을 건드리면 merge하지 않는다.
 - **release-please two-package 전환 surprise:** manifest seed `0.0.0` + 기존 `feat(companion)` history 조합이 첫 PR에서 의도(0.1.0)와 다른 버전을 제안할 수 있다. release PR 검토 단계(Task 7 Step 2)를 acceptance gate로 두고, 어긋나면 config의 `release-as`로 한 번 고정한다.
 - **sha256 race:** cask bump를 zip asset 업로드와 같은 job에서 순서대로 수행해 구조적으로 제거한다.
 - **Gatekeeper (ad-hoc 과도기):** cask caveats + README로 `--no-quarantine`을 안내한다. Developer ID secrets 등록 후 자동으로 서명/공증되며, 그 시점에 caveats 제거 tap PR을 만든다.
 - **macOS 15 runner 명령 차이:** `base64 -w0` 미지원 → `base64 | tr -d '\n'`. workflow 작성 시 ubuntu용 homebrew-bump.yml을 그대로 복사하지 않는다.
 - **universal build 경로:** `--arch` 동시 지정 시 SPM 출력 경로가 `.build/apple/Products/Release/`로 바뀐다. build-app.sh가 분기로 처리하고, CI smoke(companion-ci.yml은 native, companion-release.yml은 universal)로 양쪽을 커버한다.
-- **첫 release에서 cask 부재:** guarded skip으로 workflow 실패를 막고, cask 추가를 Task 7의 명시 단계로 둔다. 자동 bump 경로는 두 번째 release에서 검증한다.
+- **첫 release에서 cask 부재:** silent skip 금지. workflow가 `Casks/workbranch-companion.rb`를 생성해 첫 release부터 문서화된 brew install 경로를 제공한다. 기존 cask가 있으면 version/sha256만 bump한다.

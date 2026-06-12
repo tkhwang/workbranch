@@ -34,9 +34,10 @@ jobs:
           esac
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           ref: ${{ env.TAG_NAME }}
+          persist-credentials: false
 
       - name: Build universal app bundle
         run: WORKBRANCH_COMPANION_UNIVERSAL=1 ./companion/scripts/build-app.sh
@@ -103,7 +104,7 @@ jobs:
         run: gh release upload "$TAG_NAME" "$ZIP_NAME" --clobber --repo "$GITHUB_REPOSITORY"
 
       - name: Checkout Homebrew tap
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           repository: tkhwang/homebrew-tap
           token: ${{ secrets.TAP_GITHUB_TOKEN }}
@@ -114,11 +115,6 @@ jobs:
         run: |
           set -euo pipefail
           CASK_PATH="homebrew-tap/Casks/workbranch-companion.rb"
-          if [ ! -f "$CASK_PATH" ]; then
-            echo "tap cask not present yet — skipping bump"
-            echo "CASK_CHANGED=0" >> "$GITHUB_ENV"
-            exit 0
-          fi
           ZIP_SHA=$(shasum -a 256 "$ZIP_NAME" | awk '{print $1}')
           CASK_PATH="$CASK_PATH" CASK_VERSION="$VERSION" CASK_SHA="$ZIP_SHA" python3 - <<'PY'
           import os
@@ -126,23 +122,49 @@ jobs:
           from pathlib import Path
 
           cask = Path(os.environ["CASK_PATH"])
-          text = cask.read_text()
-          text, version_count = re.subn(
-              r'^  version ".*"$',
-              f'  version "{os.environ["CASK_VERSION"]}"',
-              text,
-              count=1,
-              flags=re.MULTILINE,
-          )
-          text, sha_count = re.subn(
-              r'^  sha256 ".*"$',
-              f'  sha256 "{os.environ["CASK_SHA"]}"',
-              text,
-              count=1,
-              flags=re.MULTILINE,
-          )
-          if version_count != 1 or sha_count != 1:
-              raise SystemExit("expected exactly one version and one sha256 line in cask")
+          version = os.environ["CASK_VERSION"]
+          sha = os.environ["CASK_SHA"]
+          if cask.exists():
+              text = cask.read_text()
+              text, version_count = re.subn(
+                  r'^  version ".*"$',
+                  f'  version "{version}"',
+                  text,
+                  count=1,
+                  flags=re.MULTILINE,
+              )
+              text, sha_count = re.subn(
+                  r'^  sha256 ".*"$',
+                  f'  sha256 "{sha}"',
+                  text,
+                  count=1,
+                  flags=re.MULTILINE,
+              )
+              if version_count != 1 or sha_count != 1:
+                  raise SystemExit("expected exactly one version and one sha256 line in cask")
+          else:
+              cask.parent.mkdir(parents=True, exist_ok=True)
+              text = f'''cask "workbranch-companion" do
+            version "{version}"
+            sha256 "{sha}"
+
+            url "https://github.com/tkhwang/workbranch/releases/download/workbranch-companion-v#{{version}}/WorkbranchCompanion-#{{version}}.zip"
+            name "Workbranch Companion"
+            desc "Menu bar companion for the workbranch CLI"
+            homepage "https://github.com/tkhwang/workbranch"
+
+            depends_on macos: ">= :ventura"
+
+            app "WorkbranchCompanion.app"
+
+            caveats <<~EOS
+              This app is currently ad-hoc signed. Install with --no-quarantine:
+                brew install --cask --no-quarantine tkhwang/tap/workbranch-companion
+              If already installed and blocked by Gatekeeper:
+                xattr -dr com.apple.quarantine "/Applications/WorkbranchCompanion.app"
+            EOS
+          end
+          '''
           cask.write_text(text)
           PY
           echo "CASK_CHANGED=1" >> "$GITHUB_ENV"
@@ -154,7 +176,7 @@ jobs:
           TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          if git diff --quiet -- Casks/workbranch-companion.rb; then
+          if [ -z "$(git status --porcelain -- Casks/workbranch-companion.rb)" ]; then
             echo "Casks/workbranch-companion.rb is already up to date for ${TAG_NAME}"
             exit 0
           fi
