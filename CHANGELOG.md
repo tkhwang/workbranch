@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.14.0](https://github.com/tkhwang/workbranch/compare/v1.13.0...v1.14.0) (2026-06-12)
+
+
+### Features
+
+* **companion:** add initial macOS menu bar app ([81fbbcd](https://github.com/tkhwang/workbranch/commit/81fbbcda1bd9156f128468026c80e3041883634a)), closes [#0018](https://github.com/tkhwang/workbranch/issues/0018)
+* implement mac menubar companion app ([7fa68b5](https://github.com/tkhwang/workbranch/commit/7fa68b5b55ffc29d1d749aad0d765d7ebc99654e))
+
 ## [1.13.0](https://github.com/tkhwang/workbranch/compare/v1.12.0...v1.13.0) (2026-06-12)
 
 
