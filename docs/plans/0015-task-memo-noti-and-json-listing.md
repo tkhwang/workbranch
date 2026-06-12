@@ -1,7 +1,7 @@
 # 0015 Task Memo, Notifications, and JSON Listing Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Use `superpowers:test-driven-development` before every behavior change. Make source changes under `src/workbranch/**`, rebuild with `scripts/build-workbranch.sh`, then verify syntax checks, targeted tests, `./tests/run.sh`, and `git diff --check`. Do not edit `bin/workbranch` by hand.
-
+>
 > **Series:** Part 1 of 4 of the menu bar companion initiative. Execution order: **0015 (this)** → 0016 focus command → 0017 monorepo release plumbing → 0018 companion SwiftBar plugin. This plan has no dependency on the others and ships through the existing single-package `v*` release flow.
 
 **Goal:** Add human-authored per-task state to workbranch — a task brief (`workbranch memo`, stored as `TASK-WORKBRANCH.md`) and a notification inbox (`workbranch noti`) stored at the task workspace root — plus a stable machine-readable `workbranch list --json` that downstream frontends (menu bar app, Raycast, scripts) consume.
@@ -59,7 +59,7 @@ When running 3–5 task workspaces in parallel, git state cannot distinguish wha
 - [x] `memo` cwd-inference grammar.
   - Impact: command UX and accidental overwrites.
   - Current evidence: task work may happen from either `<task>` or `<task>/<repo>`, while the canonical brief is always `<task>/TASK-WORKBRANCH.md`.
-  - Decision: keep cwd inference only from inside a registered task workspace. `workbranch memo` shows the current task brief, `workbranch memo "text"` overwrites it, and `workbranch memo --clear` removes it. Outside a task workspace, require explicit `workbranch memo <task> [text]` and fail with usage if the task is omitted.
+  - Decision: keep cwd inference only for zero-argument reads from inside a registered task workspace. `workbranch memo` shows the current task brief. Any provided argument is treated as an explicit task: `workbranch memo <task>` reads, `workbranch memo <task> "text"` overwrites, and `workbranch memo <task> --clear` removes it. Outside a task workspace, `workbranch memo` fails with usage.
   - Reason: this keeps the fast agent/user workflow for repo-local execution while preventing accidental writes from the project root or unrelated directories.
   - Status: resolved.
 
@@ -85,7 +85,7 @@ When running 3–5 task workspaces in parallel, git state cannot distinguish wha
 
 ## Product Decisions
 
-1. **`workbranch memo <task> [text]`** — with text: write (overwrite) `<task>/TASK-WORKBRANCH.md`; without: print it. `--clear` removes the file. From inside a task workspace, `<task>` may be omitted: resolve by walking up from `$PWD` to a directory directly under `$PROJECT_ROOT` that is a configured task. Multi-line task briefs allowed; only the first non-empty line is the `memoTitle` / display title.
+1. **`workbranch memo <task> [text]`** — with text: write (overwrite) `<task>/TASK-WORKBRANCH.md`; without: print it. `--clear` removes the file. From inside a task workspace, `<task>` may be omitted only for zero-argument reads: resolve by walking up from `$PWD` to a directory directly under `$PROJECT_ROOT` that is a configured task. Multi-line task briefs allowed; only the first non-empty line is the `memoTitle` / display title.
 2. **`workbranch add <task>` task-state bootstrap** — create `<task>/TASK-WORKBRANCH.md` from a short template and generated `<task>/AGENTS.md` with instructions for agents to keep that task brief current whether they run from `<task>` or `<task>/<repo>`. Do not edit repo `.gitignore` or create repo-local task-state files.
 3. **`workbranch noti add <task> <text>`** appends `{"ts":"<ISO8601>","text":"..."}` JSONL; **`noti list <task>`** prints text lines (oldest first); **`noti clear <task>`** truncates. Missing file ⇒ empty list, count 0.
 4. **`workbranch list --json`** — single JSON document on stdout, zero log noise, color-proof:
@@ -137,7 +137,7 @@ README.md / README.ko.md                # command table rows for memo / noti / l
 
 - [x] RED: `test_memo_set_show_clear` — `workbranch memo login "publish API 구현"` writes `login/TASK-WORKBRANCH.md`; `workbranch memo login` prints it; `workbranch memo login --clear` removes the file; second `--clear` is a no-op success.
 - [x] RED: `test_memo_rejects_unknown_task` — `Cannot memo: unknown task 'task9'`, exit nonzero, no task brief file created.
-- [x] RED: `test_memo_resolves_task_from_cwd` — from `login/backend`, `workbranch memo "text"` writes `login/TASK-WORKBRANCH.md`; from `$PROJECT_ROOT` without a task argument it fails with usage guidance.
+- [x] RED: `test_memo_resolves_task_from_cwd` — from `login/backend`, `workbranch memo` reads `login/TASK-WORKBRANCH.md`; from `$PROJECT_ROOT` without a task argument it fails with usage guidance.
 - [x] RED: `test_add_creates_task_brief_and_agent_guidance` — `workbranch add login` creates `login/TASK-WORKBRANCH.md` and `login/AGENTS.md`; generated guidance tells agents running from task root to update `TASK-WORKBRANCH.md` and agents running from repo folders to update `../TASK-WORKBRANCH.md`; no repo `.gitignore` changes are made.
 - [x] GREEN: implement `task_brief_path`/`task_brief_title`/`task_agents_path` in `lib/task-state.sh`; `cmd_memo` stays thin; cwd-resolution helper reuses `task-identity.sh` validation; `cmd_add` writes the task brief and guidance before repo setup commands run.
 - [x] Rebuild (`scripts/build-workbranch.sh`) + full `./tests/run.sh`.

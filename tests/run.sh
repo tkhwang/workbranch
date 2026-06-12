@@ -119,8 +119,10 @@ main() {
   run_test test_memo_set_show_clear
   run_test test_memo_rejects_unknown_task
   run_test test_memo_resolves_task_from_cwd
+  run_test test_memo_treats_task_argument_as_explicit_inside_task_workspace
   run_test test_add_creates_task_brief_and_agent_guidance
   run_test test_noti_add_list_clear
+  run_test test_noti_escapes_control_characters
   run_test test_noti_rejects_unknown_task
   run_test test_noti_state_removed_with_workspace
   run_test test_add_prompts_for_task_type_and_detail_without_task_argument
@@ -144,6 +146,7 @@ main() {
   run_test test_list_shows_conventional_task_folder_and_branch
   run_test test_list_json_shape
   run_test test_list_json_no_color_no_log_noise
+  run_test test_list_json_escapes_control_characters
   run_test test_list_json_dirty_flag
   run_test test_list_json_skips_stale_and_partial_task_dirs
   run_test test_remove_deletes_task_branch_when_worktree_missing

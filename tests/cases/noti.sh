@@ -26,6 +26,24 @@ test_noti_add_list_clear() {
   [ -z "$out" ] || fail "expected cleared noti list to be empty, got: $out"
 }
 
+test_noti_escapes_control_characters() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  run_expect_success "$WORKBRANCH" noti add login $'needs\aattention' >/dev/null
+
+  python3 -c 'import json, sys
+path = sys.argv[1]
+line = open(path, "rb").read()
+assert b"\x07" not in line, line
+d = json.loads(line)
+assert d["text"] == "needs\x07attention", d' "$project/login/.workbranch/notifications.jsonl" || return 1
+  out=$(run_expect_success "$WORKBRANCH" noti list login)
+  [ "$out" = $'needs\aattention' ] || fail "expected notification control char round-trip"
+}
+
 test_noti_rejects_unknown_task() {
   new_fixture
   project="$FIXTURE_PROJECT"

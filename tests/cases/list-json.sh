@@ -42,10 +42,25 @@ test_list_json_no_color_no_log_noise() {
   run_expect_success "$WORKBRANCH" init >/dev/null
   run_expect_success "$WORKBRANCH" add login >/dev/null
 
-  out=$(env -u NO_COLOR WORKBRANCH_COLOR=always "$WORKBRANCH" list --json)
+  out=$(run_expect_success env -u NO_COLOR WORKBRANCH_COLOR=always "$WORKBRANCH" list --json)
   printf '%s' "$out" | python3 -c 'import json,sys; json.load(sys.stdin)'
   assert_not_contains "$out" $'\033['
   assert_not_contains "$out" "[*]"
+}
+
+test_list_json_escapes_control_characters() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  run_expect_success "$WORKBRANCH" memo login $'needs\aattention' >/dev/null
+
+  out=$(run_expect_success "$WORKBRANCH" list --json)
+  printf '%s' "$out" | python3 -c 'import json, sys
+d = json.load(sys.stdin)
+assert d["tasks"][0]["memoTitle"] == "needs\x07attention", d'
+  assert_contains "$out" "\\u0007"
 }
 
 test_list_json_dirty_flag() {

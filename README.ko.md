@@ -176,7 +176,7 @@ Combined flow shortcut:
 
 `workbranch add <task>`는 repo worktree 밖의 task root에 workbranch-managed state를 생성합니다.
 
-- `<task>/TASK-WORKBRANCH.md`는 사람/AI agent가 함께 갱신하는 task brief입니다. `workbranch memo [<task>] [text]`로 읽거나 덮어쓰고, `--clear`로 삭제합니다.
+- `<task>/TASK-WORKBRANCH.md`는 사람/AI agent가 함께 갱신하는 task brief입니다. `workbranch memo <task> [text]`로 읽거나 덮어쓰고, `workbranch memo <task> --clear`로 삭제합니다. Task workspace 안에서는 읽기일 때만 `workbranch memo`처럼 `<task>`를 생략할 수 있습니다.
 - `<task>/AGENTS.md`는 `<task>` 또는 `<task>/<repo>`에서 실행되는 AI agent가 같은 task brief를 갱신하도록 안내합니다.
 - `<task>/.workbranch/notifications.jsonl`은 append-only local inbox입니다. `workbranch noti add/list/clear`가 관리하고, `workbranch list --json`은 companion app용 `notiCount`를 노출합니다.
 

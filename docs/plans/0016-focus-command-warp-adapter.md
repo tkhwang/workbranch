@@ -1,7 +1,6 @@
 # 0016 Focus Command with Warp Adapter Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Use `superpowers:test-driven-development` before every behavior change. Make source changes under `src/workbranch/**`, rebuild with `scripts/build-workbranch.sh`, then verify syntax checks, targeted tests, `./tests/run.sh`, and `git diff --check`. Do not edit `bin/workbranch` by hand. The live AppleScript path cannot run in CI — it is covered by an explicit manual verification checklist at the end.
-
 > **Series:** Part 2 of 4 of the menu bar companion initiative. Execution order: 0015 memo/noti/json → **0016 (this)** → 0017 monorepo release plumbing → 0018 companion SwiftBar plugin. Depends on 0015 only for shared README sectioning; code-wise it is independent. Ships through the existing single-package `v*` release flow. After this plan, `workbranch focus <task>` delivers the core jump value with no menu bar required.
 
 **Goal:** Add `workbranch focus <task>`: focus the existing Warp tab/pane belonging to a task workspace, from any shell. Validate the task before touching UI automation, and isolate Warp specifics behind a terminal-focus adapter seam so iTerm2/cmux adapters can be added later.

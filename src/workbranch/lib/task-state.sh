@@ -52,10 +52,13 @@ EOF_GUIDANCE
 }
 
 write_default_task_state() {
-  local task
+  local task noti state_dir
   task=$1
   write_default_task_brief "$task" || die "failed to write task brief: $task"
   write_task_agent_guidance "$task" || die "failed to write task agent guidance: $task"
+  state_dir=$(task_state_dir_path "$task")
+  noti=$(task_noti_path "$task")
+  mkdir -p "$state_dir" && : > "$noti" || die "failed to initialize notification inbox: $task"
 }
 
 remove_task_state_files() {
@@ -105,20 +108,45 @@ json_string() {
 }
 
 json_escape() {
-  awk 'BEGIN { ORS="" }
+  awk 'BEGIN {
+      ORS = ""
+      for (i = 0; i < 32; i++) {
+        c = sprintf("%c", i)
+        control_escape[c] = sprintf("\\u%04x", i)
+      }
+      control_escape[sprintf("%c", 8)] = "\\b"
+      control_escape[sprintf("%c", 9)] = "\\t"
+      control_escape[sprintf("%c", 10)] = "\\n"
+      control_escape[sprintf("%c", 12)] = "\\f"
+      control_escape[sprintf("%c", 13)] = "\\r"
+    }
     {
       if (NR > 1) printf "\\n"
-      line = $0
-      gsub(/\\/, "\\\\", line)
-      gsub(/"/, "\\\"", line)
-      gsub(/\t/, "\\t", line)
-      gsub(/\r/, "\\r", line)
-      printf "%s", line
+      for (i = 1; i <= length($0); i++) {
+        c = substr($0, i, 1)
+        if (c == "\\") printf "\\\\"
+        else if (c == "\"") printf "\\\""
+        else if (c in control_escape) printf "%s", control_escape[c]
+        else printf "%s", c
+      }
     }'
 }
 
 json_unescape() {
-  awk '{
+  awk '
+  function hex_value(c) {
+    if (c >= "0" && c <= "9") return c + 0
+    c = tolower(c)
+    if (c >= "a" && c <= "f") return index("abcdef", c) + 9
+    return -1
+  }
+  function hex_byte(value, hi, lo) {
+    hi = hex_value(substr(value, 1, 1))
+    lo = hex_value(substr(value, 2, 1))
+    if (hi < 0 || lo < 0) return -1
+    return hi * 16 + lo
+  }
+  {
     out = ""
     for (i = 1; i <= length($0); i++) {
       c = substr($0, i, 1)
@@ -128,6 +156,17 @@ json_unescape() {
         if (e == "n") out = out "\n"
         else if (e == "t") out = out "\t"
         else if (e == "r") out = out "\r"
+        else if (e == "b") out = out sprintf("%c", 8)
+        else if (e == "f") out = out sprintf("%c", 12)
+        else if (e == "u" && substr($0, i + 1, 2) == "00") {
+          code = hex_byte(substr($0, i + 3, 2))
+          if (code >= 0 && code < 32) {
+            out = out sprintf("%c", code)
+            i += 4
+          } else {
+            out = out e
+          }
+        }
         else out = out e
       } else {
         out = out c

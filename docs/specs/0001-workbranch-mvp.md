@@ -168,7 +168,7 @@ Show configured repos, base branches, current branches, and task workspaces. `--
 
 `workbranch add <task>` creates workbranch-managed task-root state outside repo worktrees: `<task>/TASK-WORKBRANCH.md`, generated `<task>/AGENTS.md`, and `<task>/.workbranch/` as needed. Workbranch does not create repo-local task-state files and does not edit repo `.gitignore`.
 
-`workbranch memo <task>` prints the task brief, `workbranch memo <task> "text"` overwrites it, and `workbranch memo <task> --clear` removes it. From inside a registered task workspace, the task may be omitted; `workbranch memo` reads the current task and `workbranch memo "text"` writes the current task.
+`workbranch memo <task>` prints the task brief, `workbranch memo <task> "text"` overwrites it, and `workbranch memo <task> --clear` removes it. From inside a registered task workspace, the task may be omitted only for reading; `workbranch memo` reads the current task. Writes and clears require an explicit task argument.
 
 `workbranch noti add <task> "text"` appends a JSON Lines event with UTC `ts` and `text`; `workbranch noti list <task>` prints notification text oldest-first; `workbranch noti clear <task>` clears the inbox. Missing notification files behave as empty inboxes.
 

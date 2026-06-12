@@ -31,6 +31,15 @@ REPO . $TMP_ROOT/remotes/frontend.git master
 CONFIG
   out=$(run_expect_fail "$WORKBRANCH" list)
   assert_contains "$out" "invalid repo name '.'"
+
+  cat > "$project/.workbranch.config" <<CONFIG
+PROJECT_NAME fullstack
+MAIN_WORKTREES_DIR _base
+BRANCH_PREFIX feature
+REPO .workbranch $TMP_ROOT/remotes/frontend.git master
+CONFIG
+  out=$(run_expect_fail "$WORKBRANCH" list)
+  assert_contains "$out" "invalid repo name '.workbranch'"
 }
 
 test_add_uses_feat_parent_branch_as_default() {

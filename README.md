@@ -176,7 +176,7 @@ Combined flow shortcuts:
 
 `workbranch add <task>` creates task-root state outside the repo worktrees:
 
-- `<task>/TASK-WORKBRANCH.md` is the human/agent-editable task brief. `workbranch memo [<task>] [text]` reads or overwrites it, and `--clear` removes it.
+- `<task>/TASK-WORKBRANCH.md` is the human/agent-editable task brief. `workbranch memo <task> [text]` reads or overwrites it, and `workbranch memo <task> --clear` removes it. Inside a task workspace, `workbranch memo` may omit `<task>` for reading only.
 - `<task>/AGENTS.md` tells AI agents running from either `<task>` or `<task>/<repo>` to keep the task brief current.
 - `<task>/.workbranch/notifications.jsonl` is an append-only local inbox. `workbranch noti add/list/clear` manages it, and `workbranch list --json` exposes `notiCount` for companion apps.
 
