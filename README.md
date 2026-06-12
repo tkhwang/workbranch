@@ -182,6 +182,22 @@ Combined flow shortcuts:
 
 `workbranch remove <task>` deletes only workbranch-managed task state after successful workspace removal; unrelated files in the task root are preserved.
 
+## Native menu bar companion preview
+
+`companion/` contains a local native macOS menu bar app, `WorkbranchCompanion.app`, that consumes `workbranch list --json` and provides a task cockpit for memo titles, notification counts, dirty markers, inline memo edits, notification clearing, and existing Finder/IDE/terminal launch actions.
+
+Build it locally:
+
+```bash
+cd companion
+swift build
+swift run CompanionCoreTestRunner
+./scripts/build-app.sh
+open dist/WorkbranchCompanion.app
+```
+
+Configure roots in `~/.config/workbranch-companion/config.json`. The app is a local preview; public cask distribution is planned separately.
+
 ## More docs
 
 - [Task identity and branch names](docs/task-identity.md)
