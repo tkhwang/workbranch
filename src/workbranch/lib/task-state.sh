@@ -59,18 +59,18 @@ task_explicit_status() {
 }
 
 task_status() {
-  local task explicit status_counts done total
+  local task explicit status_counts done_count total_count
   task=$1
   if explicit=$(task_explicit_status "$task"); then
     printf '%s' "$explicit"
     return 0
   fi
   status_counts=$(task_checklist_counts "$task")
-  done=${status_counts%% *}
-  total=${status_counts##* }
-  if [ "$total" -eq 0 ]; then
+  done_count=${status_counts%% *}
+  total_count=${status_counts##* }
+  if [ "$total_count" -eq 0 ]; then
     printf 'planning'
-  elif [ "$done" -eq "$total" ]; then
+  elif [ "$done_count" -eq "$total_count" ]; then
     printf 'done'
   else
     printf 'in-progress'

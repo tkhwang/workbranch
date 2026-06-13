@@ -130,7 +130,7 @@ cmd_remove() {
   remove_task_state_files "$task"
   if [ "$force" -eq 1 ]; then
     if [ -d "$PROJECT_ROOT/$task" ]; then
-      rm -rf "$PROJECT_ROOT/$task" || die "failed to remove task directory: $task"
+      rm -rf "${PROJECT_ROOT:?}/$task" || die "failed to remove task directory: $task"
     fi
   elif rmdir "$PROJECT_ROOT/$task" 2>/dev/null; then
     :
