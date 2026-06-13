@@ -34,6 +34,8 @@ cmd_list_json() {
     printf ',"progressTotal":%s' "$progress_total"
     printf ',"currentItem":'
     json_string "$current_item"
+    printf ',"items":'
+    task_checklist_items_json "$task"
     printf ',"notiCount":%s' "$(noti_count "$task")"
     printf ',"repos":['
     first_repo=1
@@ -65,7 +67,7 @@ cmd_list_json() {
   printf '\n'
 }
 
-cmd_list() {
+cmd_list_local() {
   require_project
   if [ $# -eq 1 ] && [ "$1" = "--json" ]; then
     cmd_list_json
@@ -134,4 +136,99 @@ cmd_list() {
     done
   done
   [ $found -eq 1 ] || info "  (none)"
+}
+
+
+cmd_list_global_json() {
+  local root first_project first_error successes errors out status message
+  printf '{"schemaVersion":1,"projects":['
+  first_project=1
+  first_error=1
+  successes=0
+  errors=0
+  error_items=""
+  while IFS= read -r root || [ -n "$root" ]; do
+    [ -n "$root" ] || continue
+    out=$(cd "$root" 2>/dev/null && "$0" list --json 2>&1)
+    status=$?
+    if [ $status -eq 0 ]; then
+      if [ $first_project -eq 1 ]; then first_project=0; else printf ','; fi
+      printf '%s' "$out"
+      successes=$((successes + 1))
+    else
+      message=$out
+      if [ $first_error -eq 1 ]; then first_error=0; else error_items="$error_items,"; fi
+      error_items="$error_items{\"root\":"
+      error_items="$error_items$(json_string_value "$root")"
+      error_items="$error_items,\"message\":"
+      error_items="$error_items$(json_string_value "$message")"
+      error_items="$error_items}"
+      errors=$((errors + 1))
+    fi
+  done <<EOF_REGISTRY_ROOTS
+$(registry_list_roots)
+EOF_REGISTRY_ROOTS
+  printf '],"errors":['
+  printf '%s' "$error_items"
+  printf ']}\n'
+  if [ $successes -eq 0 ] && [ $errors -gt 0 ]; then
+    return 1
+  fi
+  return 0
+}
+
+json_string_value() {
+  printf '"'
+  printf '%s' "$1" | json_escape
+  printf '"'
+}
+
+cmd_list_global_human() {
+  local root out status successes errors
+  successes=0
+  errors=0
+  while IFS= read -r root || [ -n "$root" ]; do
+    [ -n "$root" ] || continue
+    out=$(cd "$root" 2>/dev/null && "$0" list 2>&1)
+    status=$?
+    if [ $status -eq 0 ]; then
+      [ $successes -eq 0 ] || printf '\n'
+      printf '%s\n' "$out"
+      successes=$((successes + 1))
+    else
+      printf '[-] Error: %s: %s\n' "$root" "$out" >&2
+      errors=$((errors + 1))
+    fi
+  done <<EOF_REGISTRY_ROOTS
+$(registry_list_roots)
+EOF_REGISTRY_ROOTS
+  if [ $successes -eq 0 ] && [ $errors -gt 0 ]; then
+    return 1
+  fi
+}
+
+cmd_list() {
+  global=0
+  json=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --global) global=1; shift ;;
+      --json) json=1; shift ;;
+      *) die "usage: workbranch list [--global] [--json]" ;;
+    esac
+  done
+  if [ $global -eq 1 ]; then
+    if [ $json -eq 1 ]; then
+      cmd_list_global_json
+    else
+      cmd_list_global_human
+    fi
+    return $?
+  fi
+  if [ $json -eq 1 ]; then
+    require_project
+    cmd_list_json
+    return 0
+  fi
+  cmd_list_local
 }

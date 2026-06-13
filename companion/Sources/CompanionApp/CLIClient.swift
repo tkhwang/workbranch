@@ -36,6 +36,21 @@ struct CLIClient: Sendable {
         }
     }
 
+    func listGlobalJSON() throws -> WorkbranchGlobalDocument {
+        let result = try run(arguments: ["list", "--global", "--json"], cwd: FileManager.default.homeDirectoryForCurrentUser.path)
+        guard !result.timedOut else { throw CLIClientError.timeout("workbranch list --global --json timed out") }
+        do {
+            let document = try WorkbranchGlobalDocument.decode(result.stdout)
+            if result.exitCode == 0 || !document.projects.isEmpty || !document.errors.isEmpty {
+                return document
+            }
+        } catch {
+            if result.exitCode == 0 { throw CLIClientError.invalidJSON(String(describing: error)) }
+        }
+        let message = result.stderrText.trimmingCharacters(in: .whitespacesAndNewlines)
+        throw CLIClientError.commandFailed(message.isEmpty ? "workbranch list --global --json failed" : message)
+    }
+
     func run(arguments: [String], cwd: String, standardInput: String? = nil, detached: Bool = false) throws -> CommandResult {
         try run(executable: workbranchBin, arguments: arguments, cwd: cwd, standardInput: standardInput, detached: detached)
     }

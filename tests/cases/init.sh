@@ -197,3 +197,26 @@ CONFIG
   assert_branch "$project/_base/backend" "master"
   assert_not_exists "$project/.workbranch.config"
 }
+
+
+test_init_registers_companion_project_markdown() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  xdg="$TMP_ROOT/xdg"
+  out=$(cd "$project" && run_expect_success env XDG_CONFIG_HOME="$xdg" "$WORKBRANCH" init)
+  registry="$xdg/workbranch-companion/projects.md"
+  assert_contains "$out" "Registered with companion:"
+  assert_file "$registry"
+  project_real=$(cd "$project" && pwd -P)
+  assert_contains "$(cat "$registry")" "- $project_real"
+  assert_contains "$(cat "$registry")" "# workbranch companion projects"
+}
+
+test_init_no_companion_skips_registry() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  xdg="$TMP_ROOT/xdg"
+  out=$(cd "$project" && run_expect_success env XDG_CONFIG_HOME="$xdg" "$WORKBRANCH" init --no-companion)
+  assert_not_contains "$out" "Registered with companion:"
+  assert_not_exists "$xdg/workbranch-companion/projects.md"
+}

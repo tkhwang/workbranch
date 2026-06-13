@@ -93,6 +93,41 @@ task_current_item() {
   ' "$file"
 }
 
+
+task_checklist_items_json() {
+  local file line in_code first leading mark text depth
+  file=$(task_brief_file "$1") || true
+  printf '['
+  [ -n "${file:-}" ] || { printf ']'; return 0; }
+  in_code=0
+  first=1
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      [[:space:]]*\`\`\`*)
+        if [ "$in_code" -eq 0 ]; then in_code=1; else in_code=0; fi
+        continue
+        ;;
+    esac
+    [ "$in_code" -eq 0 ] || continue
+    if [[ $line =~ ^([[:space:]]*)-[[:space:]]*\[([xX[:space:]])\][[:space:]]*(.*)$ ]]; then
+      leading=${BASH_REMATCH[1]}
+      mark=${BASH_REMATCH[2]}
+      text=${BASH_REMATCH[3]}
+      depth=$((${#leading} / 2))
+      if [ "$first" -eq 1 ]; then first=0; else printf ','; fi
+      printf '{"text":'
+      json_string "$text"
+      if [ "$mark" = "x" ] || [ "$mark" = "X" ]; then
+        printf ',"checked":true'
+      else
+        printf ',"checked":false'
+      fi
+      printf ',"depth":%d}' "$depth"
+    fi
+  done < "$file"
+  printf ']'
+}
+
 write_default_task_brief() {
   local task file
   task=$1
@@ -103,8 +138,9 @@ write_default_task_brief() {
 
 status: planning
 
-- [ ] Start work
-- [ ] Run verification
+- [ ] Major: Start work
+  - [ ] Implement change
+  - [ ] Run verification
 
 ## Notes
 -
@@ -142,6 +178,7 @@ Rules:
 - keep checklist items small and actionable
 - mark completed items immediately with `[x]`
 - the first unchecked item should represent the current or next work
+- express sub-tasks by indenting Markdown checklist items with two spaces per level
 EOF_GUIDANCE
 }
 

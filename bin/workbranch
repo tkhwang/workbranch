@@ -369,9 +369,10 @@ Usage:
   workbranch <command> [args]
 Workspace:
   init              Initialize a workbranch project
-  list              List configured repos and task workspaces
+  list [--global] [--json]  List configured repos and task workspaces
   add [<task>] [--from <ref>]  Create a task workspace
   remove <task> [--force]  Remove task worktrees, branches, and task-root state
+  destroy [--force]  Destroy the current workbranch project
 Git:
   status            Show remote diff, task diff, and dirty state
   vertical
@@ -415,9 +416,10 @@ usage_enhanced() {
   printf '  workbranch <command> [args]\n'
   section "Workspace"
   printf '  init              Initialize a workbranch project\n'
-  printf '  list              List configured repos and task workspaces\n'
+  printf '  list [--global] [--json]  List configured repos and task workspaces\n'
   printf '  add [<task>] [--from <ref>]  Create a task workspace\n'
   printf '  remove <task> [--force]  Remove task worktrees, branches, and task-root state\n'
+  printf '  destroy [--force]  Destroy the current workbranch project\n'
   section "Git"
   printf '  status            Show remote diff, task diff, and dirty state\n'
   printf '%s  vertical%s\n' "$WB_GRAY" "$WB_RESET"
@@ -1380,6 +1382,41 @@ task_current_item() {
   ' "$file"
 }
 
+
+task_checklist_items_json() {
+  local file line in_code first leading mark text depth
+  file=$(task_brief_file "$1") || true
+  printf '['
+  [ -n "${file:-}" ] || { printf ']'; return 0; }
+  in_code=0
+  first=1
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      [[:space:]]*\`\`\`*)
+        if [ "$in_code" -eq 0 ]; then in_code=1; else in_code=0; fi
+        continue
+        ;;
+    esac
+    [ "$in_code" -eq 0 ] || continue
+    if [[ $line =~ ^([[:space:]]*)-[[:space:]]*\[([xX[:space:]])\][[:space:]]*(.*)$ ]]; then
+      leading=${BASH_REMATCH[1]}
+      mark=${BASH_REMATCH[2]}
+      text=${BASH_REMATCH[3]}
+      depth=$((${#leading} / 2))
+      if [ "$first" -eq 1 ]; then first=0; else printf ','; fi
+      printf '{"text":'
+      json_string "$text"
+      if [ "$mark" = "x" ] || [ "$mark" = "X" ]; then
+        printf ',"checked":true'
+      else
+        printf ',"checked":false'
+      fi
+      printf ',"depth":%d}' "$depth"
+    fi
+  done < "$file"
+  printf ']'
+}
+
 write_default_task_brief() {
   local task file
   task=$1
@@ -1390,8 +1427,9 @@ write_default_task_brief() {
 
 status: planning
 
-- [ ] Start work
-- [ ] Run verification
+- [ ] Major: Start work
+  - [ ] Implement change
+  - [ ] Run verification
 
 ## Notes
 -
@@ -1429,6 +1467,7 @@ Rules:
 - keep checklist items small and actionable
 - mark completed items immediately with `[x]`
 - the first unchecked item should represent the current or next work
+- express sub-tasks by indenting Markdown checklist items with two spaces per level
 EOF_GUIDANCE
 }
 
@@ -1566,6 +1605,102 @@ noti_count() {
   [ -f "$file" ] || { printf '0'; return 0; }
   count=$(wc -l < "$file" | tr -d '[:space:]')
   printf '%s' "${count:-0}"
+}
+
+# ----- src/workbranch/lib/registry.sh -----
+registry_path() {
+  printf '%s/workbranch-companion/projects.md' "${XDG_CONFIG_HOME:-$HOME/.config}"
+}
+
+registry_ensure_file() {
+  local file dir
+  file=$(registry_path)
+  dir=$(dirname "$file")
+  mkdir -p "$dir" || die "failed to create companion registry directory: $dir"
+  if [ ! -f "$file" ]; then
+    cat > "$file" <<'REGISTRY'
+# workbranch companion projects
+
+## projects
+REGISTRY
+  fi
+}
+
+registry_normalize_root() {
+  local root
+  root=$1
+  [ -d "$root" ] || die "registry root is not a directory: $root"
+  (cd "$root" && pwd -P) || die "failed to normalize registry root: $root"
+}
+
+registry_add_root() {
+  local root file tmp
+  root=$(registry_normalize_root "$1")
+  registry_ensure_file
+  file=$(registry_path)
+  if registry_list_roots | grep -Fx -- "$root" >/dev/null 2>&1; then
+    return 0
+  fi
+  if ! grep -Eq '^[[:space:]]*##[[:space:]]+projects[[:space:]]*$' "$file"; then
+    printf '\n## projects\n' >> "$file" || die "failed to update companion registry: $file"
+  fi
+  tmp=$(mktemp "${TMPDIR:-/tmp}/workbranch-registry.XXXXXX") || die "failed to create registry temp file"
+  awk -v root="$root" '
+    { print }
+    /^[[:space:]]*##[[:space:]]+projects[[:space:]]*$/ { seen = 1 }
+    END {
+      if (seen) print "- " root
+    }
+  ' "$file" > "$tmp" || { rm -f "$tmp"; die "failed to update companion registry: $file"; }
+  mv "$tmp" "$file" || { rm -f "$tmp"; die "failed to update companion registry: $file"; }
+}
+
+registry_remove_root() {
+  local root file tmp
+  root=$1
+  case "$root" in /*) ;; *) root=$(registry_normalize_root "$root") ;; esac
+  file=$(registry_path)
+  [ -f "$file" ] || return 0
+  tmp=$(mktemp "${TMPDIR:-/tmp}/workbranch-registry.XXXXXX") || die "failed to create registry temp file"
+  awk -v root="$root" '
+    /^[[:space:]]*-[[:space:]]*\// {
+      value = $0
+      sub(/^[[:space:]]*-[[:space:]]*/, "", value)
+      sub(/[[:space:]]*$/, "", value)
+      if (value == root) next
+    }
+    { print }
+  ' "$file" > "$tmp" || { rm -f "$tmp"; die "failed to update companion registry: $file"; }
+  mv "$tmp" "$file" || { rm -f "$tmp"; die "failed to update companion registry: $file"; }
+}
+
+registry_list_roots() {
+  local file
+  file=$(registry_path)
+  [ -f "$file" ] || return 0
+  awk '
+    /^[[:space:]]*-[[:space:]]*\// {
+      value = $0
+      sub(/^[[:space:]]*-[[:space:]]*/, "", value)
+      sub(/[[:space:]]*$/, "", value)
+      print value
+    }
+  ' "$file"
+}
+
+registry_workbranch_bin() {
+  local file
+  file=$(registry_path)
+  [ -f "$file" ] || return 0
+  awk '
+    /^[[:space:]]*workbranchBin:[[:space:]]*/ {
+      value = $0
+      sub(/^[[:space:]]*workbranchBin:[[:space:]]*/, "", value)
+      sub(/[[:space:]]*$/, "", value)
+      print value
+      exit
+    }
+  ' "$file"
 }
 
 # ----- src/workbranch/lib/preflight.sh -----
@@ -2864,6 +2999,7 @@ configure_existing_project() {
 # ----- src/workbranch/commands/init.sh -----
 cmd_init_interactive() {
   clone_after=${1:-yes}
+  register_companion=${2:-yes}
   reset_config
   if color_enabled; then
     print_banner
@@ -2997,6 +3133,10 @@ AFTER
   if [ "$clone_after" = "yes" ]; then
     clone_base_repos
     success "Initialized workbranch project: $PROJECT_ROOT"
+    if [ "$register_companion" = "yes" ]; then
+      registry_add_root "$PROJECT_ROOT"
+      info "Registered with companion: $PROJECT_ROOT"
+    fi
     prompt_add_first_task_after_init || return 1
     prompt_tool_config_after_init
   else
@@ -3047,7 +3187,13 @@ prompt_tool_config_after_init() {
 }
 
 cmd_init() {
-  [ $# -eq 0 ] || die "usage: workbranch init"
+  register_companion=yes
+  case "${1:-}" in
+    "") ;;
+    --no-companion) register_companion=no; shift ;;
+    *) die "usage: workbranch init [--no-companion]" ;;
+  esac
+  [ $# -eq 0 ] || die "usage: workbranch init [--no-companion]"
   CREATED_PATHS=()
   CREATED_WORKTREES=()
   CREATED_WORKTREE_BASES=()
@@ -3068,8 +3214,12 @@ cmd_init() {
     fi
     clone_base_repos
     success "Initialized workbranch project: $PROJECT_ROOT"
+    if [ "$register_companion" = "yes" ]; then
+      registry_add_root "$PROJECT_ROOT"
+      info "Registered with companion: $PROJECT_ROOT"
+    fi
   else
-    cmd_init_interactive yes
+    cmd_init_interactive yes "$register_companion"
   fi
 }
 
@@ -3431,6 +3581,8 @@ cmd_list_json() {
     printf ',"progressTotal":%s' "$progress_total"
     printf ',"currentItem":'
     json_string "$current_item"
+    printf ',"items":'
+    task_checklist_items_json "$task"
     printf ',"notiCount":%s' "$(noti_count "$task")"
     printf ',"repos":['
     first_repo=1
@@ -3462,7 +3614,7 @@ cmd_list_json() {
   printf '\n'
 }
 
-cmd_list() {
+cmd_list_local() {
   require_project
   if [ $# -eq 1 ] && [ "$1" = "--json" ]; then
     cmd_list_json
@@ -3531,6 +3683,101 @@ cmd_list() {
     done
   done
   [ $found -eq 1 ] || info "  (none)"
+}
+
+
+cmd_list_global_json() {
+  local root first_project first_error successes errors out status message
+  printf '{"schemaVersion":1,"projects":['
+  first_project=1
+  first_error=1
+  successes=0
+  errors=0
+  error_items=""
+  while IFS= read -r root || [ -n "$root" ]; do
+    [ -n "$root" ] || continue
+    out=$(cd "$root" 2>/dev/null && "$0" list --json 2>&1)
+    status=$?
+    if [ $status -eq 0 ]; then
+      if [ $first_project -eq 1 ]; then first_project=0; else printf ','; fi
+      printf '%s' "$out"
+      successes=$((successes + 1))
+    else
+      message=$out
+      if [ $first_error -eq 1 ]; then first_error=0; else error_items="$error_items,"; fi
+      error_items="$error_items{\"root\":"
+      error_items="$error_items$(json_string_value "$root")"
+      error_items="$error_items,\"message\":"
+      error_items="$error_items$(json_string_value "$message")"
+      error_items="$error_items}"
+      errors=$((errors + 1))
+    fi
+  done <<EOF_REGISTRY_ROOTS
+$(registry_list_roots)
+EOF_REGISTRY_ROOTS
+  printf '],"errors":['
+  printf '%s' "$error_items"
+  printf ']}\n'
+  if [ $successes -eq 0 ] && [ $errors -gt 0 ]; then
+    return 1
+  fi
+  return 0
+}
+
+json_string_value() {
+  printf '"'
+  printf '%s' "$1" | json_escape
+  printf '"'
+}
+
+cmd_list_global_human() {
+  local root out status successes errors
+  successes=0
+  errors=0
+  while IFS= read -r root || [ -n "$root" ]; do
+    [ -n "$root" ] || continue
+    out=$(cd "$root" 2>/dev/null && "$0" list 2>&1)
+    status=$?
+    if [ $status -eq 0 ]; then
+      [ $successes -eq 0 ] || printf '\n'
+      printf '%s\n' "$out"
+      successes=$((successes + 1))
+    else
+      printf '[-] Error: %s: %s\n' "$root" "$out" >&2
+      errors=$((errors + 1))
+    fi
+  done <<EOF_REGISTRY_ROOTS
+$(registry_list_roots)
+EOF_REGISTRY_ROOTS
+  if [ $successes -eq 0 ] && [ $errors -gt 0 ]; then
+    return 1
+  fi
+}
+
+cmd_list() {
+  global=0
+  json=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --global) global=1; shift ;;
+      --json) json=1; shift ;;
+      *) die "usage: workbranch list [--global] [--json]" ;;
+    esac
+  done
+  if [ $global -eq 1 ]; then
+    if [ $json -eq 1 ]; then
+      cmd_list_global_json
+    else
+      cmd_list_global_human
+    fi
+    return $?
+  fi
+  if [ $json -eq 1 ]; then
+    require_project
+    cmd_list_json
+    return 0
+  fi
+  cmd_list_local
 }
 
 # ----- src/workbranch/commands/path.sh -----
@@ -4352,6 +4599,123 @@ cmd_finalize() {
   execute_land_task "$task"
 }
 
+# ----- src/workbranch/commands/destroy.sh -----
+cmd_destroy_usage() { die "usage: workbranch destroy [--force]"; }
+
+confirm_destroy_project() {
+  local answer
+  [ "$1" -eq 1 ] && return 0
+  if [ -t 0 ] || [ "${WORKBRANCH_ALLOW_NON_TTY_PROMPT:-}" = "1" ]; then
+    answer=$(prompt_read "[*] Destroy workbranch project and delete files? [y/N]: ") || answer=""
+    case "$answer" in y|Y|yes|YES|Yes) return 0 ;; esac
+  fi
+  die "destroy cancelled"
+}
+
+preflight_require_no_unpushed_current_branch() {
+  local label path branch upstream
+  label=$1
+  path=$2
+  branch=$(branch_or_unknown "$path")
+  [ "$branch" != "(unknown)" ] || return 0
+  upstream=$(git -C "$path" rev-parse --verify --quiet "$branch@{upstream}^{commit}" 2>/dev/null) || upstream=""
+  [ -n "$upstream" ] || return 0
+  if ! git_is_ancestor "$path" "$branch" "$upstream"; then
+    preflight_error "$label has unpushed commits"
+  fi
+}
+
+cmd_destroy() {
+  local force i name base task task_dir path branch project_root
+  force=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --force) force=1; shift ;;
+      --keep-files) cmd_destroy_usage ;;
+      *) cmd_destroy_usage ;;
+    esac
+  done
+  require_project
+  project_root=$PROJECT_ROOT
+  reset_preflight
+
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    base=$(base_repo_path "$name")
+    if [ ! -d "$base/.git" ] && [ ! -f "$base/.git" ]; then
+      preflight_error "$BASE_DIR/$name missing git repo"
+      i=$((i + 1))
+      continue
+    fi
+    if [ "$force" -ne 1 ]; then
+      preflight_require_clean "$BASE_DIR/$name" "$base"
+      preflight_require_no_unpushed_current_branch "$BASE_DIR/$name" "$base"
+    fi
+    i=$((i + 1))
+  done
+
+  for task_dir in "$PROJECT_ROOT"/*; do
+    is_task_workspace_path "$task_dir" || continue
+    task=${task_dir##*/}
+    i=0
+    while [ $i -lt ${#REPO_NAMES[@]} ]; do
+      name=$(repo_name_at "$i")
+      path=$(task_repo_path "$task" "$name")
+      base=$(base_repo_path "$name")
+      branch=$(repo_task_branch_at "$i" "$task")
+      if [ -d "$path/.git" ] || [ -f "$path/.git" ]; then
+        if [ "$force" -ne 1 ]; then
+          preflight_require_clean "$task/$name" "$path"
+        fi
+      fi
+      if [ "$force" -ne 1 ] && { [ -d "$base/.git" ] || [ -f "$base/.git" ]; }; then
+        preflight_require_task_branch_safe_to_delete "$task/$name" "$base" "$branch" "$task"
+      fi
+      i=$((i + 1))
+    done
+  done
+
+  preflight_die_if_errors "destroy"
+  confirm_destroy_project "$force"
+
+  for task_dir in "$PROJECT_ROOT"/*; do
+    is_task_workspace_path "$task_dir" || continue
+    task=${task_dir##*/}
+    i=0
+    while [ $i -lt ${#REPO_NAMES[@]} ]; do
+      name=$(repo_name_at "$i")
+      path=$(task_repo_path "$task" "$name")
+      base=$(base_repo_path "$name")
+      branch=$(repo_task_branch_at "$i" "$task")
+      if [ -d "$path" ] && { [ -d "$base/.git" ] || [ -f "$base/.git" ]; }; then
+        if [ "$force" -eq 1 ]; then
+          git -C "$base" worktree remove --force "$path" >/dev/null 2>&1 || rm -rf "$path"
+        else
+          git -C "$base" worktree remove "$path" >/dev/null 2>&1 || die "failed to remove worktree: $task/$name"
+        fi
+      fi
+      if [ -d "$base/.git" ] || [ -f "$base/.git" ]; then
+        workbranch_git_delete_task_branch "$base" "$branch" "$force" || die "failed to delete task branch: $task/$name $branch"
+      fi
+      i=$((i + 1))
+    done
+  done
+
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    base=$(base_repo_path "$name")
+    [ ! -e "$base" ] || rm -rf "$base" || die "failed to remove base repo: $BASE_DIR/$name"
+    i=$((i + 1))
+  done
+  [ ! -e "$PROJECT_ROOT/$BASE_DIR" ] || rmdir "$PROJECT_ROOT/$BASE_DIR" 2>/dev/null || true
+  [ ! -f "$CONFIG_FILE" ] || rm -f "$CONFIG_FILE" || die "failed to remove config: $CONFIG_FILE"
+  registry_remove_root "$project_root"
+  [ ! -e "$project_root" ] || rm -rf "$project_root" || die "failed to remove project: $project_root"
+  success "Destroyed workbranch project: $project_root"
+}
+
 # ----- src/workbranch/commands/remove.sh -----
 
 task_root_items() {
@@ -4744,7 +5108,7 @@ cmd_complete_repos() {
 }
 
 cmd_complete_commands() {
-  printf '%s\n' add completion config doctor finalize finder help ide init land list memo noti path prune pull push refresh remove status terminal update version
+  printf '%s\n' add completion config destroy doctor finalize finder help ide init land list memo noti path prune pull push refresh remove status terminal update version
 }
 
 print_completion_bash() {
@@ -4794,10 +5158,10 @@ _workbranch() {
     -*)
       case "$cmd" in
         add) words='--from' ;;
-        list) words='--json' ;;
+        list) words='--json --global' ;;
         memo) words='--clear' ;;
         config) words='--rewrite' ;;
-        remove) words='--force' ;;
+        remove|destroy) words='--force' ;;
         doctor) words='--fix --repo' ;;
         update) words='--all --repo' ;;
         status|pull|push|land|finalize|refresh|path|finder|ide|terminal) words='--repo' ;;
@@ -4861,10 +5225,10 @@ _workbranch() {
   if [[ "$cur" == -* ]]; then
     case "$cmd" in
       add) flags=(--from) ;;
-      list) flags=(--json) ;;
+      list) flags=(--json --global) ;;
       memo) flags=(--clear) ;;
       config) flags=(--rewrite) ;;
-      remove) flags=(--force) ;;
+      remove|destroy) flags=(--force) ;;
       doctor) flags=(--fix --repo) ;;
       update) flags=(--all --repo) ;;
       status|pull|push|land|finalize|refresh|path|finder|ide|terminal) flags=(--repo) ;;
@@ -4949,9 +5313,11 @@ complete -c workbranch -f -n '__workbranch_seen_command terminal' -a '(__workbra
 complete -c workbranch -f -n '__fish_seen_argument -l repo' -a '(__workbranch_complete_repos)'
 complete -c workbranch -n '__workbranch_seen_command add' -l from -d 'Seed task branches from a source ref'
 complete -c workbranch -n '__workbranch_seen_command list' -l json -d 'Print machine-readable JSON'
+complete -c workbranch -n '__workbranch_seen_command list' -l global -d 'List every registered project'
 complete -c workbranch -n '__workbranch_seen_command memo' -l clear -d 'Clear the task brief'
 complete -c workbranch -n '__workbranch_seen_command config' -l rewrite -d 'Rewrite config to current format'
 complete -c workbranch -n '__workbranch_seen_command remove' -l force -d 'Force removal'
+complete -c workbranch -n '__workbranch_seen_command destroy' -l force -d 'Force destruction'
 complete -c workbranch -n '__workbranch_seen_command doctor' -l fix -d 'Apply safe repairs'
 complete -c workbranch -n '__workbranch_seen_command update' -l all -d 'Update every task workspace'
 complete -c workbranch -n '__workbranch_seen_command update' -l repo -d 'Limit operation to one repo'
@@ -5007,6 +5373,7 @@ main() {
     push) cmd_push "$@" ;;
     land) cmd_land "$@" ;;
     remove) cmd_remove "$@" ;;
+    destroy) cmd_destroy "$@" ;;
     prune) cmd_prune "$@" ;;
     completion) cmd_completion "$@" ;;
     __complete-tasks) cmd_complete_tasks ;;

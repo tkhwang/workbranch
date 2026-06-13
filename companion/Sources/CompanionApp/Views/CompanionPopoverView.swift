@@ -3,9 +3,6 @@ import CompanionCore
 
 struct CompanionPopoverView: View {
     @ObservedObject var store: StateStore
-    @State private var showingNewWorkspace = false
-    @State private var selectedRoot = ""
-    @State private var newTaskName = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -27,20 +24,20 @@ struct CompanionPopoverView: View {
             }
         }
         .padding(14)
-        .frame(width: 480, height: 560)
-        .onAppear {
-            if selectedRoot.isEmpty { selectedRoot = store.configuredRoots.first ?? "" }
-        }
-        .sheet(isPresented: $showingNewWorkspace) { newWorkspaceSheet }
+        .frame(width: 520, height: 600)
     }
 
     private var header: some View {
-        HStack {
+        HStack(spacing: 8) {
             Text("Workbranch")
                 .font(.headline)
-            Spacer()
             Text(store.menuState.title)
                 .foregroundStyle(.secondary)
+            Spacer()
+            Button("↻") { store.refreshAll() }
+                .help("Refresh")
+            Button("⏻") { store.quit() }
+                .help("Quit")
         }
     }
 
@@ -57,40 +54,11 @@ struct CompanionPopoverView: View {
 
     private var actions: some View {
         HStack {
-            Button("New workspace…") {
-                selectedRoot = store.configuredRoots.first ?? ""
-                newTaskName = ""
-                showingNewWorkspace = true
-            }
-            .disabled(store.configuredRoots.isEmpty)
-            Button("Refresh now") { store.refreshAll() }
             Button("Open config") { store.openConfig() }
             Spacer()
+            Button("Refresh now") { store.refreshAll() }
             Button("Quit") { store.quit() }
         }
-    }
-
-    private var newWorkspaceSheet: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("New workspace")
-                .font(.headline)
-            Picker("Root", selection: $selectedRoot) {
-                ForEach(store.configuredRoots, id: \.self) { root in Text(root).tag(root) }
-            }
-            TextField("Task name", text: $newTaskName)
-                .textFieldStyle(.roundedBorder)
-            HStack {
-                Spacer()
-                Button("Cancel") { showingNewWorkspace = false }
-                Button("Create") {
-                    store.addWorkspace(root: selectedRoot, task: newTaskName)
-                    showingNewWorkspace = false
-                }
-                .disabled(selectedRoot.isEmpty || newTaskName.isEmpty)
-            }
-        }
-        .padding(18)
-        .frame(width: 440)
     }
 }
 
@@ -99,6 +67,13 @@ private struct RowView: View {
     @ObservedObject var store: StateStore
     @State private var editing = false
     @State private var memoText = ""
+    @State private var expanded: Bool
+
+    init(row: MenuRow, store: StateStore) {
+        self.row = row
+        self.store = store
+        _expanded = State(initialValue: row.isExpandedByDefault)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -115,39 +90,120 @@ private struct RowView: View {
                     }
                     Button("Cancel") { editing = false }
                 }
+            } else if row.kind == .task {
+                taskDisclosure
             } else if row.kind == .repo {
-                Text(row.title)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 18)
+                repoLine(title: row.title)
             } else {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Button(action: startPrimaryAction) {
-                            Text(row.title)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(row.kind == .error ? .red : .primary)
-                        if let subtitle = row.subtitle, !subtitle.isEmpty {
-                            Text(subtitle)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                    }
-                    if row.kind == .task {
-                        Menu("Actions") {
-                            ForEach(Array(row.secondaryActions.enumerated()), id: \.offset) { _, action in
-                                Button(label(for: action)) { store.perform(action) }
-                            }
-                        }
-                        .menuStyle(.borderlessButton)
-                    }
-                }
+                messageLine
             }
         }
         .padding(.vertical, 3)
+    }
+
+    private var taskDisclosure: some View {
+        DisclosureGroup(isExpanded: $expanded) {
+            VStack(alignment: .leading, spacing: 4) {
+                if !row.currentItem.isEmpty {
+                    Text("now ▸ \(row.currentItem)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                ForEach(Array(row.repos.enumerated()), id: \.offset) { _, repo in
+                    repoLine(title: repoTitle(repo))
+                }
+                ForEach(Array(row.checklistItems.enumerated()), id: \.offset) { index, item in
+                    checklistLine(item: item, rollup: rollupText(at: index))
+                }
+                if row.repos.isEmpty && row.checklistItems.isEmpty && row.currentItem.isEmpty {
+                    Text("No details")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 18)
+                }
+            }
+            .padding(.leading, 14)
+        } label: {
+            HStack(alignment: .top) {
+                Button(action: startPrimaryAction) {
+                    Text(row.title)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(statusColor(row.status))
+                Menu("Actions") {
+                    ForEach(Array(row.secondaryActions.enumerated()), id: \.offset) { _, action in
+                        Button(label(for: action)) { store.perform(action) }
+                    }
+                }
+                .menuStyle(.borderlessButton)
+            }
+        }
+    }
+
+    private var messageLine: some View {
+        Button(action: startPrimaryAction) {
+            Text(row.title)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(row.kind == .error ? .red : .primary)
+    }
+
+    private func repoLine(title: String) -> some View {
+        Text(title)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .padding(.leading, 18)
+    }
+
+    private func checklistLine(item: WorkbranchChecklistItem, rollup: String) -> some View {
+        HStack(spacing: 4) {
+            Text(item.checked ? "✓" : "☐")
+            Text(item.text)
+                .strikethrough(item.checked)
+            if !rollup.isEmpty {
+                Text(rollup)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(item.checked ? .secondary : .primary)
+        .padding(.leading, CGFloat(max(item.depth, 0) * 14 + 18))
+    }
+
+    private func repoTitle(_ repo: WorkbranchRepo) -> String {
+        var title = "\(repo.name)  \(repo.branch)"
+        if repo.dirty { title += "  ●" }
+        return title
+    }
+
+    private func rollupText(at index: Int) -> String {
+        guard index < row.checklistItems.count else { return "" }
+        let parent = row.checklistItems[index]
+        var done = parent.checked ? 1 : 0
+        var total = 1
+        var cursor = index + 1
+        while cursor < row.checklistItems.count {
+            let candidate = row.checklistItems[cursor]
+            guard candidate.depth > parent.depth else { break }
+            total += 1
+            if candidate.checked { done += 1 }
+            cursor += 1
+        }
+        return total > 1 ? "\(done)/\(total)" : ""
+    }
+
+    private func statusColor(_ status: String) -> Color {
+        switch status {
+        case "done": return .green
+        case "in-progress": return .blue
+        case "review": return .purple
+        case "blocked": return .red
+        case "planning": return .gray
+        default: return .primary
+        }
     }
 
     private func startPrimaryAction() {
@@ -169,7 +225,6 @@ private struct RowView: View {
         case .copyPath: return "Copy task path"
         case .openConfig: return "Open config"
         case .refresh: return "Refresh now"
-        case .newWorkspace: return "New workspace"
         case .quit: return "Quit"
         }
     }
