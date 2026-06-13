@@ -190,10 +190,10 @@ Install published releases with Homebrew:
 
 ```bash
 brew tap tkhwang/tap
-brew install --cask --no-quarantine tkhwang/tap/workbranch-companion
+brew install --cask tkhwang/tap/workbranch-companion
 ```
 
-`--no-quarantine` is required while companion releases are ad-hoc signed. Developer ID signing and notarization are enabled by the release workflow once Apple credentials are registered.
+Published companion releases are signed with a Developer ID certificate and notarized, so Gatekeeper quarantine bypass flags are not required.
 
 Build it locally:
 

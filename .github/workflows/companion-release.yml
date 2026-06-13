@@ -156,13 +156,6 @@ jobs:
             depends_on macos: ">= :ventura"
 
             app "WorkbranchCompanion.app"
-
-            caveats <<~EOS
-              This app is currently ad-hoc signed. Install with --no-quarantine:
-                brew install --cask --no-quarantine tkhwang/tap/workbranch-companion
-              If already installed and blocked by Gatekeeper:
-                xattr -dr com.apple.quarantine "/Applications/WorkbranchCompanion.app"
-            EOS
           end
           '''
           cask.write_text(text)

@@ -14,25 +14,18 @@ The app is a read-only presentation client for the existing `workbranch` CLI. It
 
 ```bash
 brew tap tkhwang/tap
-brew install --cask --no-quarantine tkhwang/tap/workbranch-companion
+brew install --cask tkhwang/tap/workbranch-companion
 ```
 
-`--no-quarantine` is required while releases are ad-hoc signed: macOS Gatekeeper
-blocks downloaded apps without a Developer ID signature. If you installed without
-the flag and see an "app is damaged" warning, run:
-
-```bash
-xattr -dr com.apple.quarantine "/Applications/WorkbranchCompanion.app"
-```
-
-Once releases are signed with a Developer ID certificate and notarized
-(see below), the flag will no longer be needed.
+Published releases are signed with a Developer ID certificate and notarized, so
+Homebrew installs no longer require Gatekeeper quarantine bypass flags.
 
 ## Release signing setup (maintainer guide)
 
-The release workflow (`.github/workflows/companion-release.yml`) ships ad-hoc
-signed zips until Apple credentials are registered as GitHub secrets. To enable
-Developer ID signing + notarization:
+The release workflow (`.github/workflows/companion-release.yml`) signs and
+notarizes published zips when the Apple GitHub secrets below are registered.
+The current release secrets are registered; keep this guide for credential
+rotation or recovery:
 
 1. Join the [Apple Developer Program](https://developer.apple.com/programs/) ($99/year).
 2. Create a **Developer ID Application** certificate:
@@ -66,9 +59,9 @@ Developer ID signing + notarization:
    gh secret set APPLE_NOTARY_ISSUER_ID --repo tkhwang/workbranch      # the Issuer ID
    ```
 
-7. The next companion release is signed and notarized automatically. Then send
-   a tap PR removing the `--no-quarantine` caveat from
-   `Casks/workbranch-companion.rb`.
+7. Run `companion-release.yml` for the companion tag to verify Developer ID
+   signing, notarization, stapling, release asset replacement, and cask sha256
+   update.
 
 ## Build locally
 
@@ -129,9 +122,8 @@ The app's **Open config** action creates an empty project-list skeleton if the f
 
 - If the menu shows a binary error, set `workbranchBin` to an absolute executable path.
 - If no tasks appear, confirm the configured root works with `workbranch list --json` from Terminal.
-- If macOS blocks an ad-hoc signed Homebrew install, reinstall with `--no-quarantine` or clear the quarantine xattr shown above.
 - If notifications do not appear, check macOS notification permissions for WorkbranchCompanion.
 
 ## Current release status
 
-Release automation is implemented by plan 0020. Published companion releases are distributed as Homebrew cask zips; Developer ID signing and notarization activate automatically once the Apple secrets above are registered.
+Release automation is implemented by plan 0020. Published companion releases are distributed as Homebrew cask zips signed with Developer ID and notarized through the registered Apple secrets.
