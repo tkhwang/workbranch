@@ -162,17 +162,19 @@ Built-in macOS IDE app presets use `open -n` plus `--args --new-window` for VS C
 
 ### `workbranch list` / `workbranch list --json`
 
-Show configured repos, base branches, current branches, and task workspaces. `--json` emits a single machine-readable document with `schemaVersion`, `project`, `root`, and registered task workspaces only. Stale or partial task-shaped directories are excluded from JSON and remain diagnostic concerns for `doctor`/status-style flows.
+Show configured repos, base branches, current branches, and task workspaces. `--json` emits a single machine-readable document with `schemaVersion`, `project`, `root`, and registered task workspaces only. Schema version 1 includes additive task progress fields for companion apps: `status`, `progressDone`, `progressTotal`, and `currentItem`, alongside existing `memoTitle`, `notiCount`, and `repos`. Stale or partial task-shaped directories are excluded from JSON and remain diagnostic concerns for `doctor`/status-style flows.
 
 ### `workbranch memo` / `workbranch noti`
 
 `workbranch add <task>` creates workbranch-managed task-root state outside repo worktrees: `<task>/TASK-WORKBRANCH.md`, generated `<task>/AGENTS.md`, and `<task>/.workbranch/` as needed. Workbranch does not create repo-local task-state files and does not edit repo `.gitignore`.
 
+The generated task brief starts with a `#` memo title, may include a separated `status: planning|in-progress|review|blocked|done` line, and uses Markdown checklist items for progress. When `status:` is absent, progress may be derived from the checklist (`planning` for no started work, `in-progress` for partial progress, `done` for all checklist items complete). The first unchecked checklist item is the current item.
+
 `workbranch memo <task>` prints the task brief, `workbranch memo <task> "text"` overwrites it, and `workbranch memo <task> --clear` removes it. From inside a registered task workspace, the task may be omitted only for reading; `workbranch memo` reads the current task. Writes and clears require an explicit task argument.
 
 `workbranch noti add <task> "text"` appends a JSON Lines event with UTC `ts` and `text`; `workbranch noti list <task>` prints notification text oldest-first; `workbranch noti clear <task>` clears the inbox. Missing notification files behave as empty inboxes.
 
-`workbranch remove <task>` deletes workbranch-managed task state after successful worktree/branch removal, while preserving unrelated files in the task root.
+`workbranch remove <task>` deletes workbranch-managed task state after successful worktree/branch removal: `TASK-WORKBRANCH.md`, generated `AGENTS.md`, `.workbranch/`, `.omx/`, and `.omc/`. If unrelated files remain, normal remove reports them and prompts the user to delete the remaining task root in the same command flow. `--force` deletes the task root without prompting after the normal safety preflights pass.
 
 ### `workbranch status`
 

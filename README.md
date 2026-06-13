@@ -176,15 +176,15 @@ Combined flow shortcuts:
 
 `workbranch add <task>` creates task-root state outside the repo worktrees:
 
-- `<task>/TASK-WORKBRANCH.md` is the human/agent-editable task brief. `workbranch memo <task> [text]` reads or overwrites it, and `workbranch memo <task> --clear` removes it. Inside a task workspace, `workbranch memo` may omit `<task>` for reading only.
-- `<task>/AGENTS.md` tells AI agents running from either `<task>` or `<task>/<repo>` to keep the task brief current.
-- `<task>/.workbranch/notifications.jsonl` is an append-only local inbox. `workbranch noti add/list/clear` manages it, and `workbranch list --json` exposes `notiCount` for companion apps.
+- `<task>/TASK-WORKBRANCH.md` is the human/agent-editable task brief. The generated template uses a first `#` heading, an optional `status: planning|in-progress|review|blocked|done` line, and Markdown checklist items for progress. `workbranch memo <task> [text]` reads or overwrites it, and `workbranch memo <task> --clear` removes it. Inside a task workspace, `workbranch memo` may omit `<task>` for reading only.
+- `<task>/AGENTS.md` tells AI agents running from either `<task>` or `<task>/<repo>` to keep the task brief current, including when starting/resuming, changing the active step, before/after verification, when blocked, and before the final response.
+- `<task>/.workbranch/notifications.jsonl` is an append-only local inbox. `workbranch noti add/list/clear` manages it, and `workbranch list --json` exposes `notiCount`, `status`, `progressDone`, `progressTotal`, and `currentItem` for companion apps.
 
-`workbranch remove <task>` deletes only workbranch-managed task state after successful workspace removal; unrelated files in the task root are preserved.
+`workbranch remove <task>` deletes workbranch-managed task state after successful workspace removal, including `TASK-WORKBRANCH.md`, generated `AGENTS.md`, `.workbranch/`, `.omx/`, and `.omc/`. If unrelated files remain in the task root, normal remove lists them and asks whether to delete the remaining task root now. `workbranch remove <task> --force` removes the task root without prompting after the normal safety preflights pass.
 
 ## Native menu bar companion
 
-`companion/` contains a local native macOS menu bar app, `WorkbranchCompanion.app`, that consumes `workbranch list --json` and provides a task cockpit for memo titles, notification counts, dirty markers, inline memo edits, notification clearing, and existing Finder/IDE/terminal launch actions.
+`companion/` contains a local native macOS menu bar app, `WorkbranchCompanion.app`, that consumes `workbranch list --json` and provides a task cockpit for task status/progress, current checklist item, repo child rows with branch/dirty state, inline memo edits, notification clearing, and existing Finder/IDE/terminal launch actions. If a configured project root is truly deleted while its parent still exists, the app forgets that root after two consecutive failed refreshes and sends one notification.
 
 Install published releases with Homebrew:
 

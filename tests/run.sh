@@ -121,6 +121,10 @@ main() {
   run_test test_memo_resolves_task_from_cwd
   run_test test_memo_treats_task_argument_as_explicit_inside_task_workspace
   run_test test_add_creates_task_brief_and_agent_guidance
+  run_test test_task_status_explicit_and_derived
+  run_test test_task_checklist_counts
+  run_test test_task_current_item
+  run_test test_add_agents_md_describes_status_update_protocol
   run_test test_noti_add_list_clear
   run_test test_noti_escapes_control_characters
   run_test test_noti_rejects_unknown_task
@@ -149,6 +153,10 @@ main() {
   run_test test_list_json_escapes_control_characters
   run_test test_list_json_dirty_flag
   run_test test_list_json_skips_stale_and_partial_task_dirs
+  run_test test_list_json_schema_v1_progress_shape
+  run_test test_list_json_progress_and_status
+  run_test test_list_json_currentItem_escaped
+  run_test test_list_json_legacy_memo_no_checkboxes
   run_test test_remove_deletes_task_branch_when_worktree_missing
   run_test test_remove_force_discards_dirty_task
   run_test test_remove_rejects_unmerged_task_branch_without_force
@@ -179,6 +187,13 @@ main() {
   run_test test_remove_reports_kept_task_directory_with_extra_files
   run_test test_remove_treats_missing_worktree_as_already_removed
   run_test test_remove_cleans_stale_task_directory
+  run_test test_remove_cleans_known_generated_task_state
+  run_test test_remove_prompts_before_deleting_unknown_task_root_files
+  run_test test_remove_keeps_unknown_files_when_prompt_declined
+  run_test test_remove_noninteractive_unknown_files_keeps_without_prompt
+  run_test test_remove_deletes_unknown_files_when_prompt_confirmed
+  run_test test_remove_force_purges_without_prompt
+  run_test test_manual_task_dir_delete_vanishes_from_json
   run_test test_remove_continues_after_worktree_remove_failure
   run_test test_prune_removes_only_fully_merged_tasks
   run_test test_prune_skips_dirty_merged_task

@@ -216,11 +216,13 @@ test_remove_reports_kept_task_directory_with_extra_files() {
   run_expect_success "$WORKBRANCH" add login >/dev/null
   printf '%s\n' "task notes" > "$project/login/notes.txt"
 
-  out=$(run_expect_success "$WORKBRANCH" remove login)
+  out=$(printf 'n
+' | run_expect_success "$WORKBRANCH" remove login)
   assert_not_exists "$project/login/frontend"
   assert_not_exists "$project/login/backend"
   assert_file "$project/login/notes.txt"
-  assert_contains "$out" "Task directory kept because it is not empty: login"
+  assert_contains "$out" "Unknown task-root items remain for login"
+  assert_contains "$out" "notes.txt"
 }
 
 test_remove_treats_missing_worktree_as_already_removed() {
@@ -430,4 +432,106 @@ GIT
   assert_contains "$out" "Pruning merged task: feat-clean"
   assert_dir "$project/feat-broken/frontend"
   assert_not_exists "$project/feat-clean"
+}
+
+
+test_remove_cleans_known_generated_task_state() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  mkdir -p "$project/login/.omx" "$project/login/.omc"
+  printf '%s\n' state > "$project/login/.omx/state.txt"
+  printf '%s\n' state > "$project/login/.omc/state.txt"
+
+  out=$(run_expect_success "$WORKBRANCH" remove login)
+  assert_contains "$out" "Removed: login/frontend"
+  assert_contains "$out" "Removed: login/backend"
+  assert_not_exists "$project/login"
+}
+
+test_remove_prompts_before_deleting_unknown_task_root_files() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  printf '%s\n' keep > "$project/login/notes.txt"
+
+  out=$(printf 'n\n' | WORKBRANCH_ALLOW_NON_TTY_PROMPT=1 run_expect_success "$WORKBRANCH" remove login)
+  assert_contains "$out" "Unknown task-root items remain for login"
+  assert_contains "$out" "notes.txt"
+  assert_contains "$out" "Delete remaining task root now? [y/N]"
+}
+
+test_remove_keeps_unknown_files_when_prompt_declined() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  printf '%s\n' keep > "$project/login/notes.txt"
+
+  printf 'n\n' | WORKBRANCH_ALLOW_NON_TTY_PROMPT=1 run_expect_success "$WORKBRANCH" remove login >/dev/null
+  assert_file "$project/login/notes.txt"
+  assert_not_exists "$project/login/frontend"
+  assert_not_exists "$project/login/backend"
+}
+
+test_remove_noninteractive_unknown_files_keeps_without_prompt() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  printf '%s\n' keep > "$project/login/notes.txt"
+
+  out=$(WORKBRANCH_TEST_FORCE_TTY_STDIN=1 run_expect_success "$WORKBRANCH" remove login)
+  assert_contains "$out" "Unknown task-root items remain for login"
+  assert_not_contains "$out" "Delete remaining task root now?"
+  assert_file "$project/login/notes.txt"
+}
+
+test_remove_deletes_unknown_files_when_prompt_confirmed() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  printf '%s\n' delete > "$project/login/notes.txt"
+
+  out=$(printf 'y\n' | WORKBRANCH_ALLOW_NON_TTY_PROMPT=1 run_expect_success "$WORKBRANCH" remove login)
+  assert_contains "$out" "Unknown task-root items remain for login"
+  assert_contains "$out" "Removed task directory: login"
+  assert_not_exists "$project/login"
+}
+
+test_remove_force_purges_without_prompt() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  mkdir -p "$project/login/.omx"
+  printf '%s\n' delete > "$project/login/notes.txt"
+  printf '%s\n' delete > "$project/login/.omx/state.txt"
+
+  out=$(run_expect_success "$WORKBRANCH" remove login --force)
+  assert_not_contains "$out" "Delete remaining task root now?"
+  assert_not_exists "$project/login"
+}
+
+test_manual_task_dir_delete_vanishes_from_json() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  rm -rf "$project/login"
+
+  out=$(run_expect_success "$WORKBRANCH" list --json)
+  printf '%s' "$out" | python3 -c 'import json,sys
+d=json.load(sys.stdin)
+assert d["tasks"] == [], d'
 }

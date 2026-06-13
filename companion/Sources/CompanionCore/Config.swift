@@ -51,6 +51,10 @@ public struct CompanionConfig: Codable, Equatable, Sendable {
         return config
     }
 
+    public func removingRoot(_ root: String) throws -> CompanionConfig {
+        try CompanionConfig(roots: roots.filter { $0 != root }, workbranchBin: workbranchBin)
+    }
+
     public func write(to url: URL) throws {
         let raw = RawConfig(roots: roots, workbranchBin: workbranchBin)
         let encoder = JSONEncoder()

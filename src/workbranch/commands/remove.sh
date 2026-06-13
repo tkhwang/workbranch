@@ -1,3 +1,42 @@
+
+task_root_items() {
+  local task_dir item base found
+  task_dir=$1
+  [ -d "$task_dir" ] || return 0
+  found=0
+  for item in "$task_dir"/* "$task_dir"/.[!.]* "$task_dir"/..?*; do
+    [ -e "$item" ] || continue
+    base=${item##*/}
+    [ "$base" = "." ] && continue
+    [ "$base" = ".." ] && continue
+    printf '%s
+' "$base"
+    found=1
+  done | sort
+  [ "$found" -eq 1 ]
+}
+
+prompt_delete_remaining_task_root() {
+  local task task_dir answer
+  task=$1
+  task_dir=$2
+  info "Unknown task-root items remain for $task:"
+  task_root_items "$task_dir" | while IFS= read -r item; do
+    info "  $item"
+  done
+  if [ -t 0 ] || [ "${WORKBRANCH_ALLOW_NON_TTY_PROMPT:-}" = "1" ]; then
+    answer=$(prompt_read "[*] Delete remaining task root now? [y/N]: ") || answer=""
+    case "$answer" in
+      y|Y|yes|YES|Yes)
+        rm -rf "$task_dir" || die "failed to remove task directory: $task"
+        success "Removed task directory: $task"
+        return 0
+        ;;
+    esac
+  fi
+  info "Task directory kept because it is not empty: $task"
+}
+
 cmd_remove() {
   [ $# -eq 1 ] || [ $# -eq 2 ] || die "usage: workbranch remove <task> [--force]"
   task=$(normalize_task_argument "$1")
@@ -89,9 +128,13 @@ cmd_remove() {
     rm -f "$metadata_file" || die "failed to remove task metadata: $metadata_file"
   fi
   remove_task_state_files "$task"
-  if rmdir "$PROJECT_ROOT/$task" 2>/dev/null; then
+  if [ "$force" -eq 1 ]; then
+    if [ -d "$PROJECT_ROOT/$task" ]; then
+      rm -rf "$PROJECT_ROOT/$task" || die "failed to remove task directory: $task"
+    fi
+  elif rmdir "$PROJECT_ROOT/$task" 2>/dev/null; then
     :
   elif [ -d "$PROJECT_ROOT/$task" ]; then
-    info "Task directory kept because it is not empty: $task"
+    prompt_delete_remaining_task_root "$task" "$PROJECT_ROOT/$task"
   fi
 }
