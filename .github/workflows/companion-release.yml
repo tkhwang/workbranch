@@ -148,6 +148,22 @@ jobs:
               )
               if version_count != 1 or sha_count != 1:
                   raise SystemExit("expected exactly one version and one sha256 line in cask")
+              text, macos_count = re.subn(
+                  r'^  depends_on macos: ">= :ventura"$',
+                  '  depends_on macos: :ventura',
+                  text,
+                  count=1,
+                  flags=re.MULTILINE,
+              )
+              if '  depends_on macos: :ventura' not in text:
+                  raise SystemExit("expected cask to declare depends_on macos: :ventura")
+              if notarized:
+                  text = re.sub(
+                      r'\n  caveats <<~EOS\n(?:    .*\n)*?  EOS\n',
+                      '\n',
+                      text,
+                      count=1,
+                  )
           else:
               cask.parent.mkdir(parents=True, exist_ok=True)
               caveat = ""
@@ -170,7 +186,7 @@ jobs:
             desc "Menu bar companion for the workbranch CLI"
             homepage "https://github.com/tkhwang/workbranch"
 
-            depends_on macos: ">= :ventura"
+            depends_on macos: :ventura
 
             app "WorkbranchCompanion.app"{caveat}
           end
