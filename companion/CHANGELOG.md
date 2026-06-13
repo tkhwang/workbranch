@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v1.0.0...workbranch-companion-v1.1.0) (2026-06-13)
+
+
+### Features
+
+* **companion:** improve root identity and self-healing ([174b324](https://github.com/tkhwang/workbranch/commit/174b32432280f17c5b484a00e94baa216f7df07f))
+
 ## 1.0.0 (2026-06-12)
 
 
