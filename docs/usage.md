@@ -81,9 +81,24 @@ WORKBRANCH_COLOR=always workbranch help # force enhanced display
 
 `workbranch add <task>` creates `<task>/TASK-WORKBRANCH.md` and generated `<task>/AGENTS.md` at the task root, outside repo worktrees. Users and agents may run from either `<task>` or `<task>/<repo>`; the generated guidance points both cases at the same task brief. Workbranch does not edit repo `.gitignore` for this state.
 
+The default task brief format is shared by humans, agents, `workbranch list --json`, and companion apps:
+
+```markdown
+# Short task summary
+
+status: planning
+
+- [ ] Start work
+- [ ] Run verification
+```
+
+The first `#` heading is the memo title. A separated `status:` line may be `planning`, `in-progress`, `review`, `blocked`, or `done`. Markdown checklist items define progress; completed items count toward `progressDone`, all checklist items count toward `progressTotal`, and the first unchecked item becomes `currentItem`. The generated `AGENTS.md` asks agents to update the brief when starting/resuming, changing the active step, before/after verification, when blocked, and before the final response.
+
 Use `workbranch memo <task>` to print the task brief, `workbranch memo <task> "text"` to overwrite it, and `workbranch memo <task> --clear` to remove it. From inside a registered task workspace, the task may be omitted only for reading: `workbranch memo` prints the current task brief. Writes and clears require an explicit task argument.
 
-Notifications are append-only JSON Lines at `<task>/.workbranch/notifications.jsonl`. `workbranch noti add <task> "text"` appends one event, `workbranch noti list <task>` prints notification text oldest-first, and `workbranch noti clear <task>` clears the inbox. Companion apps should read `notiCount` from `workbranch list --json` and may call `noti list` / `noti clear` for details and acknowledgement.
+Notifications are append-only JSON Lines at `<task>/.workbranch/notifications.jsonl`. `workbranch noti add <task> "text"` appends one event, `workbranch noti list <task>` prints notification text oldest-first, and `workbranch noti clear <task>` clears the inbox. Companion apps should read `notiCount`, `status`, `progressDone`, `progressTotal`, and `currentItem` from `workbranch list --json` and may call `noti list` / `noti clear` for details and acknowledgement.
+
+`workbranch remove <task>` removes task worktrees, local task branches, and known generated task-root state: `TASK-WORKBRANCH.md`, generated `AGENTS.md`, `.workbranch/`, `.omx/`, and `.omc/`. If unrelated files remain, normal remove prints a warning with the remaining item names and, in an interactive shell, asks whether to delete the remaining task root immediately. No/EOF keeps the task root. `workbranch remove <task> --force` still runs the normal safety preflights, then deletes the task root without prompting.
 
 ## Project health
 

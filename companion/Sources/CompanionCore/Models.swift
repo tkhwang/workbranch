@@ -44,12 +44,57 @@ public struct WorkbranchTask: Codable, Equatable, Sendable {
     public let name: String
     public let path: String
     public let memoTitle: String
+    public let status: String
+    public let progressDone: Int
+    public let progressTotal: Int
+    public let currentItem: String
     public let notiCount: Int
     public let repos: [WorkbranchRepo]
+
+    public init(
+        name: String,
+        path: String,
+        memoTitle: String,
+        status: String = "",
+        progressDone: Int = 0,
+        progressTotal: Int = 0,
+        currentItem: String = "",
+        notiCount: Int,
+        repos: [WorkbranchRepo]
+    ) {
+        self.name = name
+        self.path = path
+        self.memoTitle = memoTitle
+        self.status = status
+        self.progressDone = progressDone
+        self.progressTotal = progressTotal
+        self.currentItem = currentItem
+        self.notiCount = notiCount
+        self.repos = repos
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        name = try container.decode(String.self, forKey: .name)
+        path = try container.decode(String.self, forKey: .path)
+        memoTitle = try container.decode(String.self, forKey: .memoTitle)
+        status = try container.decodeIfPresent(String.self, forKey: .status) ?? ""
+        progressDone = try container.decodeIfPresent(Int.self, forKey: .progressDone) ?? 0
+        progressTotal = try container.decodeIfPresent(Int.self, forKey: .progressTotal) ?? 0
+        currentItem = try container.decodeIfPresent(String.self, forKey: .currentItem) ?? ""
+        notiCount = try container.decode(Int.self, forKey: .notiCount)
+        repos = try container.decode([WorkbranchRepo].self, forKey: .repos)
+    }
 }
 
 public struct WorkbranchRepo: Codable, Equatable, Sendable {
     public let name: String
     public let branch: String
     public let dirty: Bool
+
+    public init(name: String, branch: String, dirty: Bool) {
+        self.name = name
+        self.branch = branch
+        self.dirty = dirty
+    }
 }

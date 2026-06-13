@@ -13,6 +13,7 @@ final class StateStore: ObservableObject {
     private var config: CompanionConfig
     private var previous: [String: WorkbranchListDocument] = [:]
     private var notificationTracker = NotificationTracker()
+    private var missingRootConfirmations: [String: Int] = [:]
     private var debounceScheduler = DebounceScheduler(delay: 2.0)
     private var refreshCoordinator = RefreshCoordinator()
     private var debounceTimer: Timer?
@@ -109,8 +110,12 @@ final class StateStore: ObservableObject {
 
     func apply(results: [RootResult], isBaseline: Bool) {
         for result in results {
-            if case .success(let document) = result {
+            switch result {
+            case .success(let document):
                 previous[document.root] = document
+                clearMissingRootConfirmations(afterSuccessfulRefreshOf: document.root)
+            case .failure(let root, _):
+                recordMissingRootIfNeeded(root: root)
             }
         }
         menuState = MenuState.make(
@@ -122,6 +127,40 @@ final class StateStore: ObservableObject {
         )
         for notification in menuState.notificationsToSend {
             sendNotification(title: "Workbranch notification", body: "\(notification.task): \(notification.count) unread")
+        }
+    }
+
+    private func clearMissingRootConfirmations(afterSuccessfulRefreshOf documentRoot: String) {
+        missingRootConfirmations.removeValue(forKey: documentRoot)
+        for root in config.roots where ProjectRootIdentity.matches(configuredRoot: root, documentRoot: documentRoot) {
+            missingRootConfirmations.removeValue(forKey: root)
+        }
+    }
+
+    private func recordMissingRootIfNeeded(root: String) {
+        switch ProjectRootSelfHeal.classify(root: root) {
+        case .available, .unavailable:
+            missingRootConfirmations.removeValue(forKey: root)
+        case .trueDeletionCandidate:
+            let count = (missingRootConfirmations[root] ?? 0) + 1
+            missingRootConfirmations[root] = count
+            guard count >= 2 else { return }
+            forgetDeletedRoot(root)
+        }
+    }
+
+    private func forgetDeletedRoot(_ root: String) {
+        do {
+            let newConfig = try config.removingRoot(root)
+            try newConfig.write(to: configURL)
+            self.config = newConfig
+            previous.removeValue(forKey: root)
+            missingRootConfirmations.removeValue(forKey: root)
+            statusMessage = "Removed deleted project root: \(root)"
+            sendNotification(title: "Workbranch root removed", body: "Deleted project root was removed from companion config: \(root)")
+            configureWatchers()
+        } catch {
+            statusMessage = "Root self-heal failed: \(error)"
         }
     }
 

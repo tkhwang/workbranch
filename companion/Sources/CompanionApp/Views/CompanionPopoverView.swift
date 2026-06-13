@@ -115,6 +115,11 @@ private struct RowView: View {
                     }
                     Button("Cancel") { editing = false }
                 }
+            } else if row.kind == .repo {
+                Text(row.title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 18)
             } else {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 2) {

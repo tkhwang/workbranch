@@ -81,9 +81,24 @@ WORKBRANCH_COLOR=always workbranch help # enhanced display 강제
 
 `workbranch add <task>`는 repo worktree 밖 task root에 `<task>/TASK-WORKBRANCH.md`와 generated `<task>/AGENTS.md`를 생성합니다. 사용자와 agent는 `<task>` 또는 `<task>/<repo>` 어디서 실행해도 되며, generated guidance는 두 경우 모두 같은 task brief를 갱신하도록 안내합니다. 이 state를 위해 repo `.gitignore`는 수정하지 않습니다.
 
+기본 task brief 포맷은 사람, agent, `workbranch list --json`, companion app이 함께 쓰는 contract입니다.
+
+```markdown
+# Short task summary
+
+status: planning
+
+- [ ] Start work
+- [ ] Run verification
+```
+
+첫 `#` heading은 memo title입니다. 분리된 `status:` 줄은 `planning`, `in-progress`, `review`, `blocked`, `done` 중 하나를 사용할 수 있습니다. Markdown checklist item이 진행도를 정의합니다. 완료 항목은 `progressDone`, 전체 checklist 항목은 `progressTotal`, 첫 번째 미완료 항목은 `currentItem`이 됩니다. Generated `AGENTS.md`는 agent가 시작/재개, active step 변경, 검증 전후, blocked, final response 직전에 task brief를 갱신하도록 안내합니다.
+
 `workbranch memo <task>`는 task brief를 출력하고, `workbranch memo <task> "text"`는 덮어쓰며, `workbranch memo <task> --clear`는 삭제합니다. Registered task workspace 안에서는 읽기일 때만 task를 생략할 수 있습니다. `workbranch memo`는 현재 task brief를 출력합니다. 쓰기와 삭제는 명시적인 task 인자가 필요합니다.
 
-Notification은 `<task>/.workbranch/notifications.jsonl`의 append-only JSON Lines입니다. `workbranch noti add <task> "text"`는 event를 추가하고, `workbranch noti list <task>`는 오래된 순서대로 text를 출력하며, `workbranch noti clear <task>`는 inbox를 비웁니다. Companion app은 `workbranch list --json`의 `notiCount`를 읽고, 상세/확인은 `noti list` / `noti clear`를 호출할 수 있습니다.
+Notification은 `<task>/.workbranch/notifications.jsonl`의 append-only JSON Lines입니다. `workbranch noti add <task> "text"`는 event를 추가하고, `workbranch noti list <task>`는 오래된 순서대로 text를 출력하며, `workbranch noti clear <task>`는 inbox를 비웁니다. Companion app은 `workbranch list --json`의 `notiCount`, `status`, `progressDone`, `progressTotal`, `currentItem`을 읽고, 상세/확인은 `noti list` / `noti clear`를 호출할 수 있습니다.
+
+`workbranch remove <task>`는 task worktree, local task branch, known generated task-root state(`TASK-WORKBRANCH.md`, generated `AGENTS.md`, `.workbranch/`, `.omx/`, `.omc/`)를 제거합니다. Unrelated 파일이 남으면 normal remove는 warning과 남은 항목 이름을 출력하고, interactive shell에서는 이어서 남은 task root를 즉시 삭제할지 묻습니다. No/EOF는 task root를 보존합니다. `workbranch remove <task> --force`는 일반 safety preflight를 그대로 실행한 뒤 묻지 않고 task root를 삭제합니다.
 
 ## Project health
 

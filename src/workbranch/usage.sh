@@ -20,7 +20,7 @@ Workspace:
   init              Initialize a workbranch project
   list              List configured repos and task workspaces
   add [<task>] [--from <ref>]  Create a task workspace
-  remove <task>     Remove task worktrees and local task branches
+  remove <task> [--force]  Remove task worktrees, branches, and task-root state
 Git:
   status            Show remote diff, task diff, and dirty state
   vertical
@@ -66,7 +66,7 @@ usage_enhanced() {
   printf '  init              Initialize a workbranch project\n'
   printf '  list              List configured repos and task workspaces\n'
   printf '  add [<task>] [--from <ref>]  Create a task workspace\n'
-  printf '  remove <task>     Remove task worktrees and local task branches\n'
+  printf '  remove <task> [--force]  Remove task worktrees, branches, and task-root state\n'
   section "Git"
   printf '  status            Show remote diff, task diff, and dirty state\n'
   printf '%s  vertical%s\n' "$WB_GRAY" "$WB_RESET"

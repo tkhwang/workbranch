@@ -14,6 +14,7 @@ public enum RootResult: Equatable, Sendable {
 
 public enum MenuRowKind: Equatable, Sendable {
     case task
+    case repo
     case message
     case error
 }
@@ -45,8 +46,8 @@ public struct MenuRow: Equatable, Identifiable, Sendable {
         if let primaryAction {
             return "primary:\(MenuRow.actionID(primaryAction))"
         }
-        if let taskName, let subtitle {
-            return "task:\(subtitle)\u{0}\(taskName)"
+        if let taskName {
+            return "task:\(taskName)"
         }
         return "\(kind):\(title)\u{0}\(subtitle ?? "")"
     }
@@ -185,7 +186,8 @@ public struct MenuState: Equatable, Sendable {
                     if let notification = tracker.observe(root: document.root, task: task.name, count: task.notiCount, isBaseline: isBaseline) {
                         notifications.append(notification)
                     }
-                    rows.append(row(for: task, root: document.root))
+                    rows.append(taskRow(for: task, root: document.root))
+                    rows.append(contentsOf: repoRows(for: task))
                 }
                 if document.tasks.isEmpty && rows.isEmpty {
                     rows.append(MenuRow(kind: .message, title: "No task workspaces"))
@@ -215,21 +217,18 @@ public struct MenuState: Equatable, Sendable {
         return uniqueRoots
     }
 
-    private static func row(for task: WorkbranchTask, root: String) -> MenuRow {
-        var title = task.name
-        if !task.memoTitle.isEmpty {
-            title += " — \(task.memoTitle)"
-        }
-        if task.notiCount > 0 {
-            title += " 🔔\(task.notiCount)"
-        }
-        if task.repos.contains(where: { $0.dirty }) {
-            title += " ●"
-        }
+    private static func taskRow(for task: WorkbranchTask, root: String) -> MenuRow {
+        var parts: [String] = []
+        if let icon = statusIcon(task.status) { parts.append(icon) }
+        let label = task.memoTitle.isEmpty ? task.name : "\(task.name) — \(task.memoTitle)"
+        parts.append(label)
+        if task.notiCount > 0 { parts.append("🔔\(task.notiCount)") }
+        if task.progressTotal > 0 { parts.append("\(task.progressDone)/\(task.progressTotal)") }
+        let subtitle = task.currentItem.isEmpty ? nil : "지금: \(task.currentItem)"
         return MenuRow(
             kind: .task,
-            title: title,
-            subtitle: task.path,
+            title: parts.joined(separator: " "),
+            subtitle: subtitle,
             primaryAction: .editMemo(root: root, task: task.name),
             secondaryActions: [
                 .clearNotifications(root: root, task: task.name),
@@ -242,5 +241,24 @@ public struct MenuState: Equatable, Sendable {
             memoTitle: task.memoTitle,
             notificationCount: task.notiCount
         )
+    }
+
+    private static func repoRows(for task: WorkbranchTask) -> [MenuRow] {
+        task.repos.map { repo in
+            var title = "[+] \(repo.name)  \(repo.branch)"
+            if repo.dirty { title += "  ●" }
+            return MenuRow(kind: .repo, title: title, subtitle: nil)
+        }
+    }
+
+    private static func statusIcon(_ status: String) -> String? {
+        switch status {
+        case "planning": return "⚪"
+        case "in-progress": return "🟡"
+        case "review": return "🔵"
+        case "blocked": return "🔴"
+        case "done": return "✅"
+        default: return nil
+        }
     }
 }

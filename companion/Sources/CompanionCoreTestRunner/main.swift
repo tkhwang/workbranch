@@ -66,7 +66,21 @@ func runModelsAndMenuStateTests() throws {
     try expect(document.tasks.count == 2, "task count")
     try expect(document.tasks[0].memoTitle == "견적 \"API\" 경로", "memo round trip")
     try expect(document.tasks[0].notiCount == 2, "noti count")
+    try expect(document.tasks[0].status == "", "legacy status default")
+    try expect(document.tasks[0].progressDone == 0, "legacy progress done default")
+    try expect(document.tasks[0].progressTotal == 0, "legacy progress total default")
+    try expect(document.tasks[0].currentItem == "", "legacy current item default")
     try expect(document.tasks[0].repos[0].dirty, "dirty repo")
+
+    let progressDocument = try WorkbranchListDocument.decode(Data("""
+    {"schemaVersion":1,"project":"fullstack","root":"/tmp/fullstack","tasks":[
+      {"name":"task3","path":"/tmp/fullstack/task3","memoTitle":"draft-tree 가이드 작성","status":"in-progress","progressDone":2,"progressTotal":4,"currentItem":"verify","notiCount":1,"repos":[]}
+    ]}
+    """.utf8))
+    try expect(progressDocument.tasks[0].status == "in-progress", "progress status decode")
+    try expect(progressDocument.tasks[0].progressDone == 2, "progress done decode")
+    try expect(progressDocument.tasks[0].progressTotal == 4, "progress total decode")
+    try expect(progressDocument.tasks[0].currentItem == "verify", "current item decode")
 
     try expectThrows("schemaVersion mismatch") {
         _ = try WorkbranchListDocument.decode(Data("""
@@ -87,8 +101,8 @@ func runModelsAndMenuStateTests() throws {
 
     let stateDoc = try WorkbranchListDocument.decode(Data("""
     {"schemaVersion":1,"project":"fullstack","root":"/tmp/fullstack","tasks":[
-      {"name":"task3","path":"/tmp/fullstack/task3","memoTitle":"draft-tree 가이드 작성","notiCount":2,"repos":[{"name":"backend","branch":"feature/task3","dirty":true}]},
-      {"name":"task4","path":"/tmp/fullstack/task4","memoTitle":"","notiCount":0,"repos":[{"name":"backend","branch":"feature/task4","dirty":false}]}
+      {"name":"task3","path":"/tmp/fullstack/task3","memoTitle":"draft-tree 가이드 작성","status":"in-progress","progressDone":1,"progressTotal":2,"currentItem":"검증 실행","notiCount":2,"repos":[{"name":"backend","branch":"feature/task3","dirty":true}]},
+      {"name":"task4","path":"/tmp/fullstack/task4","memoTitle":"","status":"planning","progressDone":0,"progressTotal":0,"currentItem":"","notiCount":0,"repos":[{"name":"backend","branch":"feature/task4","dirty":false}]}
     ]}
     """.utf8))
     let state = MenuState.make(
@@ -100,9 +114,20 @@ func runModelsAndMenuStateTests() throws {
     )
     try expect(state.title == "⎇ 2 🔔1", "title with count and notifications")
     try expect(state.sections.count == 2, "section count")
+    try expect(state.sections[0].rows[0].kind == .task, "task row kind")
+    try expect(state.sections[0].rows[0].title.contains("🟡"), "status icon")
     try expect(state.sections[0].rows[0].title.contains("task3"), "task title")
     try expect(state.sections[0].rows[0].title.contains("🔔2"), "notification marker")
-    try expect(state.sections[0].rows[0].title.contains("●"), "dirty marker")
+    try expect(state.sections[0].rows[0].title.contains("1/2"), "progress marker")
+    try expect(state.sections[0].rows[0].subtitle == "지금: 검증 실행", "current item subtitle")
+    try expect(state.sections[0].rows[1].kind == .repo, "repo row kind")
+    try expect(state.sections[0].rows[1].title.contains("backend"), "repo title")
+    try expect(state.sections[0].rows[1].title.contains("feature/task3"), "repo branch")
+    try expect(state.sections[0].rows[1].title.contains("●"), "dirty marker")
+    try expect(state.sections[0].rows[2].kind == .task, "second task row kind")
+    try expect(state.sections[0].rows[2].title.contains("⚪"), "planning status icon")
+    try expect(!state.sections[0].rows[2].title.contains("0/0"), "zero-total progress hidden")
+    try expect(state.sections[0].rows[2].subtitle == nil, "empty current item hidden")
     try expect(state.sections[0].rows[0].primaryAction == .editMemo(root: "/tmp/fullstack", task: "task3"), "primary action")
     try expect(state.sections[1].rows[0].title.contains("workbranch list failed"), "error row")
     try expect(state.notificationsToSend.isEmpty, "baseline no notifications")
@@ -194,6 +219,12 @@ func runConfigActionsDebounceTests() throws {
     let config = try CompanionConfig.load(from: configURL)
     try expect(config.roots == ["/tmp/fullstack"], "config roots")
     try expect(config.workbranchBin == "/opt/homebrew/bin/workbranch", "workbranch bin")
+    let removedConfig = try config.removingRoot("/tmp/fullstack")
+    try expect(removedConfig.roots == [], "remove config root")
+    try removedConfig.write(to: configURL)
+    let reloadedRemovedConfig = try CompanionConfig.load(from: configURL)
+    try expect(reloadedRemovedConfig.roots == [], "remove config root persists")
+    try valid.write(to: configURL)
 
     try Data("{\"roots\":[\"relative\"]}".utf8).write(to: configURL)
     try expectThrows("relative root rejected") { _ = try CompanionConfig.load(from: configURL) }
@@ -208,6 +239,24 @@ func runConfigActionsDebounceTests() throws {
     try Data("PROJECT_NAME fullstack\n".utf8).write(to: project.appendingPathComponent(".workbranch.config"))
     let initConfig = CompanionConfig.initSkeleton(currentDirectory: project)
     try expect(initConfig.roots == [project.path], "init skeleton includes cwd project root")
+    try expect(ProjectRootSelfHeal.classify(root: project.path) == .available, "existing project root is available")
+    try expect(ProjectRootIdentity.matches(configuredRoot: project.path + "/", documentRoot: project.path), "trailing slash configured root matches document root")
+    let symlinkRoot = temp.appendingPathComponent("project-link")
+    try fm.createSymbolicLink(at: symlinkRoot, withDestinationURL: project)
+    try expect(ProjectRootIdentity.matches(configuredRoot: symlinkRoot.path, documentRoot: project.path), "symlink configured root matches canonical document root")
+    try expect(!ProjectRootIdentity.matches(configuredRoot: temp.appendingPathComponent("other").path, documentRoot: project.path), "different configured root does not match document root")
+    let missingProject = temp.appendingPathComponent("missing-project")
+    try expect(ProjectRootSelfHeal.classify(root: missingProject.path) == .trueDeletionCandidate, "missing root with parent is forget candidate")
+    let missingParentRoot = temp.appendingPathComponent("missing-parent").appendingPathComponent("project")
+    try expect(ProjectRootSelfHeal.classify(root: missingParentRoot.path) == .unavailable, "missing parent is unavailable")
+    let taskPath = project.appendingPathComponent("task1")
+    try fm.createDirectory(at: taskPath, withIntermediateDirectories: true)
+    try fm.removeItem(at: taskPath)
+    try expect(ProjectRootSelfHeal.classify(root: project.path) == .available, "task deletion does not remove config root")
+    let repoPath = project.appendingPathComponent("task2").appendingPathComponent("repo")
+    try fm.createDirectory(at: repoPath, withIntermediateDirectories: true)
+    try fm.removeItem(at: repoPath)
+    try expect(ProjectRootSelfHeal.classify(root: project.path) == .available, "repo worktree deletion does not remove config root")
     let guiConfig = try CompanionConfig.ensureGUIConfig(at: configURL)
     try expect(guiConfig.roots == [], "GUI skeleton uses empty roots")
     try expect(fm.fileExists(atPath: configURL.path), "GUI skeleton creates file")

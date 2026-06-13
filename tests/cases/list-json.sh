@@ -96,3 +96,86 @@ d = json.load(sys.stdin)
 names = [t["name"] for t in d["tasks"]]
 assert names == ["login"], names'
 }
+
+
+test_list_json_schema_v1_progress_shape() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  out=$(run_expect_success "$WORKBRANCH" list --json)
+  printf '%s' "$out" | python3 -c 'import json,sys
+d=json.load(sys.stdin)
+assert d["schemaVersion"] == 1, d
+login=d["tasks"][0]
+for key in ["status", "progressDone", "progressTotal", "currentItem"]:
+    assert key in login, login
+assert login["status"] == "planning", login
+assert login["progressDone"] == 0, login
+assert login["progressTotal"] >= 1, login
+assert isinstance(login["currentItem"], str), login'
+}
+
+test_list_json_progress_and_status() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  cat > "$project/login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
+# Login work
+
+status: blocked
+
+- [x] design
+- [ ] waiting for credentials
+EOF_BRIEF
+
+  out=$(run_expect_success "$WORKBRANCH" list --json)
+  printf '%s' "$out" | python3 -c 'import json,sys
+login=json.load(sys.stdin)["tasks"][0]
+assert login["memoTitle"] == "Login work", login
+assert login["status"] == "blocked", login
+assert login["progressDone"] == 1, login
+assert login["progressTotal"] == 2, login
+assert login["currentItem"] == "waiting for credentials", login'
+}
+
+test_list_json_currentItem_escaped() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  printf '# Login\n\n- [ ] quote " slash \\ bell \a\n' > "$project/login/TASK-WORKBRANCH.md"
+
+  out=$(run_expect_success "$WORKBRANCH" list --json)
+  printf '%s' "$out" | python3 -c 'import json,sys
+login=json.load(sys.stdin)["tasks"][0]
+expected = "quote \" slash \\ bell " + chr(7)
+assert login["currentItem"] == expected, login' || return 1
+  assert_contains "$out" "\\u0007"
+}
+test_list_json_legacy_memo_no_checkboxes() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  cat > "$project/login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
+# Legacy memo
+
+## Current work
+- plain bullet only
+EOF_BRIEF
+
+  out=$(run_expect_success "$WORKBRANCH" list --json)
+  printf '%s' "$out" | python3 -c 'import json,sys
+login=json.load(sys.stdin)["tasks"][0]
+assert login["status"] == "planning", login
+assert login["progressDone"] == 0, login
+assert login["progressTotal"] == 0, login
+assert login["currentItem"] == "", login'
+}
