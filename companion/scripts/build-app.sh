@@ -23,6 +23,7 @@ rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 cp "$BINARY_SRC" "$MACOS_DIR/WorkbranchCompanion"
 chmod +x "$MACOS_DIR/WorkbranchCompanion"
+cp "$COMPANION_DIR/Resources/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
 cat > "$CONTENTS_DIR/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -32,6 +33,8 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
   <string>en</string>
   <key>CFBundleExecutable</key>
   <string>WorkbranchCompanion</string>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>
   <key>CFBundleIdentifier</key>
   <string>com.tkhwang.workbranch-companion</string>
   <key>CFBundleInfoDictionaryVersion</key>

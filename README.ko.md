@@ -190,10 +190,10 @@ Published release 설치:
 
 ```bash
 brew tap tkhwang/tap
-brew install --cask --no-quarantine tkhwang/tap/workbranch-companion
+brew install --cask tkhwang/tap/workbranch-companion
 ```
 
-Companion release가 ad-hoc signed인 동안은 `--no-quarantine`이 필요합니다. Apple credentials가 등록되면 release workflow가 Developer ID signing과 notarization을 자동으로 활성화합니다.
+Published companion release는 Developer ID 인증서로 서명되고 notarization을 거치므로, Gatekeeper quarantine 우회 flag가 필요하지 않습니다.
 
 Local build:
 
