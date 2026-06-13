@@ -2,7 +2,7 @@
 
 Native macOS menu bar companion for workbranch task workspaces.
 
-The app is a presentation/action client for the existing `workbranch` CLI. It does not read Git state directly; every refresh pulls `workbranch list --json` from each configured project root, then renders task memo titles, notification counts, and dirty markers.
+The app is a read-only presentation client for the existing `workbranch` CLI. It does not read Git state directly; every refresh pulls `workbranch list --json` from each configured project root, then renders a compact project/task memo/repo branch/dirty/status summary with the task's `TASK-WORKBRANCH.md` status items.
 
 ## Requirements
 
@@ -87,16 +87,21 @@ open dist/WorkbranchCompanion.app
 Config path:
 
 ```text
-~/.config/workbranch-companion/config.json
+~/.config/workbranch-companion/projects.md
 ```
 
 Shape:
 
-```json
-{
-  "roots": ["/absolute/workbranch/project/root"],
-  "workbranchBin": "/optional/absolute/path/to/workbranch"
-}
+```text
+# workbranch companion projects
+
+workbranchBin: /optional/absolute/path/to/workbranch
+fontName: Menlo
+fontSize: 13
+colorTheme: dracula
+
+## projects
+- /absolute/workbranch/project/root
 ```
 
 `roots` are directories that contain `.workbranch.config`. GUI apps do not inherit your shell `PATH`, so set `workbranchBin` if `workbranch` is not installed at one of the known fallback paths:
@@ -105,15 +110,18 @@ Shape:
 - `/usr/local/bin/workbranch`
 - `~/.local/bin/workbranch`
 
-The app's **Open config** action creates an empty `roots: []` skeleton if the file does not exist, then opens it in the default editor/Finder flow.
+The gear icon in the popover opens companion settings for the terminal display.
+The font picker lists installed fixed-width system fonts, and `fontSize`
+controls the display size. `colorTheme` can be `dracula`, `matrix`, `amber`,
+`nord`, or `solarized`; new configs default to `dracula`.
+
+The app's **Open config** action creates an empty project-list skeleton if the file does not exist, then opens it in the default editor/Finder flow.
 
 ## Behavior
 
-- Menu title shows task count and number of roots with notifications, e.g. `⎇ 4 🔔2`.
-- Popover rows show task name, memo title, `🔔N` notification count, and `●` when any repo is dirty.
-- Clicking a task row enters inline memo edit mode. Saving calls `workbranch memo <task> <text>`; saving an empty memo calls `workbranch memo <task> --clear`.
-- Secondary actions call existing CLI surfaces with argv arrays and explicit cwd: `noti clear`, `terminal`, `ide`, `finder`, and copy task path.
-- New workspace starts detached through `workbranch add <task>` and sends a macOS notification that creation has started.
+- Menu title still reflects aggregate task state for the macOS menu bar item.
+- Popover rows use a terminal-style layout with project name, task name, task memo, repo name, repo branch, repo dirty state, task status, and the task status checklist items.
+- Task rows are display-only: clicking a task does not edit memo text and no per-task action menu is shown.
 - Notifications are baseline-safe: first load does not send macOS notifications for existing `notiCount`; later increases for the same root/task do.
 - Refresh is event-driven through FSEvents with `.git/` events filtered out, per-root debounce, in-flight refresh limiting, and a 5-minute heartbeat fallback.
 
