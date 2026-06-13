@@ -13,19 +13,6 @@
 * **companion:** update companion signin, notarization docs and add app icon ([fc05c94](https://github.com/tkhwang/workbranch/commit/fc05c940bb45745ba670eabed2dc643a8994d3c0))
 * **release:** update companion signing and notarization docs ([a12d32d](https://github.com/tkhwang/workbranch/commit/a12d32da25352a3947b986afadf97d642f86b84e))
 
-## [1.4.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v1.3.0...workbranch-companion-v1.4.0) (2026-06-13)
-
-
-### Features
-
-* **companion:** add app icon and notarization status ([984ee3e](https://github.com/tkhwang/workbranch/commit/984ee3e4206ce045dbc0a861376fe010f599c4c2)), closes [#456](https://github.com/tkhwang/workbranch/issues/456)
-
-
-### Bug Fixes
-
-* **companion:** update companion signin, notarization docs and add app icon ([fc05c94](https://github.com/tkhwang/workbranch/commit/fc05c940bb45745ba670eabed2dc643a8994d3c0))
-* **release:** update companion signing and notarization docs ([a12d32d](https://github.com/tkhwang/workbranch/commit/a12d32da25352a3947b986afadf97d642f86b84e))
-
 ## [1.3.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v1.2.0...workbranch-companion-v1.3.0) (2026-06-13)
 
 
