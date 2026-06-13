@@ -225,6 +225,9 @@ func runConfigActionsDebounceTests() throws {
     # workbranch companion projects
 
     workbranchBin: /opt/homebrew/bin/workbranch
+    fontName: JetBrains Mono
+    fontSize: 14.5
+    colorTheme: amber
 
     ## projects
     - /tmp/fullstack
@@ -233,17 +236,35 @@ func runConfigActionsDebounceTests() throws {
     let config = try CompanionConfig.load(from: configURL)
     try expect(config.roots == ["/tmp/fullstack"], "config roots")
     try expect(config.workbranchBin == "/opt/homebrew/bin/workbranch", "workbranch bin")
+    try expect(config.font == CompanionFontSettings(name: "JetBrains Mono", size: 14.5), "font settings")
+    try expect(config.colorTheme == .amber, "color theme")
     let removedConfig = try config.removingRoot("/tmp/fullstack")
     try expect(removedConfig.roots == [], "remove config root")
+    try expect(removedConfig.font == config.font, "remove config root preserves font")
+    try expect(removedConfig.colorTheme == config.colorTheme, "remove config root preserves color theme")
     try removedConfig.write(to: configURL)
     let reloadedRemovedConfig = try CompanionConfig.load(from: configURL)
     try expect(reloadedRemovedConfig.roots == [], "remove config root persists")
+    try expect(reloadedRemovedConfig.font == config.font, "font settings persist")
+    try expect(reloadedRemovedConfig.colorTheme == .amber, "color theme persists")
     try valid.write(to: configURL)
+    try Data("colorTheme: green\n\n## projects\n- /tmp/fullstack\n".utf8).write(to: configURL)
+    let legacyGreenConfig = try CompanionConfig.load(from: configURL)
+    try expect(legacyGreenConfig.colorTheme == .matrix, "legacy green theme maps to matrix")
+    try Data("colorTheme: blue\n\n## projects\n- /tmp/fullstack\n".utf8).write(to: configURL)
+    let legacyBlueConfig = try CompanionConfig.load(from: configURL)
+    try expect(legacyBlueConfig.colorTheme == .nord, "legacy blue theme maps to nord")
 
     try Data("## projects\n- relative\n".utf8).write(to: configURL)
     try expectThrows("relative root rejected") { _ = try CompanionConfig.load(from: configURL) }
     try Data("workbranchBin: bin/workbranch\n\n## projects\n- /tmp/fullstack\n".utf8).write(to: configURL)
     try expectThrows("relative workbranch bin rejected") { _ = try CompanionConfig.load(from: configURL) }
+    try Data("fontSize: nope\n\n## projects\n- /tmp/fullstack\n".utf8).write(to: configURL)
+    try expectThrows("invalid font size rejected") { _ = try CompanionConfig.load(from: configURL) }
+    try Data("fontSize: 0\n\n## projects\n- /tmp/fullstack\n".utf8).write(to: configURL)
+    try expectThrows("zero font size rejected") { _ = try CompanionConfig.load(from: configURL) }
+    try Data("colorTheme: neon\n\n## projects\n- /tmp/fullstack\n".utf8).write(to: configURL)
+    try expectThrows("invalid color theme rejected") { _ = try CompanionConfig.load(from: configURL) }
     try fm.removeItem(at: configURL)
 
     let project = temp.appendingPathComponent("project")
@@ -272,7 +293,10 @@ func runConfigActionsDebounceTests() throws {
     let guiConfig = try CompanionConfig.ensureGUIConfig(at: configURL)
     try expect(guiConfig.roots == [], "GUI skeleton uses empty roots")
     try expect(fm.fileExists(atPath: configURL.path), "GUI skeleton creates file")
-
+    let guiConfigText = try String(contentsOf: configURL, encoding: .utf8)
+    try expect(guiConfigText.contains("fontName: Menlo"), "GUI skeleton writes default font name")
+    try expect(guiConfigText.contains("fontSize: 13"), "GUI skeleton writes default font size")
+    try expect(guiConfigText.contains("colorTheme: dracula"), "GUI skeleton writes default color theme")
 
     let actions = ActionBuilder(workbranchBin: "/opt/homebrew/bin/workbranch")
     try expect(actions.editMemo(root: "/tmp/fullstack", task: "task3", text: "한글 space \"quote\"").arguments == ["memo", "task3", "한글 space \"quote\""], "edit memo argv")
@@ -358,10 +382,16 @@ func runAppSourceInvariantTests() throws {
     let fm = FileManager.default
     let stateStorePath = "Sources/CompanionApp/StateStore.swift"
     let popoverPath = "Sources/CompanionApp/Views/CompanionPopoverView.swift"
+    let rowViewPath = "Sources/CompanionApp/Views/RowView.swift"
+    let settingsViewPath = "Sources/CompanionApp/Views/AppearanceSettingsView.swift"
     let stateStore = try String(contentsOfFile: stateStorePath, encoding: .utf8)
     let popover = try String(contentsOfFile: popoverPath, encoding: .utf8)
+    let rowView = try String(contentsOfFile: rowViewPath, encoding: .utf8)
+    let settingsView = try String(contentsOfFile: settingsViewPath, encoding: .utf8)
     try expect(fm.fileExists(atPath: stateStorePath), "StateStore source exists")
     try expect(fm.fileExists(atPath: popoverPath), "popover source exists")
+    try expect(fm.fileExists(atPath: rowViewPath), "RowView source exists")
+    try expect(fm.fileExists(atPath: settingsViewPath), "settings source exists")
     guard
         let initStart = stateStore.range(of: "init(configURL:"),
         let initEnd = stateStore[initStart.lowerBound...].range(of: "static func defaultConfigURL")
@@ -434,6 +464,35 @@ func runAppSourceInvariantTests() throws {
     try expect(!rowPrefix.contains("section.rows.enumerated()"), "row ForEach does not use offset ids")
     try expect(popover.contains("ForEach(store.menuState.sections)"), "section ForEach uses Identifiable sections")
     try expect(popover.contains("ForEach(section.rows)"), "row ForEach uses Identifiable rows")
+    try expect(!popover.contains(".sheet(isPresented:"), "settings are inline, not transient sheet")
+    try expect(popover.contains("if showingSettings"), "popover keeps settings panel inline while open")
+    try expect(popover.contains("store.saveColorTheme"), "theme selection applies through store immediately")
+    try expect(popover.contains("workbranch-companion"), "popover header uses companion app name")
+    try expect(!popover.contains("\"$ refresh\""), "refresh command text is not rendered in header")
+    try expect(!popover.contains("\"$ refresh-now\""), "refresh command text is not rendered in footer")
+    try expect(!popover.contains("\"$ quit\""), "quit command text is not rendered")
+    try expect(popover.contains("arrow.clockwise"), "refresh action is icon-only")
+    try expect(popover.contains("power"), "quit action is icon-only")
+    try expect(popover.contains("TerminalLine(prefix: \"#\", command: store.statusMessage"), "status message renders in footer")
+    try expect(!popover.contains("section.root"), "project path is not rendered in simplified companion view")
+    try expect(!popover.contains("store.menuState.title"), "header does not render aggregate task counters")
+    try expect(rowView.contains("taskBlock"), "task rows render as a static task block")
+    try expect(!rowView.contains("DisclosureGroup"), "task rows are always visible without disclosure controls")
+    try expect(!rowView.contains("TextField(\"memo text\""), "task rows do not expose memo editing")
+    try expect(rowView.contains("memo \\(memo)"), "task rows render list --global memoTitle")
+    try expect(rowView.contains("row.checklistItems"), "task rows render TASK-WORKBRANCH status items")
+    try expect(rowView.contains("statusItemLine"), "task status content renders without noisy labels")
+    try expect(!rowView.contains("startPrimaryAction"), "task rows do not trigger primary actions on click")
+    try expect(!rowView.contains("Menu(\"actions\")"), "task rows do not render action menus")
+    try expect(!rowView.contains("status now="), "task rows do not render current checklist item")
+    try expect(!rowView.contains("command: \"checklist\""), "task rows do not render checklist labels")
+    try expect(!rowView.contains("label: \"progress\""), "task rows do not render progress tokens")
+    try expect(!rowView.contains("label: \"noti\""), "task rows do not render notification tokens")
+    try expect(!rowView.contains("label: \"branch\""), "repo rows do not render branch tokens")
+    try expect(!rowView.contains("label: \"dirty\""), "repo rows do not render dirty tokens")
+    try expect(settingsView.contains("FixedWidthFontCatalog.names"), "settings font picker uses fixed-width font catalog")
+    try expect(settingsView.contains("fixedPitchFontMask"), "fixed-width font catalog filters system monospaced fonts")
+    try expect(settingsView.contains("onThemeChange(theme)"), "theme tile invokes live theme change callback")
 }
 
 do {

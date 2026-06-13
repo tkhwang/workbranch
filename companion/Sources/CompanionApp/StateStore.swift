@@ -20,6 +20,8 @@ final class StateStore: ObservableObject {
     private var heartbeatTimer: Timer?
     private var rootWatcher: RootWatcher?
     var configuredRoots: [String] { config.roots }
+    var fontSettings: CompanionFontSettings { config.font }
+    var colorTheme: CompanionColorTheme { config.colorTheme }
 
     init(configURL: URL = StateStore.defaultConfigURL()) {
         self.configURL = configURL
@@ -195,6 +197,31 @@ final class StateStore: ObservableObject {
         } catch {
             statusMessage = "Open config failed: \(error)"
         }
+    }
+
+    func saveAppearance(fontName: String, fontSize: Double, colorTheme: CompanionColorTheme) {
+        do {
+            let normalizedFontName = fontName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let nextConfig = try CompanionConfig(
+                roots: config.roots,
+                workbranchBin: config.workbranchBin,
+                font: CompanionFontSettings(name: normalizedFontName, size: fontSize),
+                colorTheme: colorTheme
+            )
+            try nextConfig.write(to: configURL)
+            config = nextConfig
+            statusMessage = "Settings saved"
+        } catch {
+            statusMessage = "Settings error: \(error)"
+        }
+    }
+
+    func saveColorTheme(_ colorTheme: CompanionColorTheme) {
+        saveAppearance(
+            fontName: config.font.name,
+            fontSize: config.font.size,
+            colorTheme: colorTheme
+        )
     }
 
     func quit() {
