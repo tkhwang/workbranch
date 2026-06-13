@@ -3616,11 +3616,6 @@ cmd_list_json() {
 
 cmd_list_local() {
   require_project
-  if [ $# -eq 1 ] && [ "$1" = "--json" ]; then
-    cmd_list_json
-    return 0
-  fi
-  [ $# -eq 0 ] || die "usage: workbranch list [--json]"
   info "Project: $PROJECT_NAME"
   info "Base: $BASE_DIR"
   section "IDE"
