@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.17.0](https://github.com/tkhwang/workbranch/compare/v1.16.0...v1.17.0) (2026-06-13)
+
+
+### Features
+
+* **companion:** add app icon and notarization status ([984ee3e](https://github.com/tkhwang/workbranch/commit/984ee3e4206ce045dbc0a861376fe010f599c4c2)), closes [#456](https://github.com/tkhwang/workbranch/issues/456)
+
+
+### Bug Fixes
+
+* **companion:** update companion signin, notarization docs and add app icon ([fc05c94](https://github.com/tkhwang/workbranch/commit/fc05c940bb45745ba670eabed2dc643a8994d3c0))
+* **release:** update companion signing and notarization docs ([a12d32d](https://github.com/tkhwang/workbranch/commit/a12d32da25352a3947b986afadf97d642f86b84e))
+
 ## [1.16.0](https://github.com/tkhwang/workbranch/compare/v1.15.0...v1.16.0) (2026-06-13)
 
 
