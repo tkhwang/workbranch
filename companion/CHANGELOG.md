@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.3.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v1.2.0...workbranch-companion-v1.3.0) (2026-06-13)
+
+
+### Features
+
+* **companion:** add appearance settings view ([fe5956b](https://github.com/tkhwang/workbranch/commit/fe5956bbbe576e291d9e8831db856df1f71438f0))
+* **companion:** add appearance settings view ([816a495](https://github.com/tkhwang/workbranch/commit/816a495a250ffc90540a6c2cc91c05e84bffb9d4))
+* **companion:** display repo branch and dirty state ([d28ad20](https://github.com/tkhwang/workbranch/commit/d28ad205fed85d9e13707ddeff5731272f6b2923))
+
 ## [1.2.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v1.1.0...workbranch-companion-v1.2.0) (2026-06-13)
 
 
