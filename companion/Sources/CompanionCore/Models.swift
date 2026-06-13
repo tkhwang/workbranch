@@ -11,6 +11,42 @@ public enum WorkbranchListError: Error, CustomStringConvertible, Equatable {
     }
 }
 
+public struct WorkbranchGlobalDocument: Codable, Equatable, Sendable {
+    public let schemaVersion: Int
+    public let projects: [WorkbranchListDocument]
+    public let errors: [WorkbranchGlobalError]
+
+    public init(schemaVersion: Int, projects: [WorkbranchListDocument], errors: [WorkbranchGlobalError] = []) throws {
+        guard schemaVersion == 1 else { throw WorkbranchListError.unsupportedSchemaVersion(schemaVersion) }
+        self.schemaVersion = schemaVersion
+        self.projects = projects
+        self.errors = errors
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let version = try container.decode(Int.self, forKey: .schemaVersion)
+        guard version == 1 else { throw WorkbranchListError.unsupportedSchemaVersion(version) }
+        schemaVersion = version
+        projects = try container.decode([WorkbranchListDocument].self, forKey: .projects)
+        errors = try container.decodeIfPresent([WorkbranchGlobalError].self, forKey: .errors) ?? []
+    }
+
+    public static func decode(_ data: Data) throws -> WorkbranchGlobalDocument {
+        try JSONDecoder().decode(WorkbranchGlobalDocument.self, from: data)
+    }
+}
+
+public struct WorkbranchGlobalError: Codable, Equatable, Sendable {
+    public let root: String
+    public let message: String
+
+    public init(root: String, message: String) {
+        self.root = root
+        self.message = message
+    }
+}
+
 public struct WorkbranchListDocument: Codable, Equatable, Sendable {
     public let schemaVersion: Int
     public let project: String
@@ -48,6 +84,7 @@ public struct WorkbranchTask: Codable, Equatable, Sendable {
     public let progressDone: Int
     public let progressTotal: Int
     public let currentItem: String
+    public let items: [WorkbranchChecklistItem]
     public let notiCount: Int
     public let repos: [WorkbranchRepo]
 
@@ -59,6 +96,7 @@ public struct WorkbranchTask: Codable, Equatable, Sendable {
         progressDone: Int = 0,
         progressTotal: Int = 0,
         currentItem: String = "",
+        items: [WorkbranchChecklistItem] = [],
         notiCount: Int,
         repos: [WorkbranchRepo]
     ) {
@@ -69,6 +107,7 @@ public struct WorkbranchTask: Codable, Equatable, Sendable {
         self.progressDone = progressDone
         self.progressTotal = progressTotal
         self.currentItem = currentItem
+        self.items = items
         self.notiCount = notiCount
         self.repos = repos
     }
@@ -82,6 +121,7 @@ public struct WorkbranchTask: Codable, Equatable, Sendable {
         progressDone = try container.decodeIfPresent(Int.self, forKey: .progressDone) ?? 0
         progressTotal = try container.decodeIfPresent(Int.self, forKey: .progressTotal) ?? 0
         currentItem = try container.decodeIfPresent(String.self, forKey: .currentItem) ?? ""
+        items = try container.decodeIfPresent([WorkbranchChecklistItem].self, forKey: .items) ?? []
         notiCount = try container.decode(Int.self, forKey: .notiCount)
         repos = try container.decode([WorkbranchRepo].self, forKey: .repos)
     }
@@ -96,5 +136,18 @@ public struct WorkbranchRepo: Codable, Equatable, Sendable {
         self.name = name
         self.branch = branch
         self.dirty = dirty
+    }
+}
+
+
+public struct WorkbranchChecklistItem: Codable, Equatable, Sendable {
+    public let text: String
+    public let checked: Bool
+    public let depth: Int
+
+    public init(text: String, checked: Bool, depth: Int) {
+        self.text = text
+        self.checked = checked
+        self.depth = depth
     }
 }

@@ -8,6 +8,7 @@ src/workbranch/lib/task-identity.sh
 src/workbranch/lib/project.sh
 src/workbranch/lib/task-metadata.sh
 src/workbranch/lib/task-state.sh
+src/workbranch/lib/registry.sh
 src/workbranch/lib/preflight.sh
 src/workbranch/lib/rollback.sh
 src/workbranch/lib/prompts.sh
@@ -30,6 +31,7 @@ src/workbranch/commands/refresh.sh
 src/workbranch/commands/push.sh
 src/workbranch/commands/land.sh
 src/workbranch/commands/finalize.sh
+src/workbranch/commands/destroy.sh
 src/workbranch/commands/remove.sh
 src/workbranch/commands/prune.sh
 src/workbranch/commands/version.sh

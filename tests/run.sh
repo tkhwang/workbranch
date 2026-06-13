@@ -35,6 +35,7 @@ main() {
   run_test test_runner_fails_fast_when_no_case_files
   run_test test_runner_rejects_non_regular_case_file
   run_test test_runner_reports_failed_case_source
+  run_test test_run_test_isolates_companion_registry_config
   run_test test_help_groups_commands
   run_test test_display_default_error_output_has_no_ansi
   run_test test_display_forced_color_colors_error_prefix
@@ -70,6 +71,9 @@ main() {
   run_test test_safe_names_reject_dot_and_dotdot
   run_test test_invalid_config_rejected_without_execution
   run_test test_init_existing_config_clones_base_repos
+  run_test test_init_registers_companion_project_markdown
+  run_test test_registry_serializes_concurrent_add_remove
+  run_test test_init_no_companion_skips_registry
   run_test test_init_completes_partial_base_clones
   run_test test_init_rejects_existing_base_repo_on_wrong_branch_during_recovery
   run_test test_init_validates_existing_base_repos_before_cloning_missing_repos
@@ -157,6 +161,16 @@ main() {
   run_test test_list_json_progress_and_status
   run_test test_list_json_currentItem_escaped
   run_test test_list_json_legacy_memo_no_checkboxes
+  run_test test_list_json_includes_checklist_items_depth
+  run_test test_list_global_json_projects_and_errors
+  run_test test_list_global_uses_stable_launcher_after_changing_directory
+  run_test test_list_global_json_all_roots_failure_is_nonzero
+  run_test test_destroy_force_removes_project_and_registry
+  run_test test_destroy_force_continues_when_base_repo_is_missing
+  run_test test_destroy_blocks_dirty_without_force
+  run_test test_destroy_blocks_dirty_partial_task_without_force
+  run_test test_destroy_skips_unpushed_check_when_base_repo_is_detached_head
+  run_test test_destroy_rejects_keep_files_and_forget_absent
   run_test test_remove_deletes_task_branch_when_worktree_missing
   run_test test_remove_force_discards_dirty_task
   run_test test_remove_rejects_unmerged_task_branch_without_force

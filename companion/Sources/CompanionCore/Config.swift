@@ -12,7 +12,7 @@ public enum CompanionConfigError: Error, CustomStringConvertible, Equatable {
     }
 }
 
-public struct CompanionConfig: Codable, Equatable, Sendable {
+public struct CompanionConfig: Equatable, Sendable {
     public let roots: [String]
     public let workbranchBin: String?
 
@@ -28,9 +28,22 @@ public struct CompanionConfig: Codable, Equatable, Sendable {
     }
 
     public static func load(from url: URL) throws -> CompanionConfig {
-        let data = try Data(contentsOf: url)
-        let decoded = try JSONDecoder().decode(RawConfig.self, from: data)
-        return try CompanionConfig(roots: decoded.roots, workbranchBin: decoded.workbranchBin)
+        let text = try String(contentsOf: url, encoding: .utf8)
+        var roots: [String] = []
+        var workbranchBin: String?
+        for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("workbranchBin:") {
+                let value = String(line.dropFirst("workbranchBin:".count)).trimmingCharacters(in: .whitespaces)
+                if !value.isEmpty { workbranchBin = value }
+                continue
+            }
+            guard line.hasPrefix("- ") else { continue }
+            let root = String(line.dropFirst(2)).trimmingCharacters(in: .whitespaces)
+            guard root.hasPrefix("/") else { throw CompanionConfigError.rootMustBeAbsolute(root) }
+            roots.append(root)
+        }
+        return try CompanionConfig(roots: roots, workbranchBin: workbranchBin)
     }
 
     public static func initSkeleton(currentDirectory: URL) -> CompanionConfig {
@@ -56,20 +69,11 @@ public struct CompanionConfig: Codable, Equatable, Sendable {
     }
 
     public func write(to url: URL) throws {
-        let raw = RawConfig(roots: roots, workbranchBin: workbranchBin)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(raw)
-        try data.write(to: url)
-    }
-}
-
-private struct RawConfig: Codable {
-    let roots: [String]
-    let workbranchBin: String?
-
-    init(roots: [String], workbranchBin: String?) {
-        self.roots = roots
-        self.workbranchBin = workbranchBin
+        var lines: [String] = ["# workbranch companion projects", ""]
+        if let workbranchBin { lines.append("workbranchBin: \(workbranchBin)"); lines.append("") }
+        lines.append("## projects")
+        for root in roots { lines.append("- \(root)") }
+        lines.append("")
+        try lines.joined(separator: "\n").write(to: url, atomically: true, encoding: .utf8)
     }
 }

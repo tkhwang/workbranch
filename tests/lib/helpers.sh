@@ -145,7 +145,13 @@ run_test() {
   log "[*] $test_name"
   test_started=$(date +%s)
   if (
-    trap cleanup_fixture EXIT
+    test_xdg_config=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test-xdg)
+    export XDG_CONFIG_HOME="$test_xdg_config"
+    cleanup_test_env() {
+      cleanup_fixture
+      [ -z "${test_xdg_config:-}" ] || rm -rf "$test_xdg_config"
+    }
+    trap cleanup_test_env EXIT
     "$test_name"
   ); then
     test_finished=$(date +%s)

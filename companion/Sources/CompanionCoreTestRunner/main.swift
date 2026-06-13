@@ -70,17 +70,26 @@ func runModelsAndMenuStateTests() throws {
     try expect(document.tasks[0].progressDone == 0, "legacy progress done default")
     try expect(document.tasks[0].progressTotal == 0, "legacy progress total default")
     try expect(document.tasks[0].currentItem == "", "legacy current item default")
+    try expect(document.tasks[0].items.isEmpty, "legacy items default")
     try expect(document.tasks[0].repos[0].dirty, "dirty repo")
 
     let progressDocument = try WorkbranchListDocument.decode(Data("""
     {"schemaVersion":1,"project":"fullstack","root":"/tmp/fullstack","tasks":[
-      {"name":"task3","path":"/tmp/fullstack/task3","memoTitle":"draft-tree 가이드 작성","status":"in-progress","progressDone":2,"progressTotal":4,"currentItem":"verify","notiCount":1,"repos":[]}
+      {"name":"task3","path":"/tmp/fullstack/task3","memoTitle":"draft-tree 가이드 작성","status":"in-progress","progressDone":2,"progressTotal":4,"currentItem":"verify","items":[{"text":"Major","checked":true,"depth":0},{"text":"Child","checked":false,"depth":1}],"notiCount":1,"repos":[]}
     ]}
     """.utf8))
     try expect(progressDocument.tasks[0].status == "in-progress", "progress status decode")
     try expect(progressDocument.tasks[0].progressDone == 2, "progress done decode")
     try expect(progressDocument.tasks[0].progressTotal == 4, "progress total decode")
     try expect(progressDocument.tasks[0].currentItem == "verify", "current item decode")
+    try expect(progressDocument.tasks[0].items == [WorkbranchChecklistItem(text: "Major", checked: true, depth: 0), WorkbranchChecklistItem(text: "Child", checked: false, depth: 1)], "items decode")
+
+    let globalDocument = try WorkbranchGlobalDocument.decode(Data("""
+    {"schemaVersion":1,"projects":[{"schemaVersion":1,"project":"fullstack","root":"/tmp/fullstack","tasks":[]}],"errors":[{"root":"/tmp/missing","message":"not inside project"}]}
+    """.utf8))
+    try expect(globalDocument.schemaVersion == 1, "global schema")
+    try expect(globalDocument.projects.count == 1, "global projects")
+    try expect(globalDocument.errors == [WorkbranchGlobalError(root: "/tmp/missing", message: "not inside project")], "global errors")
 
     try expectThrows("schemaVersion mismatch") {
         _ = try WorkbranchListDocument.decode(Data("""
@@ -112,22 +121,22 @@ func runModelsAndMenuStateTests() throws {
         tracker: &tracker,
         isBaseline: true
     )
-    try expect(state.title == "⎇ 2 🔔1", "title with count and notifications")
+    try expect(state.title == "▶1 🔔2", "title with in-progress and notifications rollup")
     try expect(state.sections.count == 2, "section count")
     try expect(state.sections[0].rows[0].kind == .task, "task row kind")
-    try expect(state.sections[0].rows[0].title.contains("🟡"), "status icon")
+    try expect(state.sections[0].rows[0].title.contains("●"), "status icon")
     try expect(state.sections[0].rows[0].title.contains("task3"), "task title")
     try expect(state.sections[0].rows[0].title.contains("🔔2"), "notification marker")
     try expect(state.sections[0].rows[0].title.contains("1/2"), "progress marker")
     try expect(state.sections[0].rows[0].subtitle == "지금: 검증 실행", "current item subtitle")
-    try expect(state.sections[0].rows[1].kind == .repo, "repo row kind")
-    try expect(state.sections[0].rows[1].title.contains("backend"), "repo title")
-    try expect(state.sections[0].rows[1].title.contains("feature/task3"), "repo branch")
-    try expect(state.sections[0].rows[1].title.contains("●"), "dirty marker")
-    try expect(state.sections[0].rows[2].kind == .task, "second task row kind")
-    try expect(state.sections[0].rows[2].title.contains("⚪"), "planning status icon")
-    try expect(!state.sections[0].rows[2].title.contains("0/0"), "zero-total progress hidden")
-    try expect(state.sections[0].rows[2].subtitle == nil, "empty current item hidden")
+    try expect(state.sections[0].rows[0].isExpandedByDefault, "notified task expands by default")
+    try expect(state.sections[0].rows[0].repos[0].name == "backend", "repo embedded in task row")
+    try expect(state.sections[0].rows[0].repos[0].branch == "feature/task3", "repo branch embedded in task row")
+    try expect(state.sections[0].rows[0].repos[0].dirty, "dirty marker source embedded in task row")
+    try expect(state.sections[0].rows[1].kind == .task, "second task row kind")
+    try expect(state.sections[0].rows[1].title.contains("○"), "planning status icon")
+    try expect(!state.sections[0].rows[1].title.contains("0/0"), "zero-total progress hidden")
+    try expect(state.sections[0].rows[1].subtitle == nil, "empty current item hidden")
     try expect(state.sections[0].rows[0].primaryAction == .editMemo(root: "/tmp/fullstack", task: "task3"), "primary action")
     try expect(state.sections[1].rows[0].title.contains("workbranch list failed"), "error row")
     try expect(state.notificationsToSend.isEmpty, "baseline no notifications")
@@ -174,7 +183,7 @@ func runModelsAndMenuStateTests() throws {
         tracker: &tracker,
         isBaseline: false
     )
-    try expect(duplicateRootRefresh.title == "⎇ 2 🔔1", "duplicate root does not double-count tasks")
+    try expect(duplicateRootRefresh.title == "▶1 🔔2", "duplicate root does not double-count tasks")
     try expect(duplicateRootRefresh.sections.count == 1, "duplicate configured root is coalesced")
     try expect(duplicateRootRefresh.sections[0].root == "/tmp/fullstack", "duplicate root keeps first section")
 
@@ -211,9 +220,14 @@ func runConfigActionsDebounceTests() throws {
     try fm.createDirectory(at: temp, withIntermediateDirectories: true)
     defer { try? fm.removeItem(at: temp) }
 
-    let configURL = temp.appendingPathComponent("config.json")
+    let configURL = temp.appendingPathComponent("projects.md")
     let valid = Data("""
-    {"roots":["/tmp/fullstack"],"workbranchBin":"/opt/homebrew/bin/workbranch"}
+    # workbranch companion projects
+
+    workbranchBin: /opt/homebrew/bin/workbranch
+
+    ## projects
+    - /tmp/fullstack
     """.utf8)
     try valid.write(to: configURL)
     let config = try CompanionConfig.load(from: configURL)
@@ -226,12 +240,10 @@ func runConfigActionsDebounceTests() throws {
     try expect(reloadedRemovedConfig.roots == [], "remove config root persists")
     try valid.write(to: configURL)
 
-    try Data("{\"roots\":[\"relative\"]}".utf8).write(to: configURL)
+    try Data("## projects\n- relative\n".utf8).write(to: configURL)
     try expectThrows("relative root rejected") { _ = try CompanionConfig.load(from: configURL) }
-    try Data("{\"roots\":[\"/tmp/fullstack\"],\"workbranchBin\":\"bin/workbranch\"}".utf8).write(to: configURL)
+    try Data("workbranchBin: bin/workbranch\n\n## projects\n- /tmp/fullstack\n".utf8).write(to: configURL)
     try expectThrows("relative workbranch bin rejected") { _ = try CompanionConfig.load(from: configURL) }
-    try Data("not json".utf8).write(to: configURL)
-    try expectThrows("invalid json rejected") { _ = try CompanionConfig.load(from: configURL) }
     try fm.removeItem(at: configURL)
 
     let project = temp.appendingPathComponent("project")
@@ -261,16 +273,6 @@ func runConfigActionsDebounceTests() throws {
     try expect(guiConfig.roots == [], "GUI skeleton uses empty roots")
     try expect(fm.fileExists(atPath: configURL.path), "GUI skeleton creates file")
 
-    try expect(TaskNameValidator.isValid("Task_1.2"), "allows CLI safe name")
-    try expect(TaskNameValidator.isValid("feat-branch-name"), "allows conventional task folder")
-    try expect(!TaskNameValidator.isValid("feat-.hidden"), "rejects conventional task folder that derives hidden branch component")
-    try expect(!TaskNameValidator.isValid("feat-bad.lock"), "rejects conventional task folder that derives .lock branch")
-    try expect(!TaskNameValidator.isValid("-bad"), "rejects task folder that can be parsed as an option")
-    try expect(!TaskNameValidator.isValid(""), "rejects empty")
-    try expect(!TaskNameValidator.isValid("."), "rejects dot")
-    try expect(!TaskNameValidator.isValid(".."), "rejects dotdot")
-    try expect(!TaskNameValidator.isValid("bad/name"), "rejects slash")
-    try expect(!TaskNameValidator.isValid("bad name"), "rejects whitespace")
 
     let actions = ActionBuilder(workbranchBin: "/opt/homebrew/bin/workbranch")
     try expect(actions.editMemo(root: "/tmp/fullstack", task: "task3", text: "한글 space \"quote\"").arguments == ["memo", "task3", "한글 space \"quote\""], "edit memo argv")
@@ -281,12 +283,6 @@ func runConfigActionsDebounceTests() throws {
     try expect(actions.revealFinder(root: "/tmp/fullstack", task: "task3").arguments == ["finder", "task3"], "finder argv")
     try expect(actions.copyPath("/tmp/fullstack/task3").executable == "/usr/bin/pbcopy", "copy path executable")
     try expect(actions.copyPath("/tmp/fullstack/task3").standardInput == "/tmp/fullstack/task3", "copy path stdin")
-    let addCommand = try actions.add(root: "/tmp/fullstack", task: "Task_1")
-    try expect(addCommand.arguments == ["add", "Task_1"], "add argv")
-    try expectThrows("unsafe add rejected") { _ = try actions.add(root: "/tmp/fullstack", task: "-bad") }
-    try expectThrows("invalid task rejected") { _ = try actions.validatedAdd(root: "/tmp/fullstack", task: "bad/name") }
-    try expectThrows("invalid conventional branch rejected") { _ = try actions.validatedAdd(root: "/tmp/fullstack", task: "feat-.hidden") }
-    try expectThrows("option-looking task rejected") { _ = try actions.validatedAdd(root: "/tmp/fullstack", task: "-bad") }
 
     let policy = EventFilter()
     try expect(policy.shouldRefresh(forPath: "/tmp/fullstack/task3/TASK-WORKBRANCH.md", root: "/tmp/fullstack"), "task state event refreshes")
@@ -397,7 +393,8 @@ func runAppSourceInvariantTests() throws {
         throw TestFailure(message: "StateStore refreshAll body not found")
     }
     let refreshAllBody = String(stateStore[refreshAllStart.lowerBound..<refreshAllEnd.lowerBound])
-    try expect(!refreshAllBody.contains("refreshResult(root:"), "refreshAll does not run CLI refresh synchronously on MainActor")
+    try expect(!refreshAllBody.contains("listJSON(root:"), "refreshAll does not run per-root CLI refresh synchronously on MainActor")
+    try expect(refreshAllBody.contains("refreshGlobalAsync"), "refreshAll uses global list refresh")
     try expect(refreshAllBody.contains("Task {"), "refreshAll schedules async refresh work")
     guard
         let refreshStart = stateStore.range(of: "func refresh(root:"),
@@ -406,10 +403,13 @@ func runAppSourceInvariantTests() throws {
         throw TestFailure(message: "StateStore refresh body not found")
     }
     let refreshBody = String(stateStore[refreshStart.lowerBound..<refreshEnd.lowerBound])
-    try expect(!refreshBody.contains("refreshResult(root:"), "refresh(root:) does not run CLI refresh synchronously on MainActor")
-    try expect(refreshBody.contains("Task {"), "refresh(root:) schedules async refresh work")
-    try expect(stateStore.contains("withTaskGroup"), "multi-root refresh runs roots concurrently")
-    try expect(stateStore.contains("Task.detached"), "CLI listJSON work is detached from MainActor")
+    try expect(!refreshBody.contains("listJSON(root:"), "refresh(root:) does not run per-root CLI refresh synchronously on MainActor")
+    try expect(refreshBody.contains("refreshAll"), "refresh(root:) delegates to global refresh")
+    try expect(stateStore.contains("refreshGlobalAsync"), "StateStore has async global refresh")
+    try expect(stateStore.contains("Task.detached"), "CLI global list work is detached from MainActor")
+    try expect(stateStore.contains("listGlobalJSON"), "StateStore consumes list --global --json")
+    try expect(!stateStore.contains("withTaskGroup"), "global refresh does not run root-by-root task group")
+    try expect(!popover.contains("New workspace"), "popover does not expose New workspace UI")
     guard
         let stdinBranchStart = stateStore.range(of: "if let standardInput = command.standardInput"),
         let stdinBranchEnd = stateStore[stdinBranchStart.lowerBound...].range(of: "return")

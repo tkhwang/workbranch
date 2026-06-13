@@ -28,7 +28,6 @@ public enum MenuAction: Equatable, Sendable {
     case copyPath(path: String)
     case openConfig
     case refresh
-    case newWorkspace(root: String?)
     case quit
 }
 
@@ -41,6 +40,13 @@ public struct MenuRow: Equatable, Identifiable, Sendable {
     public let taskName: String?
     public let memoTitle: String?
     public let notificationCount: Int
+    public let checklistItems: [WorkbranchChecklistItem]
+    public let repos: [WorkbranchRepo]
+    public let status: String
+    public let progressDone: Int
+    public let progressTotal: Int
+    public let currentItem: String
+    public let isExpandedByDefault: Bool
 
     public var id: String {
         if let primaryAction {
@@ -60,7 +66,14 @@ public struct MenuRow: Equatable, Identifiable, Sendable {
         secondaryActions: [MenuAction] = [],
         taskName: String? = nil,
         memoTitle: String? = nil,
-        notificationCount: Int = 0
+        notificationCount: Int = 0,
+        checklistItems: [WorkbranchChecklistItem] = [],
+        repos: [WorkbranchRepo] = [],
+        status: String = "",
+        progressDone: Int = 0,
+        progressTotal: Int = 0,
+        currentItem: String = "",
+        isExpandedByDefault: Bool = false
     ) {
         self.kind = kind
         self.title = title
@@ -70,6 +83,13 @@ public struct MenuRow: Equatable, Identifiable, Sendable {
         self.taskName = taskName
         self.memoTitle = memoTitle
         self.notificationCount = notificationCount
+        self.checklistItems = checklistItems
+        self.repos = repos
+        self.status = status
+        self.progressDone = progressDone
+        self.progressTotal = progressTotal
+        self.currentItem = currentItem
+        self.isExpandedByDefault = isExpandedByDefault
     }
 
     private static func actionID(_ action: MenuAction) -> String {
@@ -82,7 +102,6 @@ public struct MenuRow: Equatable, Identifiable, Sendable {
         case .copyPath(let path): return "copyPath:\(path)"
         case .openConfig: return "openConfig"
         case .refresh: return "refresh"
-        case .newWorkspace(let root): return "newWorkspace:\(root ?? "")"
         case .quit: return "quit"
         }
     }
@@ -155,7 +174,9 @@ public struct MenuState: Equatable, Sendable {
         }
         var sections: [MenuSection] = []
         var taskCount = 0
-        var rootsWithNotifications = Set<String>()
+        var inProgressCount = 0
+        var blockedCount = 0
+        var totalNotificationCount = 0
         var notifications: [TaskNotification] = []
 
         for root in roots {
@@ -182,12 +203,13 @@ public struct MenuState: Equatable, Sendable {
             if let document {
                 taskCount += document.tasks.count
                 for task in document.tasks {
-                    if task.notiCount > 0 { rootsWithNotifications.insert(document.root) }
+                    if task.status == "in-progress" { inProgressCount += 1 }
+                    if task.status == "blocked" { blockedCount += 1 }
+                    totalNotificationCount += task.notiCount
                     if let notification = tracker.observe(root: document.root, task: task.name, count: task.notiCount, isBaseline: isBaseline) {
                         notifications.append(notification)
                     }
                     rows.append(taskRow(for: task, root: document.root))
-                    rows.append(contentsOf: repoRows(for: task))
                 }
                 if document.tasks.isEmpty && rows.isEmpty {
                     rows.append(MenuRow(kind: .message, title: "No task workspaces"))
@@ -201,10 +223,11 @@ public struct MenuState: Equatable, Sendable {
             }
         }
 
-        var title = "⎇ \(taskCount)"
-        if !rootsWithNotifications.isEmpty {
-            title += " 🔔\(rootsWithNotifications.count)"
-        }
+        var titleParts: [String] = []
+        if inProgressCount > 0 { titleParts.append("▶\(inProgressCount)") }
+        if blockedCount > 0 { titleParts.append("⚠\(blockedCount)") }
+        if totalNotificationCount > 0 { titleParts.append("🔔\(totalNotificationCount)") }
+        let title = titleParts.isEmpty ? "⎇ \(taskCount)" : titleParts.joined(separator: " ")
         return MenuState(title: title, sections: sections, notificationsToSend: notifications)
     }
 
@@ -239,25 +262,24 @@ public struct MenuState: Equatable, Sendable {
             ],
             taskName: task.name,
             memoTitle: task.memoTitle,
-            notificationCount: task.notiCount
+            notificationCount: task.notiCount,
+            checklistItems: task.items,
+            repos: task.repos,
+            status: task.status,
+            progressDone: task.progressDone,
+            progressTotal: task.progressTotal,
+            currentItem: task.currentItem,
+            isExpandedByDefault: task.status == "blocked" || task.notiCount > 0
         )
-    }
-
-    private static func repoRows(for task: WorkbranchTask) -> [MenuRow] {
-        task.repos.map { repo in
-            var title = "[+] \(repo.name)  \(repo.branch)"
-            if repo.dirty { title += "  ●" }
-            return MenuRow(kind: .repo, title: title, subtitle: nil)
-        }
     }
 
     private static func statusIcon(_ status: String) -> String? {
         switch status {
-        case "planning": return "⚪"
-        case "in-progress": return "🟡"
-        case "review": return "🔵"
-        case "blocked": return "🔴"
-        case "done": return "✅"
+        case "done": return "✓"
+        case "in-progress": return "●"
+        case "review": return "◐"
+        case "blocked": return "⚠"
+        case "planning": return "○"
         default: return nil
         }
     }

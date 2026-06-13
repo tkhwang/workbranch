@@ -78,7 +78,7 @@ test_add_creates_task_brief_and_agent_guidance() {
   brief=$(cat "$project/login/TASK-WORKBRANCH.md")
   assert_contains "$brief" "# login"
   assert_contains "$brief" "status: planning"
-  assert_contains "$brief" "- [ ] Start work"
+  assert_contains "$brief" "- [ ] Major: Start work"
   guidance=$(cat "$project/login/AGENTS.md")
   assert_contains "$guidance" "TASK-WORKBRANCH.md"
   assert_contains "$guidance" "../TASK-WORKBRANCH.md"

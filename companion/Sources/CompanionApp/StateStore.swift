@@ -36,7 +36,7 @@ final class StateStore: ObservableObject {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".config")
             .appendingPathComponent("workbranch-companion")
-            .appendingPathComponent("config.json")
+            .appendingPathComponent("projects.md")
     }
 
     func reloadConfig() {
@@ -58,8 +58,8 @@ final class StateStore: ObservableObject {
             return
         }
         let refreshConfig = config
-        Task { [weak self, roots, refreshConfig] in
-            let results = await Self.refreshResultsAsync(roots: roots, config: refreshConfig)
+        Task { [weak self, refreshConfig] in
+            let results = await Self.refreshGlobalAsync(config: refreshConfig)
             await MainActor.run {
                 self?.apply(results: results, isBaseline: isBaseline)
             }
@@ -67,13 +67,7 @@ final class StateStore: ObservableObject {
     }
 
     func refresh(root: String, isBaseline: Bool = false) {
-        let refreshConfig = config
-        Task { [weak self, root, refreshConfig] in
-            let result = await Self.refreshResultAsync(root: root, config: refreshConfig)
-            await MainActor.run {
-                self?.apply(results: [result], isBaseline: isBaseline)
-            }
-        }
+        refreshAll(isBaseline: isBaseline)
     }
 
     func noteFilesystemChange(root: String) {
@@ -97,10 +91,10 @@ final class StateStore: ObservableObject {
         guard refreshCoordinator.begin(root: root) else { return }
         let refreshConfig = config
         Task { [weak self, root, refreshConfig] in
-            let result = await Self.refreshResultAsync(root: root, config: refreshConfig)
+            let results = await Self.refreshGlobalAsync(config: refreshConfig)
             await MainActor.run {
                 guard let self else { return }
-                self.apply(results: [result], isBaseline: false)
+                self.apply(results: results, isBaseline: false)
                 if self.refreshCoordinator.finish(root: root) == .runAgain {
                     self.noteFilesystemChange(root: root)
                 }
@@ -188,24 +182,8 @@ final class StateStore: ObservableObject {
             openConfig()
         case .refresh:
             refreshAll()
-        case .newWorkspace:
-            break
         case .quit:
             quit()
-        }
-    }
-
-    func addWorkspace(root: String, task: String) {
-        do {
-            let client = try CLIClient(config: config)
-            let builder = ActionBuilder(workbranchBin: client.workbranchBin)
-            let command = try builder.validatedAdd(root: root, task: task)
-            runExternal(command)
-            sendNotification(title: "Workbranch add started", body: "\(task) is being created. Check /tmp/workbranch-add logs if it fails.")
-            noteFilesystemChange(root: root)
-        } catch {
-            statusMessage = "New workspace failed: \(error)"
-            sendNotification(title: "Workbranch add failed", body: String(describing: error))
         }
     }
 
@@ -329,34 +307,21 @@ final class StateStore: ObservableObject {
         }
     }
 
-    private nonisolated static func refreshResultsAsync(roots: [String], config: CompanionConfig) async -> [RootResult] {
-        await withTaskGroup(of: (Int, RootResult).self) { group in
-            for (index, root) in roots.enumerated() {
-                group.addTask {
-                    (index, await refreshResultAsync(root: root, config: config))
-                }
-            }
-            var indexedResults: [(Int, RootResult)] = []
-            for await result in group {
-                indexedResults.append(result)
-            }
-            return indexedResults.sorted { $0.0 < $1.0 }.map { $0.1 }
-        }
-    }
-
-    private nonisolated static func refreshResultAsync(root: String, config: CompanionConfig) async -> RootResult {
+    private nonisolated static func refreshGlobalAsync(config: CompanionConfig) async -> [RootResult] {
         await Task.detached(priority: .utility) {
-            refreshResult(root: root, config: config)
+            refreshGlobal(config: config)
         }.value
     }
 
-    private nonisolated static func refreshResult(root: String, config: CompanionConfig) -> RootResult {
+    private nonisolated static func refreshGlobal(config: CompanionConfig) -> [RootResult] {
         do {
             let client = try CLIClient(config: config)
-            let document = try client.listJSON(root: root)
-            return .success(document)
+            let document = try client.listGlobalJSON()
+            let successes = document.projects.map { RootResult.success($0) }
+            let failures = document.errors.map { RootResult.failure(root: $0.root, message: $0.message) }
+            return successes + failures
         } catch {
-            return .failure(root: root, message: String(describing: error))
+            return config.roots.map { .failure(root: $0, message: String(describing: error)) }
         }
     }
 }

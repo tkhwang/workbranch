@@ -1,5 +1,6 @@
 cmd_init_interactive() {
   clone_after=${1:-yes}
+  register_companion=${2:-yes}
   reset_config
   if color_enabled; then
     print_banner
@@ -133,6 +134,10 @@ AFTER
   if [ "$clone_after" = "yes" ]; then
     clone_base_repos
     success "Initialized workbranch project: $PROJECT_ROOT"
+    if [ "$register_companion" = "yes" ]; then
+      registry_add_root "$PROJECT_ROOT"
+      info "Registered with companion: $PROJECT_ROOT"
+    fi
     prompt_add_first_task_after_init || return 1
     prompt_tool_config_after_init
   else
@@ -183,7 +188,13 @@ prompt_tool_config_after_init() {
 }
 
 cmd_init() {
-  [ $# -eq 0 ] || die "usage: workbranch init"
+  register_companion=yes
+  case "${1:-}" in
+    "") ;;
+    --no-companion) register_companion=no; shift ;;
+    *) die "usage: workbranch init [--no-companion]" ;;
+  esac
+  [ $# -eq 0 ] || die "usage: workbranch init [--no-companion]"
   CREATED_PATHS=()
   CREATED_WORKTREES=()
   CREATED_WORKTREE_BASES=()
@@ -204,8 +215,12 @@ cmd_init() {
     fi
     clone_base_repos
     success "Initialized workbranch project: $PROJECT_ROOT"
+    if [ "$register_companion" = "yes" ]; then
+      registry_add_root "$PROJECT_ROOT"
+      info "Registered with companion: $PROJECT_ROOT"
+    fi
   else
-    cmd_init_interactive yes
+    cmd_init_interactive yes "$register_companion"
   fi
 }
 

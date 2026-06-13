@@ -25,6 +25,7 @@ main() {
     push) cmd_push "$@" ;;
     land) cmd_land "$@" ;;
     remove) cmd_remove "$@" ;;
+    destroy) cmd_destroy "$@" ;;
     prune) cmd_prune "$@" ;;
     completion) cmd_completion "$@" ;;
     __complete-tasks) cmd_complete_tasks ;;

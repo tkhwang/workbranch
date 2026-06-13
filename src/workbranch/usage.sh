@@ -18,9 +18,10 @@ Usage:
   workbranch <command> [args]
 Workspace:
   init              Initialize a workbranch project
-  list              List configured repos and task workspaces
+  list [--global] [--json]  List configured repos and task workspaces
   add [<task>] [--from <ref>]  Create a task workspace
   remove <task> [--force]  Remove task worktrees, branches, and task-root state
+  destroy [--force]  Destroy the current workbranch project
 Git:
   status            Show remote diff, task diff, and dirty state
   vertical
@@ -64,9 +65,10 @@ usage_enhanced() {
   printf '  workbranch <command> [args]\n'
   section "Workspace"
   printf '  init              Initialize a workbranch project\n'
-  printf '  list              List configured repos and task workspaces\n'
+  printf '  list [--global] [--json]  List configured repos and task workspaces\n'
   printf '  add [<task>] [--from <ref>]  Create a task workspace\n'
   printf '  remove <task> [--force]  Remove task worktrees, branches, and task-root state\n'
+  printf '  destroy [--force]  Destroy the current workbranch project\n'
   section "Git"
   printf '  status            Show remote diff, task diff, and dirty state\n'
   printf '%s  vertical%s\n' "$WB_GRAY" "$WB_RESET"

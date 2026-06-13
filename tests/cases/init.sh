@@ -197,3 +197,102 @@ CONFIG
   assert_branch "$project/_base/backend" "master"
   assert_not_exists "$project/.workbranch.config"
 }
+
+
+test_init_registers_companion_project_markdown() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  xdg="$TMP_ROOT/xdg"
+  out=$(cd "$project" && run_expect_success env XDG_CONFIG_HOME="$xdg" "$WORKBRANCH" init)
+  registry="$xdg/workbranch-companion/projects.md"
+  assert_contains "$out" "Registered with companion:"
+  assert_file "$registry"
+  project_real=$(cd "$project" && pwd -P)
+  assert_contains "$(cat "$registry")" "- $project_real"
+  assert_contains "$(cat "$registry")" "# workbranch companion projects"
+}
+
+
+test_registry_serializes_concurrent_add_remove() {
+  TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
+  xdg="$TMP_ROOT/xdg"
+  mkdir -p "$TMP_ROOT/roots"
+  helper="$TMP_ROOT/registry-helper.sh"
+  cat > "$helper" <<'SCRIPT'
+#!/usr/bin/env bash
+set -eu
+REPO_ROOT=$1
+action=$2
+root=$3
+die() { printf '%s\n' "[-] Error: $*" >&2; exit 1; }
+. "$REPO_ROOT/src/workbranch/lib/registry.sh"
+case "$action" in
+  add) registry_add_root "$root" ;;
+  remove) registry_remove_root "$root" ;;
+  *) die "unknown registry helper action: $action" ;;
+esac
+SCRIPT
+  chmod +x "$helper"
+
+  i=1
+  while [ $i -le 20 ]; do
+    mkdir -p "$TMP_ROOT/roots/root-$i"
+    i=$((i + 1))
+  done
+
+  pids=""
+  i=1
+  while [ $i -le 20 ]; do
+    env XDG_CONFIG_HOME="$xdg" "$helper" "$REPO_ROOT" add "$TMP_ROOT/roots/root-$i" &
+    pids="$pids $!"
+    i=$((i + 1))
+  done
+  for pid in $pids; do
+    wait "$pid" || fail "concurrent registry add failed"
+  done
+
+  registry="$xdg/workbranch-companion/projects.md"
+  assert_file "$registry"
+  i=1
+  while [ $i -le 20 ]; do
+    root=$(cd "$TMP_ROOT/roots/root-$i" && pwd -P)
+    count=$(grep -Fx -- "- $root" "$registry" | wc -l | tr -d ' ')
+    [ "$count" = 1 ] || fail "expected one registry entry for $root, got $count: $(cat "$registry")"
+    i=$((i + 1))
+  done
+
+  pids=""
+  i=1
+  while [ $i -le 10 ]; do
+    root=$(cd "$TMP_ROOT/roots/root-$i" && pwd -P)
+    env XDG_CONFIG_HOME="$xdg" "$helper" "$REPO_ROOT" remove "$root" &
+    pids="$pids $!"
+    i=$((i + 1))
+  done
+  for pid in $pids; do
+    wait "$pid" || fail "concurrent registry remove failed"
+  done
+
+  i=1
+  while [ $i -le 10 ]; do
+    root=$(cd "$TMP_ROOT/roots/root-$i" && pwd -P)
+    if grep -Fx -- "- $root" "$registry" >/dev/null 2>&1; then
+      fail "expected removed registry entry: $root"
+    fi
+    i=$((i + 1))
+  done
+  while [ $i -le 20 ]; do
+    root=$(cd "$TMP_ROOT/roots/root-$i" && pwd -P)
+    grep -Fx -- "- $root" "$registry" >/dev/null 2>&1 || fail "expected remaining registry entry: $root"
+    i=$((i + 1))
+  done
+}
+
+test_init_no_companion_skips_registry() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  xdg="$TMP_ROOT/xdg"
+  out=$(cd "$project" && run_expect_success env XDG_CONFIG_HOME="$xdg" "$WORKBRANCH" init --no-companion)
+  assert_not_contains "$out" "Registered with companion:"
+  assert_not_exists "$xdg/workbranch-companion/projects.md"
+}

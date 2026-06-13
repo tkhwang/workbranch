@@ -19,7 +19,7 @@ cmd_complete_repos() {
 }
 
 cmd_complete_commands() {
-  printf '%s\n' add completion config doctor finalize finder help ide init land list memo noti path prune pull push refresh remove status terminal update version
+  printf '%s\n' add completion config destroy doctor finalize finder help ide init land list memo noti path prune pull push refresh remove status terminal update version
 }
 
 print_completion_bash() {
@@ -69,10 +69,10 @@ _workbranch() {
     -*)
       case "$cmd" in
         add) words='--from' ;;
-        list) words='--json' ;;
+        list) words='--json --global' ;;
         memo) words='--clear' ;;
         config) words='--rewrite' ;;
-        remove) words='--force' ;;
+        remove|destroy) words='--force' ;;
         doctor) words='--fix --repo' ;;
         update) words='--all --repo' ;;
         status|pull|push|land|finalize|refresh|path|finder|ide|terminal) words='--repo' ;;
@@ -136,10 +136,10 @@ _workbranch() {
   if [[ "$cur" == -* ]]; then
     case "$cmd" in
       add) flags=(--from) ;;
-      list) flags=(--json) ;;
+      list) flags=(--json --global) ;;
       memo) flags=(--clear) ;;
       config) flags=(--rewrite) ;;
-      remove) flags=(--force) ;;
+      remove|destroy) flags=(--force) ;;
       doctor) flags=(--fix --repo) ;;
       update) flags=(--all --repo) ;;
       status|pull|push|land|finalize|refresh|path|finder|ide|terminal) flags=(--repo) ;;
@@ -224,9 +224,11 @@ complete -c workbranch -f -n '__workbranch_seen_command terminal' -a '(__workbra
 complete -c workbranch -f -n '__fish_seen_argument -l repo' -a '(__workbranch_complete_repos)'
 complete -c workbranch -n '__workbranch_seen_command add' -l from -d 'Seed task branches from a source ref'
 complete -c workbranch -n '__workbranch_seen_command list' -l json -d 'Print machine-readable JSON'
+complete -c workbranch -n '__workbranch_seen_command list' -l global -d 'List every registered project'
 complete -c workbranch -n '__workbranch_seen_command memo' -l clear -d 'Clear the task brief'
 complete -c workbranch -n '__workbranch_seen_command config' -l rewrite -d 'Rewrite config to current format'
 complete -c workbranch -n '__workbranch_seen_command remove' -l force -d 'Force removal'
+complete -c workbranch -n '__workbranch_seen_command destroy' -l force -d 'Force destruction'
 complete -c workbranch -n '__workbranch_seen_command doctor' -l fix -d 'Apply safe repairs'
 complete -c workbranch -n '__workbranch_seen_command update' -l all -d 'Update every task workspace'
 complete -c workbranch -n '__workbranch_seen_command update' -l repo -d 'Limit operation to one repo'

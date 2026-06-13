@@ -155,11 +155,39 @@ test_resume_command_is_removed() {
   assert_contains "$out" "unknown command: resume"
 }
 
+
+test_run_test_isolates_companion_registry_config() {
+  outer_xdg=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-outer-xdg)
+  old_xdg=${XDG_CONFIG_HOME-}
+  had_xdg=0
+  [ -z "${XDG_CONFIG_HOME+x}" ] || had_xdg=1
+  export XDG_CONFIG_HOME="$outer_xdg"
+
+  nested_registry_write() {
+    mkdir -p "$XDG_CONFIG_HOME/workbranch-companion"
+    printf '%s\n' '- /tmp/workbranch-test-should-not-leak' > "$XDG_CONFIG_HOME/workbranch-companion/projects.md"
+  }
+
+  old_pass=$PASS
+  old_fail=$FAIL
+  run_test nested_registry_write
+  PASS=$old_pass
+  FAIL=$old_fail
+
+  if [ "$had_xdg" -eq 1 ]; then
+    export XDG_CONFIG_HOME="$old_xdg"
+  else
+    unset XDG_CONFIG_HOME
+  fi
+  assert_not_exists "$outer_xdg/workbranch-companion/projects.md"
+  rm -rf "$outer_xdg"
+}
+
 test_help_groups_commands() {
   out=$(run_expect_success "$WORKBRANCH" help)
   assert_contains "$out" "Workspace:"
   assert_contains "$out" "init              Initialize a workbranch project"
-  assert_contains "$out" "list              List configured repos and task workspaces"
+  assert_contains "$out" "list [--global] [--json]  List configured repos and task workspaces"
   assert_contains "$out" "add [<task>] [--from <ref>]  Create a task workspace"
   assert_contains "$out" "remove <task> [--force]  Remove task worktrees, branches, and task-root state"
   assert_not_contains "$out" "resume <task>"
@@ -208,7 +236,7 @@ test_help_groups_commands() {
 '*) fail "expected compact help without blank lines; got: $out" ;;
   esac
   case "$out" in
-    *"Workspace:"*"init              Initialize a workbranch project"*"list              List configured repos and task workspaces"*"add [<task>] [--from <ref>]  Create a task workspace"*"remove <task> [--force]  Remove task worktrees, branches, and task-root state"*"Git:"*"status            Show remote diff, task diff, and dirty state"*"  vertical"*"land <task>       Land task branches into base branches"*"Combined:"*"refresh           Pull base branches, then update every task workspace"*"refresh <task>    Pull base branches, then update one task workspace"*"finalize <task>   Pull base, update task, then land task"*"prune             Remove fully merged task workspaces"*"Tool:"*"path <task>       Print a task workspace path"*"finder <task>     Open a task workspace in Finder"*"ide <task>        Open task repo worktrees in the configured IDE"*"terminal <task>   Open task repo worktrees in the configured terminal"*"Config:"*"config            Create or update .workbranch.config without cloning repos"*"config base       Update base branch settings and checkout base worktrees"*"config ide        Update only the configured IDE command"*"config terminal   Update only the configured terminal command"*"config --rewrite  Rewrite config to current format without prompts"*"Other:"*"doctor            Diagnose project health; --fix applies safe repairs"*) ;;
+    *"Workspace:"*"init              Initialize a workbranch project"*"list [--global] [--json]  List configured repos and task workspaces"*"add [<task>] [--from <ref>]  Create a task workspace"*"remove <task> [--force]  Remove task worktrees, branches, and task-root state"*"Git:"*"status            Show remote diff, task diff, and dirty state"*"  vertical"*"land <task>       Land task branches into base branches"*"Combined:"*"refresh           Pull base branches, then update every task workspace"*"refresh <task>    Pull base branches, then update one task workspace"*"finalize <task>   Pull base, update task, then land task"*"prune             Remove fully merged task workspaces"*"Tool:"*"path <task>       Print a task workspace path"*"finder <task>     Open a task workspace in Finder"*"ide <task>        Open task repo worktrees in the configured IDE"*"terminal <task>   Open task repo worktrees in the configured terminal"*"Config:"*"config            Create or update .workbranch.config without cloning repos"*"config base       Update base branch settings and checkout base worktrees"*"config ide        Update only the configured IDE command"*"config terminal   Update only the configured terminal command"*"config --rewrite  Rewrite config to current format without prompts"*"Other:"*"doctor            Diagnose project health; --fix applies safe repairs"*) ;;
     *) fail "expected workspace, git, tool, config, and other group ordering; got: $out" ;;
   esac
 }
