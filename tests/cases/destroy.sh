@@ -68,6 +68,8 @@ test_destroy_skips_unpushed_check_when_base_repo_is_detached_head() {
   xdg="$TMP_ROOT/xdg"
   cd "$project" || return 1
   run_expect_success env XDG_CONFIG_HOME="$xdg" "$WORKBRANCH" init >/dev/null
+  git -C "$project/_base/frontend" config user.name "Workbranch Test"
+  git -C "$project/_base/frontend" config user.email "workbranch-test@example.com"
   git -C "$project/_base/frontend" checkout --detach >/dev/null 2>&1
   printf '%s\n' detached-change > "$project/_base/frontend/detached.txt"
   git -C "$project/_base/frontend" add detached.txt
