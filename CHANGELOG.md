@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.16.0](https://github.com/tkhwang/workbranch/compare/v1.15.0...v1.16.0) (2026-06-13)
+
+
+### Features
+
+* **companion:** add project registry and task checklist json ([c9642ea](https://github.com/tkhwang/workbranch/commit/c9642eae04a209dcbe8afd28185eb25a0f087381))
+* **companion:** add project registry and task checklist json ([0539b7b](https://github.com/tkhwang/workbranch/commit/0539b7b71e519fe226a2c259f6fce91900ac823e))
+* **registry:** add file locking to companion registry operations ([39458f8](https://github.com/tkhwang/workbranch/commit/39458f84121f5584d0ce7c4ad4caa34b0f59384b))
+
+
+### Bug Fixes
+
+* **test:** configure git user for detached head test ([b8bb6cd](https://github.com/tkhwang/workbranch/commit/b8bb6cd4f2d45802e9c0dd23ef1c0ded3a4aef08))
+
 ## [1.15.0](https://github.com/tkhwang/workbranch/compare/v1.14.0...v1.15.0) (2026-06-12)
 
 
