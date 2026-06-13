@@ -106,6 +106,7 @@ func runModelsAndMenuStateTests() throws {
     try expect(empty.sections.count == 1, "empty section count")
     try expect(empty.sections[0].rows.first?.kind == .message, "empty message row")
     try expect(empty.sections[0].rows.first?.title.contains("config") == true, "empty config guidance")
+    try expect(empty.sections[0].rows.first?.primaryAction == .openConfig, "empty config row opens config")
     try expect(empty.notificationsToSend.isEmpty, "empty notifications")
 
     let stateDoc = try WorkbranchListDocument.decode(Data("""
@@ -466,7 +467,35 @@ func runAppSourceInvariantTests() throws {
     try expect(popover.contains("ForEach(section.rows)"), "row ForEach uses Identifiable rows")
     try expect(!popover.contains(".sheet(isPresented:"), "settings are inline, not transient sheet")
     try expect(popover.contains("if showingSettings"), "popover keeps settings panel inline while open")
-    try expect(popover.contains("store.saveColorTheme"), "theme selection applies through store immediately")
+    guard
+        let saveSettingsStart = popover.range(of: "private func saveSettings()"),
+        let saveSettingsEnd = popover[saveSettingsStart.lowerBound...].range(of: "private func applyTheme")
+    else {
+        throw TestFailure(message: "saveSettings body not found")
+    }
+    let saveSettingsBody = String(popover[saveSettingsStart.lowerBound..<saveSettingsEnd.lowerBound])
+    try expect(saveSettingsBody.contains("if store.saveAppearance"), "Settings close only after a successful save")
+    try expect(saveSettingsBody.contains("colorTheme: draftColorTheme"), "Save persists the selected draft theme")
+    try expect(saveSettingsBody.contains("showingSettings = false"), "successful Save closes settings")
+    guard
+        let saveAppearanceStart = stateStore.range(of: "func saveAppearance"),
+        let saveAppearanceEnd = stateStore[saveAppearanceStart.lowerBound...].range(of: "func saveColorTheme")
+    else {
+        throw TestFailure(message: "StateStore saveAppearance body not found")
+    }
+    let saveAppearanceBody = String(stateStore[saveAppearanceStart.lowerBound..<saveAppearanceEnd.lowerBound])
+    try expect(saveAppearanceBody.contains("-> Bool"), "saveAppearance reports success or failure")
+    try expect(saveAppearanceBody.contains("return true"), "saveAppearance returns true after config write succeeds")
+    try expect(saveAppearanceBody.contains("return false"), "saveAppearance returns false after config write fails")
+    guard
+        let applyThemeStart = popover.range(of: "private func applyTheme"),
+        let applyThemeEnd = popover[applyThemeStart.lowerBound...].range(of: "\\n    }\\n}", options: .regularExpression)
+    else {
+        throw TestFailure(message: "applyTheme body not found")
+    }
+    let applyThemeBody = String(popover[applyThemeStart.lowerBound..<applyThemeEnd.lowerBound])
+    try expect(applyThemeBody.contains("draftColorTheme = theme"), "theme selection updates draft state")
+    try expect(!applyThemeBody.contains("store.save"), "theme selection does not persist before Save")
     try expect(popover.contains("workbranch-companion"), "popover header uses companion app name")
     try expect(!popover.contains("\"$ refresh\""), "refresh command text is not rendered in header")
     try expect(!popover.contains("\"$ refresh-now\""), "refresh command text is not rendered in footer")
@@ -476,20 +505,24 @@ func runAppSourceInvariantTests() throws {
     try expect(popover.contains("TerminalLine(prefix: \"#\", command: store.statusMessage"), "status message renders in footer")
     try expect(!popover.contains("section.root"), "project path is not rendered in simplified companion view")
     try expect(!popover.contains("store.menuState.title"), "header does not render aggregate task counters")
+    try expect(popover.contains("RowView(row: row, store: store)"), "row view receives store for non-task primary actions")
     try expect(rowView.contains("taskBlock"), "task rows render as a static task block")
     try expect(!rowView.contains("DisclosureGroup"), "task rows are always visible without disclosure controls")
     try expect(!rowView.contains("TextField(\"memo text\""), "task rows do not expose memo editing")
     try expect(rowView.contains("memo \\(memo)"), "task rows render list --global memoTitle")
     try expect(rowView.contains("row.checklistItems"), "task rows render TASK-WORKBRANCH status items")
     try expect(rowView.contains("statusItemLine"), "task status content renders without noisy labels")
+    try expect(rowView.contains("if let primaryAction = row.primaryAction"), "non-task primary actions remain clickable")
+    try expect(rowView.contains("store.perform(primaryAction)"), "message primary action invokes StateStore")
     try expect(!rowView.contains("startPrimaryAction"), "task rows do not trigger primary actions on click")
     try expect(!rowView.contains("Menu(\"actions\")"), "task rows do not render action menus")
     try expect(!rowView.contains("status now="), "task rows do not render current checklist item")
     try expect(!rowView.contains("command: \"checklist\""), "task rows do not render checklist labels")
     try expect(!rowView.contains("label: \"progress\""), "task rows do not render progress tokens")
     try expect(!rowView.contains("label: \"noti\""), "task rows do not render notification tokens")
-    try expect(!rowView.contains("label: \"branch\""), "repo rows do not render branch tokens")
-    try expect(!rowView.contains("label: \"dirty\""), "repo rows do not render dirty tokens")
+    try expect(rowView.contains("label: \"branch\""), "repo rows render branch tokens")
+    try expect(rowView.contains("label: \"dirty\""), "repo rows render dirty tokens")
+    try expect(rowView.contains("repo.dirty ? \"yes\" : \"no\""), "dirty token reflects worktree dirty state")
     try expect(settingsView.contains("FixedWidthFontCatalog.names"), "settings font picker uses fixed-width font catalog")
     try expect(settingsView.contains("fixedPitchFontMask"), "fixed-width font catalog filters system monospaced fonts")
     try expect(settingsView.contains("onThemeChange(theme)"), "theme tile invokes live theme change callback")

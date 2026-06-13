@@ -61,7 +61,7 @@ struct CompanionPopoverView: View {
         VStack(alignment: .leading, spacing: 8) {
             TerminalLine(prefix: "$", command: section.title, tone: .accent)
             ForEach(section.rows) { row in
-                RowView(row: row)
+                RowView(row: row, store: store)
             }
         }
         .padding(10)
@@ -123,17 +123,17 @@ struct CompanionPopoverView: View {
     }
 
     private func saveSettings() {
-        store.saveAppearance(
+        if store.saveAppearance(
             fontName: draftFontName,
             fontSize: draftFontSize,
             colorTheme: draftColorTheme
-        )
-        showingSettings = false
+        ) {
+            showingSettings = false
+        }
     }
 
     private func applyTheme(_ theme: CompanionColorTheme) {
         draftColorTheme = theme
-        store.saveColorTheme(theme)
     }
 }
 

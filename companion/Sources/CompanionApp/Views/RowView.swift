@@ -3,6 +3,7 @@ import CompanionCore
 
 struct RowView: View {
     let row: MenuRow
+    @ObservedObject var store: StateStore
     @Environment(\.terminalPalette) private var palette
 
     var body: some View {
@@ -45,6 +46,19 @@ struct RowView: View {
     }
 
     private var messageLine: some View {
+        Group {
+            if let primaryAction = row.primaryAction {
+                Button(action: { store.perform(primaryAction) }) {
+                    messageText
+                }
+                .buttonStyle(.plain)
+            } else {
+                messageText
+            }
+        }
+    }
+
+    private var messageText: some View {
         TerminalLine(
             prefix: row.kind == .error ? "!" : "#",
             command: row.title,
@@ -60,6 +74,12 @@ struct RowView: View {
             Text(repo.name)
                 .foregroundStyle(palette.command)
                 .fontWeight(.semibold)
+            TerminalToken(label: "branch", value: repo.branch, tone: .normal)
+            TerminalToken(
+                label: "dirty",
+                value: repo.dirty ? "yes" : "no",
+                tone: repo.dirty ? .warning : .muted
+            )
         }
     }
 

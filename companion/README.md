@@ -2,7 +2,7 @@
 
 Native macOS menu bar companion for workbranch task workspaces.
 
-The app is a read-only presentation client for the existing `workbranch` CLI. It does not read Git state directly; every refresh pulls `workbranch list --json` from each configured project root, then renders a compact project/task memo/repo/status summary with the task's `TASK-WORKBRANCH.md` status items.
+The app is a read-only presentation client for the existing `workbranch` CLI. It does not read Git state directly; every refresh pulls `workbranch list --json` from each configured project root, then renders a compact project/task memo/repo branch/dirty/status summary with the task's `TASK-WORKBRANCH.md` status items.
 
 ## Requirements
 
@@ -120,7 +120,7 @@ The app's **Open config** action creates an empty project-list skeleton if the f
 ## Behavior
 
 - Menu title still reflects aggregate task state for the macOS menu bar item.
-- Popover rows use a terminal-style layout with project name, task name, task memo, repo name, task status, and the task status checklist items.
+- Popover rows use a terminal-style layout with project name, task name, task memo, repo name, repo branch, repo dirty state, task status, and the task status checklist items.
 - Task rows are display-only: clicking a task does not edit memo text and no per-task action menu is shown.
 - Notifications are baseline-safe: first load does not send macOS notifications for existing `notiCount`; later increases for the same root/task do.
 - Refresh is event-driven through FSEvents with `.git/` events filtered out, per-root debounce, in-flight refresh limiting, and a 5-minute heartbeat fallback.

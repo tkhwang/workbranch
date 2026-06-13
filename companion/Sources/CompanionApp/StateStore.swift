@@ -199,7 +199,8 @@ final class StateStore: ObservableObject {
         }
     }
 
-    func saveAppearance(fontName: String, fontSize: Double, colorTheme: CompanionColorTheme) {
+    @discardableResult
+    func saveAppearance(fontName: String, fontSize: Double, colorTheme: CompanionColorTheme) -> Bool {
         do {
             let normalizedFontName = fontName.trimmingCharacters(in: .whitespacesAndNewlines)
             let nextConfig = try CompanionConfig(
@@ -211,8 +212,10 @@ final class StateStore: ObservableObject {
             try nextConfig.write(to: configURL)
             config = nextConfig
             statusMessage = "Settings saved"
+            return true
         } catch {
             statusMessage = "Settings error: \(error)"
+            return false
         }
     }
 
