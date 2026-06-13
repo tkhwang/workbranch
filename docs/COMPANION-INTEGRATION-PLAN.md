@@ -27,6 +27,7 @@ CLI(`workbranch`)와 companion을 project 레지스트리로 연동하고, `TASK
 - project root는 항상 **절대경로**(`cd "$dir" && pwd -P`)로 정규화해 bullet line으로 저장한다.
 - `registry_add_root`/`registry_remove_root`는 멱등이어야 하며, jq/Python 미설치 여부와 무관하게 동작해야 한다.
 - 레지스트리 파일 `~/.config/workbranch-companion/projects.md` 예시는 다음 형태를 기본으로 한다:
+
   ```markdown
   # workbranch companion projects
 
@@ -115,6 +116,7 @@ CLI(`workbranch`)와 companion을 project 레지스트리로 연동하고, `TASK
 - `cmd_list`는 인자 파싱을 먼저 수행하고, `--global` 경로에서는 cwd project의 `require_project` 없이 Markdown registry를 읽는다.
 - `--global`: `registry_list_roots` 순회 → 각 root에서 서브셸 `cd` 후 프로젝트 단위 수집 → 집계 출력.
 - `--global --json`: 래퍼 문서
+
   ```json
   {
     "schemaVersion": 1,
@@ -122,6 +124,7 @@ CLI(`workbranch`)와 companion을 project 레지스트리로 연동하고, `TASK
     "errors": [ { "root": "/missing/root", "message": "..." } ]
   }
   ```
+
 - 기본(플래그 없음)은 현행 유지 = cwd 로컬 1개이며 이 경로만 `require_project`를 호출한다.
 - 실패 root는 registry에서 제거하지 않는다. JSON에서는 `errors[]`에 포함하고, human output에서는 stderr warning을 출력한다(self-heal은 companion 담당).
 - partial failure exit status: 성공 project가 하나라도 있으면 exit 0이고 실패 root는 `errors[]`로만 표현한다. registry를 읽을 수 없거나 모든 root가 실패하면 nonzero로 종료한다.
@@ -135,6 +138,7 @@ CLI(`workbranch`)와 companion을 project 레지스트리로 연동하고, `TASK
 ### 5a. 컨벤션 (들여쓰기 = major/medium/small)
 수정: `src/workbranch/lib/task-state.sh`
 - `write_default_task_brief` 템플릿을 중첩 예시로:
+
   ```markdown
   # <task>
 
@@ -147,6 +151,7 @@ CLI(`workbranch`)와 companion을 project 레지스트리로 연동하고, `TASK
   ## Notes
   -
   ```
+
 - `write_task_agent_guidance`에 "하위 작업은 들여쓰기로 표현" 규칙 추가.
 
 ### 5b. CLI: 체크리스트 항목을 depth와 함께 JSON에
@@ -191,7 +196,8 @@ CLI(`workbranch`)와 companion을 project 레지스트리로 연동하고, `TASK
 - 기본 펼침 정책: `blocked`이거나 noti 있는 task는 펼침, `done`/clean은 접힘.
 
 목표 레이아웃:
-```
+
+```text
 ▾ workbranch                                  🔔1
   ▾ feat-companion-ui        ● in-progress 6/10
        now ▸ status 렌더링 구현
@@ -232,7 +238,7 @@ CLI(`workbranch`)와 companion을 project 레지스트리로 연동하고, `TASK
 
 ## 구현 순서 (tracer-bullet)
 
-```
+```text
 Phase 1 (registry.sh)
    ↓
 Phase 2 (init 등록) ─── 최소 가치: "init한 프로젝트가 companion에 자동 표시"

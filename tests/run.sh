@@ -72,6 +72,7 @@ main() {
   run_test test_invalid_config_rejected_without_execution
   run_test test_init_existing_config_clones_base_repos
   run_test test_init_registers_companion_project_markdown
+  run_test test_registry_serializes_concurrent_add_remove
   run_test test_init_no_companion_skips_registry
   run_test test_init_completes_partial_base_clones
   run_test test_init_rejects_existing_base_repo_on_wrong_branch_during_recovery
@@ -162,9 +163,13 @@ main() {
   run_test test_list_json_legacy_memo_no_checkboxes
   run_test test_list_json_includes_checklist_items_depth
   run_test test_list_global_json_projects_and_errors
+  run_test test_list_global_uses_stable_launcher_after_changing_directory
   run_test test_list_global_json_all_roots_failure_is_nonzero
   run_test test_destroy_force_removes_project_and_registry
+  run_test test_destroy_force_continues_when_base_repo_is_missing
   run_test test_destroy_blocks_dirty_without_force
+  run_test test_destroy_blocks_dirty_partial_task_without_force
+  run_test test_destroy_skips_unpushed_check_when_base_repo_is_detached_head
   run_test test_destroy_rejects_keep_files_and_forget_absent
   run_test test_remove_deletes_task_branch_when_worktree_missing
   run_test test_remove_force_discards_dirty_task

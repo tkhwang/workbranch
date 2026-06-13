@@ -134,17 +134,39 @@ cmd_list_local() {
 }
 
 
+workbranch_self_path() {
+  local self self_dir self_base resolved
+  self=$0
+  if resolved=$(command -v -- "$0" 2>/dev/null) && [ -n "$resolved" ]; then
+    self=$resolved
+  fi
+  case "$self" in
+    /*) printf '%s' "$self" ;;
+    */*)
+      self_dir=${self%/*}
+      self_base=${self##*/}
+      if [ -d "$self_dir" ]; then
+        (cd "$self_dir" 2>/dev/null && printf '%s/%s' "$(pwd -P)" "$self_base") || printf '%s' "$self"
+      else
+        printf '%s' "$self"
+      fi
+      ;;
+    *) printf '%s' "$self" ;;
+  esac
+}
+
 cmd_list_global_json() {
-  local root first_project first_error successes errors out status message
+  local root first_project first_error successes errors out status message self
   printf '{"schemaVersion":1,"projects":['
   first_project=1
   first_error=1
   successes=0
   errors=0
   error_items=""
+  self=$(workbranch_self_path)
   while IFS= read -r root || [ -n "$root" ]; do
     [ -n "$root" ] || continue
-    out=$(cd "$root" 2>/dev/null && "$0" list --json 2>&1)
+    out=$(cd "$root" 2>/dev/null && "$self" list --json 2>&1)
     status=$?
     if [ $status -eq 0 ]; then
       if [ $first_project -eq 1 ]; then first_project=0; else printf ','; fi
@@ -179,12 +201,13 @@ json_string_value() {
 }
 
 cmd_list_global_human() {
-  local root out status successes errors
+  local root out status successes errors self
   successes=0
   errors=0
+  self=$(workbranch_self_path)
   while IFS= read -r root || [ -n "$root" ]; do
     [ -n "$root" ] || continue
-    out=$(cd "$root" 2>/dev/null && "$0" list 2>&1)
+    out=$(cd "$root" 2>/dev/null && "$self" list 2>&1)
     status=$?
     if [ $status -eq 0 ]; then
       [ $successes -eq 0 ] || printf '\n'

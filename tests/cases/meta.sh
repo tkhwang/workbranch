@@ -168,7 +168,11 @@ test_run_test_isolates_companion_registry_config() {
     printf '%s\n' '- /tmp/workbranch-test-should-not-leak' > "$XDG_CONFIG_HOME/workbranch-companion/projects.md"
   }
 
+  old_pass=$PASS
+  old_fail=$FAIL
   run_test nested_registry_write
+  PASS=$old_pass
+  FAIL=$old_fail
 
   if [ "$had_xdg" -eq 1 ]; then
     export XDG_CONFIG_HOME="$old_xdg"

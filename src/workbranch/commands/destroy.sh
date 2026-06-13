@@ -15,7 +15,10 @@ preflight_require_no_unpushed_current_branch() {
   label=$1
   path=$2
   branch=$(branch_or_unknown "$path")
-  [ "$branch" != "(unknown)" ] || return 0
+  case "$branch" in
+    ""|"(unknown)"|"HEAD"|"(detached)"|"(detached HEAD)") return 0 ;;
+  esac
+  git -C "$path" check-ref-format --branch "$branch" >/dev/null 2>&1 || return 0
   upstream=$(git -C "$path" rev-parse --verify --quiet "$branch@{upstream}^{commit}" 2>/dev/null) || upstream=""
   [ -n "$upstream" ] || return 0
   if ! git_is_ancestor "$path" "$branch" "$upstream"; then
@@ -42,9 +45,12 @@ cmd_destroy() {
     name=$(repo_name_at "$i")
     base=$(base_repo_path "$name")
     if [ ! -d "$base/.git" ] && [ ! -f "$base/.git" ]; then
-      preflight_error "$BASE_DIR/$name missing git repo"
-      i=$((i + 1))
-      continue
+      if [ "$force" -ne 1 ]; then
+        preflight_error "$BASE_DIR/$name missing git repo"
+        i=$((i + 1))
+        continue
+      fi
+      printf '[-] Warning: %s missing git repo; continuing forced destroy\n' "$BASE_DIR/$name" >&2
     fi
     if [ "$force" -ne 1 ]; then
       preflight_require_clean "$BASE_DIR/$name" "$base"
@@ -54,7 +60,7 @@ cmd_destroy() {
   done
 
   for task_dir in "$PROJECT_ROOT"/*; do
-    is_task_workspace_path "$task_dir" || continue
+    doctor_task_candidate_path "$task_dir" || continue
     task=${task_dir##*/}
     i=0
     while [ $i -lt ${#REPO_NAMES[@]} ]; do
