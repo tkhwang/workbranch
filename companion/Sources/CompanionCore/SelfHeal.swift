@@ -14,3 +14,13 @@ public enum ProjectRootSelfHeal {
         return .unavailable
     }
 }
+
+public enum ProjectRootIdentity {
+    public static func matches(configuredRoot: String, documentRoot: String) -> Bool {
+        canonicalPath(configuredRoot) == canonicalPath(documentRoot)
+    }
+
+    public static func canonicalPath(_ root: String) -> String {
+        URL(fileURLWithPath: root).resolvingSymlinksInPath().standardizedFileURL.path
+    }
+}

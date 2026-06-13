@@ -113,7 +113,7 @@ final class StateStore: ObservableObject {
             switch result {
             case .success(let document):
                 previous[document.root] = document
-                missingRootConfirmations.removeValue(forKey: document.root)
+                clearMissingRootConfirmations(afterSuccessfulRefreshOf: document.root)
             case .failure(let root, _):
                 recordMissingRootIfNeeded(root: root)
             }
@@ -127,6 +127,13 @@ final class StateStore: ObservableObject {
         )
         for notification in menuState.notificationsToSend {
             sendNotification(title: "Workbranch notification", body: "\(notification.task): \(notification.count) unread")
+        }
+    }
+
+    private func clearMissingRootConfirmations(afterSuccessfulRefreshOf documentRoot: String) {
+        missingRootConfirmations.removeValue(forKey: documentRoot)
+        for root in config.roots where ProjectRootIdentity.matches(configuredRoot: root, documentRoot: documentRoot) {
+            missingRootConfirmations.removeValue(forKey: root)
         }
     }
 
@@ -144,8 +151,9 @@ final class StateStore: ObservableObject {
 
     private func forgetDeletedRoot(_ root: String) {
         do {
-            config = try config.removingRoot(root)
-            try config.write(to: configURL)
+            let newConfig = try config.removingRoot(root)
+            try newConfig.write(to: configURL)
+            self.config = newConfig
             previous.removeValue(forKey: root)
             missingRootConfirmations.removeValue(forKey: root)
             statusMessage = "Removed deleted project root: \(root)"
