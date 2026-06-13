@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v1.1.0...workbranch-companion-v1.2.0) (2026-06-13)
+
+
+### Features
+
+* **companion:** add project registry and task checklist json ([c9642ea](https://github.com/tkhwang/workbranch/commit/c9642eae04a209dcbe8afd28185eb25a0f087381))
+* **companion:** add project registry and task checklist json ([0539b7b](https://github.com/tkhwang/workbranch/commit/0539b7b71e519fe226a2c259f6fce91900ac823e))
+
 ## [1.1.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v1.0.0...workbranch-companion-v1.1.0) (2026-06-13)
 
 
