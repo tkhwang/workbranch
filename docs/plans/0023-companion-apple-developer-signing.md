@@ -1,6 +1,6 @@
 # 0023 Companion Apple Developer ID 서명·공증 활성화 계획
 
-> **agentic worker 지침:** 이 계획의 대부분은 **유지보수자(사람)의 수동 작업**이다 — Apple Developer 포털, Keychain Access(GUI), App Store Connect는 자동화할 수 없다. agent가 수행할 수 있는 부분은 (a) `.p12`/`.p8` 검증, (b) base64 인코딩, (c) `gh secret set` 등록, (d) `gh workflow run`으로 서명 파이프라인 검증, (e) `README.md`/`companion/README.md` 문구 갱신, (f) tap cask caveat 제거 PR, (g) `.github/workflows/companion-release.yml`의 cask **최초 생성 template**에서 stale ad-hoc caveat 제거뿐이다. `src/workbranch/**`, `bin/workbranch`, companion Swift 코드(`companion/Sources/**`, `companion/Tests/**`), release-please 설정은 **건드리지 않는다**. 워크플로의 서명/공증 실행 로직은 수정하지 않는다(서명/공증 step은 0020에서 이미 guarded 상태로 구현되어 있고, 이번에는 cask 재생성 시 stale 문구가 되살아나지 않도록 template 문구만 정리한다).
+> **agentic worker 지침:** 이 계획의 대부분은 **유지보수자(사람)의 수동 작업**이다 — Apple Developer 포털, Keychain Access(GUI), App Store Connect는 자동화할 수 없다. agent가 수행할 수 있는 부분은 (a) `.p12`/`.p8` 검증, (b) base64 인코딩, (c) `gh secret set` 등록, (d) `gh workflow run`으로 서명 파이프라인 검증, (e) `README.md`/`companion/README.md` 문구 갱신, (f) tap cask caveat 제거 PR, (g) `.github/workflows/companion-release.yml`의 cask **최초 생성 template**에서 stale ad-hoc caveat 제거뿐이다. `src/workbranch/**`, `bin/workbranch`, companion Swift 코드(`companion/Sources/**`, `companion/Tests/**`), release-please 설정은 **건드리지 않는다**. 워크플로의 서명/공증 실행 로직은 수정하지 않는다(서명/공증 step은 0020에서 이미 guarded 상태로 구현되어 있고, 이번에는 cask 재생성 시 notarized release에는 stale 문구가 되살아나지 않게 하고, unsigned/not-notarized fallback에는 recovery caveat을 보존하도록 template 문구만 조건화한다).
 >
 > **시리즈 위치:** 0020(companion brew 배포)의 마지막 미체크 follow-up 항목 — "Developer ID secrets 등록과 공증 활성화"를 실행하는 계획이다. 0020은 ad-hoc 서명 + `--no-quarantine`으로 배포 파이프라인을 완성했고, companion은 이미 `1.3.0`까지 release되어 운영 중이다. 이 계획은 **새 Apple 자격증명을 발급**해서 그 파이프라인을 Developer ID 서명 + notarization으로 업그레이드한다.
 
@@ -17,32 +17,34 @@
 - [x] GitHub Actions Apple secret 6개 등록 확인: `APPLE_CERTIFICATE_P12`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_NOTARY_KEY`, `APPLE_NOTARY_KEY_ID`, `APPLE_NOTARY_ISSUER_ID`.
 - [x] `companion-release.yml` workflow_dispatch 검증: run `27480803909` success, `.p12` import, Developer ID `codesign`, `notarytool` Accepted, `stapler` validate 성공.
 - [x] 배포 asset 로컬 검증: `WorkbranchCompanion-1.3.0.zip` sha256 `e3d19c4407fec8dafdbcad33ae068ad3213fb900ec8fa82634d9f1ce7be0282b`, `codesign --verify --deep --strict` 통과, `spctl` `source=Notarized Developer ID`, `xcrun stapler validate` 통과.
-- [x] repo 문서 정리: `README.md`, `companion/README.md`에서 Homebrew 설치 안내의 quarantine bypass 문구 제거.
-- [x] workflow template 하드닝: Decision 1에 따라 `.github/workflows/companion-release.yml`의 cask 최초 생성 template에서 stale ad-hoc caveat 제거.
+- [x] repo 문서 정리: `README.md`, `README.ko.md`, `companion/README.md`에서 Homebrew 설치 안내의 quarantine bypass 문구 제거.
+- [x] workflow template 하드닝: Decision 1 보완에 따라 `.github/workflows/companion-release.yml`의 cask 최초 생성 template은 notarized release에는 caveat을 만들지 않고, unsigned/not-notarized fallback에는 Gatekeeper recovery caveat을 조건부로 유지한다.
 - [ ] tap cask caveat 제거 PR: `tkhwang/homebrew-tap` local checkout에 caveat 제거 변경 준비 완료. commit/push/PR은 별도 git publish 단계에서 수행.
 - [ ] 최종 사용자 경로 확인: caveat 제거 PR 반영 후 `brew install --cask tkhwang/tap/workbranch-companion`로 설치·실행 확인.
 
 ---
 
-## 문제
+## 초기 문제(해결됨)
 
-0020으로 배포 배관은 완성됐지만 release가 **ad-hoc 서명**으로 나가고 있어, 사용자는 Gatekeeper를 우회하려고 `--no-quarantine`를 붙여야 한다. GitHub secret을 확인하면 Apple 관련 6개(`APPLE_CERTIFICATE_P12`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_NOTARY_KEY`, `APPLE_NOTARY_KEY_ID`, `APPLE_NOTARY_ISSUER_ID`)가 **하나도 등록되어 있지 않다**(현재는 `RELEASE_PLEASE_TOKEN`, `TAP_GITHUB_TOKEN`만 존재). 그래서 서명/공증 step이 항상 skip된다.
+이 계획을 시작할 때는 0020으로 배포 배관은 완성됐지만 release가 **ad-hoc 서명**으로 나가고 있어, 사용자가 Gatekeeper를 우회하려고 `--no-quarantine`를 붙여야 했다. 당시 GitHub Actions secret에는 `RELEASE_PLEASE_TOKEN`, `TAP_GITHUB_TOKEN`만 있었고 Apple 관련 6개(`APPLE_CERTIFICATE_P12`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_NOTARY_KEY`, `APPLE_NOTARY_KEY_ID`, `APPLE_NOTARY_ISSUER_ID`)가 등록되어 있지 않아 서명/공증 step이 항상 skip됐다.
 
-## 현재 repo 근거
+현재 상태는 위 `진행 상태 (2026-06-14)`가 source of truth다. Apple secret 6개는 모두 등록 확인됐고, `companion-release.yml` workflow_dispatch run `27480803909`로 Developer ID 서명, notarization, staple, release asset 교체, cask sha256 갱신까지 검증됐다. 남은 작업은 secret 등록 자체가 아니라 tap caveat 제거 PR과 최종 사용자 설치 경로 확인이다.
+
+## 근거와 검증 기록
 
 - `.github/workflows/companion-release.yml`:
   - `Sign with Developer ID (skipped until secrets are set)` step — `APPLE_CERTIFICATE_P12`가 비어 있으면 `exit 0`(ad-hoc 유지), 있으면 임시 keychain에 `.p12` import 후 `codesign --force --options runtime --timestamp --sign "$APPLE_SIGNING_IDENTITY"`.
   - `Notarize and staple (skipped until secrets are set)` step — `APPLE_NOTARY_KEY`가 비어 있으면 `exit 0`, 있으면 `xcrun notarytool submit "$ZIP_NAME" --key … --key-id … --issuer … --wait` → `xcrun stapler staple` → `ditto`로 재zip.
   - `workflow_dispatch` 입력 `tag`로 임의 companion 태그를 수동 재실행 가능.
   - **중요(부분 등록 위험):** 두 step은 "해당 secret이 **존재하면** 무조건 실행"한다. `APPLE_CERTIFICATE_P12`만 등록하고 password를 빠뜨리면 `security import`가 실패해 release 워크플로가 깨진다. → **6개를 한 번에** 등록해야 한다.
-- `Update cask version and sha256` step의 python: cask 파일이 **이미 존재하면** version/sha256 두 줄만 정규식 치환하고 **caveat 블록은 건드리지 않는다**. cask가 없을 때(최초 생성)만 ad-hoc caveat을 써넣는다. → tap에서 caveat을 한 번 수동 제거하면 이후 자동 bump가 caveat-free 상태를 보존한다.
-- `companion/README.md`: "Release signing setup (maintainer guide)" 섹션에 동일한 secret 6개 이름과 등록 절차가 이미 문서화되어 있다(0020 Task 6). 이 계획은 그 가이드를 실행하고, 설치 안내의 `--no-quarantine` 문구를 정리한다.
+- `Update cask version and sha256` step의 python: cask 파일이 **이미 존재하면** version/sha256 두 줄만 정규식 치환하고 **caveat 블록은 건드리지 않는다**. cask가 없을 때(최초 생성)는 notarization 성공 여부에 따라 caveat을 조건부 생성한다. → tap에서 caveat을 한 번 수동 제거하면 이후 signed/notarized 자동 bump가 caveat-free 상태를 보존하고, unsigned/not-notarized 최초 생성 fallback에는 recovery caveat을 남긴다.
+- `companion/README.md`: "Release signing setup (maintainer guide)" 섹션에 동일한 secret 6개 이름과 등록 절차가 이미 문서화되어 있다(0020 Task 6). 이 계획은 그 가이드를 실행하고, `README.md`, `README.ko.md`, `companion/README.md` 설치 안내의 `--no-quarantine` 문구를 정리한다.
 - 등록된 secret(초기 상태): `RELEASE_PLEASE_TOKEN`, `TAP_GITHUB_TOKEN`. Apple secret 6개 부재.
 - 등록된 secret(2026-06-14 확인): `APPLE_CERTIFICATE_P12`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_NOTARY_KEY`, `APPLE_NOTARY_KEY_ID`, `APPLE_NOTARY_ISSUER_ID` 6개가 모두 존재한다.
 - 검증 실행(2026-06-14): `companion-release.yml` workflow_dispatch run `27480803909`가 성공했고, 로그에서 `.p12` import, Developer ID `codesign`, `notarytool` Accepted, `stapler` validate 성공을 확인했다.
 - 배포 asset 검증(2026-06-14): `WorkbranchCompanion-1.3.0.zip` sha256 `e3d19c4407fec8dafdbcad33ae068ad3213fb900ec8fa82634d9f1ce7be0282b`, `codesign --verify --deep --strict` 통과, `spctl` `source=Notarized Developer ID`, `xcrun stapler validate` 통과.
 - tap cask(원격 `tkhwang/homebrew-tap`): version/sha256은 서명본과 일치하지만, caveat 블록은 아직 ad-hoc/`--no-quarantine` 안내를 담고 있다.
-- repo public docs: `README.md`와 `companion/README.md` 모두 아직 ad-hoc/`--no-quarantine` 안내를 담고 있다.
+- repo public docs: `README.md`, `README.ko.md`, `companion/README.md` 모두 아직 ad-hoc/`--no-quarantine` 안내를 담고 있었다.
 - companion 현재 버전: `.release-please-manifest.json`의 `"companion": "1.3.0"`. 최신 companion 태그 `workbranch-companion-v1.3.0` 존재.
 
 ## 결정 사항
@@ -50,7 +52,7 @@
 - [x] **Decision 1: workflow 최초 생성 cask template 하드닝을 포함한다.**
   - 영향: public cask 생성 경로와 설치 안내 계약.
   - 근거: 서명/공증이 활성화된 뒤에도 `.github/workflows/companion-release.yml`의 cask 최초 생성 template에는 ad-hoc/`--no-quarantine` caveat이 남아 있었다.
-  - 결정: 서명/공증 실행 로직은 건드리지 않고, 최초 생성 template에서 stale caveat 블록만 제거한다.
+  - 결정: 서명/공증 실행 로직의 fallback 계약은 유지하고, workflow env로 notarization 성공 여부를 기록해 최초 생성 cask template에서 caveat을 조건부로 만든다.
   - 상태: resolved: A(포함).
 
 - [ ] **자격증명은 전부 새로 발급한다. 백업(Archive)은 재사용하지 않고 revoke한다.**
@@ -72,7 +74,7 @@
 - [ ] **서명·공증 확인 후 `--no-quarantine` 안내를 제거한다.**
   - tap의 `Casks/workbranch-companion.rb`에서 caveat 블록을 제거하는 PR을 한 번 만든다(이후 자동 bump가 caveat-free를 유지). 같은 변경을 `companion/README.md` 설치 섹션에도 반영한다.
 
-- [x] **워크플로/Swift/release-please 경계:** Swift/release-please/서명·공증 실행 로직은 수정하지 않는다. 단, Decision 1에 따라 `.github/workflows/companion-release.yml`의 cask 최초 생성 template에서 stale caveat 문구만 제거한다.
+- [x] **워크플로/Swift/release-please 경계:** Swift/release-please/서명·공증 실행 로직은 수정하지 않는다. 단, Decision 1에 따라 `.github/workflows/companion-release.yml`의 cask 최초 생성 template에서 notarized release에는 caveat을 생략하고 unsigned/not-notarized fallback에는 caveat을 유지한다.
 
 ## 자격증명 → secret 매핑 (목표 상태)
 
@@ -95,8 +97,9 @@
 (외부, 검증) GitHub Actions: companion-release.yml workflow_dispatch (tag=workbranch-companion-v1.3.0)
 (외부 repo) tkhwang/homebrew-tap: Casks/workbranch-companion.rb caveat 제거 PR
 README.md                                       # companion 설치 섹션 --no-quarantine 제거
+README.ko.md                                    # localized companion 설치 섹션 --no-quarantine 제거
 companion/README.md                             # 설치 섹션 --no-quarantine 제거, 가이드 최신화
-.github/workflows/companion-release.yml          # 최초-생성 cask stale caveat 제거 — Decision 1 resolved
+.github/workflows/companion-release.yml          # 최초-생성 cask caveat 조건화 — Decision 1/P2 review resolved
 ```
 
 ## 구현 작업
@@ -236,20 +239,21 @@ Expected: `codesign --verify` 통과, Authority에 `Developer ID Application: Ta
   - 이후 companion release의 자동 bump는 caveat을 다시 추가하지 않는다(기존-파일 경로는 version/sha256만 치환).
 
 - [x] **Step 2: repo README 갱신**
-  - `README.md`의 companion 설치 명령에서 `--no-quarantine`를 제거한다.
+  - `README.md`와 `README.ko.md`의 companion 설치 명령에서 `--no-quarantine`를 제거한다.
   - `companion/README.md`의 "Install via Homebrew" 섹션의 명령에서 `--no-quarantine`를 제거: `brew install --cask tkhwang/tap/workbranch-companion`.
   - ad-hoc/`--no-quarantine`/`xattr -dr com.apple.quarantine` 안내 문단을 "releases are signed with a Developer ID certificate and notarized" 사실 서술로 교체.
   - "Release signing setup (maintainer guide)"는 유지하되, secret이 이제 **등록 완료**임을 한 줄로 표기(재발급 시 절차 참고용).
 
 - [x] **Step 3: 워크플로 최초-생성 caveat 하드닝(Decision 1)**
-  - `companion-release.yml`의 cask **최초 생성** 분기(파일 부재 시)에 들어가는 ad-hoc caveat은, 서명이 상시화된 지금은 부정확하다. cask가 삭제·재생성될 경우를 대비해 이 분기에서 caveat 블록을 제거한다. 현재 tap에 cask가 존재하므로 기존 release 업데이트 동작상 영향은 없다 — 하드닝 목적의 template 정리다.
+  - `companion-release.yml`의 cask **최초 생성** 분기(파일 부재 시)에 들어가는 unconditional ad-hoc caveat은, 서명·공증이 상시화된 지금은 부정확하다. 다만 secret 부재/임시 제거 fallback은 여전히 ad-hoc 또는 not-notarized zip을 publish할 수 있으므로, 이 분기에서 `APPLE_RELEASE_NOTARIZED`가 `1`일 때만 caveat을 생략하고 그렇지 않으면 Gatekeeper recovery caveat을 유지한다. 현재 tap에 cask가 존재하므로 기존 release 업데이트 동작상 영향은 없다 — fallback 문서 계약을 보존하는 template 정리다.
   - 변경 시 commit type은 `chore(ci):`로 두어 root CLI release를 만들지 않는다(0020 commit discipline 계승).
 
 - [x] **Step 4: 검증**
 
 ```bash
 ruby -ryaml -e "YAML.load_file('.github/workflows/companion-release.yml'); puts 'OK'"   # Step 3 수행 시
-grep -RIn "no-quarantine" README.md companion/README.md .github/workflows/companion-release.yml   # 출력 없어야 함
+grep -RIn "no-quarantine" README.md README.ko.md companion/README.md   # 출력 없어야 함
+grep -n "no-quarantine" .github/workflows/companion-release.yml   # unsigned/not-notarized fallback caveat에서만 출력되어야 함
 ```
 
 ## 검증 (acceptance)
