@@ -21,6 +21,7 @@ public enum MenuRowKind: Equatable, Sendable {
 
 public enum MenuAction: Equatable, Sendable {
     case editMemo(root: String, task: String)
+    case markStatusRead(root: String, task: String, updatedAt: Int)
     case clearNotifications(root: String, task: String)
     case openTerminal(root: String, task: String)
     case openIDE(root: String, task: String)
@@ -36,6 +37,7 @@ public struct MenuRow: Equatable, Identifiable, Sendable {
     public let title: String
     public let subtitle: String?
     public let primaryAction: MenuAction?
+    public let statusReadAction: MenuAction?
     public let secondaryActions: [MenuAction]
     public let taskName: String?
     public let memoTitle: String?
@@ -47,6 +49,7 @@ public struct MenuRow: Equatable, Identifiable, Sendable {
     public let progressTotal: Int
     public let currentItem: String
     public let updatedAt: Int
+    public let isStatusUnread: Bool
     public let isExpandedByDefault: Bool
 
     public var id: String {
@@ -64,6 +67,7 @@ public struct MenuRow: Equatable, Identifiable, Sendable {
         title: String,
         subtitle: String? = nil,
         primaryAction: MenuAction? = nil,
+        statusReadAction: MenuAction? = nil,
         secondaryActions: [MenuAction] = [],
         taskName: String? = nil,
         memoTitle: String? = nil,
@@ -75,12 +79,14 @@ public struct MenuRow: Equatable, Identifiable, Sendable {
         progressTotal: Int = 0,
         currentItem: String = "",
         updatedAt: Int = 0,
+        isStatusUnread: Bool = false,
         isExpandedByDefault: Bool = false
     ) {
         self.kind = kind
         self.title = title
         self.subtitle = subtitle
         self.primaryAction = primaryAction
+        self.statusReadAction = statusReadAction
         self.secondaryActions = secondaryActions
         self.taskName = taskName
         self.memoTitle = memoTitle
@@ -92,12 +98,14 @@ public struct MenuRow: Equatable, Identifiable, Sendable {
         self.progressTotal = progressTotal
         self.currentItem = currentItem
         self.updatedAt = updatedAt
+        self.isStatusUnread = isStatusUnread
         self.isExpandedByDefault = isExpandedByDefault
     }
 
     private static func actionID(_ action: MenuAction) -> String {
         switch action {
         case .editMemo(let root, let task): return "editMemo:\(root)\u{0}\(task)"
+        case .markStatusRead(let root, let task, let updatedAt): return "markStatusRead:\(root)\u{0}\(task)\u{0}\(updatedAt)"
         case .clearNotifications(let root, let task): return "clearNotifications:\(root)\u{0}\(task)"
         case .openTerminal(let root, let task): return "openTerminal:\(root)\u{0}\(task)"
         case .openIDE(let root, let task): return "openIDE:\(root)\u{0}\(task)"
@@ -148,6 +156,62 @@ public struct NotificationTracker: Equatable, Sendable {
     }
 }
 
+public struct StatusReadMarkers: Codable, Equatable, Sendable {
+    public let schemaVersion: Int
+    public private(set) var roots: [String: [String: Int]]
+
+    public init(schemaVersion: Int = 1, roots: [String: [String: Int]] = [:]) {
+        self.schemaVersion = schemaVersion
+        self.roots = roots
+    }
+
+    public var isEmpty: Bool {
+        roots.isEmpty
+    }
+
+    public static func load(from url: URL) throws -> StatusReadMarkers {
+        let data = try Data(contentsOf: url)
+        let markers = try JSONDecoder().decode(StatusReadMarkers.self, from: data)
+        guard markers.schemaVersion == 1 else { throw WorkbranchListError.unsupportedSchemaVersion(markers.schemaVersion) }
+        return markers
+    }
+
+    public static func loadOrEmpty(from url: URL) -> StatusReadMarkers {
+        (try? load(from: url)) ?? StatusReadMarkers()
+    }
+
+    public func write(to url: URL) throws {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(self)
+        try data.write(to: url, options: .atomic)
+    }
+
+    public func lastReadUpdatedAt(root: String, task: String) -> Int {
+        roots[root]?[task] ?? 0
+    }
+
+    public func isUnread(root: String, task: String, updatedAt: Int) -> Bool {
+        updatedAt > 0 && updatedAt > lastReadUpdatedAt(root: root, task: task)
+    }
+
+    public mutating func markRead(root: String, task: String, updatedAt: Int) {
+        guard updatedAt > 0 else { return }
+        var tasks = roots[root] ?? [:]
+        tasks[task] = max(tasks[task] ?? 0, updatedAt)
+        roots[root] = tasks
+    }
+
+    public mutating func markBaselineRead(documents: [WorkbranchListDocument]) {
+        for document in documents {
+            for task in document.tasks {
+                markRead(root: document.root, task: task.name, updatedAt: task.updatedAt)
+            }
+        }
+    }
+}
+
 public struct MenuState: Equatable, Sendable {
     public let title: String
     public let sections: [MenuSection]
@@ -158,7 +222,8 @@ public struct MenuState: Equatable, Sendable {
         results: [RootResult],
         previous: [String: WorkbranchListDocument]?,
         tracker: inout NotificationTracker,
-        isBaseline: Bool
+        isBaseline: Bool,
+        statusReadMarkers: StatusReadMarkers = StatusReadMarkers()
     ) -> MenuState {
         guard !configuredRoots.isEmpty else {
             return MenuState(
@@ -175,14 +240,14 @@ public struct MenuState: Equatable, Sendable {
         for result in results {
             resultByRoot[result.root] = result
         }
-        var sections: [MenuSection] = []
+        var sectionBuilds: [(section: MenuSection, maxUpdatedAt: Int, originalIndex: Int)] = []
         var taskCount = 0
         var inProgressCount = 0
         var blockedCount = 0
         var totalNotificationCount = 0
         var notifications: [TaskNotification] = []
 
-        for root in roots {
+        for (rootIndex, root) in roots.enumerated() {
             let result = resultByRoot[root]
             let document: WorkbranchListDocument?
             let errorMessage: String?
@@ -205,24 +270,43 @@ public struct MenuState: Equatable, Sendable {
 
             if let document {
                 taskCount += document.tasks.count
-                for task in document.tasks {
+                let sortedTasks = document.tasks.enumerated().sorted { lhs, rhs in
+                    if lhs.element.updatedAt != rhs.element.updatedAt {
+                        return lhs.element.updatedAt > rhs.element.updatedAt
+                    }
+                    return lhs.offset < rhs.offset
+                }.map(\.element)
+                let maxUpdatedAt = sortedTasks.map(\.updatedAt).max() ?? 0
+                for task in sortedTasks {
                     if task.status == "in-progress" { inProgressCount += 1 }
                     if task.status == "blocked" { blockedCount += 1 }
                     totalNotificationCount += task.notiCount
                     if let notification = tracker.observe(root: document.root, task: task.name, count: task.notiCount, isBaseline: isBaseline) {
                         notifications.append(notification)
                     }
-                    rows.append(taskRow(for: task, root: document.root))
+                    rows.append(taskRow(
+                        for: task,
+                        root: document.root,
+                        isStatusUnread: statusReadMarkers.isUnread(root: document.root, task: task.name, updatedAt: task.updatedAt)
+                    ))
                 }
                 if document.tasks.isEmpty && rows.isEmpty {
                     rows.append(MenuRow(kind: .message, title: "No task workspaces"))
                 }
-                sections.append(MenuSection(root: document.root, title: document.project, rows: rows))
+                sectionBuilds.append((
+                    section: MenuSection(root: document.root, title: document.project, rows: rows),
+                    maxUpdatedAt: maxUpdatedAt,
+                    originalIndex: rootIndex
+                ))
             } else {
                 if rows.isEmpty {
                     rows.append(MenuRow(kind: .error, title: "Error: root has no data"))
                 }
-                sections.append(MenuSection(root: root, title: root, rows: rows))
+                sectionBuilds.append((
+                    section: MenuSection(root: root, title: root, rows: rows),
+                    maxUpdatedAt: 0,
+                    originalIndex: rootIndex
+                ))
             }
         }
 
@@ -231,6 +315,12 @@ public struct MenuState: Equatable, Sendable {
         if blockedCount > 0 { titleParts.append("⚠\(blockedCount)") }
         if totalNotificationCount > 0 { titleParts.append("🔔\(totalNotificationCount)") }
         let title = titleParts.isEmpty ? "⎇ \(taskCount)" : titleParts.joined(separator: " ")
+        let sections = sectionBuilds.sorted { lhs, rhs in
+            if lhs.maxUpdatedAt != rhs.maxUpdatedAt {
+                return lhs.maxUpdatedAt > rhs.maxUpdatedAt
+            }
+            return lhs.originalIndex < rhs.originalIndex
+        }.map(\.section)
         return MenuState(title: title, sections: sections, notificationsToSend: notifications)
     }
 
@@ -243,7 +333,7 @@ public struct MenuState: Equatable, Sendable {
         return uniqueRoots
     }
 
-    private static func taskRow(for task: WorkbranchTask, root: String) -> MenuRow {
+    private static func taskRow(for task: WorkbranchTask, root: String, isStatusUnread: Bool) -> MenuRow {
         var parts: [String] = []
         if let icon = statusIcon(task.status) { parts.append(icon) }
         let label = task.memoTitle.isEmpty ? task.name : "\(task.name) — \(task.memoTitle)"
@@ -256,6 +346,7 @@ public struct MenuState: Equatable, Sendable {
             title: parts.joined(separator: " "),
             subtitle: subtitle,
             primaryAction: .editMemo(root: root, task: task.name),
+            statusReadAction: .markStatusRead(root: root, task: task.name, updatedAt: task.updatedAt),
             secondaryActions: [
                 .clearNotifications(root: root, task: task.name),
                 .openTerminal(root: root, task: task.name),
@@ -273,7 +364,8 @@ public struct MenuState: Equatable, Sendable {
             progressTotal: task.progressTotal,
             currentItem: task.currentItem,
             updatedAt: task.updatedAt,
-            isExpandedByDefault: task.status == "blocked" || task.notiCount > 0
+            isStatusUnread: isStatusUnread,
+            isExpandedByDefault: task.status == "blocked" || task.notiCount > 0 || isStatusUnread
         )
     }
 

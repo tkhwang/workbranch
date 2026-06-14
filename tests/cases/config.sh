@@ -135,8 +135,10 @@ TERMINAL open -a Warp
 PREFERRED_LANGUAGE en
 CONFIG
 
-  out=$(printf '%s\n' "ko" | run_expect_success "$WORKBRANCH" config language)
+  out=$(printf '%s\n' "2" | run_expect_success "$WORKBRANCH" config language)
   assert_contains "$out" "[*] Preferred language"
+  assert_contains "$out" "1) English"
+  assert_contains "$out" "2) 한글"
   assert_contains "$out" "[+] Config updated:"
   config=$(cat "$project/.workbranch.config")
   assert_contains "$config" "PREFERRED_LANGUAGE ko"

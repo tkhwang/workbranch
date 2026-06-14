@@ -90,22 +90,39 @@ struct RowView: View {
     }
 
     private var currentWorkLine: some View {
+        Group {
+            if let statusReadAction = row.statusReadAction {
+                Button(action: { store.perform(statusReadAction) }) {
+                    currentWorkLineContent
+                }
+                .buttonStyle(.plain)
+                .help(row.isStatusUnread ? "Mark status update as read" : "Status update is read")
+            } else {
+                currentWorkLineContent
+            }
+        }
+    }
+
+    private var currentWorkLineContent: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text("│ status")
                 .foregroundStyle(palette.accent)
                 .fontWeight(.semibold)
+            if row.isStatusUnread {
+                Text("●")
+                    .foregroundStyle(palette.warning)
+                    .fontWeight(.bold)
+                Text("unread")
+                    .foregroundStyle(palette.warning)
+                    .fontWeight(.semibold)
+            }
             Text(statusDisplayText)
-                .foregroundStyle(palette.warning)
+                .foregroundStyle(row.isStatusUnread ? palette.accent : palette.warning)
                 .fontWeight(.bold)
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 2)
-                .background(
-                    RoundedRectangle(cornerRadius: 4)
-                        .stroke(palette.warning.opacity(0.75), lineWidth: 1)
-                )
         }
+        .contentShape(Rectangle())
     }
 
     private var statusDetailsBlock: some View {

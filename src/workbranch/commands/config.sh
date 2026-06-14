@@ -176,6 +176,7 @@ configure_preferred_language_prompt() {
   allow_eof=${1:-no}
   info "Preferred language"
   current=$(preferred_language_label)
+  print_language_presets
   if ! value=$(prompt_read "[*] Preferred language for generated task guidance [$current]: "); then
     [ "$allow_eof" = "yes" ] && return 2
     die "input aborted"
