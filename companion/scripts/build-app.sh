@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_VERSION="1.6.0" # x-release-please-version
+APP_VERSION="1.7.0" # x-release-please-version
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 COMPANION_DIR=$(cd "$SCRIPT_DIR/.." && pwd -P)

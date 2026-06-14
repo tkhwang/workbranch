@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.7.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v1.6.0...workbranch-companion-v1.7.0) (2026-06-14)
+
+
+### Features
+
+* **companion:** add status read markers and language presets ([3c4583c](https://github.com/tkhwang/workbranch/commit/3c4583c24a59e638f10909438453ca614ae426ab))
+* **companion:** add status read markers and language presets ([1c1242a](https://github.com/tkhwang/workbranch/commit/1c1242a6b02d848977be6d196862c5ba6120f9bf))
+* **config:** improve config file change detection ([06e00c4](https://github.com/tkhwang/workbranch/commit/06e00c4cc0d1baab77ee485c5152b4dddbd4944f))
+
 ## [1.6.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v1.5.0...workbranch-companion-v1.6.0) (2026-06-14)
 
 
