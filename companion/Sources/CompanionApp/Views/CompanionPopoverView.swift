@@ -113,6 +113,10 @@ struct CompanionPopoverView: View {
             fontName: $draftFontName,
             fontSize: $draftFontSize,
             colorTheme: $draftColorTheme,
+            launchAtLogin: Binding(
+                get: { store.launchAtLogin },
+                set: { store.setLaunchAtLogin($0) }
+            ),
             onOpenConfig: store.openConfig,
             onCancel: { showingSettings = false },
             onSave: saveSettings,

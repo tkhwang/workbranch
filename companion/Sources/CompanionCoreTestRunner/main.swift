@@ -470,6 +470,74 @@ func runProcessRunnerTests() throws {
     try expect(stubborn.stderrText.contains("still running"), "stubborn child stderr is preserved")
 }
 
+
+func runLoginItemTests() throws {
+    let enabled = LoginItemToggleOutcome.resolve(requested: true, statusAfter: .enabled)
+    try expect(enabled.launchAtLogin, "enabled status sets launch at login on")
+    try expect(enabled.message == "Launch at login enabled", "enabled status message")
+
+    let disabled = LoginItemToggleOutcome.resolve(requested: false, statusAfter: .notRegistered)
+    try expect(!disabled.launchAtLogin, "notRegistered status sets launch at login off")
+    try expect(disabled.message == "Launch at login disabled", "disabled status message")
+
+    let requiresApproval = LoginItemToggleOutcome.resolve(requested: true, statusAfter: .requiresApproval)
+    try expect(!requiresApproval.launchAtLogin, "requiresApproval keeps launch at login off until approval")
+    try expect(requiresApproval.message.contains("System Settings"), "requiresApproval points to System Settings")
+    try expect(requiresApproval.message.contains("Login Items"), "requiresApproval points to Login Items")
+
+    let failed = LoginItemToggleOutcome.resolve(
+        requested: true,
+        statusAfter: .notRegistered,
+        errorDescription: "Operation not permitted"
+    )
+    try expect(!failed.launchAtLogin, "failed register remains off")
+    try expect(failed.message.contains("failed"), "failed register explains failure")
+    try expect(failed.message.contains("Operation not permitted"), "failed register includes error detail")
+
+    let approvalBeatsFailure = LoginItemToggleOutcome.resolve(
+        requested: true,
+        statusAfter: .requiresApproval,
+        errorDescription: "Launch denied"
+    )
+    try expect(!approvalBeatsFailure.launchAtLogin, "requiresApproval with error remains off")
+    try expect(approvalBeatsFailure.message.contains("System Settings"), "requiresApproval takes priority over generic failure")
+    try expect(!approvalBeatsFailure.message.contains("failed"), "requiresApproval does not collapse into generic failure")
+
+    let notFound = LoginItemToggleOutcome.resolve(requested: true, statusAfter: .notFound)
+    try expect(!notFound.launchAtLogin, "notFound keeps launch at login off")
+    try expect(notFound.message.contains("unavailable"), "notFound reports unavailable status")
+    try expect(notFound.message.contains("System Settings"), "notFound gives recovery hint")
+
+    enum FakeLoginItemError: Error { case denied }
+    final class FakeLoginItemController: LoginItemControlling {
+        var status: LoginItemStatus
+        var nextStatus: LoginItemStatus?
+        var shouldThrow = false
+
+        init(status: LoginItemStatus) {
+            self.status = status
+        }
+
+        func setEnabled(_ enabled: Bool) throws {
+            if shouldThrow { throw FakeLoginItemError.denied }
+            status = nextStatus ?? (enabled ? .enabled : .notRegistered)
+        }
+    }
+
+    let controller = FakeLoginItemController(status: .notRegistered)
+    try controller.setEnabled(true)
+    try expect(controller.status == .enabled, "fake login item enables")
+    try controller.setEnabled(false)
+    try expect(controller.status == .notRegistered, "fake login item disables")
+    controller.nextStatus = .requiresApproval
+    try controller.setEnabled(true)
+    try expect(controller.status == .requiresApproval, "fake login item can model approval-required state")
+    controller.shouldThrow = true
+    try expectThrows("fake login item throws") {
+        try controller.setEnabled(true)
+    }
+}
+
 func runAppSourceInvariantTests() throws {
     let fm = FileManager.default
     let stateStorePath = "Sources/CompanionApp/StateStore.swift"
@@ -477,16 +545,22 @@ func runAppSourceInvariantTests() throws {
     let popoverPath = "Sources/CompanionApp/Views/CompanionPopoverView.swift"
     let rowViewPath = "Sources/CompanionApp/Views/RowView.swift"
     let settingsViewPath = "Sources/CompanionApp/Views/AppearanceSettingsView.swift"
+    let loginItemControllerPath = "Sources/CompanionApp/LoginItemController.swift"
+    let coreLoginItemPath = "Sources/CompanionCore/LoginItem.swift"
     let stateStore = try String(contentsOfFile: stateStorePath, encoding: .utf8)
     let rootWatcher = try String(contentsOfFile: rootWatcherPath, encoding: .utf8)
     let popover = try String(contentsOfFile: popoverPath, encoding: .utf8)
     let rowView = try String(contentsOfFile: rowViewPath, encoding: .utf8)
     let settingsView = try String(contentsOfFile: settingsViewPath, encoding: .utf8)
+    let loginItemController = try String(contentsOfFile: loginItemControllerPath, encoding: .utf8)
+    let coreLoginItem = try String(contentsOfFile: coreLoginItemPath, encoding: .utf8)
     try expect(fm.fileExists(atPath: stateStorePath), "StateStore source exists")
     try expect(fm.fileExists(atPath: rootWatcherPath), "RootWatcher source exists")
     try expect(fm.fileExists(atPath: popoverPath), "popover source exists")
     try expect(fm.fileExists(atPath: rowViewPath), "RowView source exists")
     try expect(fm.fileExists(atPath: settingsViewPath), "settings source exists")
+    try expect(fm.fileExists(atPath: loginItemControllerPath), "login item controller source exists")
+    try expect(fm.fileExists(atPath: coreLoginItemPath), "core login item source exists")
     guard
         let initStart = stateStore.range(of: "init(configURL:"),
         let initEnd = stateStore[initStart.lowerBound...].range(of: "static func defaultConfigURL")
@@ -495,6 +569,7 @@ func runAppSourceInvariantTests() throws {
     }
     let initBody = String(stateStore[initStart.lowerBound..<initEnd.lowerBound])
     try expect(initBody.contains("refreshAll(isBaseline: true)"), "StateStore init triggers initial baseline refresh")
+    try expect(initBody.contains("loginItem.status == .enabled"), "StateStore init reads login item status for startup toggle")
     try expect(!popover.contains("store.refreshAll(isBaseline: true)"), "popover appearance does not own startup baseline refresh")
     guard
         let configureStart = stateStore.range(of: "private func configureWatchers()"),
@@ -604,6 +679,11 @@ func runAppSourceInvariantTests() throws {
     try expect(saveAppearanceBody.contains("-> Bool"), "saveAppearance reports success or failure")
     try expect(saveAppearanceBody.contains("return true"), "saveAppearance returns true after config write succeeds")
     try expect(saveAppearanceBody.contains("return false"), "saveAppearance returns false after config write fails")
+    try expect(stateStore.contains("@Published private(set) var launchAtLogin"), "StateStore publishes launch at login state")
+    try expect(stateStore.contains("func setLaunchAtLogin"), "StateStore exposes launch at login setter")
+    try expect(stateStore.contains("loginItem: LoginItemControlling"), "StateStore receives login item controller")
+    try expect(stateStore.contains("loginItem.status"), "StateStore reads login item status")
+    try expect(stateStore.contains("LoginItemToggleOutcome.resolve"), "StateStore resolves login item status messages through Core")
     guard
         let applyThemeStart = popover.range(of: "private func applyTheme"),
         let applyThemeEnd = popover[applyThemeStart.lowerBound...].range(of: "\\n    }\\n}", options: .regularExpression)
@@ -699,6 +779,32 @@ func runAppSourceInvariantTests() throws {
     try expect(settingsView.contains("Text(\"Selected theme\")"), "settings view labels selected theme")
     try expect(settingsView.contains("Text(\"Candidate themes\")"), "settings view labels candidate themes")
     try expect(settingsView.contains("onThemeChange(theme)"), "theme tile invokes live theme change callback")
+    try expect(settingsView.contains("@Binding var launchAtLogin"), "settings view receives launch at login binding")
+    try expect(settingsView.contains("Toggle(isOn: $launchAtLogin)"), "settings view renders launch at login toggle")
+    try expect(settingsView.contains("Launch at login"), "settings view labels launch at login toggle")
+    try expect(popover.contains("store.launchAtLogin"), "popover binds settings toggle to store login item state")
+    try expect(popover.contains("store.setLaunchAtLogin"), "popover writes settings toggle through store login item setter")
+    guard
+        let openSettingsStart = popover.range(of: "private func openSettings()"),
+        let openSettingsEnd = popover[openSettingsStart.lowerBound...].range(of: "private func saveSettings()")
+    else {
+        throw TestFailure(message: "openSettings body not found")
+    }
+    let openSettingsBody = String(popover[openSettingsStart.lowerBound..<openSettingsEnd.lowerBound])
+    try expect(!openSettingsBody.contains("launchAtLogin"), "openSettings does not copy launch at login into draft state")
+    try expect(!saveSettingsBody.contains("launchAtLogin"), "saveSettings does not persist launch at login through config")
+    try expect(loginItemController.contains("struct SMAppServiceLoginItemController"), "login item controller is value-type system glue")
+    try expect(loginItemController.contains("import ServiceManagement"), "login item controller imports ServiceManagement")
+    try expect(loginItemController.contains("SMAppService.mainApp"), "login item controller uses SMAppService.mainApp")
+    try expect(loginItemController.contains("register()"), "login item controller registers main app")
+    try expect(loginItemController.contains("unregister()"), "login item controller unregisters main app")
+    try expect(loginItemController.contains(".requiresApproval"), "login item controller maps requiresApproval status")
+    try expect(loginItemController.contains("@unknown default"), "login item controller handles future SMAppService statuses")
+    try expect(coreLoginItem.contains("enum LoginItemStatus"), "core login item defines status enum")
+    try expect(coreLoginItem.contains("protocol LoginItemControlling"), "core login item defines controller protocol")
+    try expect(coreLoginItem.contains("var status: LoginItemStatus"), "core login item protocol preserves full status")
+    try expect(coreLoginItem.contains("func resolve("), "core login item defines pure outcome resolver")
+    try expect(!coreLoginItem.contains("import ServiceManagement"), "core login item remains ServiceManagement-free")
 }
 
 do {
@@ -706,6 +812,7 @@ do {
     try runModelsAndMenuStateTests()
     try runConfigActionsDebounceTests()
     try runProcessRunnerTests()
+    try runLoginItemTests()
     try runAppSourceInvariantTests()
     print("CompanionCoreTestRunner: PASS")
 } catch {

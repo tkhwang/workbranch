@@ -6,6 +6,7 @@ struct AppearanceSettingsView: View {
     @Binding var fontName: String
     @Binding var fontSize: Double
     @Binding var colorTheme: CompanionColorTheme
+    @Binding var launchAtLogin: Bool
     let onOpenConfig: () -> Void
     let onCancel: () -> Void
     let onSave: () -> Void
@@ -15,6 +16,7 @@ struct AppearanceSettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             header
+            startupSection
             fontSection
             themeSection
             preview
@@ -33,6 +35,18 @@ struct AppearanceSettingsView: View {
                 Image(systemName: "doc.text")
             }
             .help("Open config file")
+        }
+    }
+
+    private var startupSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Startup")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Toggle(isOn: $launchAtLogin) {
+                Text("Launch at login")
+            }
+            .toggleStyle(.switch)
         }
     }
 

@@ -205,7 +205,7 @@ swift run CompanionCoreTestRunner
 open dist/WorkbranchCompanion.app
 ```
 
-Configure roots in `~/.config/workbranch-companion/projects.md`.
+Configure roots in `~/.config/workbranch-companion/projects.md`. In companion settings, `Launch at login` registers the app with macOS Login Items immediately and may require approval in System Settings > General > Login Items.
 
 ## More docs
 
