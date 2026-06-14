@@ -609,8 +609,8 @@ func runAppSourceInvariantTests() throws {
     try expect(!rowView.contains("Text(\"progress\")"), "task rows do not render a progress parent label")
     try expect(rowView.contains("ScrollView(.vertical)"), "status details are scrollable")
     try expect(rowView.contains(".frame(maxHeight:"), "status details have a bounded height")
-    try expect(rowView.contains("showsGuide: false"), "status summary renders without a leading guide")
-    try expect(rowView.contains("row.progressDone") && rowView.contains("row.progressTotal"), "status summary includes progress counts")
+    try expect(!rowView.contains("private var statusSummaryLine"), "status details do not duplicate the primary status line")
+    try expect(rowView.contains("row.progressDone") && rowView.contains("row.progressTotal"), "primary status message can include progress counts")
     try expect(!rowView.contains(".padding(.leading, 13)"), "status details align with repo and branch guide lines")
     try expect(!rowView.contains("TextField(\"memo text\""), "task rows do not expose memo editing")
     try expect(rowView.contains("detailLine(label: \"memo\""), "task rows render list --global memoTitle in the detail area")
@@ -620,16 +620,24 @@ func runAppSourceInvariantTests() throws {
     try expect(rowView.contains("statusReadAction"), "current work line owns status-read action")
     try expect(rowView.contains("store.perform(statusReadAction)"), "current work line click marks status read")
     try expect(rowView.contains("row.isStatusUnread"), "current work line renders unread state")
-    try expect(rowView.contains("unread"), "current work line renders unread affordance")
+    try expect(rowView.contains("\"● \\(text)\""), "current work line renders a compact unread dot affordance")
     guard let currentWorkLineRange = rowView.range(of: "currentWorkLine"), let detailsRange = rowView.range(of: "statusDetailsBlock") else {
         throw TestFailure(message: "current work line or status details block not found")
     }
     try expect(currentWorkLineRange.lowerBound < detailsRange.lowerBound, "current work line is defined before detail block")
-    guard let summaryStart = rowView.range(of: "private var statusSummaryLine"), let summaryEnd = rowView[summaryStart.lowerBound...].range(of: "private func detailLine") else {
-        throw TestFailure(message: "status summary body not found")
+    guard let taskCommandStart = rowView.range(of: "private var taskCommandLine"), let taskCommandEnd = rowView[taskCommandStart.lowerBound...].range(of: "private var messageLine") else {
+        throw TestFailure(message: "task command line body not found")
     }
-    let summaryBody = String(rowView[summaryStart.lowerBound..<summaryEnd.lowerBound])
-    try expect(!summaryBody.contains("row.currentItem"), "detail status summary does not duplicate current work")
+    let taskCommandBody = String(rowView[taskCommandStart.lowerBound..<taskCommandEnd.lowerBound])
+    try expect(!taskCommandBody.contains("statusLabel"), "task command line does not duplicate status")
+    guard let statusLineStart = rowView.range(of: "private var currentWorkLineContent"), let statusLineEnd = rowView[statusLineStart.lowerBound...].range(of: "private var statusDetailsBlock") else {
+        throw TestFailure(message: "current work line content body not found")
+    }
+    let statusLineBody = String(rowView[statusLineStart.lowerBound..<statusLineEnd.lowerBound])
+    try expect(statusLineBody.contains("Text(\"│\")"), "primary status line uses pipe separators")
+    try expect(statusLineBody.contains("statusSegmentText"), "primary status line renders status segment")
+    try expect(statusLineBody.contains("timeSegmentText"), "primary status line renders time segment")
+    try expect(statusLineBody.contains("statusMessageText"), "primary status line renders message segment")
     try expect(rowView.contains("if let primaryAction = row.primaryAction"), "non-task primary actions remain clickable")
     try expect(rowView.contains("store.perform(primaryAction)"), "message primary action invokes StateStore")
     try expect(!rowView.contains("startPrimaryAction"), "task rows do not trigger primary actions on click")
@@ -641,7 +649,7 @@ func runAppSourceInvariantTests() throws {
     try expect(rowView.contains("label: \"branch\""), "repo rows render branch tokens")
     try expect(!rowView.contains("label: \"dirty\""), "repo rows do not render dirty tokens")
     try expect(!rowView.contains("repo.dirty ? \"yes\" : \"no\""), "dirty token is not rendered beside branch")
-    try expect(rowView.contains("statusDisplayText"), "primary status line uses a display string")
+    try expect(rowView.contains("statusLabel.uppercased()"), "primary status line uppercases the status label")
     try expect(rowView.contains("updatedTimeText"), "primary status line includes update time helper")
     try expect(rowView.contains("dateFormat = \"HH:mm\""), "status update time is hour-minute only")
     try expect(rowView.contains("palette.warning"), "primary status line uses warm color")
