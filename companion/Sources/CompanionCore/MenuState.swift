@@ -376,6 +376,7 @@ public struct MenuState: Equatable, Sendable {
         case "review": return "◐"
         case "blocked": return "⚠"
         case "planning": return "○"
+        case "todo": return "·"
         default: return nil
         }
     }

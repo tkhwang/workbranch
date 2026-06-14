@@ -42,12 +42,29 @@ struct CompanionPopoverView: View {
         TerminalPalette(theme: store.colorTheme)
     }
 
+    private var companionVersionText: String {
+        let rawVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        let version = rawVersion?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if version.isEmpty { return "v0.0.0-dev" }
+        return "v\(version)"
+    }
+
     private var header: some View {
         HStack(spacing: 8) {
-            Text("workbranch-companion")
-                .fontWeight(.bold)
-                .foregroundStyle(palette.accent)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("workbranch-companion")
+                    .fontWeight(.bold)
+                    .foregroundStyle(palette.accent)
+                Text("status monitor")
+                    .font(.caption2)
+                    .foregroundStyle(palette.muted)
+            }
             Spacer()
+            Text(companionVersionText)
+                .font(.caption2)
+                .monospacedDigit()
+                .foregroundStyle(palette.muted)
+                .help("Workbranch Companion version")
         }
     }
 

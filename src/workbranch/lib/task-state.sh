@@ -62,7 +62,7 @@ task_explicit_status() {
       sub(/^[[:space:]]*status:[[:space:]]*/, "", value)
       sub(/[[:space:]]+.*/, "", value)
       value = lower(value)
-      if (value == "planning" || value == "in-progress" || value == "review" || value == "blocked" || value == "done") print value
+      if (value == "todo" || value == "planning" || value == "in-progress" || value == "review" || value == "blocked" || value == "done") print value
       else print ""
       found = 1
       exit
@@ -81,8 +81,8 @@ task_status() {
   status_counts=$(task_checklist_counts "$task")
   done_count=${status_counts%% *}
   total_count=${status_counts##* }
-  if [ "$total_count" -eq 0 ]; then
-    printf 'planning'
+  if [ "$done_count" -eq 0 ]; then
+    printf 'todo'
   elif [ "$done_count" -eq "$total_count" ]; then
     printf 'done'
   else
@@ -150,8 +150,8 @@ write_default_task_brief() {
     cat > "$file" <<EOF_BRIEF
 # $task
 
-상태: planning
-status: planning
+상태: todo
+status: todo
 
 - [ ] 주요: 작업 시작
   - [ ] 변경 구현
@@ -164,7 +164,7 @@ EOF_BRIEF
     cat > "$file" <<EOF_BRIEF
 # $task
 
-status: planning
+status: todo
 
 - [ ] Major: Start work
   - [ ] Implement change
@@ -207,7 +207,8 @@ write_task_agent_guidance() {
 - final response 직전
 
 규칙:
-- `status:`는 planning | in-progress | review | blocked | done 중 하나로 유지합니다.
+- `status:`는 todo | planning | in-progress | review | blocked | done 중 하나로 유지합니다.
+- 계획(planning)을 포함해 의미 있는 작업을 시작하면 즉시 `todo`에서 `planning`으로 status를 갱신합니다. 초기 planning 단계에서도 status와 checklist를 갱신합니다.
 - checklist item은 작고 실행 가능한 단위로 유지합니다.
 - 완료한 항목은 즉시 `[x]`로 표시합니다.
 - 첫 번째 미완료 항목이 현재 또는 다음 작업을 나타내야 합니다.
@@ -240,7 +241,8 @@ Update `TASK-WORKBRANCH.md` when:
 - before final response
 
 Rules:
-- keep `status:` current: planning | in-progress | review | blocked | done
+- keep `status:` current: todo | planning | in-progress | review | blocked | done
+- when starting meaningful work, including planning, move status from todo to planning immediately; keep status and checklist current during the initial planning phase
 - keep checklist items small and actionable
 - mark completed items immediately with `[x]`
 - the first unchecked item should represent the current or next work

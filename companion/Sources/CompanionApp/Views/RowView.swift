@@ -202,6 +202,7 @@ struct RowView: View {
         case "review": return .warning
         case "blocked": return .error
         case "planning": return .muted
+        case "todo": return .muted
         default: return .muted
         }
     }

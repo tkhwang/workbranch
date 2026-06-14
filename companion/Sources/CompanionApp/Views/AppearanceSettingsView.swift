@@ -41,13 +41,33 @@ struct AppearanceSettingsView: View {
             Text("Fixed-width font")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Picker("Fixed-width font", selection: $fontName) {
+            Menu {
                 ForEach(FixedWidthFontCatalog.names(including: fontName), id: \.self) { name in
-                    Text(name).tag(name)
+                    Button { fontName = name } label: {
+                        Text(name)
+                    }
                 }
+            } label: {
+                HStack(spacing: 8) {
+                    Text(fontName)
+                        .foregroundStyle(palette.text)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Spacer()
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption2)
+                        .foregroundStyle(palette.muted)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(palette.panel, in: RoundedRectangle(cornerRadius: 7))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7)
+                        .stroke(palette.rule, lineWidth: 1)
+                )
             }
-            .labelsHidden()
-            .pickerStyle(.menu)
+            .buttonStyle(.plain)
             Stepper(value: $fontSize, in: 9...24, step: 0.5) {
                 Text("Size \(fontSize, specifier: "%.1f")")
                     .monospacedDigit()
@@ -60,15 +80,28 @@ struct AppearanceSettingsView: View {
             Text("Color theme")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            Text("Selected theme")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            ThemeTile(theme: selectedTheme, isSelected: true) {}
+            Text("Candidate themes")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                ForEach(CompanionColorTheme.allCases, id: \.self) { theme in
-                    ThemeTile(theme: theme, isSelected: colorTheme == theme) {
+                ForEach(candidateThemes, id: \.self) { theme in
+                    ThemeTile(theme: theme, isSelected: false) {
                         colorTheme = theme
                         onThemeChange(theme)
                     }
                 }
             }
         }
+    }
+
+    private var selectedTheme: CompanionColorTheme { colorTheme }
+
+    private var candidateThemes: [CompanionColorTheme] {
+        CompanionColorTheme.allCases.filter { $0 != colorTheme }
     }
 
     private var preview: some View {

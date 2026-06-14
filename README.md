@@ -176,7 +176,7 @@ Combined flow shortcuts:
 
 `workbranch add <task>` creates task-root state outside the repo worktrees:
 
-- `<task>/TASK-WORKBRANCH.md` is the human/agent-editable task brief. The generated template uses a first `#` heading, an optional `status: planning|in-progress|review|blocked|done` line, and Markdown checklist items for progress. `workbranch memo <task> [text]` reads or overwrites it, and `workbranch memo <task> --clear` removes it. Inside a task workspace, `workbranch memo` may omit `<task>` for reading only.
+- `<task>/TASK-WORKBRANCH.md` is the human/agent-editable task brief. The generated template uses a first `#` heading, an optional `status: todo|planning|in-progress|review|blocked|done` line, and Markdown checklist items for progress. `workbranch memo <task> [text]` reads or overwrites it, and `workbranch memo <task> --clear` removes it. Inside a task workspace, `workbranch memo` may omit `<task>` for reading only.
 - `<task>/AGENTS.md` tells AI agents running from either `<task>` or `<task>/<repo>` to keep the task brief current, including when starting/resuming, changing the active step, before/after verification, when blocked, and before the final response.
 - `<task>/.workbranch/notifications.jsonl` is an append-only local inbox. `workbranch noti add/list/clear` manages it, and `workbranch list --json` exposes `notiCount`, `status`, `progressDone`, `progressTotal`, `currentItem`, and `updatedAt` for companion apps.
 
@@ -184,7 +184,7 @@ Combined flow shortcuts:
 
 ## Native menu bar companion
 
-`companion/` contains a local native macOS menu bar app, `WorkbranchCompanion.app`, that consumes `workbranch list --json` and provides a task cockpit for task status/progress, an always-visible warm-colored current-work/status line with `HH:mm` update time under repo/branch identity, repo child rows with branch identity, inline memo edits, notification clearing, and existing Finder/IDE/terminal launch actions. If a configured project root is truly deleted while its parent still exists, the app forgets that root after two consecutive failed refreshes and sends one notification.
+`companion/` contains a local native macOS menu bar app, `WorkbranchCompanion.app` — a workbranch status monitor for task status, notifications, and current-work visibility — that consumes `workbranch list --json` and provides a task cockpit for task status/progress, an always-visible warm-colored current-work/status line with `HH:mm` update time under repo/branch identity, repo child rows with branch identity, inline memo edits, notification clearing, and existing Finder/IDE/terminal launch actions. If a configured project root is truly deleted while its parent still exists, the app forgets that root after two consecutive failed refreshes and sends one notification.
 
 Install published releases with Homebrew:
 
@@ -205,7 +205,7 @@ swift run CompanionCoreTestRunner
 open dist/WorkbranchCompanion.app
 ```
 
-Configure roots in `~/.config/workbranch-companion/config.json`.
+Configure roots in `~/.config/workbranch-companion/projects.md`.
 
 ## More docs
 

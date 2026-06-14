@@ -77,7 +77,7 @@ test_add_creates_task_brief_and_agent_guidance() {
   [ ! -s "$project/login/.workbranch/notifications.jsonl" ] || fail "expected empty notification inbox"
   brief=$(cat "$project/login/TASK-WORKBRANCH.md")
   assert_contains "$brief" "# login"
-  assert_contains "$brief" "status: planning"
+  assert_contains "$brief" "status: todo"
   assert_contains "$brief" "- [ ] Major: Start work"
   guidance=$(cat "$project/login/AGENTS.md")
   assert_contains "$guidance" "TASK-WORKBRANCH.md"
@@ -117,6 +117,28 @@ assert login["progressTotal"] == 2, login'
   cat > "$project/login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
 # Login work
 
+- [ ] design
+- [ ] verify
+EOF_BRIEF
+  out=$(run_expect_success "$WORKBRANCH" list --json)
+  printf '%s' "$out" | python3 -c 'import json,sys
+login=json.load(sys.stdin)["tasks"][0]
+assert login["status"] == "todo", login'
+
+  cat > "$project/login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
+# Login work
+
+- [x] design
+- [ ] verify
+EOF_BRIEF
+  out=$(run_expect_success "$WORKBRANCH" list --json)
+  printf '%s' "$out" | python3 -c 'import json,sys
+login=json.load(sys.stdin)["tasks"][0]
+assert login["status"] == "in-progress", login'
+
+  cat > "$project/login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
+# Login work
+
 - [x] design
 - [x] verify
 EOF_BRIEF
@@ -124,6 +146,26 @@ EOF_BRIEF
   printf '%s' "$out" | python3 -c 'import json,sys
 login=json.load(sys.stdin)["tasks"][0]
 assert login["status"] == "done", login'
+
+  cat > "$project/login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
+# Login work
+
+status: todo
+
+- [ ] design
+EOF_BRIEF
+  out=$(run_expect_success "$WORKBRANCH" list --json)
+  printf '%s' "$out" | python3 -c 'import json,sys
+login=json.load(sys.stdin)["tasks"][0]
+assert login["status"] == "todo", login'
+
+  cat > "$project/login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
+# Login work
+EOF_BRIEF
+  out=$(run_expect_success "$WORKBRANCH" list --json)
+  printf '%s' "$out" | python3 -c 'import json,sys
+login=json.load(sys.stdin)["tasks"][0]
+assert login["status"] == "todo", login'
 
   cat > "$project/login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
 # Login work
@@ -195,7 +237,8 @@ test_add_agents_md_describes_status_update_protocol() {
   assert_contains "$guidance" "starting or resuming meaningful work"
   assert_contains "$guidance" "before running verification"
   assert_contains "$guidance" "before final response"
-  assert_contains "$guidance" "planning | in-progress | review | blocked | done"
+  assert_contains "$guidance" "todo | planning | in-progress | review | blocked | done"
+  assert_contains "$guidance" "starting meaningful work, including planning, move status from todo to planning"
 }
 
 
@@ -210,7 +253,8 @@ CONFIG
   run_expect_success "$WORKBRANCH" add login >/dev/null
 
   brief=$(cat "$project/login/TASK-WORKBRANCH.md")
-  assert_contains "$brief" "상태: planning"
+  assert_contains "$brief" "상태: todo"
+  assert_contains "$brief" "status: todo"
   assert_contains "$brief" "- [ ] 주요: 작업 시작"
   guidance=$(cat "$project/login/AGENTS.md")
   assert_contains "$guidance" "Workbranch 작업 안내"

@@ -17,29 +17,25 @@ public enum CompanionConfigError: Error, CustomStringConvertible, Equatable {
 }
 
 public enum CompanionColorTheme: String, CaseIterable, Equatable, Sendable {
+    case catppuccin
     case dracula
-    case matrix
-    case amber
+    case onedark
     case nord
-    case solarized
+    case tokyonight
 
     public static let `default`: CompanionColorTheme = .dracula
 
     public static func parse(_ value: String) -> CompanionColorTheme? {
-        switch value.lowercased() {
-        case "green": return .matrix
-        case "blue": return .nord
-        default: return CompanionColorTheme(rawValue: value.lowercased())
-        }
+        CompanionColorTheme(rawValue: value.lowercased())
     }
 
     public var label: String {
         switch self {
+        case .catppuccin: return "Catppuccin Mocha"
         case .dracula: return "Dracula"
-        case .matrix: return "Matrix"
-        case .amber: return "Amber"
+        case .onedark: return "One Dark Pro"
         case .nord: return "Nord"
-        case .solarized: return "Solarized"
+        case .tokyonight: return "Tokyo Night"
         }
     }
 }
