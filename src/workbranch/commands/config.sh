@@ -171,6 +171,7 @@ configure_terminal_prompt() {
   esac
 }
 
+# shellcheck disable=SC2120 # optional allow_eof argument is passed from init.sh in generated build
 configure_preferred_language_prompt() {
   allow_eof=${1:-no}
   info "Preferred language"
