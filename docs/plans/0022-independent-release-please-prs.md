@@ -55,6 +55,10 @@
 - [x] **release-please PR branch naming만으로 성공을 판단하지 않는다.**
   - 성공 기준은 package별 독립 open PR 개수와 각 PR의 변경 파일/본문이다. branch 이름은 release-please 내부 구현 변화 가능성이 있으므로 보조 증거로만 둔다.
 
+- [x] **root package의 디렉터리 exclude는 recursive glob로 고정한다.**
+  - 이유: `companion`, `docs`, `.github` 같은 bare directory entry는 nested file 변경을 충분히 차단하지 못해 companion-only 변경이 root changelog/version bump로 새어 들어갈 수 있다.
+  - 결정: root `exclude-paths`는 `companion/**`, `docs/**`, `.github/**`로 유지하고, README/config/manifest exact file exclude는 그대로 둔다.
+
 ## Decision Grill Notes
 
 - **No further user-blocking decision: existing combined PR handling.** Current open PR list is empty, so there is no live combined `chore: release main` PR to choose how to close. The plan keeps this as a post-merge verification gate for future/open PRs.
@@ -115,9 +119,9 @@ Expected:
       "component": "workbranch",
       "include-component-in-tag": false,
       "exclude-paths": [
-        "companion",
-        ".github",
-        "docs",
+        "companion/**",
+        ".github/**",
+        "docs/**",
         "README.md",
         "README.ko.md",
         "release-please-config.json",
