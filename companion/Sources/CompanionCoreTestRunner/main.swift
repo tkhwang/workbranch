@@ -521,6 +521,7 @@ func runAppSourceInvariantTests() throws {
     try expect(rowView.contains("ScrollView(.vertical)"), "status details are scrollable")
     try expect(rowView.contains(".frame(maxHeight:"), "status details have a bounded height")
     try expect(rowView.contains("showsGuide: false"), "status summary renders without a leading guide")
+    try expect(rowView.contains("row.progressDone") && rowView.contains("row.progressTotal"), "status summary includes progress counts")
     try expect(!rowView.contains(".padding(.leading, 13)"), "status details align with repo and branch guide lines")
     try expect(!rowView.contains("TextField(\"memo text\""), "task rows do not expose memo editing")
     try expect(rowView.contains("detailLine(label: \"memo\""), "task rows render list --global memoTitle in the detail area")

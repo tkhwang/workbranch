@@ -111,8 +111,14 @@ struct RowView: View {
     }
 
     private var statusSummaryLine: some View {
-        let summary = row.currentItem.isEmpty ? statusLabel : "\(statusLabel) · now ▸ \(row.currentItem)"
-        return detailLine(label: "status", value: summary, tone: statusTone, showsGuide: false)
+        var parts = [statusLabel]
+        if row.progressTotal > 0 {
+            parts.append("\(row.progressDone)/\(row.progressTotal)")
+        }
+        if !row.currentItem.isEmpty {
+            parts.append("now ▸ \(row.currentItem)")
+        }
+        return detailLine(label: "status", value: parts.joined(separator: " · "), tone: statusTone, showsGuide: false)
     }
 
     private func detailLine(label: String, value: String, tone: TerminalTone, showsGuide: Bool = true) -> some View {
