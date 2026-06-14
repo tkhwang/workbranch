@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.18.0](https://github.com/tkhwang/workbranch/compare/v1.17.0...v1.18.0) (2026-06-14)
+
+
+### Features
+
+* **command:** clarify task workspace structure and usage ([69d7733](https://github.com/tkhwang/workbranch/commit/69d7733db0d506d6ee9192995d4ef150edc86656))
+* **command:** clarify task workspace structure and usage ([a81fdf6](https://github.com/tkhwang/workbranch/commit/a81fdf660cc60c831677fb2b7b543b19e3c0e9c2))
+
+
+### Bug Fixes
+
+* **config:** add shellcheck disable for optional argument ([2166c6c](https://github.com/tkhwang/workbranch/commit/2166c6c703a6fe2eaea47d9308aa5c02d48c1305))
+
 ## [1.17.0](https://github.com/tkhwang/workbranch/compare/v1.16.0...v1.17.0) (2026-06-13)
 
 
