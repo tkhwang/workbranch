@@ -66,7 +66,7 @@
 
 ## 파일 구조
 
-```
+```text
 # Bash CLI
 src/workbranch/lib/task-state.sh   # status 허용목록 + fallback + 기본 템플릿 + 가이드 heredoc
 AGENTS.md                          # repo 루트 가이드(중복 텍스트)
@@ -150,7 +150,7 @@ companion/Sources/CompanionApp/Views/CompanionPopoverView.swift  # popover 헤�
 
 ## 최종 검증
 
-```
+```bash
 # Bash
 bash -n src/workbranch/**/*.sh
 scripts/build-workbranch.sh
