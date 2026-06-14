@@ -70,18 +70,20 @@ func runModelsAndMenuStateTests() throws {
     try expect(document.tasks[0].progressDone == 0, "legacy progress done default")
     try expect(document.tasks[0].progressTotal == 0, "legacy progress total default")
     try expect(document.tasks[0].currentItem == "", "legacy current item default")
+    try expect(document.tasks[0].updatedAt == 0, "legacy updatedAt default")
     try expect(document.tasks[0].items.isEmpty, "legacy items default")
     try expect(document.tasks[0].repos[0].dirty, "dirty repo")
 
     let progressDocument = try WorkbranchListDocument.decode(Data("""
     {"schemaVersion":1,"project":"fullstack","root":"/tmp/fullstack","tasks":[
-      {"name":"task3","path":"/tmp/fullstack/task3","memoTitle":"draft-tree 가이드 작성","status":"in-progress","progressDone":2,"progressTotal":4,"currentItem":"verify","items":[{"text":"Major","checked":true,"depth":0},{"text":"Child","checked":false,"depth":1}],"notiCount":1,"repos":[]}
+      {"name":"task3","path":"/tmp/fullstack/task3","memoTitle":"draft-tree 가이드 작성","status":"in-progress","progressDone":2,"progressTotal":4,"currentItem":"verify","updatedAt":1760000040,"items":[{"text":"Major","checked":true,"depth":0},{"text":"Child","checked":false,"depth":1}],"notiCount":1,"repos":[]}
     ]}
     """.utf8))
     try expect(progressDocument.tasks[0].status == "in-progress", "progress status decode")
     try expect(progressDocument.tasks[0].progressDone == 2, "progress done decode")
     try expect(progressDocument.tasks[0].progressTotal == 4, "progress total decode")
     try expect(progressDocument.tasks[0].currentItem == "verify", "current item decode")
+    try expect(progressDocument.tasks[0].updatedAt == 1760000040, "updatedAt decode")
     try expect(progressDocument.tasks[0].items == [WorkbranchChecklistItem(text: "Major", checked: true, depth: 0), WorkbranchChecklistItem(text: "Child", checked: false, depth: 1)], "items decode")
 
     let globalDocument = try WorkbranchGlobalDocument.decode(Data("""
@@ -111,7 +113,7 @@ func runModelsAndMenuStateTests() throws {
 
     let stateDoc = try WorkbranchListDocument.decode(Data("""
     {"schemaVersion":1,"project":"fullstack","root":"/tmp/fullstack","tasks":[
-      {"name":"task3","path":"/tmp/fullstack/task3","memoTitle":"draft-tree 가이드 작성","status":"in-progress","progressDone":1,"progressTotal":2,"currentItem":"검증 실행","notiCount":2,"repos":[{"name":"backend","branch":"feature/task3","dirty":true}]},
+      {"name":"task3","path":"/tmp/fullstack/task3","memoTitle":"draft-tree 가이드 작성","status":"in-progress","progressDone":1,"progressTotal":2,"currentItem":"검증 실행","updatedAt":1760000100,"notiCount":2,"repos":[{"name":"backend","branch":"feature/task3","dirty":true}]},
       {"name":"task4","path":"/tmp/fullstack/task4","memoTitle":"","status":"planning","progressDone":0,"progressTotal":0,"currentItem":"","notiCount":0,"repos":[{"name":"backend","branch":"feature/task4","dirty":false}]}
     ]}
     """.utf8))
@@ -130,6 +132,9 @@ func runModelsAndMenuStateTests() throws {
     try expect(state.sections[0].rows[0].title.contains("🔔2"), "notification marker")
     try expect(state.sections[0].rows[0].title.contains("1/2"), "progress marker")
     try expect(state.sections[0].rows[0].subtitle == "지금: 검증 실행", "current item subtitle")
+    try expect(state.sections[0].rows[0].currentItem == "검증 실행", "current item remains primary row data")
+    try expect(state.sections[0].rows[0].updatedAt == 1760000100, "updatedAt is embedded in task row")
+    try expect(state.sections[0].rows[0].checklistItems.isEmpty, "current item is not mixed into checklist details")
     try expect(state.sections[0].rows[0].isExpandedByDefault, "notified task expands by default")
     try expect(state.sections[0].rows[0].repos[0].name == "backend", "repo embedded in task row")
     try expect(state.sections[0].rows[0].repos[0].branch == "feature/task3", "repo branch embedded in task row")
@@ -527,6 +532,16 @@ func runAppSourceInvariantTests() throws {
     try expect(rowView.contains("detailLine(label: \"memo\""), "task rows render list --global memoTitle in the detail area")
     try expect(rowView.contains("row.checklistItems"), "task rows render TASK-WORKBRANCH status items")
     try expect(rowView.contains("statusItemLine"), "task status content renders as checklist lines")
+    try expect(rowView.contains("currentWorkLine"), "task rows render current work as a primary fixed line")
+    guard let currentWorkLineRange = rowView.range(of: "currentWorkLine"), let detailsRange = rowView.range(of: "statusDetailsBlock") else {
+        throw TestFailure(message: "current work line or status details block not found")
+    }
+    try expect(currentWorkLineRange.lowerBound < detailsRange.lowerBound, "current work line is defined before detail block")
+    guard let summaryStart = rowView.range(of: "private var statusSummaryLine"), let summaryEnd = rowView[summaryStart.lowerBound...].range(of: "private func detailLine") else {
+        throw TestFailure(message: "status summary body not found")
+    }
+    let summaryBody = String(rowView[summaryStart.lowerBound..<summaryEnd.lowerBound])
+    try expect(!summaryBody.contains("row.currentItem"), "detail status summary does not duplicate current work")
     try expect(rowView.contains("if let primaryAction = row.primaryAction"), "non-task primary actions remain clickable")
     try expect(rowView.contains("store.perform(primaryAction)"), "message primary action invokes StateStore")
     try expect(!rowView.contains("startPrimaryAction"), "task rows do not trigger primary actions on click")
@@ -536,8 +551,12 @@ func runAppSourceInvariantTests() throws {
     try expect(!rowView.contains("label: \"progress\""), "task rows do not render progress tokens")
     try expect(!rowView.contains("label: \"noti\""), "task rows do not render notification tokens")
     try expect(rowView.contains("label: \"branch\""), "repo rows render branch tokens")
-    try expect(rowView.contains("label: \"dirty\""), "repo rows render dirty tokens")
-    try expect(rowView.contains("repo.dirty ? \"yes\" : \"no\""), "dirty token reflects worktree dirty state")
+    try expect(!rowView.contains("label: \"dirty\""), "repo rows do not render dirty tokens")
+    try expect(!rowView.contains("repo.dirty ? \"yes\" : \"no\""), "dirty token is not rendered beside branch")
+    try expect(rowView.contains("statusDisplayText"), "primary status line uses a display string")
+    try expect(rowView.contains("updatedTimeText"), "primary status line includes update time helper")
+    try expect(rowView.contains("dateFormat = \"HH:mm\""), "status update time is hour-minute only")
+    try expect(rowView.contains("palette.warning"), "primary status line uses warm color")
     try expect(settingsView.contains("FixedWidthFontCatalog.names"), "settings font picker uses fixed-width font catalog")
     try expect(settingsView.contains("fixedPitchFontMask"), "fixed-width font catalog filters system monospaced fonts")
     try expect(settingsView.contains("onThemeChange(theme)"), "theme tile invokes live theme change callback")

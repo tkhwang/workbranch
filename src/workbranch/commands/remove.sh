@@ -20,12 +20,12 @@ prompt_delete_remaining_task_root() {
   local task task_dir answer
   task=$1
   task_dir=$2
-  info "Unknown task-root items remain for $task:"
+  info "These items in the task root are NOT git-managed and will be lost if deleted:"
   task_root_items "$task_dir" | while IFS= read -r item; do
     info "  $item"
   done
   if [ -t 0 ] || [ "${WORKBRANCH_ALLOW_NON_TTY_PROMPT:-}" = "1" ]; then
-    answer=$(prompt_read "[*] Delete remaining task root now? [y/N]: ") || answer=""
+    answer=$(prompt_read "[*] Delete the entire task root for $task now? [y/N]: ") || answer=""
     case "$answer" in
       y|Y|yes|YES|Yes)
         rm -rf "$task_dir" || die "failed to remove task directory: $task"

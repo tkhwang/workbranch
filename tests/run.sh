@@ -129,6 +129,7 @@ main() {
   run_test test_task_checklist_counts
   run_test test_task_current_item
   run_test test_add_agents_md_describes_status_update_protocol
+  run_test test_preferred_language_generates_korean_task_guidance
   run_test test_noti_add_list_clear
   run_test test_noti_escapes_control_characters
   run_test test_noti_rejects_unknown_task
@@ -190,6 +191,7 @@ main() {
   run_test test_path_accepts_completion_trailing_slash_for_task_key
   run_test test_scoped_tool_paths_reject_stale_task_directories
   run_test test_ide_and_terminal_run_configured_command_for_task_repos
+  run_test test_terminal_opens_task_root_without_repo_filter
   run_test test_ide_legacy_macos_app_preset_opens_new_instance_per_repo
   run_test test_finder_opens_task_root_without_repo_filter
   run_test test_finder_repo_filter_opens_one_repo_path
@@ -201,7 +203,8 @@ main() {
   run_test test_remove_reports_kept_task_directory_with_extra_files
   run_test test_remove_treats_missing_worktree_as_already_removed
   run_test test_remove_cleans_stale_task_directory
-  run_test test_remove_cleans_known_generated_task_state
+  run_test test_remove_warns_and_can_purge_agent_leftovers
+  run_test test_remove_keeps_agent_leftovers_when_prompt_declined
   run_test test_remove_prompts_before_deleting_unknown_task_root_files
   run_test test_remove_keeps_unknown_files_when_prompt_declined
   run_test test_remove_noninteractive_unknown_files_keeps_without_prompt
@@ -218,6 +221,8 @@ main() {
   run_test test_pull_preflight_guidance_uses_project_root_from_subdirectory
   run_test test_add_preflight_requires_clean_base_on_configured_branch
   run_test test_config_reads_and_writes_ide_terminal_commands
+  run_test test_config_language_updates_preferred_language_only
+  run_test test_config_rejects_invalid_preferred_language
   run_test test_config_ide_can_set_custom_command_without_prompting_repos
   run_test test_config_ide_preset_uses_superset_level1_order
   run_test test_config_tool_preset_names_are_colored
@@ -247,6 +252,7 @@ main() {
   run_test test_repo_setup_failure_reports_directory_and_command
   run_test test_repo_setup_can_be_cleared_without_removing_other_repo_setup
   run_test test_interactive_init_writes_config_and_clones
+  run_test test_interactive_init_can_choose_korean_preferred_language_before_tool_config
   run_test test_interactive_init_can_add_first_task_after_cloning
   run_test test_interactive_init_persists_ide_when_terminal_prompt_eofs
   run_test test_interactive_init_does_not_prompt_for_task_branch_prefix

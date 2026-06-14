@@ -221,7 +221,7 @@ test_remove_reports_kept_task_directory_with_extra_files() {
   assert_not_exists "$project/login/frontend"
   assert_not_exists "$project/login/backend"
   assert_file "$project/login/notes.txt"
-  assert_contains "$out" "Unknown task-root items remain for login"
+  assert_contains "$out" "These items in the task root are NOT git-managed and will be lost if deleted:"
   assert_contains "$out" "notes.txt"
 }
 
@@ -435,7 +435,7 @@ GIT
 }
 
 
-test_remove_cleans_known_generated_task_state() {
+test_remove_warns_and_can_purge_agent_leftovers() {
   new_fixture
   project="$FIXTURE_PROJECT"
   cd "$project" || return 1
@@ -445,10 +445,39 @@ test_remove_cleans_known_generated_task_state() {
   printf '%s\n' state > "$project/login/.omx/state.txt"
   printf '%s\n' state > "$project/login/.omc/state.txt"
 
-  out=$(run_expect_success "$WORKBRANCH" remove login)
+  out=$(printf 'y
+' | WORKBRANCH_ALLOW_NON_TTY_PROMPT=1 run_expect_success "$WORKBRANCH" remove login)
   assert_contains "$out" "Removed: login/frontend"
   assert_contains "$out" "Removed: login/backend"
+  assert_contains "$out" "NOT git-managed"
+  assert_contains "$out" ".omc"
+  assert_contains "$out" ".omx"
+  assert_contains "$out" "Delete the entire task root for login now? [y/N]"
   assert_not_exists "$project/login"
+  return 0
+}
+
+
+test_remove_keeps_agent_leftovers_when_prompt_declined() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  mkdir -p "$project/login/.omx" "$project/login/.omc"
+  printf '%s
+' state > "$project/login/.omx/state.txt"
+  printf '%s
+' state > "$project/login/.omc/state.txt"
+
+  out=$(printf 'n
+' | WORKBRANCH_ALLOW_NON_TTY_PROMPT=1 run_expect_success "$WORKBRANCH" remove login)
+  assert_contains "$out" "NOT git-managed"
+  assert_contains "$out" ".omc"
+  assert_contains "$out" ".omx"
+  assert_dir "$project/login/.omx"
+  assert_dir "$project/login/.omc"
+  return 0
 }
 
 test_remove_prompts_before_deleting_unknown_task_root_files() {
@@ -460,9 +489,9 @@ test_remove_prompts_before_deleting_unknown_task_root_files() {
   printf '%s\n' keep > "$project/login/notes.txt"
 
   out=$(printf 'n\n' | WORKBRANCH_ALLOW_NON_TTY_PROMPT=1 run_expect_success "$WORKBRANCH" remove login)
-  assert_contains "$out" "Unknown task-root items remain for login"
+  assert_contains "$out" "These items in the task root are NOT git-managed and will be lost if deleted:"
   assert_contains "$out" "notes.txt"
-  assert_contains "$out" "Delete remaining task root now? [y/N]"
+  assert_contains "$out" "Delete the entire task root for login now? [y/N]"
 }
 
 test_remove_keeps_unknown_files_when_prompt_declined() {
@@ -488,7 +517,7 @@ test_remove_noninteractive_unknown_files_keeps_without_prompt() {
   printf '%s\n' keep > "$project/login/notes.txt"
 
   out=$(WORKBRANCH_TEST_FORCE_TTY_STDIN=1 run_expect_success "$WORKBRANCH" remove login)
-  assert_contains "$out" "Unknown task-root items remain for login"
+  assert_contains "$out" "These items in the task root are NOT git-managed and will be lost if deleted:"
   assert_not_contains "$out" "Delete remaining task root now?"
   assert_file "$project/login/notes.txt"
 }
@@ -502,7 +531,7 @@ test_remove_deletes_unknown_files_when_prompt_confirmed() {
   printf '%s\n' delete > "$project/login/notes.txt"
 
   out=$(printf 'y\n' | WORKBRANCH_ALLOW_NON_TTY_PROMPT=1 run_expect_success "$WORKBRANCH" remove login)
-  assert_contains "$out" "Unknown task-root items remain for login"
+  assert_contains "$out" "These items in the task root are NOT git-managed and will be lost if deleted:"
   assert_contains "$out" "Removed task directory: login"
   assert_not_exists "$project/login"
 }

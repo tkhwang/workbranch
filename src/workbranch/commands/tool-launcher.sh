@@ -26,6 +26,13 @@ cmd_tool_launcher() {
   fi
 
   resolve_task_path "$task"
+  if [ "$tool_label" = "terminal" ]; then
+    path=$RESOLVED_PATH
+    info_tool_opening "$display_label" "$task"
+    run_tool_command "$tool_label" "$command" "$path" || die "failed to open $tool_label: $task"
+    return 0
+  fi
+
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")

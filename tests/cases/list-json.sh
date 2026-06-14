@@ -110,12 +110,14 @@ test_list_json_schema_v1_progress_shape() {
 d=json.load(sys.stdin)
 assert d["schemaVersion"] == 1, d
 login=d["tasks"][0]
-for key in ["status", "progressDone", "progressTotal", "currentItem"]:
+for key in ["status", "progressDone", "progressTotal", "currentItem", "updatedAt"]:
     assert key in login, login
 assert login["status"] == "planning", login
 assert login["progressDone"] == 0, login
 assert login["progressTotal"] >= 1, login
-assert isinstance(login["currentItem"], str), login'
+assert isinstance(login["currentItem"], str), login
+assert isinstance(login["updatedAt"], int), login
+assert login["updatedAt"] > 0, login'
 }
 
 test_list_json_progress_and_status() {

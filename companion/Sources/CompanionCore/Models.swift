@@ -84,6 +84,7 @@ public struct WorkbranchTask: Codable, Equatable, Sendable {
     public let progressDone: Int
     public let progressTotal: Int
     public let currentItem: String
+    public let updatedAt: Int
     public let items: [WorkbranchChecklistItem]
     public let notiCount: Int
     public let repos: [WorkbranchRepo]
@@ -96,6 +97,7 @@ public struct WorkbranchTask: Codable, Equatable, Sendable {
         progressDone: Int = 0,
         progressTotal: Int = 0,
         currentItem: String = "",
+        updatedAt: Int = 0,
         items: [WorkbranchChecklistItem] = [],
         notiCount: Int,
         repos: [WorkbranchRepo]
@@ -107,6 +109,7 @@ public struct WorkbranchTask: Codable, Equatable, Sendable {
         self.progressDone = progressDone
         self.progressTotal = progressTotal
         self.currentItem = currentItem
+        self.updatedAt = updatedAt
         self.items = items
         self.notiCount = notiCount
         self.repos = repos
@@ -121,6 +124,7 @@ public struct WorkbranchTask: Codable, Equatable, Sendable {
         progressDone = try container.decodeIfPresent(Int.self, forKey: .progressDone) ?? 0
         progressTotal = try container.decodeIfPresent(Int.self, forKey: .progressTotal) ?? 0
         currentItem = try container.decodeIfPresent(String.self, forKey: .currentItem) ?? ""
+        updatedAt = try container.decodeIfPresent(Int.self, forKey: .updatedAt) ?? 0
         items = try container.decodeIfPresent([WorkbranchChecklistItem].self, forKey: .items) ?? []
         notiCount = try container.decode(Int.self, forKey: .notiCount)
         repos = try container.decode([WorkbranchRepo].self, forKey: .repos)

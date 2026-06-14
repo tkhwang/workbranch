@@ -27,6 +27,13 @@ A command file owns orchestration:
 
 `src/workbranch/lib/tool-launcher.sh` owns editor/terminal presets, task path resolution, and configured tool execution. `src/workbranch/commands/path.sh` owns the stdout-only path command. `src/workbranch/commands/tool-launcher.sh` owns `editor` and `terminal` orchestration. These commands are not Git operations and do not modify repositories.
 
+
+## Task root boundary
+
+A task root (`<task>`) is a workbranch metadata/agent workspace outside Git. The actual Git repositories live under `<task>/<repo>`. Workbranch-owned task-root state is limited to `TASK-WORKBRANCH.md`, generated `AGENTS.md`, `.workbranch/`, and `.workbranch.task`; other task-root entries are non-git leftovers. Remove flows first remove repo worktrees and task branches, then known metadata, then list any non-git leftovers and ask once before deleting the remaining task root unless `--force` is used.
+
+`workbranch terminal <task>` opens the task root by default, while `workbranch ide <task>` opens repo worktrees. `PREFERRED_LANGUAGE en|ko` only affects generated task briefs and generated agent guidance; it is not full CLI localization.
+
 ## Distribution boundary
 
 All install channels use the same generated `bin/workbranch` artifact:

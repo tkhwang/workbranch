@@ -64,9 +64,9 @@ my-app-workspace
 ├── _base
 │   ├── frontend
 │   └── backend
-└── feat-login          // run your AI agent here!
-    ├── frontend
-    └── backend
+└── feat-login          // task root: not git-managed; run your AI agent here
+    ├── frontend        // git repo worktree
+    └── backend         // git repo worktree
 ```
 
 For multi-repo products, `workbranch` gathers every repo an agent needs into one task folder. That makes AI-agent sessions easier to start, inspect, and clean up than juggling separate clones or unrelated worktrees.
@@ -77,16 +77,16 @@ See [AI agent workflows](docs/ai-agents.md) for the multi-repo benefits.
 
 ## Working on a task
 
-Now work inside the task workspace. On macOS, open it directly with `workbranch ide` / `workbranch terminal`; elsewhere, just `cd` in.
+Now work inside the task workspace. The task root (`<task>`) is a non-git workbranch metadata/agent workspace; the actual Git repos live under `<task>/<repo>`.
 
 ```bash
-# macOS: open the task workspace in your configured IDE / terminal
-workbranch ide feat-login
-workbranch terminal feat-login
+# macOS: open code repos in the IDE, and the task root in the terminal
+workbranch ide feat-login        # opens feat-login/<repo> worktrees
+workbranch terminal feat-login   # opens feat-login task root
 
 # or anywhere
 cd feat-login/<repo>
-# edit code in repo
+# edit code and run git commands in the repo
 ```
 
 Need the latest base while you work? See [Staying up to date](#staying-up-to-date). When the work is done, [ship it](#two-ways-to-ship).
@@ -178,13 +178,13 @@ Combined flow shortcuts:
 
 - `<task>/TASK-WORKBRANCH.md` is the human/agent-editable task brief. The generated template uses a first `#` heading, an optional `status: planning|in-progress|review|blocked|done` line, and Markdown checklist items for progress. `workbranch memo <task> [text]` reads or overwrites it, and `workbranch memo <task> --clear` removes it. Inside a task workspace, `workbranch memo` may omit `<task>` for reading only.
 - `<task>/AGENTS.md` tells AI agents running from either `<task>` or `<task>/<repo>` to keep the task brief current, including when starting/resuming, changing the active step, before/after verification, when blocked, and before the final response.
-- `<task>/.workbranch/notifications.jsonl` is an append-only local inbox. `workbranch noti add/list/clear` manages it, and `workbranch list --json` exposes `notiCount`, `status`, `progressDone`, `progressTotal`, and `currentItem` for companion apps.
+- `<task>/.workbranch/notifications.jsonl` is an append-only local inbox. `workbranch noti add/list/clear` manages it, and `workbranch list --json` exposes `notiCount`, `status`, `progressDone`, `progressTotal`, `currentItem`, and `updatedAt` for companion apps.
 
-`workbranch remove <task>` deletes workbranch-managed task state after successful workspace removal, including `TASK-WORKBRANCH.md`, generated `AGENTS.md`, `.workbranch/`, `.omx/`, and `.omc/`. If unrelated files remain in the task root, normal remove lists them and asks whether to delete the remaining task root now. `workbranch remove <task> --force` removes the task root without prompting after the normal safety preflights pass.
+`workbranch remove <task>` deletes known workbranch task state after successful workspace removal: `TASK-WORKBRANCH.md`, generated `AGENTS.md`, `.workbranch/`, and `.workbranch.task`. Everything else left in the task root, including agent runtime folders such as `.omx/` and `.omc/`, is not git-managed. Normal remove lists those leftovers and asks once whether to delete the entire task root. `workbranch remove <task> --force` removes the task root without prompting after the normal safety preflights pass.
 
 ## Native menu bar companion
 
-`companion/` contains a local native macOS menu bar app, `WorkbranchCompanion.app`, that consumes `workbranch list --json` and provides a task cockpit for task status/progress, current checklist item, repo child rows with branch/dirty state, inline memo edits, notification clearing, and existing Finder/IDE/terminal launch actions. If a configured project root is truly deleted while its parent still exists, the app forgets that root after two consecutive failed refreshes and sends one notification.
+`companion/` contains a local native macOS menu bar app, `WorkbranchCompanion.app`, that consumes `workbranch list --json` and provides a task cockpit for task status/progress, an always-visible warm-colored current-work/status line with `HH:mm` update time under repo/branch identity, repo child rows with branch identity, inline memo edits, notification clearing, and existing Finder/IDE/terminal launch actions. If a configured project root is truly deleted while its parent still exists, the app forgets that root after two consecutive failed refreshes and sends one notification.
 
 Install published releases with Homebrew:
 

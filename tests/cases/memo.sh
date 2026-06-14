@@ -82,8 +82,13 @@ test_add_creates_task_brief_and_agent_guidance() {
   guidance=$(cat "$project/login/AGENTS.md")
   assert_contains "$guidance" "TASK-WORKBRANCH.md"
   assert_contains "$guidance" "../TASK-WORKBRANCH.md"
+  assert_contains "$guidance" 'Run AI agent sessions from the task root (`<task>`) by default.'
+  assert_contains "$guidance" "The task root is not a Git repository; it is a workbranch metadata/agent workspace."
+  assert_contains "$guidance" 'The actual Git repositories live under `<task>/<repo>`.'
+  assert_contains "$guidance" 'Make code changes and run Git commands inside the repo folders; keep progress in `TASK-WORKBRANCH.md` at the task root.'
   assert_not_exists "$project/login/frontend/.gitignore"
   assert_not_exists "$project/login/backend/.gitignore"
+  return 0
 }
 
 
@@ -191,4 +196,25 @@ test_add_agents_md_describes_status_update_protocol() {
   assert_contains "$guidance" "before running verification"
   assert_contains "$guidance" "before final response"
   assert_contains "$guidance" "planning | in-progress | review | blocked | done"
+}
+
+
+test_preferred_language_generates_korean_task_guidance() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  cat >> "$project/.workbranch.config" <<'CONFIG'
+PREFERRED_LANGUAGE ko
+CONFIG
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  brief=$(cat "$project/login/TASK-WORKBRANCH.md")
+  assert_contains "$brief" "상태: planning"
+  assert_contains "$brief" "- [ ] 주요: 작업 시작"
+  guidance=$(cat "$project/login/AGENTS.md")
+  assert_contains "$guidance" "Workbranch 작업 안내"
+  assert_contains "$guidance" "작업 진행 업데이트 규칙"
+  assert_contains "$guidance" '실제 Git repo는 `<task>/<repo>` 아래에 있습니다.'
+  return 0
 }

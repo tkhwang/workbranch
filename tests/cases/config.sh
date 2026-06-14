@@ -123,6 +123,39 @@ test_config_tool_targets_are_macos_only() {
   assert_not_contains "$out" "no enclosing workbranch project found"
 }
 
+
+
+test_config_language_updates_preferred_language_only() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  cat >> "$project/.workbranch.config" <<'CONFIG'
+IDE open -a Cursor
+TERMINAL open -a Warp
+PREFERRED_LANGUAGE en
+CONFIG
+
+  out=$(printf '%s\n' "ko" | run_expect_success "$WORKBRANCH" config language)
+  assert_contains "$out" "[*] Preferred language"
+  assert_contains "$out" "[+] Config updated:"
+  config=$(cat "$project/.workbranch.config")
+  assert_contains "$config" "PREFERRED_LANGUAGE ko"
+  assert_contains "$config" "IDE open -a Cursor"
+  assert_contains "$config" "TERMINAL open -a Warp"
+}
+
+test_config_rejects_invalid_preferred_language() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  cat >> "$project/.workbranch.config" <<'CONFIG'
+PREFERRED_LANGUAGE jp
+CONFIG
+
+  out=$(run_expect_fail "$WORKBRANCH" list)
+  assert_contains "$out" "invalid PREFERRED_LANGUAGE 'jp'"
+}
+
 test_config_base_checks_out_changed_base_branches_before_add() {
   new_fixture
   project="$FIXTURE_PROJECT"
