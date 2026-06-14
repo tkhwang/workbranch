@@ -76,8 +76,11 @@ public struct ActivityEvent: Codable, Equatable, Sendable {
             let previousTasks = Dictionary(uniqueKeysWithValues: (previous[document.root]?.tasks ?? []).map { ($0.name, $0) })
             for task in document.tasks {
                 guard task.updatedAt > 0 else { continue }
-                if let previousTask = previousTasks[task.name], task.updatedAt <= previousTask.updatedAt { continue }
-                let key = "\(document.root)\u{0}\(task.name)\u{0}\(task.updatedAt)"
+                if let previousTask = previousTasks[task.name] {
+                    if task.updatedAt < previousTask.updatedAt { continue }
+                    if task.updatedAt == previousTask.updatedAt, task.activityEventKey == previousTask.activityEventKey { continue }
+                }
+                let key = "\(document.root)\u{0}\(task.name)\u{0}\(task.activityEventKey)"
                 guard seen.insert(key).inserted else { continue }
                 events.append(ActivityEvent(
                     editedAt: task.updatedAt,
@@ -109,5 +112,21 @@ public struct ActivityEvent: Codable, Equatable, Sendable {
         let event = try JSONDecoder().decode(ActivityEvent.self, from: data)
         guard event.v == 1 else { throw WorkbranchListError.unsupportedSchemaVersion(event.v) }
         return event
+    }
+}
+
+private extension WorkbranchTask {
+    var activityEventKey: String {
+        let stepKey = items.map { "\($0.depth)\u{1}\($0.checked)\u{1}\($0.text)" }.joined(separator: "\u{2}")
+        return [
+            "\(updatedAt)",
+            memoTitle,
+            planTitle,
+            status,
+            "\(progressDone)",
+            "\(progressTotal)",
+            currentItem,
+            stepKey
+        ].joined(separator: "\u{0}")
     }
 }

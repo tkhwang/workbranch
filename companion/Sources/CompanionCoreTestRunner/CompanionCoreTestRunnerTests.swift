@@ -341,7 +341,15 @@ func runActivityEventTests() throws {
     """.utf8))
 
     try expect(ActivityEvent.diff(previous: [:], next: [baseline], observedAt: 200, isBaseline: true).isEmpty, "baseline does not create activity events")
-    try expect(ActivityEvent.diff(previous: [root: baseline], next: [baseline], observedAt: 201, isBaseline: false).isEmpty, "same updatedAt creates no event")
+    try expect(ActivityEvent.diff(previous: [root: baseline], next: [baseline], observedAt: 201, isBaseline: false).isEmpty, "unchanged task creates no event")
+
+    let sameSecondProgress = try WorkbranchListDocument.decode(Data("""
+    {"schemaVersion":1,"project":"fullstack","root":"/tmp/fullstack","tasks":[
+      {"name":"task-a","path":"/tmp/fullstack/task-a","memoTitle":"","planTitle":"Checkout plan","status":"in-progress","progressDone":2,"progressTotal":3,"updatedAt":100,"notiCount":0,"repos":[]}
+    ]}
+    """.utf8))
+    let sameSecondEvents = ActivityEvent.diff(previous: [root: baseline], next: [sameSecondProgress], observedAt: 205, isBaseline: false)
+    try expect(sameSecondEvents == [ActivityEvent(editedAt: 100, observedAt: 205, root: root, project: "fullstack", task: "task-a", planTitle: "Checkout plan", status: "in-progress", progressDone: 2, progressTotal: 3)], "same-second progress/status change creates activity event")
 
     let events = ActivityEvent.diff(previous: [root: baseline], next: [increased, otherRoot], observedAt: 220, isBaseline: false)
     try expect(events.count == 3, "updated, new task, and other root events")
