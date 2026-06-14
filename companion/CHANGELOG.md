@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v1.7.0...workbranch-companion-v1.8.0) (2026-06-14)
+
+
+### Features
+
+* update task status values and companion config ([9529c3f](https://github.com/tkhwang/workbranch/commit/9529c3fda5314f2f0ce300acbfa03af434fb0ceb))
+* update task status values and companion config ([99adbbe](https://github.com/tkhwang/workbranch/commit/99adbbefe027574a97bd5adc2b478b07d91c2445))
+
 ## [1.7.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v1.6.0...workbranch-companion-v1.7.0) (2026-06-14)
 
 
