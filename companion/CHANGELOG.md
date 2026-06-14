@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v1.5.0...workbranch-companion-v1.6.0) (2026-06-14)
+
+
+### Features
+
+* **command:** clarify task workspace structure and usage ([69d7733](https://github.com/tkhwang/workbranch/commit/69d7733db0d506d6ee9192995d4ef150edc86656))
+* **command:** clarify task workspace structure and usage ([a81fdf6](https://github.com/tkhwang/workbranch/commit/a81fdf660cc60c831677fb2b7b543b19e3c0e9c2))
+
 ## [1.5.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v1.4.0...workbranch-companion-v1.5.0) (2026-06-14)
 
 
