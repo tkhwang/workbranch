@@ -42,7 +42,7 @@
 - `companion/Sources/CompanionApp/Views/RowView.swift:171` `statusDisplayText`: `currentWorkText`와 `updatedTimeText`(`updatedAt` → `HH:mm`)를 합쳐 status line에 표시한다.
 - `src/workbranch/commands/noti.sh:1` `workbranch noti <add|list|clear>`는 task 단위 inbox를 append/list/clear만 한다. `src/workbranch/lib/task-state.sh:378` `noti_count()`와 `src/workbranch/commands/list.sh:41` `notiCount`는 unread count처럼 보이지만 개별 message read marker는 없다.
 - `companion/Sources/CompanionCore/MenuState.swift:137` `NotificationTracker`는 `notiCount` 증가를 감지해 macOS notification을 보내는 runtime tracker다. `companion/Sources/CompanionCore/Actions.swift:31` clear action은 `workbranch noti clear <task>` 전체 삭제다.
-- companion 테스트 진입점: `companion/Sources/CompanionCoreTestRunner/main.swift`, `Tests/CompanionCoreTests/`. 현재 `companion/Tests/CompanionCoreTests/Empty.swift`는 XCTest/Testing module unavailable 때문에 비워 둔다는 주석만 있다.
+- companion 테스트 진입점: `companion/Sources/CompanionCoreTestRunner/CompanionCoreTestRunnerTests.swift`, `Tests/CompanionCoreTests/`. 현재 `companion/Tests/CompanionCoreTests/Empty.swift`는 XCTest/Testing module unavailable 때문에 비워 둔다는 주석만 있다.
 
 ## 결정 사항 (확정됨)
 

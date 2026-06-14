@@ -145,6 +145,30 @@ assert login["progressTotal"] == 2, login
 assert login["currentItem"] == "waiting for credentials", login'
 }
 
+test_list_json_plan_title() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  cat > "$project/login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
+# Login work
+
+plan: Authentication hardening slice
+status: in-progress
+
+- [x] inspect current auth flow
+- [ ] implement session expiry guard
+EOF_BRIEF
+
+  out=$(run_expect_success "$WORKBRANCH" list --json)
+  printf '%s' "$out" | python3 -c 'import json,sys
+login=json.load(sys.stdin)["tasks"][0]
+assert login["planTitle"] == "Authentication hardening slice", login
+assert login["memoTitle"] == "Login work", login
+assert login["currentItem"] == "implement session expiry guard", login'
+}
+
 test_list_json_currentItem_escaped() {
   new_fixture
   project="$FIXTURE_PROJECT"

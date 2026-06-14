@@ -202,7 +202,7 @@ companion/Sources/CompanionCore/MenuState.swift     # .repo row kind, 진행도/
 companion/Sources/CompanionApp/Views/CompanionPopoverView.swift  # repo 들여쓰기, 보조 줄
 companion/Sources/CompanionApp/StateStore.swift     # configured project root self-heal 트리거
 companion/Sources/CompanionCore/Config.swift        # root 제거(저장) 지원
-companion/Sources/CompanionCoreTestRunner/main.swift # decode, menu model, self-heal 판정 behavioral tests
+companion/Sources/CompanionCoreTestRunner/CompanionCoreTestRunnerTests.swift # decode, menu model, self-heal 판정 behavioral tests
 companion/Tests/CompanionCoreTests/*.swift          # swift test placeholder/build check
 ```
 

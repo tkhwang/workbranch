@@ -80,6 +80,7 @@ public struct WorkbranchTask: Codable, Equatable, Sendable {
     public let name: String
     public let path: String
     public let memoTitle: String
+    public let planTitle: String
     public let status: String
     public let progressDone: Int
     public let progressTotal: Int
@@ -93,6 +94,7 @@ public struct WorkbranchTask: Codable, Equatable, Sendable {
         name: String,
         path: String,
         memoTitle: String,
+        planTitle: String = "",
         status: String = "",
         progressDone: Int = 0,
         progressTotal: Int = 0,
@@ -105,6 +107,7 @@ public struct WorkbranchTask: Codable, Equatable, Sendable {
         self.name = name
         self.path = path
         self.memoTitle = memoTitle
+        self.planTitle = planTitle
         self.status = status
         self.progressDone = progressDone
         self.progressTotal = progressTotal
@@ -120,6 +123,7 @@ public struct WorkbranchTask: Codable, Equatable, Sendable {
         name = try container.decode(String.self, forKey: .name)
         path = try container.decode(String.self, forKey: .path)
         memoTitle = try container.decode(String.self, forKey: .memoTitle)
+        planTitle = try container.decodeIfPresent(String.self, forKey: .planTitle) ?? ""
         status = try container.decodeIfPresent(String.self, forKey: .status) ?? ""
         progressDone = try container.decodeIfPresent(Int.self, forKey: .progressDone) ?? 0
         progressTotal = try container.decodeIfPresent(Int.self, forKey: .progressTotal) ?? 0

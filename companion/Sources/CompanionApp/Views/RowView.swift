@@ -36,6 +36,13 @@ struct RowView: View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text("[+]")
                 .foregroundStyle(palette.accent)
+            if !row.activeTimeText.isEmpty {
+                Text(row.activeTimeText)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(palette.warning)
+                    .monospacedDigit()
+                    .lineLimit(1)
+            }
             Text(row.taskName ?? row.title)
                 .fontWeight(.semibold)
                 .foregroundStyle(palette.command)

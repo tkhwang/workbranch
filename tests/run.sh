@@ -161,6 +161,7 @@ main() {
   run_test test_list_json_skips_stale_and_partial_task_dirs
   run_test test_list_json_schema_v1_progress_shape
   run_test test_list_json_progress_and_status
+  run_test test_list_json_plan_title
   run_test test_list_json_currentItem_escaped
   run_test test_list_json_legacy_memo_no_checkboxes
   run_test test_list_json_includes_checklist_items_depth

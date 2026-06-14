@@ -29,7 +29,7 @@
 - `companion/Sources/CompanionApp/Views/CompanionPopoverView.swift:111-127` — `settingsPanel`이 `AppearanceSettingsView`를 인라인으로 그린다. `:129-134` `openSettings()`는 store 값을 draft `@State`로 복사한다. `:136-144` `saveSettings()`는 `store.saveAppearance(...)` 성공 시에만 패널을 닫는다. footer(`:96-100`)는 `store.statusMessage`를 한 줄로 보여준다.
 - `companion/Sources/CompanionApp/StateStore.swift:8-28` — `@MainActor final class StateStore: ObservableObject`. `@Published private(set) var statusMessage`(`:11`)가 사용자 피드백 채널. `init(configURL:)`(`:30`)는 config 로드 + watcher + 초기 refresh를 수행. `saveAppearance(...)`(`:282`)는 config 파일에 쓰고 `statusMessage`를 갱신하는 패턴.
 - `companion/Sources/CompanionCore/Config.swift:55` — `CompanionConfig`는 roots/workbranchBin/font/colorTheme만 직렬화한다. 로그인 항목 필드는 없다(추가하지 않는다).
-- `companion/Sources/CompanionCoreTestRunner/main.swift:473` — `runAppSourceInvariantTests()`는 App 소스를 **텍스트로 읽어** 필수 배선을 `expect(... .contains(...))`로 잠근다. 이 runner는 `import CompanionCore`만 하며 **CompanionApp 타입은 import하지 못한다**(`:2`). → 순수 로직 단위 테스트는 CompanionCore에 있어야 import 가능하고, App-side 배선은 소스 인바리언트로만 잠근다.
+- `companion/Sources/CompanionCoreTestRunner/CompanionCoreTestRunnerTests.swift:473` — `runAppSourceInvariantTests()`는 App 소스를 **텍스트로 읽어** 필수 배선을 `expect(... .contains(...))`로 잠근다. 이 runner는 `import CompanionCore`만 하며 **CompanionApp 타입은 import하지 못한다**(`:2`). → 순수 로직 단위 테스트는 CompanionCore에 있어야 import 가능하고, App-side 배선은 소스 인바리언트로만 잠근다.
 - `companion/Sources/CompanionApp/StateStore.swift:475-490` 부근(runner 내부) — runner는 `StateStore`/`AppearanceSettingsView`/`CompanionPopoverView` 소스 문자열을 이미 읽고 있어, 신규 인바리언트를 같은 자리에서 추가하기 쉽다.
 
 ## 결정 사항 (확정 제안 — 실행 전 확인)
