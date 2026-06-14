@@ -1,11 +1,18 @@
 import Foundation
 
 public struct EventFilter: Sendable {
-    public init() {}
+    private let allowedFileName: String?
+
+    public init(allowedFileName: String? = nil) {
+        self.allowedFileName = allowedFileName
+    }
 
     public func shouldRefresh(forPath path: String, root: String) -> Bool {
         guard path == root || path.hasPrefix(root + "/") else { return false }
         let relative = String(path.dropFirst(root.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if let allowedFileName {
+            return relative == allowedFileName
+        }
         guard !relative.isEmpty else { return true }
         let parts = relative.split(separator: "/").map(String.init)
         return !parts.contains(".git")

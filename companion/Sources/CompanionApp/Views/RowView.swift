@@ -40,11 +40,6 @@ struct RowView: View {
                 .fontWeight(.semibold)
                 .foregroundStyle(palette.command)
                 .lineLimit(1)
-            Text("|")
-                .foregroundStyle(palette.muted)
-            Text(statusLabel)
-                .foregroundStyle(palette.color(for: statusTone))
-                .lineLimit(1)
         }
     }
 
@@ -90,28 +85,48 @@ struct RowView: View {
     }
 
     private var currentWorkLine: some View {
+        Group {
+            if let statusReadAction = row.statusReadAction {
+                Button(action: { store.perform(statusReadAction) }) {
+                    currentWorkLineContent
+                }
+                .buttonStyle(.plain)
+                .help(row.isStatusUnread ? "Mark status update as read" : "Status update is read")
+            } else {
+                currentWorkLineContent
+            }
+        }
+    }
+
+    private var currentWorkLineContent: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("│ status")
+            Text("│")
                 .foregroundStyle(palette.accent)
                 .fontWeight(.semibold)
-            Text(statusDisplayText)
+            Text(statusSegmentText)
+                .foregroundStyle(row.isStatusUnread ? palette.warning : palette.color(for: statusTone))
+                .fontWeight(.bold)
+                .lineLimit(1)
+            Text("│")
+                .foregroundStyle(palette.muted)
+            Text(timeSegmentText)
                 .foregroundStyle(palette.warning)
+                .fontWeight(.semibold)
+                .lineLimit(1)
+            Text("│")
+                .foregroundStyle(palette.muted)
+            Text(statusMessageText)
+                .foregroundStyle(row.isStatusUnread ? palette.accent : palette.warning)
                 .fontWeight(.bold)
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 2)
-                .background(
-                    RoundedRectangle(cornerRadius: 4)
-                        .stroke(palette.warning.opacity(0.75), lineWidth: 1)
-                )
         }
+        .contentShape(Rectangle())
     }
 
     private var statusDetailsBlock: some View {
         ScrollView(.vertical) {
             VStack(alignment: .leading, spacing: 4) {
-                statusSummaryLine
                 if let memo = row.memoTitle, !memo.isEmpty {
                     detailLine(label: "memo", value: memo, tone: .muted)
                 }
@@ -122,14 +137,6 @@ struct RowView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxHeight: 176, alignment: .top)
-    }
-
-    private var statusSummaryLine: some View {
-        var parts = [statusLabel]
-        if row.progressTotal > 0 {
-            parts.append("\(row.progressDone)/\(row.progressTotal)")
-        }
-        return detailLine(label: "status", value: parts.joined(separator: " · "), tone: statusTone, showsGuide: false)
     }
 
     private func detailLine(label: String, value: String, tone: TerminalTone, showsGuide: Bool = true) -> some View {
@@ -159,18 +166,22 @@ struct RowView: View {
 
     private var hasStatusDetails: Bool {
         if let memo = row.memoTitle, !memo.isEmpty { return true }
-        return !row.checklistItems.isEmpty || row.progressTotal > 0
+        return !row.checklistItems.isEmpty
     }
 
-    private var currentWorkText: String {
+    private var statusMessageText: String {
         if !row.currentItem.isEmpty { return row.currentItem }
-        if row.status == "done" { return "done" }
+        if row.progressTotal > 0 { return "\(row.progressDone)/\(row.progressTotal)" }
         return "no active checklist item"
     }
 
-    private var statusDisplayText: String {
-        guard let updatedTimeText else { return currentWorkText }
-        return "\(currentWorkText) \(updatedTimeText)"
+    private var statusSegmentText: String {
+        let text = statusLabel.uppercased()
+        return row.isStatusUnread ? "● \(text)" : text
+    }
+
+    private var timeSegmentText: String {
+        updatedTimeText ?? "--:--"
     }
 
     private var updatedTimeText: String? {

@@ -147,6 +147,83 @@ func runModelsAndMenuStateTests() throws {
     try expect(state.sections[1].rows[0].title.contains("workbranch list failed"), "error row")
     try expect(state.notificationsToSend.isEmpty, "baseline no notifications")
 
+    let unsortedDocument = try WorkbranchListDocument.decode(Data("""
+    {"schemaVersion":1,"project":"sort","root":"/tmp/sort","tasks":[
+      {"name":"old","path":"/tmp/sort/old","memoTitle":"","updatedAt":100,"notiCount":0,"repos":[]},
+      {"name":"new","path":"/tmp/sort/new","memoTitle":"","updatedAt":300,"notiCount":0,"repos":[]},
+      {"name":"tie-first","path":"/tmp/sort/tie-first","memoTitle":"","updatedAt":200,"notiCount":0,"repos":[]},
+      {"name":"tie-second","path":"/tmp/sort/tie-second","memoTitle":"","updatedAt":200,"notiCount":0,"repos":[]}
+    ]}
+    """.utf8))
+    let otherSortDocument = try WorkbranchListDocument.decode(Data("""
+    {"schemaVersion":1,"project":"other-sort","root":"/tmp/other-sort","tasks":[
+      {"name":"other-newest","path":"/tmp/other-sort/other-newest","memoTitle":"","updatedAt":900,"notiCount":0,"repos":[]}
+    ]}
+    """.utf8))
+    let emptySortDocument = try WorkbranchListDocument.decode(Data("""
+    {"schemaVersion":1,"project":"empty-sort","root":"/tmp/empty-sort","tasks":[]}
+    """.utf8))
+    var sortTracker = NotificationTracker()
+    let sortedState = MenuState.make(
+        configuredRoots: ["/tmp/sort", "/tmp/broken-sort", "/tmp/empty-sort", "/tmp/other-sort"],
+        results: [
+            .success(unsortedDocument),
+            .failure(root: "/tmp/broken-sort", message: "no data"),
+            .success(emptySortDocument),
+            .success(otherSortDocument),
+        ],
+        previous: nil,
+        tracker: &sortTracker,
+        isBaseline: true
+    )
+    try expect(sortedState.sections.map { $0.root ?? "" } == ["/tmp/other-sort", "/tmp/sort", "/tmp/broken-sort", "/tmp/empty-sort"], "sections sort by latest task updatedAt, then config order for no-data sections")
+    try expect(sortedState.sections[1].rows.compactMap(\.taskName) == ["new", "tie-first", "tie-second", "old"], "tasks sort by updatedAt descending with original-order tie break")
+
+    let readStateDocument = try WorkbranchListDocument.decode(Data("""
+    {"schemaVersion":1,"project":"read","root":"/tmp/read","tasks":[
+      {"name":"task-read","path":"/tmp/read/task-read","memoTitle":"","updatedAt":100,"notiCount":0,"repos":[]},
+      {"name":"task-zero","path":"/tmp/read/task-zero","memoTitle":"","updatedAt":0,"notiCount":0,"repos":[]}
+    ]}
+    """.utf8))
+    var readMarkers = StatusReadMarkers()
+    try expect(readMarkers.isEmpty, "empty read markers report empty for first-run baseline")
+    try expect(readMarkers.isUnread(root: "/tmp/read", task: "task-read", updatedAt: 100), "empty read markers treat positive updatedAt as unread after baseline")
+    try expect(!readMarkers.isUnread(root: "/tmp/read", task: "task-zero", updatedAt: 0), "zero updatedAt is never unread")
+    readMarkers.markBaselineRead(documents: [readStateDocument])
+    try expect(!readMarkers.isEmpty, "baseline read markers are no longer empty")
+    try expect(!readMarkers.isUnread(root: "/tmp/read", task: "task-read", updatedAt: 100), "baseline marks existing status as read")
+    try expect(readMarkers.isUnread(root: "/tmp/read", task: "task-read", updatedAt: 101), "larger updatedAt becomes unread after baseline")
+    readMarkers.markRead(root: "/tmp/read", task: "task-read", updatedAt: 101)
+    try expect(!readMarkers.isUnread(root: "/tmp/read", task: "task-read", updatedAt: 101), "mark read clears current updatedAt")
+    try expect(readMarkers.isUnread(root: "/tmp/read", task: "task-read", updatedAt: 102), "future updatedAt becomes unread again")
+    try expect(readMarkers.isUnread(root: "/tmp/other-read", task: "task-read", updatedAt: 101), "other root marker is independent")
+    try expect(readMarkers.isUnread(root: "/tmp/read", task: "other-task", updatedAt: 101), "other task marker is independent")
+
+    let tempReadStateURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("workbranch-read-state-\(UUID().uuidString)").appendingPathComponent("read-state.json")
+    defer { try? FileManager.default.removeItem(at: tempReadStateURL.deletingLastPathComponent()) }
+    try readMarkers.write(to: tempReadStateURL)
+    let reloadedReadMarkers = try StatusReadMarkers.load(from: tempReadStateURL)
+    try expect(reloadedReadMarkers == readMarkers, "read-state JSON round trip")
+    let readStateText = try String(contentsOf: tempReadStateURL, encoding: .utf8)
+    try expect(readStateText.contains("\"schemaVersion\" : 1") || readStateText.contains("\"schemaVersion\":1"), "read-state JSON writes schemaVersion 1")
+    try expect(readStateText.contains("\"roots\""), "read-state JSON writes nested roots map")
+    try expect(StatusReadMarkers.loadOrEmpty(from: tempReadStateURL.deletingLastPathComponent().appendingPathComponent("missing.json")) == StatusReadMarkers(), "missing read-state recovers as empty")
+    try Data("not json".utf8).write(to: tempReadStateURL)
+    try expect(StatusReadMarkers.loadOrEmpty(from: tempReadStateURL) == StatusReadMarkers(), "malformed read-state recovers as empty")
+
+    var unreadTracker = NotificationTracker()
+    let unreadState = MenuState.make(
+        configuredRoots: ["/tmp/read"],
+        results: [.success(readStateDocument)],
+        previous: nil,
+        tracker: &unreadTracker,
+        isBaseline: false,
+        statusReadMarkers: StatusReadMarkers()
+    )
+    try expect(unreadState.sections[0].rows[0].isStatusUnread, "MenuState preserves unread status on row")
+    try expect(!unreadState.sections[0].rows[1].isStatusUnread, "MenuState does not mark zero updatedAt unread")
+    try expect(unreadState.sections[0].rows[0].statusReadAction == .markStatusRead(root: "/tmp/read", task: "task-read", updatedAt: 100), "task row carries status read action")
+
     let previousDocument = try WorkbranchListDocument.decode(Data("""
     {"schemaVersion":1,"project":"fullstack","root":"/tmp/fullstack","tasks":[
       {"name":"task3","path":"/tmp/fullstack/task3","memoTitle":"old memo","notiCount":0,"repos":[]}
@@ -318,6 +395,10 @@ func runConfigActionsDebounceTests() throws {
     try expect(policy.shouldRefresh(forPath: "/tmp/fullstack/task3/TASK-WORKBRANCH.md", root: "/tmp/fullstack"), "task state event refreshes")
     try expect(!policy.shouldRefresh(forPath: "/tmp/fullstack/task3/backend/.git/index", root: "/tmp/fullstack"), "git index ignored")
     try expect(!policy.shouldRefresh(forPath: "/tmp/fullstack/task3/backend/.git", root: "/tmp/fullstack"), "git dir ignored")
+    let configPolicy = EventFilter(allowedFileName: "projects.md")
+    try expect(configPolicy.shouldRefresh(forPath: "/tmp/workbranch-companion/projects.md", root: "/tmp/workbranch-companion"), "config projects.md event refreshes")
+    try expect(!configPolicy.shouldRefresh(forPath: "/tmp/workbranch-companion/read-state.json", root: "/tmp/workbranch-companion"), "read-state write does not refresh config")
+    try expect(!configPolicy.shouldRefresh(forPath: "/tmp/workbranch-companion", root: "/tmp/workbranch-companion"), "config directory event does not refresh config")
 
     var scheduler = DebounceScheduler(delay: 2.0)
     scheduler.record(root: "/a", at: 0)
@@ -387,14 +468,17 @@ func runProcessRunnerTests() throws {
 func runAppSourceInvariantTests() throws {
     let fm = FileManager.default
     let stateStorePath = "Sources/CompanionApp/StateStore.swift"
+    let rootWatcherPath = "Sources/CompanionApp/RootWatcher.swift"
     let popoverPath = "Sources/CompanionApp/Views/CompanionPopoverView.swift"
     let rowViewPath = "Sources/CompanionApp/Views/RowView.swift"
     let settingsViewPath = "Sources/CompanionApp/Views/AppearanceSettingsView.swift"
     let stateStore = try String(contentsOfFile: stateStorePath, encoding: .utf8)
+    let rootWatcher = try String(contentsOfFile: rootWatcherPath, encoding: .utf8)
     let popover = try String(contentsOfFile: popoverPath, encoding: .utf8)
     let rowView = try String(contentsOfFile: rowViewPath, encoding: .utf8)
     let settingsView = try String(contentsOfFile: settingsViewPath, encoding: .utf8)
     try expect(fm.fileExists(atPath: stateStorePath), "StateStore source exists")
+    try expect(fm.fileExists(atPath: rootWatcherPath), "RootWatcher source exists")
     try expect(fm.fileExists(atPath: popoverPath), "popover source exists")
     try expect(fm.fileExists(atPath: rowViewPath), "RowView source exists")
     try expect(fm.fileExists(atPath: settingsViewPath), "settings source exists")
@@ -415,6 +499,7 @@ func runAppSourceInvariantTests() throws {
     }
     let configureBody = String(stateStore[configureStart.lowerBound..<configureEnd.lowerBound])
     try expect(configureBody.contains("configURL.deletingLastPathComponent()"), "config watcher derives config directory")
+    try expect(rootWatcher.contains("EventFilter(allowedFileName: configURL.lastPathComponent)"), "config watcher only reacts to projects.md changes")
     guard
         let createDirectoryRange = configureBody.range(of: "createDirectory"),
         let rootWatcherRange = configureBody.range(of: "RootWatcher")
@@ -458,6 +543,28 @@ func runAppSourceInvariantTests() throws {
     try expect(!stdinBranch.contains("fileHandleForWriting.write"), "stdin branch does not write stdin on MainActor")
     try expect(!stdinBranch.contains("process.run()"), "stdin branch does not run process on MainActor")
     try expect(stateStore.contains("private func runStandardInputExternal"), "StateStore has async stdin external runner")
+    try expect(stateStore.contains("defaultReadStateURL"), "StateStore has read-state path helper")
+    try expect(stateStore.contains("read-state.json"), "StateStore uses read-state.json")
+    try expect(stateStore.contains("pendingBaselineStatusReadRoots"), "StateStore tracks per-root pending baseline read roots")
+    try expect(!stateStore.contains("shouldBaselineStatusReadMarkers"), "StateStore does not close first-run baselining with a global flag")
+    try expect(stateStore.contains("pendingBaselineRoots(configuredRoots:"), "StateStore computes pending baseline roots from configured roots and persisted markers")
+    try expect(stateStore.contains("self.pendingBaselineStatusReadRoots = Set(config.roots)"), "StateStore keeps all configured roots pending when read-state is missing")
+    try expect(stateStore.contains("!markers.roots.keys.contains"), "StateStore leaves roots without persisted markers pending")
+    try expect(stateStore.contains("pendingBaselineStatusReadRoots.remove(document.root)"), "StateStore clears baseline pending only for successful roots")
+    try expect(stateStore.contains("statusReadMarkers.markBaselineRead"), "StateStore baselines existing tasks as read")
+    try expect(stateStore.contains("markStatusRead"), "StateStore exposes markStatusRead action")
+    try expect(stateStore.contains("statusReadMarkers.write"), "StateStore persists read markers")
+    try expect(stateStore.contains("lastRefreshResults"), "StateStore tracks the last refresh results")
+    try expect(stateStore.contains("lastRefreshResults = results"), "StateStore updates last refresh results after refresh apply")
+    guard
+        let rebuildStart = stateStore.range(of: "private func rebuildMenuStateFromPrevious()"),
+        let rebuildEnd = stateStore[rebuildStart.lowerBound...].range(of: "func openConfig()")
+    else {
+        throw TestFailure(message: "StateStore rebuildMenuStateFromPrevious body not found")
+    }
+    let rebuildBody = String(stateStore[rebuildStart.lowerBound..<rebuildEnd.lowerBound])
+    try expect(rebuildBody.contains("results: lastRefreshResults"), "status read rebuild preserves current refresh errors")
+    try expect(!rebuildBody.contains("results: []"), "status read rebuild does not drop current refresh errors")
     guard
         let sectionForEachStart = popover.range(of: "ForEach(store.menuState.sections"),
         let rowForEachStart = popover.range(of: "ForEach(section.rows")
@@ -519,29 +626,42 @@ func runAppSourceInvariantTests() throws {
     try expect(!popover.contains("section.root"), "project path is not rendered in simplified companion view")
     try expect(!popover.contains("store.menuState.title"), "header does not render aggregate task counters")
     try expect(popover.contains("RowView(row: row, store: store)"), "row view receives store for non-task primary actions")
+    try expect(popover.contains(".frame(width: 560, height: 720)"), "popover default height is 720")
     try expect(rowView.contains("taskBlock"), "task rows render as a fixed meta block")
     try expect(!rowView.contains("DisclosureGroup"), "task rows do not add a parent disclosure row")
     try expect(!rowView.contains("State(initialValue: true)"), "status details are rendered directly without a parent progress row")
     try expect(!rowView.contains("Text(\"progress\")"), "task rows do not render a progress parent label")
     try expect(rowView.contains("ScrollView(.vertical)"), "status details are scrollable")
     try expect(rowView.contains(".frame(maxHeight:"), "status details have a bounded height")
-    try expect(rowView.contains("showsGuide: false"), "status summary renders without a leading guide")
-    try expect(rowView.contains("row.progressDone") && rowView.contains("row.progressTotal"), "status summary includes progress counts")
+    try expect(!rowView.contains("private var statusSummaryLine"), "status details do not duplicate the primary status line")
+    try expect(rowView.contains("row.progressDone") && rowView.contains("row.progressTotal"), "primary status message can include progress counts")
     try expect(!rowView.contains(".padding(.leading, 13)"), "status details align with repo and branch guide lines")
     try expect(!rowView.contains("TextField(\"memo text\""), "task rows do not expose memo editing")
     try expect(rowView.contains("detailLine(label: \"memo\""), "task rows render list --global memoTitle in the detail area")
     try expect(rowView.contains("row.checklistItems"), "task rows render TASK-WORKBRANCH status items")
     try expect(rowView.contains("statusItemLine"), "task status content renders as checklist lines")
     try expect(rowView.contains("currentWorkLine"), "task rows render current work as a primary fixed line")
+    try expect(rowView.contains("statusReadAction"), "current work line owns status-read action")
+    try expect(rowView.contains("store.perform(statusReadAction)"), "current work line click marks status read")
+    try expect(rowView.contains("row.isStatusUnread"), "current work line renders unread state")
+    try expect(rowView.contains("\"● \\(text)\""), "current work line renders a compact unread dot affordance")
     guard let currentWorkLineRange = rowView.range(of: "currentWorkLine"), let detailsRange = rowView.range(of: "statusDetailsBlock") else {
         throw TestFailure(message: "current work line or status details block not found")
     }
     try expect(currentWorkLineRange.lowerBound < detailsRange.lowerBound, "current work line is defined before detail block")
-    guard let summaryStart = rowView.range(of: "private var statusSummaryLine"), let summaryEnd = rowView[summaryStart.lowerBound...].range(of: "private func detailLine") else {
-        throw TestFailure(message: "status summary body not found")
+    guard let taskCommandStart = rowView.range(of: "private var taskCommandLine"), let taskCommandEnd = rowView[taskCommandStart.lowerBound...].range(of: "private var messageLine") else {
+        throw TestFailure(message: "task command line body not found")
     }
-    let summaryBody = String(rowView[summaryStart.lowerBound..<summaryEnd.lowerBound])
-    try expect(!summaryBody.contains("row.currentItem"), "detail status summary does not duplicate current work")
+    let taskCommandBody = String(rowView[taskCommandStart.lowerBound..<taskCommandEnd.lowerBound])
+    try expect(!taskCommandBody.contains("statusLabel"), "task command line does not duplicate status")
+    guard let statusLineStart = rowView.range(of: "private var currentWorkLineContent"), let statusLineEnd = rowView[statusLineStart.lowerBound...].range(of: "private var statusDetailsBlock") else {
+        throw TestFailure(message: "current work line content body not found")
+    }
+    let statusLineBody = String(rowView[statusLineStart.lowerBound..<statusLineEnd.lowerBound])
+    try expect(statusLineBody.contains("Text(\"│\")"), "primary status line uses pipe separators")
+    try expect(statusLineBody.contains("statusSegmentText"), "primary status line renders status segment")
+    try expect(statusLineBody.contains("timeSegmentText"), "primary status line renders time segment")
+    try expect(statusLineBody.contains("statusMessageText"), "primary status line renders message segment")
     try expect(rowView.contains("if let primaryAction = row.primaryAction"), "non-task primary actions remain clickable")
     try expect(rowView.contains("store.perform(primaryAction)"), "message primary action invokes StateStore")
     try expect(!rowView.contains("startPrimaryAction"), "task rows do not trigger primary actions on click")
@@ -553,10 +673,12 @@ func runAppSourceInvariantTests() throws {
     try expect(rowView.contains("label: \"branch\""), "repo rows render branch tokens")
     try expect(!rowView.contains("label: \"dirty\""), "repo rows do not render dirty tokens")
     try expect(!rowView.contains("repo.dirty ? \"yes\" : \"no\""), "dirty token is not rendered beside branch")
-    try expect(rowView.contains("statusDisplayText"), "primary status line uses a display string")
+    try expect(rowView.contains("statusLabel.uppercased()"), "primary status line uppercases the status label")
     try expect(rowView.contains("updatedTimeText"), "primary status line includes update time helper")
     try expect(rowView.contains("dateFormat = \"HH:mm\""), "status update time is hour-minute only")
     try expect(rowView.contains("palette.warning"), "primary status line uses warm color")
+    try expect(!rowView.contains("RoundedRectangle(cornerRadius: 4)"), "primary status text no longer uses old stroke box")
+    try expect(!rowView.contains(".padding(.horizontal, 7)"), "primary status text no longer keeps box padding")
     try expect(settingsView.contains("FixedWidthFontCatalog.names"), "settings font picker uses fixed-width font catalog")
     try expect(settingsView.contains("fixedPitchFontMask"), "fixed-width font catalog filters system monospaced fonts")
     try expect(settingsView.contains("onThemeChange(theme)"), "theme tile invokes live theme change callback")

@@ -74,6 +74,8 @@ INPUT
   assert_contains "$out" "[*] Repo #1"
   assert_contains "$out" "[*] Repo #2"
   assert_contains "$out" "[*] Preferred language for generated task guidance [English]:"
+  assert_contains "$out" "1) English"
+  assert_contains "$out" "2) 한글"
   case "$out" in
     *"[*] Repo #1"*"[*] Preferred language for generated task guidance [English]:"*"[*] IDE command:"*) ;;
     *) fail "expected language prompt before IDE prompt after repo setup; got: $out" ;;
@@ -388,7 +390,7 @@ master
 n
 Y
 n
-ko
+2
 
 
 INPUT
@@ -396,6 +398,8 @@ INPUT
   out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" init)
   project="$TMP_ROOT/work/fullstack"
   assert_contains "$out" "[*] Preferred language for generated task guidance [English]:"
+  assert_contains "$out" "1) English"
+  assert_contains "$out" "2) 한글"
   case "$out" in
     *"[*] Preferred language for generated task guidance [English]:"*"[*] IDE command:"*) ;;
     *) fail "expected language prompt before tool config; got: $out" ;;

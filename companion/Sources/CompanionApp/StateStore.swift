@@ -12,7 +12,11 @@ final class StateStore: ObservableObject {
     private(set) var configURL: URL
     private var config: CompanionConfig
     private var previous: [String: WorkbranchListDocument] = [:]
+    private var lastRefreshResults: [RootResult] = []
     private var notificationTracker = NotificationTracker()
+    private let readStateURL: URL
+    private var statusReadMarkers: StatusReadMarkers
+    private var pendingBaselineStatusReadRoots: Set<String>
     private var missingRootConfirmations: [String: Int] = [:]
     private var debounceScheduler = DebounceScheduler(delay: 2.0)
     private var refreshCoordinator = RefreshCoordinator()
@@ -26,8 +30,16 @@ final class StateStore: ObservableObject {
     init(configURL: URL = StateStore.defaultConfigURL()) {
         self.configURL = configURL
         self.config = (try? CompanionConfig.load(from: configURL)) ?? (try! CompanionConfig(roots: []))
+        self.readStateURL = Self.defaultReadStateURL(configURL: configURL)
+        if let markers = try? StatusReadMarkers.load(from: readStateURL) {
+            self.statusReadMarkers = markers
+            self.pendingBaselineStatusReadRoots = Self.pendingBaselineRoots(configuredRoots: config.roots, markers: markers)
+        } else {
+            self.statusReadMarkers = StatusReadMarkers()
+            self.pendingBaselineStatusReadRoots = Set(config.roots)
+        }
         var tracker = NotificationTracker()
-        self.menuState = MenuState.make(configuredRoots: config.roots, results: [], previous: nil, tracker: &tracker, isBaseline: true)
+        self.menuState = MenuState.make(configuredRoots: config.roots, results: [], previous: nil, tracker: &tracker, isBaseline: true, statusReadMarkers: statusReadMarkers)
         self.notificationTracker = tracker
         configureWatchers()
         refreshAll(isBaseline: true)
@@ -39,6 +51,18 @@ final class StateStore: ObservableObject {
             .appendingPathComponent(".config")
             .appendingPathComponent("workbranch-companion")
             .appendingPathComponent("projects.md")
+    }
+
+    static func defaultReadStateURL(configURL: URL = StateStore.defaultConfigURL()) -> URL {
+        configURL.deletingLastPathComponent().appendingPathComponent("read-state.json")
+    }
+
+    private static func pendingBaselineRoots(configuredRoots: [String], markers: StatusReadMarkers) -> Set<String> {
+        Set(configuredRoots.filter { configuredRoot in
+            !markers.roots.keys.contains { markerRoot in
+                ProjectRootIdentity.matches(configuredRoot: configuredRoot, documentRoot: markerRoot)
+            }
+        })
     }
 
     func reloadConfig() {
@@ -56,7 +80,7 @@ final class StateStore: ObservableObject {
     func refreshAll(isBaseline: Bool = false) {
         let roots = config.roots
         guard !roots.isEmpty else {
-            menuState = MenuState.make(configuredRoots: roots, results: [], previous: previous, tracker: &notificationTracker, isBaseline: true)
+            menuState = MenuState.make(configuredRoots: roots, results: [], previous: previous, tracker: &notificationTracker, isBaseline: true, statusReadMarkers: statusReadMarkers)
             return
         }
         let refreshConfig = config
@@ -105,21 +129,28 @@ final class StateStore: ObservableObject {
     }
 
     func apply(results: [RootResult], isBaseline: Bool) {
+        lastRefreshResults = results
+        var successfulDocuments: [WorkbranchListDocument] = []
         for result in results {
             switch result {
             case .success(let document):
                 previous[document.root] = document
+                successfulDocuments.append(document)
                 clearMissingRootConfirmations(afterSuccessfulRefreshOf: document.root)
             case .failure(let root, _):
                 recordMissingRootIfNeeded(root: root)
             }
+        }
+        if baselinePendingStatusReadMarkers(with: successfulDocuments) {
+            persistStatusReadMarkers()
         }
         menuState = MenuState.make(
             configuredRoots: config.roots,
             results: results,
             previous: previous,
             tracker: &notificationTracker,
-            isBaseline: isBaseline
+            isBaseline: isBaseline,
+            statusReadMarkers: statusReadMarkers
         )
         for notification in menuState.notificationsToSend {
             sendNotification(title: "Workbranch notification", body: "\(notification.task): \(notification.count) unread")
@@ -131,6 +162,27 @@ final class StateStore: ObservableObject {
         for root in config.roots where ProjectRootIdentity.matches(configuredRoot: root, documentRoot: documentRoot) {
             missingRootConfirmations.removeValue(forKey: root)
         }
+    }
+
+    @discardableResult
+    private func baselinePendingStatusReadMarkers(with documents: [WorkbranchListDocument]) -> Bool {
+        var didChange = false
+        for document in documents where isPendingBaselineStatusReadRoot(document.root) {
+            statusReadMarkers.markBaselineRead(documents: [document])
+            pendingBaselineStatusReadRoots.remove(document.root)
+            for root in config.roots where ProjectRootIdentity.matches(configuredRoot: root, documentRoot: document.root) {
+                pendingBaselineStatusReadRoots.remove(root)
+            }
+            didChange = true
+        }
+        return didChange
+    }
+
+    private func isPendingBaselineStatusReadRoot(_ documentRoot: String) -> Bool {
+        pendingBaselineStatusReadRoots.contains(documentRoot) ||
+            pendingBaselineStatusReadRoots.contains { configuredRoot in
+                ProjectRootIdentity.matches(configuredRoot: configuredRoot, documentRoot: documentRoot)
+            }
     }
 
     private func recordMissingRootIfNeeded(root: String) {
@@ -169,6 +221,8 @@ final class StateStore: ObservableObject {
         switch action {
         case .editMemo:
             break
+        case .markStatusRead(let root, let task, let updatedAt):
+            markStatusRead(root: root, task: task, updatedAt: updatedAt)
         case .clearNotifications(let root, let task):
             runWorkbranchAction(root: root) { $0.clearNotifications(root: root, task: task) }
             refresh(root: root)
@@ -187,6 +241,31 @@ final class StateStore: ObservableObject {
         case .quit:
             quit()
         }
+    }
+
+    func markStatusRead(root: String, task: String, updatedAt: Int) {
+        statusReadMarkers.markRead(root: root, task: task, updatedAt: updatedAt)
+        persistStatusReadMarkers()
+        rebuildMenuStateFromPrevious()
+    }
+
+    private func persistStatusReadMarkers() {
+        do {
+            try statusReadMarkers.write(to: readStateURL)
+        } catch {
+            statusMessage = "Read state failed: \(error)"
+        }
+    }
+
+    private func rebuildMenuStateFromPrevious() {
+        menuState = MenuState.make(
+            configuredRoots: config.roots,
+            results: lastRefreshResults,
+            previous: previous,
+            tracker: &notificationTracker,
+            isBaseline: true,
+            statusReadMarkers: statusReadMarkers
+        )
     }
 
     func openConfig() {

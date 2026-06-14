@@ -162,11 +162,15 @@ preferred_language_label() {
   esac
 }
 
+print_language_presets() {
+  printf '%s\n' '    1) English' >&2
+  printf '%s\n' '    2) 한글' >&2
+}
 normalize_preferred_language_choice() {
   case "$1" in
     "" ) printf '%s' "${PREFERRED_LANGUAGE:-en}" ;;
     en|EN|English|english|1) printf '%s' 'en' ;;
-    ko|KO|Korean|korean|Hangul|hangul|한글) printf '%s' 'ko' ;;
+    ko|KO|Korean|korean|Hangul|hangul|한글|2) printf '%s' 'ko' ;;
     *) die "invalid preferred language: $1 (expected English or 한글)" ;;
   esac
 }

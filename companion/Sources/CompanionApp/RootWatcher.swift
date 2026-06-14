@@ -28,7 +28,7 @@ final class RootWatcher {
             addStream(path: root, root: root, filter: filter, onRootChange: onRootChange)
         }
         if let configURL, let onConfigChange {
-            addStream(path: configURL.deletingLastPathComponent().path, root: configURL.deletingLastPathComponent().path, filter: EventFilter()) { changedRoot in
+            addStream(path: configURL.deletingLastPathComponent().path, root: configURL.deletingLastPathComponent().path, filter: EventFilter(allowedFileName: configURL.lastPathComponent)) { changedRoot in
                 if changedRoot == configURL.deletingLastPathComponent().path {
                     onConfigChange()
                 }
