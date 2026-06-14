@@ -4,6 +4,7 @@ import CompanionCore
 struct CompanionPopoverView: View {
     @ObservedObject var store: StateStore
     @State private var showingSettings = false
+    @State private var showingActivityReport = false
     @State private var draftFontName = ""
     @State private var draftFontSize = CompanionFontSettings.default.size
     @State private var draftColorTheme = CompanionColorTheme.default
@@ -16,8 +17,12 @@ struct CompanionPopoverView: View {
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    ForEach(store.menuState.sections) { section in
-                        sectionView(section)
+                    if showingActivityReport {
+                        ActivityReportView(today: store.activityReport, week: store.weeklyActivityReport, month: store.monthlyActivityReport)
+                    } else {
+                        ForEach(store.menuState.sections) { section in
+                            sectionView(section)
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -86,12 +91,27 @@ struct CompanionPopoverView: View {
 
     private var footer: some View {
         HStack(spacing: 10) {
+            IconControl(
+                systemName: "house",
+                help: "Main view",
+                tone: showingSettings || showingActivityReport ? palette.accent : palette.warning
+            ) {
+                openHome()
+            }
+            IconControl(
+                systemName: "chart.bar",
+                help: "Activity report",
+                tone: showingActivityReport ? palette.warning : palette.accent
+            ) {
+                showingActivityReport = true
+                showingSettings = false
+            }
             Button(action: openSettings) {
                 Image(systemName: "gearshape")
                     .frame(width: 24, height: 24)
             }
             .buttonStyle(.plain)
-            .foregroundStyle(palette.accent)
+            .foregroundStyle(showingSettings ? palette.warning : palette.accent)
             .help("Companion settings")
             if !store.statusMessage.isEmpty {
                 TerminalLine(prefix: "#", command: store.statusMessage, tone: .muted)
@@ -130,7 +150,13 @@ struct CompanionPopoverView: View {
         )
     }
 
+    private func openHome() {
+        showingSettings = false
+        showingActivityReport = false
+    }
+
     private func openSettings() {
+        showingActivityReport = false
         draftFontName = store.fontSettings.name
         draftFontSize = store.fontSettings.size
         draftColorTheme = store.colorTheme

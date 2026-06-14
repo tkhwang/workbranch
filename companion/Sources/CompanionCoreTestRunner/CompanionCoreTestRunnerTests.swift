@@ -21,6 +21,10 @@ func expectThrows(_ message: String, _ body: () throws -> Void) throws {
     }
 }
 
+func writeStandardError(_ message: String) {
+    FileHandle.standardError.write(Data(message.utf8))
+}
+
 func runHarnessHelperTests() throws {
     do {
         try expectThrows("outer expectation") {
@@ -65,6 +69,7 @@ func runModelsAndMenuStateTests() throws {
     try expect(document.root == "/tmp/fullstack", "root")
     try expect(document.tasks.count == 2, "task count")
     try expect(document.tasks[0].memoTitle == "견적 \"API\" 경로", "memo round trip")
+    try expect(document.tasks[0].planTitle == "", "legacy plan title default")
     try expect(document.tasks[0].notiCount == 2, "noti count")
     try expect(document.tasks[0].status == "", "legacy status default")
     try expect(document.tasks[0].progressDone == 0, "legacy progress done default")
@@ -76,10 +81,11 @@ func runModelsAndMenuStateTests() throws {
 
     let progressDocument = try WorkbranchListDocument.decode(Data("""
     {"schemaVersion":1,"project":"fullstack","root":"/tmp/fullstack","tasks":[
-      {"name":"task3","path":"/tmp/fullstack/task3","memoTitle":"draft-tree 가이드 작성","status":"in-progress","progressDone":2,"progressTotal":4,"currentItem":"verify","updatedAt":1760000040,"items":[{"text":"Major","checked":true,"depth":0},{"text":"Child","checked":false,"depth":1}],"notiCount":1,"repos":[]}
+      {"name":"task3","path":"/tmp/fullstack/task3","memoTitle":"draft-tree 가이드 작성","planTitle":"Draft tree rollout","status":"in-progress","progressDone":2,"progressTotal":4,"currentItem":"verify","updatedAt":1760000040,"items":[{"text":"Major","checked":true,"depth":0},{"text":"Child","checked":false,"depth":1}],"notiCount":1,"repos":[]}
     ]}
     """.utf8))
     try expect(progressDocument.tasks[0].status == "in-progress", "progress status decode")
+    try expect(progressDocument.tasks[0].planTitle == "Draft tree rollout", "progress plan title decode")
     try expect(progressDocument.tasks[0].progressDone == 2, "progress done decode")
     try expect(progressDocument.tasks[0].progressTotal == 4, "progress total decode")
     try expect(progressDocument.tasks[0].currentItem == "verify", "current item decode")
@@ -135,6 +141,7 @@ func runModelsAndMenuStateTests() throws {
     try expect(state.sections[0].rows[0].subtitle == "지금: 검증 실행", "current item subtitle")
     try expect(state.sections[0].rows[0].currentItem == "검증 실행", "current item remains primary row data")
     try expect(state.sections[0].rows[0].updatedAt == 1760000100, "updatedAt is embedded in task row")
+    try expect(state.sections[0].rows[0].activeTimeText == "", "active time defaults empty")
     try expect(state.sections[0].rows[0].checklistItems.isEmpty, "current item is not mixed into checklist details")
     try expect(state.sections[0].rows[0].isExpandedByDefault, "notified task expands by default")
     try expect(state.sections[0].rows[0].repos[0].name == "backend", "repo embedded in task row")
@@ -182,6 +189,22 @@ func runModelsAndMenuStateTests() throws {
     )
     try expect(sortedState.sections.map { $0.root ?? "" } == ["/tmp/other-sort", "/tmp/sort", "/tmp/broken-sort", "/tmp/empty-sort"], "sections sort by latest task updatedAt, then config order for no-data sections")
     try expect(sortedState.sections[1].rows.compactMap(\.taskName) == ["new", "tie-first", "tie-second", "old"], "tasks sort by updatedAt descending with original-order tie break")
+
+    var activeTracker = NotificationTracker()
+    let activeState = MenuState.make(
+        configuredRoots: ["/tmp/sort"],
+        results: [.success(unsortedDocument)],
+        previous: nil,
+        tracker: &activeTracker,
+        isBaseline: true,
+        activeSecondsByTask: [ActivityReport.taskKey(root: "/tmp/sort", task: "new"): 4_980]
+    )
+    try expect(activeState.sections[0].rows[0].taskName == "new", "active time state keeps sort order")
+    try expect(activeState.sections[0].rows[0].activeTimeText == "1h23m", "active seconds format as compact hours/minutes")
+    try expect(activeState.sections[0].rows[1].activeTimeText == "", "missing active seconds format as empty")
+    try expect(ActivityReport.formatDuration(59) == "<1m", "sub-minute duration format")
+    try expect(ActivityReport.formatDuration(60) == "1m", "minute duration format")
+    try expect(ActivityReport.formatDuration(3_600) == "1h", "hour duration format")
 
     let readStateDocument = try WorkbranchListDocument.decode(Data("""
     {"schemaVersion":1,"project":"read","root":"/tmp/read","tasks":[
@@ -299,6 +322,129 @@ func runModelsAndMenuStateTests() throws {
     try expect(third.notificationsToSend.isEmpty, "clear no notification")
     let fourth = MenuState.make(configuredRoots: [root], results: [.success(increased)], previous: [root: cleared], tracker: &notificationTracker, isBaseline: false)
     try expect(fourth.notificationsToSend == [TaskNotification(root: root, task: "task3", count: 3, previousCount: 0)], "re-increase notification")
+}
+
+
+func runActivityEventTests() throws {
+    let root = "/tmp/fullstack"
+    let baseline = try WorkbranchListDocument.decode(Data("""
+    {"schemaVersion":1,"project":"fullstack","root":"/tmp/fullstack","tasks":[
+      {"name":"task-a","path":"/tmp/fullstack/task-a","memoTitle":"","planTitle":"Checkout plan","status":"planning","progressDone":1,"progressTotal":3,"updatedAt":100,"notiCount":0,"repos":[]}
+    ]}
+    """.utf8))
+    let increased = try WorkbranchListDocument.decode(Data("""
+    {"schemaVersion":1,"project":"fullstack","root":"/tmp/fullstack","tasks":[
+      {"name":"task-a","path":"/tmp/fullstack/task-a","memoTitle":"","planTitle":"Checkout plan","status":"in-progress","progressDone":2,"progressTotal":3,"updatedAt":160,"notiCount":0,"repos":[]},
+      {"name":"task-b","path":"/tmp/fullstack/task-b","memoTitle":"","status":"todo","progressDone":0,"progressTotal":1,"updatedAt":170,"notiCount":0,"repos":[]}
+    ]}
+    """.utf8))
+    let otherRoot = try WorkbranchListDocument.decode(Data("""
+    {"schemaVersion":1,"project":"other","root":"/tmp/other","tasks":[
+      {"name":"task-a","path":"/tmp/other/task-a","memoTitle":"","status":"review","progressDone":1,"progressTotal":1,"updatedAt":180,"notiCount":0,"repos":[]}
+    ]}
+    """.utf8))
+
+    try expect(ActivityEvent.diff(previous: [:], next: [baseline], observedAt: 200, isBaseline: true).isEmpty, "baseline does not create activity events")
+    try expect(ActivityEvent.diff(previous: [root: baseline], next: [baseline], observedAt: 201, isBaseline: false).isEmpty, "unchanged task creates no event")
+
+    let sameSecondProgress = try WorkbranchListDocument.decode(Data("""
+    {"schemaVersion":1,"project":"fullstack","root":"/tmp/fullstack","tasks":[
+      {"name":"task-a","path":"/tmp/fullstack/task-a","memoTitle":"","planTitle":"Checkout plan","status":"in-progress","progressDone":2,"progressTotal":3,"updatedAt":100,"notiCount":0,"repos":[]}
+    ]}
+    """.utf8))
+    let sameSecondEvents = ActivityEvent.diff(previous: [root: baseline], next: [sameSecondProgress], observedAt: 205, isBaseline: false)
+    try expect(sameSecondEvents == [ActivityEvent(editedAt: 100, observedAt: 205, root: root, project: "fullstack", task: "task-a", planTitle: "Checkout plan", status: "in-progress", progressDone: 2, progressTotal: 3)], "same-second progress/status change creates activity event")
+
+    let events = ActivityEvent.diff(previous: [root: baseline], next: [increased, otherRoot], observedAt: 220, isBaseline: false)
+    try expect(events.count == 2, "updated and new tasks under previously seen roots create events")
+    try expect(events.contains(ActivityEvent(editedAt: 160, observedAt: 220, root: root, project: "fullstack", task: "task-a", planTitle: "Checkout plan", status: "in-progress", progressDone: 2, progressTotal: 3)), "updated task event captures editedAt, plan, and status")
+    try expect(events.contains(ActivityEvent(editedAt: 170, observedAt: 220, root: root, project: "fullstack", task: "task-b", status: "todo", progressDone: 0, progressTotal: 1)), "new non-baseline task under a previously seen root creates event")
+    try expect(ActivityEvent.diff(previous: [:], next: [otherRoot], observedAt: 221, isBaseline: false).isEmpty, "root first success after a failed baseline does not backfill existing tasks")
+
+    let encoded = try events[0].jsonLine()
+    try expect(encoded.hasSuffix("\n"), "activity event JSONL ends with newline")
+    let decoded = try ActivityEvent.decodeLine(encoded)
+    try expect(decoded == events[0], "activity event JSON line round trip")
+}
+
+
+func runActivityReportTests() throws {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    func timestamp(year: Int, month: Int, day: Int, hour: Int, minute: Int) throws -> Int {
+        var components = DateComponents()
+        components.calendar = calendar
+        components.timeZone = calendar.timeZone
+        components.year = year
+        components.month = month
+        components.day = day
+        components.hour = hour
+        components.minute = minute
+        guard let date = calendar.date(from: components) else {
+            throw TestFailure(message: "timestamp date creation failed")
+        }
+        return Int(date.timeIntervalSince1970)
+    }
+    let events = [
+        ActivityEvent(editedAt: 1_700_000_100, observedAt: 1_700_000_101, root: "/tmp/a", project: "alpha", task: "task-one", status: "in-progress", progressDone: 1, progressTotal: 2),
+        ActivityEvent(editedAt: 1_700_000_700, observedAt: 1_700_000_701, root: "/tmp/a", project: "alpha", task: "task-one", planTitle: "Alpha launch plan", status: "in-progress", progressDone: 2, progressTotal: 2),
+        ActivityEvent(editedAt: 1_700_003_000, observedAt: 1_700_003_001, root: "/tmp/a", project: "alpha", task: "task-one", planTitle: "Alpha launch plan", status: "review", progressDone: 2, progressTotal: 2),
+        ActivityEvent(editedAt: 1_700_000_400, observedAt: 1_700_000_401, root: "/tmp/b", project: "beta", task: "task-two", status: "planning", progressDone: 0, progressTotal: 1),
+    ]
+    let report = ActivityReport.make(events: events, scope: .month, generatedAt: 1_700_010_000, calendar: calendar)
+    try expect(report.scope == .month, "month report scope")
+    try expect(report.projects.count == 2, "report groups by root/project")
+    try expect(report.projects[0].root == "/tmp/a", "projects sort by total seconds descending")
+    try expect(report.projects[0].tasks[0].seconds == 1_200, "gap-within session plus lead pad")
+    try expect(report.projects[0].tasks[0].sessions == 2, "gap-over-idle creates second session")
+    try expect(report.projects[0].tasks[0].lastEditedAt == 1_700_003_000, "last edited timestamp")
+    try expect(report.projects[0].tasks[0].status == "review", "latest task status is retained for plan detail")
+    try expect(report.projects[0].tasks[0].planTitle == "Alpha launch plan", "latest plan title is retained for plan detail")
+    try expect(report.projects[0].tasks[0].progressDone == 2, "latest task progress done is retained for plan detail")
+    try expect(report.projects[0].tasks[0].progressTotal == 2, "latest task progress total is retained for plan detail")
+    try expect(report.projects[1].tasks[0].seconds == 300, "single event receives lead pad")
+    try expect(report.totals.seconds == 1_500, "report total seconds")
+
+    let today = ActivityReport.make(events: events, scope: .today, generatedAt: 1_700_005_000, calendar: calendar)
+    try expect(today.totals.seconds == 1_500, "today scope includes same UTC day")
+    let futureToday = ActivityReport.make(events: events, scope: .today, generatedAt: 1_700_200_000, calendar: calendar)
+    try expect(futureToday.totals.seconds == 0, "today scope excludes other days")
+    let filtered = ActivityReport.make(events: events, scope: .month, project: "beta", generatedAt: 1_700_005_000, calendar: calendar)
+    try expect(filtered.projects.map(\.project) == ["beta"], "project filter")
+
+    let boundaryEvents = [
+        ActivityEvent(editedAt: try timestamp(year: 2026, month: 1, day: 1, hour: 23, minute: 55), observedAt: 1, root: "/tmp/boundary", project: "boundary", task: "task", status: "in-progress", progressDone: 1, progressTotal: 2),
+        ActivityEvent(editedAt: try timestamp(year: 2026, month: 1, day: 2, hour: 0, minute: 5), observedAt: 2, root: "/tmp/boundary", project: "boundary", task: "task", status: "in-progress", progressDone: 2, progressTotal: 2),
+    ]
+    let previousDay = ActivityReport.make(events: boundaryEvents, scope: .today, generatedAt: try timestamp(year: 2026, month: 1, day: 1, hour: 12, minute: 0), calendar: calendar)
+    let nextDay = ActivityReport.make(events: boundaryEvents, scope: .today, generatedAt: try timestamp(year: 2026, month: 1, day: 2, hour: 12, minute: 0), calendar: calendar)
+    try expect(previousDay.totals.seconds == 300, "scope boundary split keeps pre-midnight activity only in previous day")
+    try expect(nextDay.totals.seconds == 600, "scope boundary split keeps post-midnight interval and lead pad in next day")
+
+    let parsed = ActivityReport.parseEvents(fromJSONL: """
+    {"v":1,"editedAt":1700000100,"observedAt":1700000101,"root":"/tmp/a","project":"alpha","task":"task-one","status":"in-progress","progressDone":1,"progressTotal":2}
+    not-json
+    {"v":1,"editedAt":1700000400,"observedAt":1700000401,"root":"/tmp/b","project":"beta","task":"task-two","status":"planning","progressDone":0,"progressTotal":1}
+    """)
+    try expect(parsed.count == 2, "malformed JSONL lines are skipped")
+    try expect(ActivityReport.empty(scope: .week, generatedAt: 1).totals.seconds == 0, "empty report has zero total")
+    let nextMonth = ActivityReport.make(events: events, scope: .month, generatedAt: 1_702_700_000, calendar: calendar)
+    try expect(nextMonth.totals.seconds == 0, "month scope excludes other months")
+
+    let renamedProjectEvents = [
+        ActivityEvent(editedAt: 1_700_000_100, observedAt: 1_700_000_101, root: "/tmp/renamed", project: "old-name", task: "task", status: "done", progressDone: 1, progressTotal: 1),
+        ActivityEvent(editedAt: 1_700_000_200, observedAt: 1_700_000_201, root: "/tmp/renamed", project: "new-name", task: "task", status: "done", progressDone: 1, progressTotal: 1),
+    ]
+    let renamedProjectReport = ActivityReport.make(events: renamedProjectEvents, scope: .month, generatedAt: 1_700_005_000, calendar: calendar)
+    try expect(renamedProjectReport.projects.count == 2, "same root with different project names remains separate report groups")
+    try expect(Set(renamedProjectReport.projects.map(\.identity)).count == 2, "project report identities include project name")
+
+    let midnightEvents = [
+        ActivityEvent(editedAt: 1_700_006_300, observedAt: 1_700_006_301, root: "/tmp/m", project: "midnight", task: "task", status: "in-progress", progressDone: 0, progressTotal: 1),
+        ActivityEvent(editedAt: 1_700_007_300, observedAt: 1_700_007_301, root: "/tmp/m", project: "midnight", task: "task", status: "in-progress", progressDone: 1, progressTotal: 1),
+    ]
+    let midnightReport = ActivityReport.make(events: midnightEvents, scope: .month, generatedAt: 1_700_005_000, calendar: calendar)
+    try expect(midnightReport.totals.seconds == 1_300, "session duration plus lead pad survives midnight split")
 }
 
 func runConfigActionsDebounceTests() throws {
@@ -544,23 +690,34 @@ func runAppSourceInvariantTests() throws {
     let rootWatcherPath = "Sources/CompanionApp/RootWatcher.swift"
     let popoverPath = "Sources/CompanionApp/Views/CompanionPopoverView.swift"
     let rowViewPath = "Sources/CompanionApp/Views/RowView.swift"
+    let activityReportViewPath = "Sources/CompanionApp/Views/ActivityReportView.swift"
+    let activityRecorderPath = "Sources/CompanionApp/ActivityRecorder.swift"
     let settingsViewPath = "Sources/CompanionApp/Views/AppearanceSettingsView.swift"
     let loginItemControllerPath = "Sources/CompanionApp/LoginItemController.swift"
     let coreLoginItemPath = "Sources/CompanionCore/LoginItem.swift"
+    let runnerPath = "Sources/CompanionCoreTestRunner/CompanionCoreTestRunnerTests.swift"
     let stateStore = try String(contentsOfFile: stateStorePath, encoding: .utf8)
     let rootWatcher = try String(contentsOfFile: rootWatcherPath, encoding: .utf8)
     let popover = try String(contentsOfFile: popoverPath, encoding: .utf8)
     let rowView = try String(contentsOfFile: rowViewPath, encoding: .utf8)
+    let activityReportView = try String(contentsOfFile: activityReportViewPath, encoding: .utf8)
+    let activityRecorder = try String(contentsOfFile: activityRecorderPath, encoding: .utf8)
     let settingsView = try String(contentsOfFile: settingsViewPath, encoding: .utf8)
     let loginItemController = try String(contentsOfFile: loginItemControllerPath, encoding: .utf8)
     let coreLoginItem = try String(contentsOfFile: coreLoginItemPath, encoding: .utf8)
+    let runner = try String(contentsOfFile: runnerPath, encoding: .utf8)
     try expect(fm.fileExists(atPath: stateStorePath), "StateStore source exists")
     try expect(fm.fileExists(atPath: rootWatcherPath), "RootWatcher source exists")
     try expect(fm.fileExists(atPath: popoverPath), "popover source exists")
     try expect(fm.fileExists(atPath: rowViewPath), "RowView source exists")
+    try expect(fm.fileExists(atPath: activityReportViewPath), "ActivityReportView source exists")
+    try expect(fm.fileExists(atPath: activityRecorderPath), "ActivityRecorder source exists")
     try expect(fm.fileExists(atPath: settingsViewPath), "settings source exists")
     try expect(fm.fileExists(atPath: loginItemControllerPath), "login item controller source exists")
     try expect(fm.fileExists(atPath: coreLoginItemPath), "core login item source exists")
+    try expect(fm.fileExists(atPath: runnerPath), "runner source exists")
+    let cStderrWrite = "fpu" + "ts("
+    try expect(!runner.contains(cStderrWrite), "runner avoids C stderr writes that can fail Swift 6 concurrency checks")
     guard
         let initStart = stateStore.range(of: "init(configURL:"),
         let initEnd = stateStore[initStart.lowerBound...].range(of: "static func defaultConfigURL")
@@ -571,6 +728,56 @@ func runAppSourceInvariantTests() throws {
     try expect(initBody.contains("refreshAll(isBaseline: true)"), "StateStore init triggers initial baseline refresh")
     try expect(initBody.contains("loginItem.status == .enabled"), "StateStore init reads login item status for startup toggle")
     try expect(!popover.contains("store.refreshAll(isBaseline: true)"), "popover appearance does not own startup baseline refresh")
+    try expect(stateStore.contains("@Published private(set) var activityReport"), "StateStore publishes activity report")
+    try expect(stateStore.contains("weeklyActivityReport"), "StateStore publishes weekly activity report")
+    try expect(stateStore.contains("monthlyActivityReport"), "StateStore publishes monthly activity report")
+    try expect(!stateStore.contains("allActivityReport"), "StateStore no longer publishes all-time activity report for UI")
+    try expect(stateStore.contains("ActivityRecorder"), "StateStore owns activity recorder")
+    try expect(stateStore.contains("previousSnapshot = previous"), "StateStore snapshots previous documents before activity diff")
+    try expect(stateStore.contains("ActivityEvent.diff"), "StateStore computes activity events during apply")
+    try expect(stateStore.contains("activityRecorder.append(events)"), "StateStore appends activity events")
+    try expect(stateStore.contains("refreshActivityReport"), "StateStore refreshes activity report after activity changes")
+    try expect(activityRecorder.contains("defaultLogURL"), "ActivityRecorder owns default XDG state path")
+    try expect(activityRecorder.contains("XDG_STATE_HOME"), "ActivityRecorder honors XDG_STATE_HOME")
+    try expect(activityRecorder.contains("activity.jsonl"), "ActivityRecorder writes activity.jsonl")
+    try expect(popover.contains("@State private var showingActivityReport"), "popover owns activity report view toggle")
+    try expect(popover.contains("if showingActivityReport"), "popover gates report view behind toggle")
+    try expect(popover.contains("ActivityReportView(today: store.activityReport, week: store.weeklyActivityReport, month: store.monthlyActivityReport)"), "popover renders activity report in report view")
+    try expect(popover.contains("systemName: \"house\""), "footer exposes home icon")
+    try expect(popover.contains("systemName: \"chart.bar\""), "footer exposes activity report icon")
+    try expect(popover.contains("help: \"Main view\""), "home icon identifies main view")
+    guard
+        let homeIcon = popover.range(of: "systemName: \"house\""),
+        let reportIcon = popover.range(of: "systemName: \"chart.bar\""),
+        let settingsIcon = popover.range(of: "Image(systemName: \"gearshape\")")
+    else {
+        throw TestFailure(message: "footer navigation icon order markers not found")
+    }
+    try expect(homeIcon.lowerBound < reportIcon.lowerBound && reportIcon.lowerBound < settingsIcon.lowerBound, "footer icons are ordered home, report, settings")
+    try expect(popover.contains("showingActivityReport = false"), "settings path can leave activity report view")
+    guard
+        let reportGateStart = popover.range(of: "if showingActivityReport"),
+        let reportGateEnd = popover[reportGateStart.lowerBound...].range(of: "} else {")
+    else {
+        throw TestFailure(message: "popover report gate body not found")
+    }
+    let reportGateBody = String(popover[reportGateStart.lowerBound..<reportGateEnd.lowerBound])
+    try expect(reportGateBody.contains("ActivityReportView(today: store.activityReport, week: store.weeklyActivityReport, month: store.monthlyActivityReport)"), "activity report is inside report toggle branch")
+    try expect(activityReportView.contains("sectionBlock(title: \"Today\""), "ActivityReportView renders Today section")
+    try expect(activityReportView.contains("sectionBlock(title: \"Weekly\""), "ActivityReportView renders Weekly section")
+    try expect(activityReportView.contains("sectionBlock(title: \"Monthly\""), "ActivityReportView renders Monthly section")
+    try expect(activityReportView.contains("sectionSpacing"), "ActivityReportView separates sections with visible spacing")
+    try expect(activityReportView.contains("ForEach(report.projects, id: \\.identity)"), "ActivityReportView keys project rows by root and project")
+    try expect(activityReportView.contains("planTitleText(task)"), "ActivityReportView renders concrete plan title when available")
+    try expect(activityReportView.contains("taskLine(task)"), "ActivityReportView keeps task workspace visible under concrete plan title")
+    try expect(activityReportView.contains("statusLine(task)"), "ActivityReportView renders task status detail")
+    try expect(activityReportView.contains("│  • plan"), "ActivityReportView labels concrete plan title when present")
+    try expect(activityReportView.contains("│  • task"), "ActivityReportView falls back to task workspace when plan title is missing")
+    try expect(activityReportView.contains("No activity recorded"), "ActivityReportView has empty state")
+    try expect(rowView.contains("row.activeTimeText"), "RowView renders active time text")
+    try expect(!rowView.contains("activeTimeColumnWidth"), "RowView does not use fixed-width active-time column")
+    try expect(!rowView.contains("emptyActiveTimeColumn"), "task detail rows do not reserve an active-time column")
+    try expect(rowView.contains("Text(row.activeTimeText)"), "task command line renders active time inline")
     guard
         let configureStart = stateStore.range(of: "private func configureWatchers()"),
         let configureEnd = stateStore[configureStart.lowerBound...].range(of: "private func startHeartbeat()")
@@ -807,15 +1014,22 @@ func runAppSourceInvariantTests() throws {
     try expect(!coreLoginItem.contains("import ServiceManagement"), "core login item remains ServiceManagement-free")
 }
 
-do {
-    try runHarnessHelperTests()
-    try runModelsAndMenuStateTests()
-    try runConfigActionsDebounceTests()
-    try runProcessRunnerTests()
-    try runLoginItemTests()
-    try runAppSourceInvariantTests()
-    print("CompanionCoreTestRunner: PASS")
-} catch {
-    fputs("CompanionCoreTestRunner: FAIL: \(error)\n", stderr)
-    exit(1)
+@main
+struct CompanionCoreTestRunnerTests {
+    static func main() {
+        do {
+            try runHarnessHelperTests()
+            try runModelsAndMenuStateTests()
+            try runActivityEventTests()
+            try runActivityReportTests()
+            try runConfigActionsDebounceTests()
+            try runProcessRunnerTests()
+            try runLoginItemTests()
+            try runAppSourceInvariantTests()
+            print("CompanionCoreTestRunner: PASS")
+        } catch {
+            writeStandardError("CompanionCoreTestRunner: FAIL: \(error)\n")
+            exit(1)
+        }
+    }
 }

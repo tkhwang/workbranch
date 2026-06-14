@@ -49,6 +49,7 @@ public struct MenuRow: Equatable, Identifiable, Sendable {
     public let progressTotal: Int
     public let currentItem: String
     public let updatedAt: Int
+    public let activeTimeText: String
     public let isStatusUnread: Bool
     public let isExpandedByDefault: Bool
 
@@ -79,6 +80,7 @@ public struct MenuRow: Equatable, Identifiable, Sendable {
         progressTotal: Int = 0,
         currentItem: String = "",
         updatedAt: Int = 0,
+        activeTimeText: String = "",
         isStatusUnread: Bool = false,
         isExpandedByDefault: Bool = false
     ) {
@@ -98,6 +100,7 @@ public struct MenuRow: Equatable, Identifiable, Sendable {
         self.progressTotal = progressTotal
         self.currentItem = currentItem
         self.updatedAt = updatedAt
+        self.activeTimeText = activeTimeText
         self.isStatusUnread = isStatusUnread
         self.isExpandedByDefault = isExpandedByDefault
     }
@@ -223,7 +226,8 @@ public struct MenuState: Equatable, Sendable {
         previous: [String: WorkbranchListDocument]?,
         tracker: inout NotificationTracker,
         isBaseline: Bool,
-        statusReadMarkers: StatusReadMarkers = StatusReadMarkers()
+        statusReadMarkers: StatusReadMarkers = StatusReadMarkers(),
+        activeSecondsByTask: [String: Int] = [:]
     ) -> MenuState {
         guard !configuredRoots.isEmpty else {
             return MenuState(
@@ -287,7 +291,8 @@ public struct MenuState: Equatable, Sendable {
                     rows.append(taskRow(
                         for: task,
                         root: document.root,
-                        isStatusUnread: statusReadMarkers.isUnread(root: document.root, task: task.name, updatedAt: task.updatedAt)
+                        isStatusUnread: statusReadMarkers.isUnread(root: document.root, task: task.name, updatedAt: task.updatedAt),
+                        activeTimeText: ActivityReport.formatDuration(activeSecondsByTask[ActivityReport.taskKey(root: document.root, task: task.name)] ?? 0)
                     ))
                 }
                 if document.tasks.isEmpty && rows.isEmpty {
@@ -333,7 +338,7 @@ public struct MenuState: Equatable, Sendable {
         return uniqueRoots
     }
 
-    private static func taskRow(for task: WorkbranchTask, root: String, isStatusUnread: Bool) -> MenuRow {
+    private static func taskRow(for task: WorkbranchTask, root: String, isStatusUnread: Bool, activeTimeText: String) -> MenuRow {
         var parts: [String] = []
         if let icon = statusIcon(task.status) { parts.append(icon) }
         let label = task.memoTitle.isEmpty ? task.name : "\(task.name) — \(task.memoTitle)"
@@ -364,6 +369,7 @@ public struct MenuState: Equatable, Sendable {
             progressTotal: task.progressTotal,
             currentItem: task.currentItem,
             updatedAt: task.updatedAt,
+            activeTimeText: activeTimeText,
             isStatusUnread: isStatusUnread,
             isExpandedByDefault: task.status == "blocked" || task.notiCount > 0 || isStatusUnread
         )

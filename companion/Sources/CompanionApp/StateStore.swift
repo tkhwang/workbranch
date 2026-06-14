@@ -9,6 +9,9 @@ final class StateStore: ObservableObject {
     @Published private(set) var menuState: MenuState
     @Published private(set) var statusMessage: String = ""
     @Published private(set) var launchAtLogin: Bool
+    @Published private(set) var activityReport: ActivityReport = ActivityReport.empty(scope: .today, generatedAt: 0)
+    @Published private(set) var weeklyActivityReport: ActivityReport = ActivityReport.empty(scope: .week, generatedAt: 0)
+    @Published private(set) var monthlyActivityReport: ActivityReport = ActivityReport.empty(scope: .month, generatedAt: 0)
 
     private(set) var configURL: URL
     private var config: CompanionConfig
@@ -16,6 +19,7 @@ final class StateStore: ObservableObject {
     private var lastRefreshResults: [RootResult] = []
     private var notificationTracker = NotificationTracker()
     private let readStateURL: URL
+    private let activityRecorder: ActivityRecorder
     private var statusReadMarkers: StatusReadMarkers
     private var pendingBaselineStatusReadRoots: Set<String>
     private var missingRootConfirmations: [String: Int] = [:]
@@ -29,12 +33,13 @@ final class StateStore: ObservableObject {
     var fontSettings: CompanionFontSettings { config.font }
     var colorTheme: CompanionColorTheme { config.colorTheme }
 
-    init(configURL: URL = StateStore.defaultConfigURL(), loginItem: LoginItemControlling = SMAppServiceLoginItemController()) {
+    init(configURL: URL = StateStore.defaultConfigURL(), loginItem: LoginItemControlling = SMAppServiceLoginItemController(), activityRecorder: ActivityRecorder = ActivityRecorder()) {
         self.configURL = configURL
         self.config = (try? CompanionConfig.load(from: configURL)) ?? (try! CompanionConfig(roots: []))
         self.loginItem = loginItem
         self.launchAtLogin = (loginItem.status == .enabled)
         self.readStateURL = Self.defaultReadStateURL(configURL: configURL)
+        self.activityRecorder = activityRecorder
         if let markers = try? StatusReadMarkers.load(from: readStateURL) {
             self.statusReadMarkers = markers
             self.pendingBaselineStatusReadRoots = Self.pendingBaselineRoots(configuredRoots: config.roots, markers: markers)
@@ -43,7 +48,21 @@ final class StateStore: ObservableObject {
             self.pendingBaselineStatusReadRoots = Set(config.roots)
         }
         var tracker = NotificationTracker()
-        self.menuState = MenuState.make(configuredRoots: config.roots, results: [], previous: nil, tracker: &tracker, isBaseline: true, statusReadMarkers: statusReadMarkers)
+        let initialGeneratedAt = Int(Date().timeIntervalSince1970)
+        let initialEvents = activityRecorder.readEvents()
+        let initialActivityReport = ActivityReport.make(events: initialEvents, scope: .today, generatedAt: initialGeneratedAt)
+        self.activityReport = initialActivityReport
+        self.weeklyActivityReport = ActivityReport.make(events: initialEvents, scope: .week, generatedAt: initialGeneratedAt)
+        self.monthlyActivityReport = ActivityReport.make(events: initialEvents, scope: .month, generatedAt: initialGeneratedAt)
+        self.menuState = MenuState.make(
+            configuredRoots: config.roots,
+            results: [],
+            previous: nil,
+            tracker: &tracker,
+            isBaseline: true,
+            statusReadMarkers: statusReadMarkers,
+            activeSecondsByTask: initialActivityReport.activeSecondsByTask()
+        )
         self.notificationTracker = tracker
         configureWatchers()
         refreshAll(isBaseline: true)
@@ -84,7 +103,8 @@ final class StateStore: ObservableObject {
     func refreshAll(isBaseline: Bool = false) {
         let roots = config.roots
         guard !roots.isEmpty else {
-            menuState = MenuState.make(configuredRoots: roots, results: [], previous: previous, tracker: &notificationTracker, isBaseline: true, statusReadMarkers: statusReadMarkers)
+            refreshActivityReport()
+            menuState = MenuState.make(configuredRoots: roots, results: [], previous: previous, tracker: &notificationTracker, isBaseline: true, statusReadMarkers: statusReadMarkers, activeSecondsByTask: activityReport.activeSecondsByTask())
             return
         }
         let refreshConfig = config
@@ -134,17 +154,32 @@ final class StateStore: ObservableObject {
 
     func apply(results: [RootResult], isBaseline: Bool) {
         lastRefreshResults = results
+        let previousSnapshot = previous
         var successfulDocuments: [WorkbranchListDocument] = []
         for result in results {
             switch result {
             case .success(let document):
-                previous[document.root] = document
                 successfulDocuments.append(document)
                 clearMissingRootConfirmations(afterSuccessfulRefreshOf: document.root)
             case .failure(let root, _):
                 recordMissingRootIfNeeded(root: root)
             }
         }
+        let events = ActivityEvent.diff(
+            previous: previousSnapshot,
+            next: successfulDocuments,
+            observedAt: Int(Date().timeIntervalSince1970),
+            isBaseline: isBaseline
+        )
+        do {
+            try activityRecorder.append(events)
+        } catch {
+            statusMessage = "Activity log failed: \(error)"
+        }
+        for document in successfulDocuments {
+            previous[document.root] = document
+        }
+        refreshActivityReport()
         if baselinePendingStatusReadMarkers(with: successfulDocuments) {
             persistStatusReadMarkers()
         }
@@ -154,7 +189,8 @@ final class StateStore: ObservableObject {
             previous: previous,
             tracker: &notificationTracker,
             isBaseline: isBaseline,
-            statusReadMarkers: statusReadMarkers
+            statusReadMarkers: statusReadMarkers,
+            activeSecondsByTask: activityReport.activeSecondsByTask()
         )
         for notification in menuState.notificationsToSend {
             sendNotification(title: "Workbranch notification", body: "\(notification.task): \(notification.count) unread")
@@ -253,6 +289,14 @@ final class StateStore: ObservableObject {
         rebuildMenuStateFromPrevious()
     }
 
+    private func refreshActivityReport() {
+        let generatedAt = Int(Date().timeIntervalSince1970)
+        let events = activityRecorder.readEvents()
+        activityReport = ActivityReport.make(events: events, scope: .today, generatedAt: generatedAt)
+        weeklyActivityReport = ActivityReport.make(events: events, scope: .week, generatedAt: generatedAt)
+        monthlyActivityReport = ActivityReport.make(events: events, scope: .month, generatedAt: generatedAt)
+    }
+
     private func persistStatusReadMarkers() {
         do {
             try statusReadMarkers.write(to: readStateURL)
@@ -268,7 +312,8 @@ final class StateStore: ObservableObject {
             previous: previous,
             tracker: &notificationTracker,
             isBaseline: true,
-            statusReadMarkers: statusReadMarkers
+            statusReadMarkers: statusReadMarkers,
+            activeSecondsByTask: activityReport.activeSecondsByTask()
         )
     }
 

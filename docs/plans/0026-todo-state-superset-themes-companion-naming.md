@@ -27,7 +27,7 @@
   - Companion 색상 매핑: `companion/Sources/CompanionApp/Views/RowView.swift:200-204` (그리고 `:281-282`에서 `in-progress`/`blocked` 카운트, `:368`에서 `blocked` 자동 펼침).
 - 테마는 `CompanionColorTheme`(`companion/Sources/CompanionCore/Config.swift:19-45`)에 enum·`default`·`parse`·`label`로 정의되고, 색상값은 `companion/Sources/CompanionApp/Views/TerminalStyle.swift:23-72`의 `switch theme`에 있다.
   - `parse`는 legacy alias `green→matrix`, `blue→nord`를 매핑하고, 알 수 없는 값은 `nil`을 반환한다. `Config.load`(`Config.swift:108-114`)는 `nil`이면 `unsupportedColorTheme`를 throw해 config 로드 전체가 실패한다. 이번 plan은 아직 만드는 단계의 새 theme contract이므로 이 reject 동작을 유지한다.
-  - 테마 관련 테스트: `companion/Sources/CompanionCoreTestRunner/main.swift:313,323,332,336` (`amber` 사용, legacy `green→matrix` 기대).
+  - 테마 관련 테스트: `companion/Sources/CompanionCoreTestRunner/CompanionCoreTestRunnerTests.swift:313,323,332,336` (`amber` 사용, legacy `green→matrix` 기대).
 - Companion 사용자 노출 텍스트: `companion/README.md`, repo `README.md`/`README.ko.md`, popover 헤더(`companion/Sources/CompanionApp/Views/CompanionPopoverView.swift`), 설정 화면 헤더 `"Companion Settings"`(`AppearanceSettingsView.swift:29`).
 
 ## 결정 사항 (확정됨)
@@ -136,7 +136,7 @@ companion/Sources/CompanionApp/Views/CompanionPopoverView.swift  # popover 헤�
 - Candidate tile을 클릭하면 draft `colorTheme`가 즉시 바뀌고 기존 `onThemeChange(theme)` live preview 동작을 유지한다.
 - Acceptance: 항상 selected theme 1개와 candidate theme 4개가 구분되어 보이며, 선택 변경 후 새 selected 1개 + candidate 4개 구성이 다시 계산된다.
 
-### Task 9: 테마 테스트 갱신 (`CompanionCoreTestRunner/main.swift`)
+### Task 9: 테마 테스트 갱신 (`CompanionCoreTestRunnerTests.swift`)
 - `:313,323,332` `amber` 사용을 살아있는 테마(예: `tokyonight`)로 교체.
 - `:336` legacy `green→matrix` 기대 테스트를 제거하고, `green`/`blue`가 모두 `unsupportedColorTheme`로 rejected 되는지 검증한다.
 - 새 검증 추가: 제거 테마(`matrix`/`amber`/`solarized`)가 포함된 config가 fallback 없이 `unsupportedColorTheme`로 rejected 되는지(Task 6).

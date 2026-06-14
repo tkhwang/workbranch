@@ -231,7 +231,7 @@ CLI(`workbranch`)와 companion을 project 레지스트리로 연동하고, `TASK
 ## Phase 7 — 검증 & 테스트
 
 - **CLI(shell)** `tests/`: Markdown registry add/remove 멱등성·workbranchBin 보존·추가 의존성 없음, init→등록, `--no-companion`, destroy 안전검사/삭제순서/`--force`, `--keep-files` 거부, `list --global --json` wrapper(`projects[]`+`errors[]`) 스키마, partial failure exit 0, all-roots failure nonzero, `items[]` depth 파싱.
-- **companion(Swift)** `CompanionCoreTests`: schemaVersion 1 + additive items 디코딩, global wrapper(`projects[]`+`errors[]`) 디코딩, partial failure decode, `list --global --json` 1회 refresh, 실패 root error row/self-heal 판단, items depth, MenuState 롤업/색/타이틀, 트리 구성, `New workspace` 제거 후 기존 task action 유지. `CompanionCoreTestRunner/main.swift` 갱신.
+- **companion(Swift)** `CompanionCoreTests`: schemaVersion 1 + additive items 디코딩, global wrapper(`projects[]`+`errors[]`) 디코딩, partial failure decode, `list --global --json` 1회 refresh, 실패 root error row/self-heal 판단, items depth, MenuState 롤업/색/타이틀, 트리 구성, `New workspace` 제거 후 기존 task action 유지. `CompanionCoreTestRunnerTests.swift` 갱신.
 - **수동**: 실제 2~3개 프로젝트 init → companion 트리/접기/색/now/롤업 육안 확인.
 
 ---
@@ -269,7 +269,7 @@ Phase 7 (테스트/검증)
 - `companion/Sources/CompanionApp/Views/CompanionPopoverView.swift` (UI 개편)
 - `companion/Sources/CompanionApp/CLIClient.swift` (`list --global --json` 호출)
 - `companion/Sources/CompanionApp/StateStore.swift` (`list --global` 1회 refresh, `New workspace` 제거, task action 유지)
-- 테스트: `tests/`, `companion/Tests/`, `companion/Sources/CompanionCoreTestRunner/main.swift`
+- 테스트: `tests/`, `companion/Tests/`, `companion/Sources/CompanionCoreTestRunner/CompanionCoreTestRunnerTests.swift`
 ---
 
 ## 실행 결과 (2026-06-13)

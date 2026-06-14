@@ -176,15 +176,15 @@ Combined flow shortcut:
 
 `workbranch add <task>`는 repo worktree 밖의 task root에 workbranch-managed state를 생성합니다.
 
-- `<task>/TASK-WORKBRANCH.md`는 사람/AI agent가 함께 갱신하는 task brief입니다. 생성 템플릿은 첫 `#` heading, 선택적 `status: todo|planning|in-progress|review|blocked|done` 줄, Markdown checklist 진행도를 사용합니다. `workbranch memo <task> [text]`로 읽거나 덮어쓰고, `workbranch memo <task> --clear`로 삭제합니다. Task workspace 안에서는 읽기일 때만 `workbranch memo`처럼 `<task>`를 생략할 수 있습니다.
+- `<task>/TASK-WORKBRANCH.md`는 사람/AI agent가 함께 갱신하는 task brief입니다. 생성 템플릿은 첫 `#` heading, 선택적 `status: todo|planning|in-progress|review|blocked|done` 줄, 구체적인 Plan 이름을 담는 `plan:` 줄, Step으로 해석되는 Markdown checklist 진행도를 사용합니다. `workbranch memo <task> [text]`로 읽거나 덮어쓰고, `workbranch memo <task> --clear`로 삭제합니다. Task workspace 안에서는 읽기일 때만 `workbranch memo`처럼 `<task>`를 생략할 수 있습니다.
 - `<task>/AGENTS.md`는 `<task>` 또는 `<task>/<repo>`에서 실행되는 AI agent가 같은 task brief를 갱신하도록 안내합니다. 갱신 시점은 시작/재개, active step 변경, 검증 전후, blocked, final response 직전입니다.
-- `<task>/.workbranch/notifications.jsonl`은 append-only local inbox입니다. `workbranch noti add/list/clear`가 관리하고, `workbranch list --json`은 companion app용 `notiCount`, `status`, `progressDone`, `progressTotal`, `currentItem`, `updatedAt`을 노출합니다.
+- `<task>/.workbranch/notifications.jsonl`은 append-only local inbox입니다. `workbranch noti add/list/clear`가 관리하고, `workbranch list --json`은 companion app용 `notiCount`, `planTitle`, `status`, `progressDone`, `progressTotal`, `currentItem`, `updatedAt`을 노출합니다.
 
 `workbranch remove <task>`는 workspace 제거가 성공한 뒤 known workbranch task state(`TASK-WORKBRANCH.md`, generated `AGENTS.md`, `.workbranch/`, `.workbranch.task`)를 삭제합니다. 그 외 task root에 남은 항목은 `.omx/`, `.omc/` 같은 agent runtime folder를 포함해 git으로 관리되지 않는 잔여물입니다. Normal remove는 이 목록을 보여주고 task root 전체를 삭제할지 한 번 묻습니다. `workbranch remove <task> --force`는 일반 safety preflight 통과 후 묻지 않고 task root를 제거합니다.
 
 ## Native menu bar companion
 
-`companion/`에는 local native macOS menu bar app인 `WorkbranchCompanion.app`이 있습니다. 이 app은 task 상태·알림·현재 작업을 보여주는 workbranch status monitor이며, `workbranch list --json`을 소비해서 task status/progress, repo/branch identity 아래 항상 보이는 warm color의 현재 작업/status 한 줄과 `HH:mm` update time, branch identity를 보여주는 repo child row, inline memo edit, notification clear, 기존 Finder/IDE/terminal launch action을 제공합니다. Configured project root가 parent는 존재하지만 root 자체만 삭제된 true deletion 상태이면, app은 연속 2회 refresh 실패 뒤 해당 root를 config에서 제거하고 1회 알림을 보냅니다.
+`companion/`에는 local native macOS menu bar app인 `WorkbranchCompanion.app`이 있습니다. 이 app은 task 상태·알림·현재 작업·Companion-local 활동 시간을 보여주는 workbranch status monitor이며, `workbranch list --json`을 소비해서 task status/progress, repo/branch identity 아래 항상 보이는 warm color의 현재 작업/status 한 줄과 `HH:mm` update time, branch identity를 보여주는 repo child row, task별 inline active-time label, footer Home/Report/Setting navigation과 report icon으로 여는 today/weekly/monthly activity view, inline memo edit, notification clear, 기존 Finder/IDE/terminal launch action을 제공합니다. Activity history는 `~/.local/state/workbranch/activity.jsonl`에 저장되고, 관련 repo/task workspace가 나중에 제거되어도 보존됩니다. Configured project root가 parent는 존재하지만 root 자체만 삭제된 true deletion 상태이면, app은 연속 2회 refresh 실패 뒤 해당 root를 config에서 제거하고 1회 알림을 보냅니다.
 
 Published release 설치:
 
