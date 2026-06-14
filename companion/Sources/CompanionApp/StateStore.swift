@@ -12,10 +12,11 @@ final class StateStore: ObservableObject {
     private(set) var configURL: URL
     private var config: CompanionConfig
     private var previous: [String: WorkbranchListDocument] = [:]
+    private var lastRefreshResults: [RootResult] = []
     private var notificationTracker = NotificationTracker()
     private let readStateURL: URL
     private var statusReadMarkers: StatusReadMarkers
-    private var shouldBaselineStatusReadMarkers: Bool
+    private var pendingBaselineStatusReadRoots: Set<String>
     private var missingRootConfirmations: [String: Int] = [:]
     private var debounceScheduler = DebounceScheduler(delay: 2.0)
     private var refreshCoordinator = RefreshCoordinator()
@@ -32,10 +33,10 @@ final class StateStore: ObservableObject {
         self.readStateURL = Self.defaultReadStateURL(configURL: configURL)
         if let markers = try? StatusReadMarkers.load(from: readStateURL) {
             self.statusReadMarkers = markers
-            self.shouldBaselineStatusReadMarkers = markers.isEmpty
+            self.pendingBaselineStatusReadRoots = Self.pendingBaselineRoots(configuredRoots: config.roots, markers: markers)
         } else {
             self.statusReadMarkers = StatusReadMarkers()
-            self.shouldBaselineStatusReadMarkers = true
+            self.pendingBaselineStatusReadRoots = Set(config.roots)
         }
         var tracker = NotificationTracker()
         self.menuState = MenuState.make(configuredRoots: config.roots, results: [], previous: nil, tracker: &tracker, isBaseline: true, statusReadMarkers: statusReadMarkers)
@@ -54,6 +55,14 @@ final class StateStore: ObservableObject {
 
     static func defaultReadStateURL(configURL: URL = StateStore.defaultConfigURL()) -> URL {
         configURL.deletingLastPathComponent().appendingPathComponent("read-state.json")
+    }
+
+    private static func pendingBaselineRoots(configuredRoots: [String], markers: StatusReadMarkers) -> Set<String> {
+        Set(configuredRoots.filter { configuredRoot in
+            !markers.roots.keys.contains { markerRoot in
+                ProjectRootIdentity.matches(configuredRoot: configuredRoot, documentRoot: markerRoot)
+            }
+        })
     }
 
     func reloadConfig() {
@@ -120,6 +129,7 @@ final class StateStore: ObservableObject {
     }
 
     func apply(results: [RootResult], isBaseline: Bool) {
+        lastRefreshResults = results
         var successfulDocuments: [WorkbranchListDocument] = []
         for result in results {
             switch result {
@@ -131,10 +141,8 @@ final class StateStore: ObservableObject {
                 recordMissingRootIfNeeded(root: root)
             }
         }
-        if isBaseline && shouldBaselineStatusReadMarkers && !successfulDocuments.isEmpty {
-            statusReadMarkers.markBaselineRead(documents: successfulDocuments)
+        if baselinePendingStatusReadMarkers(with: successfulDocuments) {
             persistStatusReadMarkers()
-            shouldBaselineStatusReadMarkers = false
         }
         menuState = MenuState.make(
             configuredRoots: config.roots,
@@ -154,6 +162,27 @@ final class StateStore: ObservableObject {
         for root in config.roots where ProjectRootIdentity.matches(configuredRoot: root, documentRoot: documentRoot) {
             missingRootConfirmations.removeValue(forKey: root)
         }
+    }
+
+    @discardableResult
+    private func baselinePendingStatusReadMarkers(with documents: [WorkbranchListDocument]) -> Bool {
+        var didChange = false
+        for document in documents where isPendingBaselineStatusReadRoot(document.root) {
+            statusReadMarkers.markBaselineRead(documents: [document])
+            pendingBaselineStatusReadRoots.remove(document.root)
+            for root in config.roots where ProjectRootIdentity.matches(configuredRoot: root, documentRoot: document.root) {
+                pendingBaselineStatusReadRoots.remove(root)
+            }
+            didChange = true
+        }
+        return didChange
+    }
+
+    private func isPendingBaselineStatusReadRoot(_ documentRoot: String) -> Bool {
+        pendingBaselineStatusReadRoots.contains(documentRoot) ||
+            pendingBaselineStatusReadRoots.contains { configuredRoot in
+                ProjectRootIdentity.matches(configuredRoot: configuredRoot, documentRoot: documentRoot)
+            }
     }
 
     private func recordMissingRootIfNeeded(root: String) {
@@ -231,7 +260,7 @@ final class StateStore: ObservableObject {
     private func rebuildMenuStateFromPrevious() {
         menuState = MenuState.make(
             configuredRoots: config.roots,
-            results: [],
+            results: lastRefreshResults,
             previous: previous,
             tracker: &notificationTracker,
             isBaseline: true,

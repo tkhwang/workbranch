@@ -232,6 +232,8 @@
 - [x] Companion status update가 `updatedAt` 기준 unread로 표시되고, 사용자가 status/current-work line을 클릭하면 read marker가 저장되어 읽음으로 바뀐다.
 - [x] `read-state.json`이 없거나 빈 상태인 최초 baseline refresh에서는 기존 visible task를 read로 저장해 도입 직후 전체 task가 unread가 되지 않게 했다.
 - [x] 후속 UI 보정: task header에서는 status를 제거하고 primary status line을 `│ STATUS │ HH:mm │ MESSAGE` 형식으로 단순화했다. unread는 status segment의 compact dot/색 강조로 유지한다.
+- [x] 리뷰 보정: status read 클릭 후 재빌드가 마지막 refresh error를 보존하고, first-run baseline은 root별 pending set으로 추적해 startup partial failure root가 나중에 복구되어도 기존 task가 unread로 튀지 않게 했다.
+- [x] 리뷰 보정: read-state persistence가 config directory watcher를 다시 깨우지 않도록 config watcher를 `projects.md` 파일 이벤트로 제한했다.
 
 검증 evidence:
 
@@ -243,4 +245,6 @@
 - `(cd companion && swift run CompanionCoreTestRunner)` → `CompanionCoreTestRunner: PASS`.
 - `git diff --check` → pass.
 - 후속 UI 보정 검증: `(cd companion && swift build && swift run CompanionCoreTestRunner)` → build complete + `CompanionCoreTestRunner: PASS`; `git diff --check` → pass.
+- 리뷰 보정 검증: `CompanionCoreTestRunner` red/green으로 refresh error 보존과 root별 pending baseline source invariant를 확인했고, `(cd companion && swift build && swift run CompanionCoreTestRunner)` → PASS, `git diff --check` → pass.
+- read-state watcher 보정 검증: `EventFilter(allowedFileName:)` red/green으로 `projects.md`만 config refresh 대상이고 `read-state.json`은 무시됨을 확인했고, `(cd companion && swift build && swift run CompanionCoreTestRunner)` → PASS, `git diff --check`/`git diff --cached --check` → pass.
 - 수동 visual QA: 미실행. 메뉴바 popover GUI 조작은 이 세션에서 직접 관찰하지 못했고, 대신 source invariant + `swift build`로 height/status/unread click wiring을 검증했다.

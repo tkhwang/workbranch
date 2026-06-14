@@ -395,6 +395,10 @@ func runConfigActionsDebounceTests() throws {
     try expect(policy.shouldRefresh(forPath: "/tmp/fullstack/task3/TASK-WORKBRANCH.md", root: "/tmp/fullstack"), "task state event refreshes")
     try expect(!policy.shouldRefresh(forPath: "/tmp/fullstack/task3/backend/.git/index", root: "/tmp/fullstack"), "git index ignored")
     try expect(!policy.shouldRefresh(forPath: "/tmp/fullstack/task3/backend/.git", root: "/tmp/fullstack"), "git dir ignored")
+    let configPolicy = EventFilter(allowedFileName: "projects.md")
+    try expect(configPolicy.shouldRefresh(forPath: "/tmp/workbranch-companion/projects.md", root: "/tmp/workbranch-companion"), "config projects.md event refreshes")
+    try expect(!configPolicy.shouldRefresh(forPath: "/tmp/workbranch-companion/read-state.json", root: "/tmp/workbranch-companion"), "read-state write does not refresh config")
+    try expect(!configPolicy.shouldRefresh(forPath: "/tmp/workbranch-companion", root: "/tmp/workbranch-companion"), "config directory event does not refresh config")
 
     var scheduler = DebounceScheduler(delay: 2.0)
     scheduler.record(root: "/a", at: 0)
@@ -464,14 +468,17 @@ func runProcessRunnerTests() throws {
 func runAppSourceInvariantTests() throws {
     let fm = FileManager.default
     let stateStorePath = "Sources/CompanionApp/StateStore.swift"
+    let rootWatcherPath = "Sources/CompanionApp/RootWatcher.swift"
     let popoverPath = "Sources/CompanionApp/Views/CompanionPopoverView.swift"
     let rowViewPath = "Sources/CompanionApp/Views/RowView.swift"
     let settingsViewPath = "Sources/CompanionApp/Views/AppearanceSettingsView.swift"
     let stateStore = try String(contentsOfFile: stateStorePath, encoding: .utf8)
+    let rootWatcher = try String(contentsOfFile: rootWatcherPath, encoding: .utf8)
     let popover = try String(contentsOfFile: popoverPath, encoding: .utf8)
     let rowView = try String(contentsOfFile: rowViewPath, encoding: .utf8)
     let settingsView = try String(contentsOfFile: settingsViewPath, encoding: .utf8)
     try expect(fm.fileExists(atPath: stateStorePath), "StateStore source exists")
+    try expect(fm.fileExists(atPath: rootWatcherPath), "RootWatcher source exists")
     try expect(fm.fileExists(atPath: popoverPath), "popover source exists")
     try expect(fm.fileExists(atPath: rowViewPath), "RowView source exists")
     try expect(fm.fileExists(atPath: settingsViewPath), "settings source exists")
@@ -492,6 +499,7 @@ func runAppSourceInvariantTests() throws {
     }
     let configureBody = String(stateStore[configureStart.lowerBound..<configureEnd.lowerBound])
     try expect(configureBody.contains("configURL.deletingLastPathComponent()"), "config watcher derives config directory")
+    try expect(rootWatcher.contains("EventFilter(allowedFileName: configURL.lastPathComponent)"), "config watcher only reacts to projects.md changes")
     guard
         let createDirectoryRange = configureBody.range(of: "createDirectory"),
         let rootWatcherRange = configureBody.range(of: "RootWatcher")
@@ -537,10 +545,26 @@ func runAppSourceInvariantTests() throws {
     try expect(stateStore.contains("private func runStandardInputExternal"), "StateStore has async stdin external runner")
     try expect(stateStore.contains("defaultReadStateURL"), "StateStore has read-state path helper")
     try expect(stateStore.contains("read-state.json"), "StateStore uses read-state.json")
-    try expect(stateStore.contains("shouldBaselineStatusReadMarkers = markers.isEmpty"), "StateStore baselines missing or empty read-state")
+    try expect(stateStore.contains("pendingBaselineStatusReadRoots"), "StateStore tracks per-root pending baseline read roots")
+    try expect(!stateStore.contains("shouldBaselineStatusReadMarkers"), "StateStore does not close first-run baselining with a global flag")
+    try expect(stateStore.contains("pendingBaselineRoots(configuredRoots:"), "StateStore computes pending baseline roots from configured roots and persisted markers")
+    try expect(stateStore.contains("self.pendingBaselineStatusReadRoots = Set(config.roots)"), "StateStore keeps all configured roots pending when read-state is missing")
+    try expect(stateStore.contains("!markers.roots.keys.contains"), "StateStore leaves roots without persisted markers pending")
+    try expect(stateStore.contains("pendingBaselineStatusReadRoots.remove(document.root)"), "StateStore clears baseline pending only for successful roots")
     try expect(stateStore.contains("statusReadMarkers.markBaselineRead"), "StateStore baselines existing tasks as read")
     try expect(stateStore.contains("markStatusRead"), "StateStore exposes markStatusRead action")
     try expect(stateStore.contains("statusReadMarkers.write"), "StateStore persists read markers")
+    try expect(stateStore.contains("lastRefreshResults"), "StateStore tracks the last refresh results")
+    try expect(stateStore.contains("lastRefreshResults = results"), "StateStore updates last refresh results after refresh apply")
+    guard
+        let rebuildStart = stateStore.range(of: "private func rebuildMenuStateFromPrevious()"),
+        let rebuildEnd = stateStore[rebuildStart.lowerBound...].range(of: "func openConfig()")
+    else {
+        throw TestFailure(message: "StateStore rebuildMenuStateFromPrevious body not found")
+    }
+    let rebuildBody = String(stateStore[rebuildStart.lowerBound..<rebuildEnd.lowerBound])
+    try expect(rebuildBody.contains("results: lastRefreshResults"), "status read rebuild preserves current refresh errors")
+    try expect(!rebuildBody.contains("results: []"), "status read rebuild does not drop current refresh errors")
     guard
         let sectionForEachStart = popover.range(of: "ForEach(store.menuState.sections"),
         let rowForEachStart = popover.range(of: "ForEach(section.rows")
