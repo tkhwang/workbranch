@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.22.0](https://github.com/tkhwang/workbranch/compare/v1.21.0...v1.22.0) (2026-06-14)
+
+
+### Features
+
+* implement activity report feature ([a0f18f1](https://github.com/tkhwang/workbranch/commit/a0f18f1d0a105d4b2b92daf721fd8f4b1b865cf4))
+* implement activity report feature ([1760a0b](https://github.com/tkhwang/workbranch/commit/1760a0be76d5af81d833944dbc9b7a0e6771a335))
+
+
+### Bug Fixes
+
+* **activityevent:** handle same-second task updates ([d925312](https://github.com/tkhwang/workbranch/commit/d92531221572181bc16534b9444047fa29552242))
+* **activity:** improve report filtering and rollup logic ([75b1162](https://github.com/tkhwang/workbranch/commit/75b11626519b04772cf81e4c2a98b10bb764ce70))
+
 ## [1.21.0](https://github.com/tkhwang/workbranch/compare/v1.20.0...v1.21.0) (2026-06-14)
 
 
