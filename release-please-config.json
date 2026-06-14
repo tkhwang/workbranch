@@ -9,9 +9,9 @@
       "component": "workbranch",
       "include-component-in-tag": false,
       "exclude-paths": [
-        "companion",
-        ".github",
-        "docs",
+        "companion/**",
+        ".github/**",
+        "docs/**",
         "README.md",
         "README.ko.md",
         "release-please-config.json",
