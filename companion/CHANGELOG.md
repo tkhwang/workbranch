@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.5.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v1.4.0...workbranch-companion-v1.5.0) (2026-06-14)
+
+
+### Features
+
+* **rowview:** display progress counts in status summary ([e365c5c](https://github.com/tkhwang/workbranch/commit/e365c5cc4fd3064e191e4e9331395e1ab929803d))
+* **ui:** redesign popover and row views ([8b2678b](https://github.com/tkhwang/workbranch/commit/8b2678b578202def88b07d24ee658391a3e673c4))
+* **ui:** redesign popover and row views ([58ce57b](https://github.com/tkhwang/workbranch/commit/58ce57b2b5920c695a4a2d164fa527c323b963fe))
+
 ## [1.4.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v1.3.0...workbranch-companion-v1.4.0) (2026-06-13)
 
 
