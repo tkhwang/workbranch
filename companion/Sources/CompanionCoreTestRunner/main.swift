@@ -114,7 +114,8 @@ func runModelsAndMenuStateTests() throws {
     let stateDoc = try WorkbranchListDocument.decode(Data("""
     {"schemaVersion":1,"project":"fullstack","root":"/tmp/fullstack","tasks":[
       {"name":"task3","path":"/tmp/fullstack/task3","memoTitle":"draft-tree 가이드 작성","status":"in-progress","progressDone":1,"progressTotal":2,"currentItem":"검증 실행","updatedAt":1760000100,"notiCount":2,"repos":[{"name":"backend","branch":"feature/task3","dirty":true}]},
-      {"name":"task4","path":"/tmp/fullstack/task4","memoTitle":"","status":"planning","progressDone":0,"progressTotal":0,"currentItem":"","notiCount":0,"repos":[{"name":"backend","branch":"feature/task4","dirty":false}]}
+      {"name":"task4","path":"/tmp/fullstack/task4","memoTitle":"","status":"planning","progressDone":0,"progressTotal":0,"currentItem":"","notiCount":0,"repos":[{"name":"backend","branch":"feature/task4","dirty":false}]},
+      {"name":"task5","path":"/tmp/fullstack/task5","memoTitle":"","status":"todo","progressDone":0,"progressTotal":2,"currentItem":"설계 시작","notiCount":0,"repos":[{"name":"backend","branch":"feature/task5","dirty":false}]}
     ]}
     """.utf8))
     let state = MenuState.make(
@@ -143,6 +144,9 @@ func runModelsAndMenuStateTests() throws {
     try expect(state.sections[0].rows[1].title.contains("○"), "planning status icon")
     try expect(!state.sections[0].rows[1].title.contains("0/0"), "zero-total progress hidden")
     try expect(state.sections[0].rows[1].subtitle == nil, "empty current item hidden")
+    try expect(state.sections[0].rows[2].title.contains("·"), "todo status icon")
+    try expect(state.sections[0].rows[2].status == "todo", "todo status remains row data")
+    try expect(state.sections[0].rows[2].currentItem == "설계 시작", "todo current item remains row data")
     try expect(state.sections[0].rows[0].primaryAction == .editMemo(root: "/tmp/fullstack", task: "task3"), "primary action")
     try expect(state.sections[1].rows[0].title.contains("workbranch list failed"), "error row")
     try expect(state.notificationsToSend.isEmpty, "baseline no notifications")
@@ -310,7 +314,7 @@ func runConfigActionsDebounceTests() throws {
     workbranchBin: /opt/homebrew/bin/workbranch
     fontName: JetBrains Mono
     fontSize: 14.5
-    colorTheme: amber
+    colorTheme: tokyonight
 
     ## projects
     - /tmp/fullstack
@@ -320,7 +324,7 @@ func runConfigActionsDebounceTests() throws {
     try expect(config.roots == ["/tmp/fullstack"], "config roots")
     try expect(config.workbranchBin == "/opt/homebrew/bin/workbranch", "workbranch bin")
     try expect(config.font == CompanionFontSettings(name: "JetBrains Mono", size: 14.5), "font settings")
-    try expect(config.colorTheme == .amber, "color theme")
+    try expect(config.colorTheme == .tokyonight, "color theme")
     let removedConfig = try config.removingRoot("/tmp/fullstack")
     try expect(removedConfig.roots == [], "remove config root")
     try expect(removedConfig.font == config.font, "remove config root preserves font")
@@ -329,14 +333,15 @@ func runConfigActionsDebounceTests() throws {
     let reloadedRemovedConfig = try CompanionConfig.load(from: configURL)
     try expect(reloadedRemovedConfig.roots == [], "remove config root persists")
     try expect(reloadedRemovedConfig.font == config.font, "font settings persist")
-    try expect(reloadedRemovedConfig.colorTheme == .amber, "color theme persists")
-    try valid.write(to: configURL)
-    try Data("colorTheme: green\n\n## projects\n- /tmp/fullstack\n".utf8).write(to: configURL)
-    let legacyGreenConfig = try CompanionConfig.load(from: configURL)
-    try expect(legacyGreenConfig.colorTheme == .matrix, "legacy green theme maps to matrix")
-    try Data("colorTheme: blue\n\n## projects\n- /tmp/fullstack\n".utf8).write(to: configURL)
-    let legacyBlueConfig = try CompanionConfig.load(from: configURL)
-    try expect(legacyBlueConfig.colorTheme == .nord, "legacy blue theme maps to nord")
+    try expect(reloadedRemovedConfig.colorTheme == .tokyonight, "color theme persists")
+    try expect(CompanionColorTheme.allCases == [.catppuccin, .dracula, .onedark, .nord, .tokyonight], "selected Superset theme order")
+    try expect(CompanionColorTheme.catppuccin.label == "Catppuccin Mocha", "catppuccin label")
+    try expect(CompanionColorTheme.onedark.label == "One Dark Pro", "onedark label")
+    try expect(CompanionColorTheme.tokyonight.label == "Tokyo Night", "tokyonight label")
+    for removedTheme in ["matrix", "amber", "solarized", "green", "blue"] {
+        try Data("colorTheme: \(removedTheme)\n\n## projects\n- /tmp/fullstack\n".utf8).write(to: configURL)
+        try expectThrows("removed or legacy theme rejected: \(removedTheme)") { _ = try CompanionConfig.load(from: configURL) }
+    }
 
     try Data("## projects\n- relative\n".utf8).write(to: configURL)
     try expectThrows("relative root rejected") { _ = try CompanionConfig.load(from: configURL) }
@@ -609,6 +614,7 @@ func runAppSourceInvariantTests() throws {
     try expect(applyThemeBody.contains("draftColorTheme = theme"), "theme selection updates draft state")
     try expect(!applyThemeBody.contains("store.save"), "theme selection does not persist before Save")
     try expect(popover.contains("workbranch-companion"), "popover header uses companion app name")
+    try expect(popover.contains("status monitor"), "popover header states companion status monitor role")
     guard
         let headerStart = popover.range(of: "private var header"),
         let headerEnd = popover[headerStart.lowerBound...].range(of: "private func sectionView")
@@ -616,6 +622,9 @@ func runAppSourceInvariantTests() throws {
         throw TestFailure(message: "header body not found")
     }
     let headerBody = String(popover[headerStart.lowerBound..<headerEnd.lowerBound])
+    try expect(headerBody.contains("Text(companionVersionText)"), "header renders version text on the right")
+    try expect(popover.contains("Bundle.main.object(forInfoDictionaryKey: \"CFBundleShortVersionString\")"), "version text reads app bundle short version")
+    try expect(popover.contains("0.0.0-dev"), "version text has local development fallback")
     try expect(!headerBody.contains("IconControl"), "header does not render refresh or quit controls")
     try expect(!popover.contains("\"$ refresh\""), "refresh command text is not rendered in header")
     try expect(!popover.contains("\"$ refresh-now\""), "refresh command text is not rendered in footer")
@@ -679,8 +688,16 @@ func runAppSourceInvariantTests() throws {
     try expect(rowView.contains("palette.warning"), "primary status line uses warm color")
     try expect(!rowView.contains("RoundedRectangle(cornerRadius: 4)"), "primary status text no longer uses old stroke box")
     try expect(!rowView.contains(".padding(.horizontal, 7)"), "primary status text no longer keeps box padding")
+    try expect(settingsView.contains("Text(fontName)"), "settings font selector renders selected font with custom text")
+    try expect(settingsView.contains("foregroundStyle(palette.text)"), "settings selected font text uses terminal palette text color")
+    try expect(settingsView.contains("Button { fontName = name }"), "settings font selector remains interactive")
     try expect(settingsView.contains("FixedWidthFontCatalog.names"), "settings font picker uses fixed-width font catalog")
     try expect(settingsView.contains("fixedPitchFontMask"), "fixed-width font catalog filters system monospaced fonts")
+    try expect(settingsView.contains("selectedTheme"), "settings view separates selected theme")
+    try expect(settingsView.contains("candidateThemes"), "settings view computes four candidate themes")
+    try expect(settingsView.contains("CompanionColorTheme.allCases.filter { $0 != colorTheme }"), "candidate themes exclude selected theme")
+    try expect(settingsView.contains("Text(\"Selected theme\")"), "settings view labels selected theme")
+    try expect(settingsView.contains("Text(\"Candidate themes\")"), "settings view labels candidate themes")
     try expect(settingsView.contains("onThemeChange(theme)"), "theme tile invokes live theme change callback")
 }
 

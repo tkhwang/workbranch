@@ -112,7 +112,7 @@ assert d["schemaVersion"] == 1, d
 login=d["tasks"][0]
 for key in ["status", "progressDone", "progressTotal", "currentItem", "updatedAt"]:
     assert key in login, login
-assert login["status"] == "planning", login
+assert login["status"] == "todo", login
 assert login["progressDone"] == 0, login
 assert login["progressTotal"] >= 1, login
 assert isinstance(login["currentItem"], str), login
@@ -176,7 +176,7 @@ EOF_BRIEF
   out=$(run_expect_success "$WORKBRANCH" list --json)
   printf '%s' "$out" | python3 -c 'import json,sys
 login=json.load(sys.stdin)["tasks"][0]
-assert login["status"] == "planning", login
+assert login["status"] == "todo", login
 assert login["progressDone"] == 0, login
 assert login["progressTotal"] == 0, login
 assert login["currentItem"] == "", login'

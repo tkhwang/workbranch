@@ -87,13 +87,13 @@ WORKBRANCH_COLOR=always workbranch help # enhanced display 강제
 ```markdown
 # Short task summary
 
-status: planning
+status: todo
 
 - [ ] Start work
 - [ ] Run verification
 ```
 
-첫 `#` heading은 memo title입니다. 분리된 `status:` 줄은 `planning`, `in-progress`, `review`, `blocked`, `done` 중 하나를 사용할 수 있습니다. Markdown checklist item이 진행도를 정의합니다. 완료 항목은 `progressDone`, 전체 checklist 항목은 `progressTotal`, 첫 번째 미완료 항목은 `currentItem`이 됩니다. Generated `AGENTS.md`는 agent가 시작/재개, active step 변경, 검증 전후, blocked, final response 직전에 task brief를 갱신하도록 안내합니다.
+첫 `#` heading은 memo title입니다. 분리된 `status:` 줄은 `todo`, `planning`, `in-progress`, `review`, `blocked`, `done` 중 하나를 사용할 수 있습니다. `status:` 줄이 없으면 checklist 진행도로 상태를 도출합니다. 완료 항목이 없거나 checklist가 없으면 `todo`, 일부 완료는 `in-progress`, 전부 완료는 `done`입니다. Markdown checklist item이 진행도를 정의합니다. 완료 항목은 `progressDone`, 전체 checklist 항목은 `progressTotal`, 첫 번째 미완료 항목은 `currentItem`이 됩니다. Generated `AGENTS.md`는 agent가 시작/재개, active step 변경, 검증 전후, blocked, final response 직전에 task brief를 갱신하도록 안내합니다.
 
 `workbranch memo <task>`는 task brief를 출력하고, `workbranch memo <task> "text"`는 덮어쓰며, `workbranch memo <task> --clear`는 삭제합니다. Registered task workspace 안에서는 읽기일 때만 task를 생략할 수 있습니다. `workbranch memo`는 현재 task brief를 출력합니다. 쓰기와 삭제는 명시적인 task 인자가 필요합니다.
 

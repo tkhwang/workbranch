@@ -87,13 +87,13 @@ The default task brief format is shared by humans, agents, `workbranch list --js
 ```markdown
 # Short task summary
 
-status: planning
+status: todo
 
 - [ ] Start work
 - [ ] Run verification
 ```
 
-The first `#` heading is the memo title. A separated `status:` line may be `planning`, `in-progress`, `review`, `blocked`, or `done`. Markdown checklist items define progress; completed items count toward `progressDone`, all checklist items count toward `progressTotal`, and the first unchecked item becomes `currentItem`. The generated `AGENTS.md` asks agents to update the brief when starting/resuming, changing the active step, before/after verification, when blocked, and before the final response.
+The first `#` heading is the memo title. A separated `status:` line may be `todo`, `planning`, `in-progress`, `review`, `blocked`, or `done`. When `status:` is absent, checklist progress derives status as `todo` for no completed checklist work or no checklist, `in-progress` for partial progress, and `done` when all checklist items are complete. Markdown checklist items define progress; completed items count toward `progressDone`, all checklist items count toward `progressTotal`, and the first unchecked item becomes `currentItem`. The generated `AGENTS.md` asks agents to update the brief when starting/resuming, changing the active step, before/after verification, when blocked, and before the final response.
 
 Use `workbranch memo <task>` to print the task brief, `workbranch memo <task> "text"` to overwrite it, and `workbranch memo <task> --clear` to remove it. From inside a registered task workspace, the task may be omitted only for reading: `workbranch memo` prints the current task brief. Writes and clears require an explicit task argument.
 

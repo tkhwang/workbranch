@@ -1,8 +1,8 @@
 # Workbranch Companion
 
-Native macOS menu bar companion for workbranch task workspaces.
+Native macOS menu bar companion and status monitor for workbranch task workspaces.
 
-The app is a read-only presentation client for the existing `workbranch` CLI. It does not read Git state directly; every refresh pulls `workbranch list --json` from each configured project root, then renders a compact project/task memo/repo branch/status summary with the task's `TASK-WORKBRANCH.md` status items.
+The app is a read-only status monitor and presentation client for the existing `workbranch` CLI. It does not read Git state directly; every refresh pulls `workbranch list --json` from each configured project root, then renders a compact project/task memo/repo branch/status summary with the task's `TASK-WORKBRANCH.md` status items.
 
 ## Requirements
 
@@ -105,8 +105,10 @@ colorTheme: dracula
 
 The gear icon in the popover opens companion settings for the terminal display.
 The font picker lists installed fixed-width system fonts, and `fontSize`
-controls the display size. `colorTheme` can be `dracula`, `matrix`, `amber`,
-`nord`, or `solarized`; new configs default to `dracula`.
+controls the display size. `colorTheme` can be `catppuccin`, `dracula`,
+`onedark`, `nord`, or `tokyonight`; new configs default to `dracula`. The
+settings UI shows the selected theme first and the other four themes as
+candidates.
 
 The app's **Open config** action creates an empty project-list skeleton if the file does not exist, then opens it in the default editor/Finder flow.
 
