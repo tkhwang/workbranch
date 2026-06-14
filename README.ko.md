@@ -205,7 +205,7 @@ swift run CompanionCoreTestRunner
 open dist/WorkbranchCompanion.app
 ```
 
-Root 설정은 `~/.config/workbranch-companion/projects.md`에서 합니다.
+Root 설정은 `~/.config/workbranch-companion/projects.md`에서 합니다. Companion settings의 `Launch at login`은 app을 macOS Login Items에 즉시 등록하며, 필요한 경우 System Settings > General > Login Items에서 승인을 해야 합니다.
 
 ## More docs
 

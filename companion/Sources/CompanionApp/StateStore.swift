@@ -8,6 +8,7 @@ import CompanionCore
 final class StateStore: ObservableObject {
     @Published private(set) var menuState: MenuState
     @Published private(set) var statusMessage: String = ""
+    @Published private(set) var launchAtLogin: Bool
 
     private(set) var configURL: URL
     private var config: CompanionConfig
@@ -23,13 +24,16 @@ final class StateStore: ObservableObject {
     private var debounceTimer: Timer?
     private var heartbeatTimer: Timer?
     private var rootWatcher: RootWatcher?
+    private let loginItem: LoginItemControlling
     var configuredRoots: [String] { config.roots }
     var fontSettings: CompanionFontSettings { config.font }
     var colorTheme: CompanionColorTheme { config.colorTheme }
 
-    init(configURL: URL = StateStore.defaultConfigURL()) {
+    init(configURL: URL = StateStore.defaultConfigURL(), loginItem: LoginItemControlling = SMAppServiceLoginItemController()) {
         self.configURL = configURL
         self.config = (try? CompanionConfig.load(from: configURL)) ?? (try! CompanionConfig(roots: []))
+        self.loginItem = loginItem
+        self.launchAtLogin = (loginItem.status == .enabled)
         self.readStateURL = Self.defaultReadStateURL(configURL: configURL)
         if let markers = try? StatusReadMarkers.load(from: readStateURL) {
             self.statusReadMarkers = markers
@@ -304,6 +308,23 @@ final class StateStore: ObservableObject {
             fontSize: config.font.size,
             colorTheme: colorTheme
         )
+    }
+
+    func setLaunchAtLogin(_ enabled: Bool) {
+        let errorDescription: String?
+        do {
+            try loginItem.setEnabled(enabled)
+            errorDescription = nil
+        } catch {
+            errorDescription = String(describing: error)
+        }
+        let outcome = LoginItemToggleOutcome.resolve(
+            requested: enabled,
+            statusAfter: loginItem.status,
+            errorDescription: errorDescription
+        )
+        launchAtLogin = outcome.launchAtLogin
+        statusMessage = outcome.message
     }
 
     func quit() {

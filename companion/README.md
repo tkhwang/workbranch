@@ -103,7 +103,12 @@ colorTheme: dracula
 - `/usr/local/bin/workbranch`
 - `~/.local/bin/workbranch`
 
-The gear icon in the popover opens companion settings for the terminal display.
+The gear icon in the popover opens companion settings. `Launch at login`
+registers or unregisters WorkbranchCompanion with macOS Login Items immediately;
+this setting is owned by System Settings and is not written to `projects.md`. If
+macOS reports that approval is required, open System Settings → General → Login
+Items and approve WorkbranchCompanion.
+
 The font picker lists installed fixed-width system fonts, and `fontSize`
 controls the display size. `colorTheme` can be `catppuccin`, `dracula`,
 `onedark`, `nord`, or `tokyonight`; new configs default to `dracula`. The
