@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.20.0](https://github.com/tkhwang/workbranch/compare/v1.19.0...v1.20.0) (2026-06-14)
+
+
+### Features
+
+* update task status values and companion config ([9529c3f](https://github.com/tkhwang/workbranch/commit/9529c3fda5314f2f0ce300acbfa03af434fb0ceb))
+* update task status values and companion config ([99adbbe](https://github.com/tkhwang/workbranch/commit/99adbbefe027574a97bd5adc2b478b07d91c2445))
+
 ## [1.19.0](https://github.com/tkhwang/workbranch/compare/v1.18.0...v1.19.0) (2026-06-14)
 
 
