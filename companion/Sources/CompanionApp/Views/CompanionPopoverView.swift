@@ -48,18 +48,12 @@ struct CompanionPopoverView: View {
                 .fontWeight(.bold)
                 .foregroundStyle(palette.accent)
             Spacer()
-            IconControl(systemName: "arrow.clockwise", help: "Refresh", tone: palette.accent) {
-                store.refreshAll()
-            }
-            IconControl(systemName: "power", help: "Quit", tone: palette.warning) {
-                store.quit()
-            }
         }
     }
 
     private func sectionView(_ section: MenuSection) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            TerminalLine(prefix: "$", command: section.title, tone: .accent)
+            TerminalLine(prefix: "[*]", command: section.title, tone: .accent)
             ForEach(section.rows) { row in
                 RowView(row: row, store: store)
             }
