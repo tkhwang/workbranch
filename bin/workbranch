@@ -395,12 +395,13 @@ Tool:
   path <task>       Print a task workspace path
   finder <task>     Open a task workspace in Finder
   ide <task>        Open task repo worktrees in the configured IDE
-  terminal <task>   Open task repo worktrees in the configured terminal
+  terminal <task>   Open the task root in the configured terminal
 Config:
   config            Create or update .workbranch.config without cloning repos
   config base       Update base branch settings and checkout base worktrees
   config ide        Update only the configured IDE command
   config terminal   Update only the configured terminal command
+  config language   Update preferred language for generated task guidance
   config --rewrite  Rewrite config to current format without prompts
 Other:
   doctor            Diagnose project health; --fix applies safe repairs
@@ -442,12 +443,13 @@ usage_enhanced() {
   printf '  path <task>       Print a task workspace path\n'
   printf '  finder <task>     Open a task workspace in Finder\n'
   printf '  ide <task>        Open task repo worktrees in the configured IDE\n'
-  printf '  terminal <task>   Open task repo worktrees in the configured terminal\n'
+  printf '  terminal <task>   Open the task root in the configured terminal\n'
   section "Config"
   printf '  config            Create or update .workbranch.config without cloning repos\n'
   printf '  config base       Update base branch settings and checkout base worktrees\n'
   printf '  config ide        Update only the configured IDE command\n'
-  printf '  config terminal   Update only the configured terminal command\n'
+  printf '  config terminal   Update only the configured terminal command
+  config language   Update preferred language for generated task guidance\n'
   printf '  config --rewrite  Rewrite config to current format without prompts\n'
   section "Other"
   printf '  doctor            Diagnose project health; --fix applies safe repairs\n'
@@ -614,6 +616,7 @@ reset_config() {
   TASK_SETUP=""
   IDE_COMMAND=""
   TERMINAL_COMMAND=""
+  PREFERRED_LANGUAGE="en"
   REPO_NAMES=()
   REPO_URLS=()
   REPO_BASE_BRANCHES=()
@@ -650,6 +653,34 @@ set_terminal_command() {
 
 clear_terminal_command() {
   TERMINAL_COMMAND=""
+}
+
+validate_preferred_language() {
+  case "$1" in
+    en|ko) return 0 ;;
+    *) die "invalid PREFERRED_LANGUAGE '$1' (expected en or ko)" ;;
+  esac
+}
+
+set_preferred_language() {
+  validate_preferred_language "$1"
+  PREFERRED_LANGUAGE=$1
+}
+
+preferred_language_label() {
+  case "${PREFERRED_LANGUAGE:-en}" in
+    ko) printf '%s' '한글' ;;
+    *) printf '%s' 'English' ;;
+  esac
+}
+
+normalize_preferred_language_choice() {
+  case "$1" in
+    "" ) printf '%s' "${PREFERRED_LANGUAGE:-en}" ;;
+    en|EN|English|english|1) printf '%s' 'en' ;;
+    ko|KO|Korean|korean|Hangul|hangul|한글) printf '%s' 'ko' ;;
+    *) die "invalid preferred language: $1 (expected English or 한글)" ;;
+  esac
 }
 
 set_repo_setup() {
@@ -743,6 +774,10 @@ parse_config() {
         [ -z "$TERMINAL_COMMAND" ] || die "duplicate TERMINAL directive in config"
         set_terminal_command "$(task_setup_from_line "$line")"
         ;;
+      PREFERRED_LANGUAGE)
+        [ $# -eq 2 ] || die "invalid config line $line_no: PREFERRED_LANGUAGE expects 1 value"
+        set_preferred_language "$2"
+        ;;
       TASK_SETUP)
         [ -z "$TASK_SETUP" ] || die "duplicate TASK_SETUP directive in config"
         TASK_SETUP=$(task_setup_from_line "$line")
@@ -806,6 +841,10 @@ parse_config_for_rewrite() {
         [ -z "$TERMINAL_COMMAND" ] || die "duplicate TERMINAL directive in config"
         set_terminal_command "$(task_setup_from_line "$line")"
         ;;
+      PREFERRED_LANGUAGE|preferred_language|language)
+        [ $# -eq 2 ] || die "invalid config line $line_no: PREFERRED_LANGUAGE expects 1 value"
+        set_preferred_language "$2"
+        ;;
       TASK_SETUP|task_setup)
         [ -z "$TASK_SETUP" ] || die "duplicate TASK_SETUP directive in config"
         TASK_SETUP=$(task_setup_from_line "$line")
@@ -855,6 +894,7 @@ write_config() {
     printf 'PROJECT_NAME %s\n' "$PROJECT_NAME"
     printf 'MAIN_WORKTREES_DIR %s\n' "$BASE_DIR"
     printf 'BRANCH_PREFIX %s\n' "${BRANCH_PREFIX:-feature}"
+    printf 'PREFERRED_LANGUAGE %s\n' "${PREFERRED_LANGUAGE:-en}"
     if [ -n "$IDE_COMMAND" ]; then
       printf 'IDE %s\n' "$IDE_COMMAND"
     fi
@@ -1311,6 +1351,19 @@ task_brief_file() {
   [ -f "$file" ] && printf '%s' "$file"
 }
 
+task_updated_at() {
+  local file
+  file=$(task_brief_file "$1") || true
+  [ -n "${file:-}" ] || { printf '0'; return 0; }
+  if stat -f %m "$file" >/dev/null 2>&1; then
+    stat -f %m "$file"
+  elif stat -c %Y "$file" >/dev/null 2>&1; then
+    stat -c %Y "$file"
+  else
+    printf '0'
+  fi
+}
+
 task_checklist_counts() {
   local file
   file=$(task_brief_file "$1") || true
@@ -1422,7 +1475,22 @@ write_default_task_brief() {
   task=$1
   file=$(task_brief_path "$task")
   [ -e "$file" ] && return 0
-  cat > "$file" <<EOF_BRIEF
+  if [ "${PREFERRED_LANGUAGE:-en}" = "ko" ]; then
+    cat > "$file" <<EOF_BRIEF
+# $task
+
+상태: planning
+status: planning
+
+- [ ] 주요: 작업 시작
+  - [ ] 변경 구현
+  - [ ] 검증 실행
+
+## 메모
+-
+EOF_BRIEF
+  else
+    cat > "$file" <<EOF_BRIEF
 # $task
 
 status: planning
@@ -1434,6 +1502,7 @@ status: planning
 ## Notes
 -
 EOF_BRIEF
+  fi
 }
 
 write_task_agent_guidance() {
@@ -1441,11 +1510,48 @@ write_task_agent_guidance() {
   task=$1
   file=$(task_agents_path "$task")
   [ -e "$file" ] && return 0
-  cat > "$file" <<'EOF_GUIDANCE'
+  if [ "${PREFERRED_LANGUAGE:-en}" = "ko" ]; then
+    cat > "$file" <<'EOF_GUIDANCE'
+# Workbranch 작업 안내
+
+이 파일은 workbranch가 이 task workspace에 생성한 안내입니다.
+
+- AI agent session은 기본적으로 task root(`<task>`)에서 실행합니다.
+- task root는 Git repository가 아닙니다. workbranch metadata/agent 작업 공간입니다.
+- 실제 Git repo는 `<task>/<repo>` 아래에 있습니다.
+- 코드 변경과 Git 명령은 repo folder 안에서 수행하고, 진행 상황은 task root의 `TASK-WORKBRANCH.md`에 기록합니다.
+- 현재 작업 디렉터리가 task root이면 `TASK-WORKBRANCH.md`를 갱신합니다.
+- 현재 작업 디렉터리가 이 task 아래의 repo folder이면 `../TASK-WORKBRANCH.md`를 갱신합니다.
+- 현재 작업, blocker, 다음 action을 사람이 읽을 수 있게 task brief에 남깁니다.
+- 사용자가 명시적으로 요청하지 않는 한 repo-local task-state file을 만들지 않습니다.
+
+## 작업 진행 업데이트 규칙
+
+다음 시점에 `TASK-WORKBRANCH.md`를 갱신합니다:
+- 의미 있는 작업을 시작하거나 재개할 때
+- active implementation step이 바뀔 때
+- 검증을 실행하기 전
+- 검증이 통과하거나 실패한 후
+- blocked 상태가 되었을 때
+- final response 직전
+
+규칙:
+- `status:`는 planning | in-progress | review | blocked | done 중 하나로 유지합니다.
+- checklist item은 작고 실행 가능한 단위로 유지합니다.
+- 완료한 항목은 즉시 `[x]`로 표시합니다.
+- 첫 번째 미완료 항목이 현재 또는 다음 작업을 나타내야 합니다.
+- 하위 task는 Markdown checklist item을 두 칸 들여써 표현합니다.
+EOF_GUIDANCE
+  else
+    cat > "$file" <<'EOF_GUIDANCE'
 # Workbranch Task Guidance
 
 This file is generated by workbranch for this task workspace.
 
+- Run AI agent sessions from the task root (`<task>`) by default.
+- The task root is not a Git repository; it is a workbranch metadata/agent workspace.
+- The actual Git repositories live under `<task>/<repo>`.
+- Make code changes and run Git commands inside the repo folders; keep progress in `TASK-WORKBRANCH.md` at the task root.
 - Keep the task brief current as work progresses.
 - If your current working directory is the task root, update `TASK-WORKBRANCH.md`.
 - If your current working directory is a repo folder under this task, update `../TASK-WORKBRANCH.md`.
@@ -1469,6 +1575,7 @@ Rules:
 - the first unchecked item should represent the current or next work
 - express sub-tasks by indenting Markdown checklist items with two spaces per level
 EOF_GUIDANCE
+  fi
 }
 
 write_default_task_state() {
@@ -1493,8 +1600,6 @@ remove_task_state_files() {
   [ ! -f "$agents" ] || rm -f "$agents" || die "failed to remove task agent guidance: $agents"
   [ ! -f "$noti" ] || rm -f "$noti" || die "failed to remove task notifications: $noti"
   rmdir "$state_dir" 2>/dev/null || true
-  [ ! -e "$task_dir/.omx" ] || rm -rf "$task_dir/.omx" || die "failed to remove task OMX state: $task_dir/.omx"
-  [ ! -e "$task_dir/.omc" ] || rm -rf "$task_dir/.omc" || die "failed to remove task OMC state: $task_dir/.omc"
 }
 
 resolve_current_task_from_cwd() {
@@ -2696,10 +2801,11 @@ cmd_config() {
         base) config_target="base" ;;
         ide) config_target="ide" ;;
         terminal) config_target="terminal" ;;
-        *) die "usage: workbranch config [base|ide|terminal|--rewrite]" ;;
+        language) config_target="language" ;;
+        *) die "usage: workbranch config [base|ide|terminal|language|--rewrite]" ;;
       esac
       ;;
-    *) die "usage: workbranch config [base|ide|terminal|--rewrite]" ;;
+    *) die "usage: workbranch config [base|ide|terminal|language|--rewrite]" ;;
   esac
   case "$config_target" in
     ide|terminal) require_macos_tool_platform "config $config_target" ;;
@@ -2719,6 +2825,7 @@ cmd_config() {
         base) configure_base_branches ;;
         ide) configure_ide_prompt ;;
         terminal) configure_terminal_prompt ;;
+        language) configure_preferred_language_prompt ;;
       esac
     fi
     if [ "$rewrite_only" -eq 0 ]; then
@@ -2854,6 +2961,18 @@ configure_terminal_prompt() {
     6|--clear) clear_terminal_command ;;
     *) die "invalid terminal choice: $value" ;;
   esac
+}
+
+configure_preferred_language_prompt() {
+  allow_eof=${1:-no}
+  info "Preferred language"
+  current=$(preferred_language_label)
+  if ! value=$(prompt_read "[*] Preferred language for generated task guidance [$current]: "); then
+    [ "$allow_eof" = "yes" ] && return 2
+    die "input aborted"
+  fi
+  normalized=$(normalize_preferred_language_choice "$value") || return 1
+  set_preferred_language "$normalized"
 }
 
 configure_base_branches() {
@@ -3193,6 +3312,7 @@ AFTER
       info "Registered with companion: $PROJECT_ROOT"
     fi
     prompt_add_first_task_after_init || return 1
+    prompt_language_config_after_init || return 1
     prompt_tool_config_after_init
   else
     success "Config written: $CONFIG_FILE"
@@ -3218,6 +3338,16 @@ prompt_add_first_task_after_init() {
     cd "$PROJECT_ROOT" || exit 1
     cmd_add
   )
+}
+
+prompt_language_config_after_init() {
+  printf '
+' >&2
+  section "Generated task guidance"
+  configure_preferred_language_prompt yes
+  status=$?
+  [ "$status" -ne 0 ] && [ "$status" -ne 2 ] && return "$status"
+  write_config "$CONFIG_FILE"
 }
 
 prompt_tool_config_after_init() {
@@ -3601,7 +3731,7 @@ cmd_noti() {
 
 # ----- src/workbranch/commands/list.sh -----
 cmd_list_json() {
-  local first_task first_repo path task name repo_path branch title dirty status counts progress_done progress_total current_item
+  local first_task first_repo path task name repo_path branch title dirty status counts progress_done progress_total current_item updated_at
   printf '{'
   printf '"schemaVersion":1,'
   printf '"project":'
@@ -3630,12 +3760,14 @@ cmd_list_json() {
     progress_done=${counts%% *}
     progress_total=${counts##* }
     current_item=$(task_current_item "$task")
+    updated_at=$(task_updated_at "$task")
     printf ',"status":'
     json_string "$status"
     printf ',"progressDone":%s' "$progress_done"
     printf ',"progressTotal":%s' "$progress_total"
     printf ',"currentItem":'
     json_string "$current_item"
+    printf ',"updatedAt":%s' "$updated_at"
     printf ',"items":'
     task_checklist_items_json "$task"
     printf ',"notiCount":%s' "$(noti_count "$task")"
@@ -3899,6 +4031,13 @@ cmd_tool_launcher() {
   fi
 
   resolve_task_path "$task"
+  if [ "$tool_label" = "terminal" ]; then
+    path=$RESOLVED_PATH
+    info_tool_opening "$display_label" "$task"
+    run_tool_command "$tool_label" "$command" "$path" || die "failed to open $tool_label: $task"
+    return 0
+  fi
+
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
@@ -4818,12 +4957,12 @@ prompt_delete_remaining_task_root() {
   local task task_dir answer
   task=$1
   task_dir=$2
-  info "Unknown task-root items remain for $task:"
+  info "These items in the task root are NOT git-managed and will be lost if deleted:"
   task_root_items "$task_dir" | while IFS= read -r item; do
     info "  $item"
   done
   if [ -t 0 ] || [ "${WORKBRANCH_ALLOW_NON_TTY_PROMPT:-}" = "1" ]; then
-    answer=$(prompt_read "[*] Delete remaining task root now? [y/N]: ") || answer=""
+    answer=$(prompt_read "[*] Delete the entire task root for $task now? [y/N]: ") || answer=""
     case "$answer" in
       y|Y|yes|YES|Yes)
         rm -rf "$task_dir" || die "failed to remove task directory: $task"

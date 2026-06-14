@@ -9,10 +9,11 @@ cmd_config() {
         base) config_target="base" ;;
         ide) config_target="ide" ;;
         terminal) config_target="terminal" ;;
-        *) die "usage: workbranch config [base|ide|terminal|--rewrite]" ;;
+        language) config_target="language" ;;
+        *) die "usage: workbranch config [base|ide|terminal|language|--rewrite]" ;;
       esac
       ;;
-    *) die "usage: workbranch config [base|ide|terminal|--rewrite]" ;;
+    *) die "usage: workbranch config [base|ide|terminal|language|--rewrite]" ;;
   esac
   case "$config_target" in
     ide|terminal) require_macos_tool_platform "config $config_target" ;;
@@ -32,6 +33,7 @@ cmd_config() {
         base) configure_base_branches ;;
         ide) configure_ide_prompt ;;
         terminal) configure_terminal_prompt ;;
+        language) configure_preferred_language_prompt ;;
       esac
     fi
     if [ "$rewrite_only" -eq 0 ]; then
@@ -167,6 +169,18 @@ configure_terminal_prompt() {
     6|--clear) clear_terminal_command ;;
     *) die "invalid terminal choice: $value" ;;
   esac
+}
+
+configure_preferred_language_prompt() {
+  allow_eof=${1:-no}
+  info "Preferred language"
+  current=$(preferred_language_label)
+  if ! value=$(prompt_read "[*] Preferred language for generated task guidance [$current]: "); then
+    [ "$allow_eof" = "yes" ] && return 2
+    die "input aborted"
+  fi
+  normalized=$(normalize_preferred_language_choice "$value") || return 1
+  set_preferred_language "$normalized"
 }
 
 configure_base_branches() {

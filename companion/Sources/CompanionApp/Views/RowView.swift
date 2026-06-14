@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 import CompanionCore
 
@@ -23,6 +24,7 @@ struct RowView: View {
             ForEach(Array(row.repos.enumerated()), id: \.offset) { _, repo in
                 repoMetaLines(repo)
             }
+            currentWorkLine
             if hasStatusDetails {
                 statusDetailsBlock
             }
@@ -71,14 +73,7 @@ struct RowView: View {
     private func repoMetaLines(_ repo: WorkbranchRepo) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             metaLine(label: "repo", value: repo.name, tone: .normal)
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                metaLine(label: "branch", value: repo.branch, tone: .normal)
-                TerminalToken(
-                    label: "dirty",
-                    value: repo.dirty ? "yes" : "no",
-                    tone: repo.dirty ? .warning : .muted
-                )
-            }
+            metaLine(label: "branch", value: repo.branch, tone: .normal)
         }
     }
 
@@ -91,6 +86,25 @@ struct RowView: View {
                 .fontWeight(label == "repo" ? .semibold : .regular)
                 .lineLimit(1)
                 .truncationMode(.middle)
+        }
+    }
+
+    private var currentWorkLine: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("│ status")
+                .foregroundStyle(palette.accent)
+                .fontWeight(.semibold)
+            Text(statusDisplayText)
+                .foregroundStyle(palette.warning)
+                .fontWeight(.bold)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 2)
+                .background(
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(palette.warning.opacity(0.75), lineWidth: 1)
+                )
         }
     }
 
@@ -114,9 +128,6 @@ struct RowView: View {
         var parts = [statusLabel]
         if row.progressTotal > 0 {
             parts.append("\(row.progressDone)/\(row.progressTotal)")
-        }
-        if !row.currentItem.isEmpty {
-            parts.append("now ▸ \(row.currentItem)")
         }
         return detailLine(label: "status", value: parts.joined(separator: " · "), tone: statusTone, showsGuide: false)
     }
@@ -148,7 +159,25 @@ struct RowView: View {
 
     private var hasStatusDetails: Bool {
         if let memo = row.memoTitle, !memo.isEmpty { return true }
-        return !row.checklistItems.isEmpty || !row.currentItem.isEmpty || row.progressTotal > 0
+        return !row.checklistItems.isEmpty || row.progressTotal > 0
+    }
+
+    private var currentWorkText: String {
+        if !row.currentItem.isEmpty { return row.currentItem }
+        if row.status == "done" { return "done" }
+        return "no active checklist item"
+    }
+
+    private var statusDisplayText: String {
+        guard let updatedTimeText else { return currentWorkText }
+        return "\(currentWorkText) \(updatedTimeText)"
+    }
+
+    private var updatedTimeText: String? {
+        guard row.updatedAt > 0 else { return nil }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: Date(timeIntervalSince1970: TimeInterval(row.updatedAt)))
     }
 
     private var statusLabel: String {

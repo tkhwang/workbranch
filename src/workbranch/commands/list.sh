@@ -1,5 +1,5 @@
 cmd_list_json() {
-  local first_task first_repo path task name repo_path branch title dirty status counts progress_done progress_total current_item
+  local first_task first_repo path task name repo_path branch title dirty status counts progress_done progress_total current_item updated_at
   printf '{'
   printf '"schemaVersion":1,'
   printf '"project":'
@@ -28,12 +28,14 @@ cmd_list_json() {
     progress_done=${counts%% *}
     progress_total=${counts##* }
     current_item=$(task_current_item "$task")
+    updated_at=$(task_updated_at "$task")
     printf ',"status":'
     json_string "$status"
     printf ',"progressDone":%s' "$progress_done"
     printf ',"progressTotal":%s' "$progress_total"
     printf ',"currentItem":'
     json_string "$current_item"
+    printf ',"updatedAt":%s' "$updated_at"
     printf ',"items":'
     task_checklist_items_json "$task"
     printf ',"notiCount":%s' "$(noti_count "$task")"

@@ -21,6 +21,7 @@ macOS 전용: `finder`, `ide`, `terminal`, `config ide`, `config terminal`. Linu
 | `workbranch config base`                 | base branch 설정만 수정하고 base worktree checkout                 |
 | `workbranch config ide`                  | IDE 명령만 수정                                                    |
 | `workbranch config terminal`             | terminal 명령만 수정                                               |
+| `workbranch config language`             | generated task guidance 선호 언어 수정                             |
 | `workbranch add [<task>] [--from <ref>]` | task workspace 생성                                                |
 | `workbranch list [--json]`               | repo와 task workspace 목록 확인; `--json`은 companion용 contract 출력 |
 | `workbranch remove <task>`               | task worktree와 local task branch 제거                             |
@@ -53,7 +54,7 @@ macOS 전용: `finder`, `ide`, `terminal`, `config ide`, `config terminal`. Linu
 | `workbranch path <task>`     | task workspace 또는 repo 경로 출력        |
 | `workbranch finder <task>`   | Finder로 task workspace folder 열기       |
 | `workbranch ide <task>`      | 설정된 IDE로 task repo worktree 열기      |
-| `workbranch terminal <task>` | 설정된 terminal로 task repo worktree 열기 |
+| `workbranch terminal <task>` | 설정된 terminal로 task root 열기          |
 
 ### Other
 
@@ -79,7 +80,7 @@ WORKBRANCH_COLOR=always workbranch help # enhanced display 강제
 
 ## Task brief와 notifications
 
-`workbranch add <task>`는 repo worktree 밖 task root에 `<task>/TASK-WORKBRANCH.md`와 generated `<task>/AGENTS.md`를 생성합니다. 사용자와 agent는 `<task>` 또는 `<task>/<repo>` 어디서 실행해도 되며, generated guidance는 두 경우 모두 같은 task brief를 갱신하도록 안내합니다. 이 state를 위해 repo `.gitignore`는 수정하지 않습니다.
+`workbranch add <task>`는 repo worktree 밖 task root에 `<task>/TASK-WORKBRANCH.md`와 generated `<task>/AGENTS.md`를 생성합니다. Agent는 기본적으로 `<task>`에서 실행하고, 코드 변경과 Git 명령은 `<task>/<repo>` 안에서 수행합니다. Generated guidance는 두 위치 모두 같은 task brief를 갱신하도록 안내합니다. 이 state를 위해 repo `.gitignore`는 수정하지 않습니다. `PREFERRED_LANGUAGE en|ko`는 generated task brief와 agent guidance 언어를 제어하며, `workbranch config language`로 설정합니다.
 
 기본 task brief 포맷은 사람, agent, `workbranch list --json`, companion app이 함께 쓰는 contract입니다.
 
@@ -96,9 +97,9 @@ status: planning
 
 `workbranch memo <task>`는 task brief를 출력하고, `workbranch memo <task> "text"`는 덮어쓰며, `workbranch memo <task> --clear`는 삭제합니다. Registered task workspace 안에서는 읽기일 때만 task를 생략할 수 있습니다. `workbranch memo`는 현재 task brief를 출력합니다. 쓰기와 삭제는 명시적인 task 인자가 필요합니다.
 
-Notification은 `<task>/.workbranch/notifications.jsonl`의 append-only JSON Lines입니다. `workbranch noti add <task> "text"`는 event를 추가하고, `workbranch noti list <task>`는 오래된 순서대로 text를 출력하며, `workbranch noti clear <task>`는 inbox를 비웁니다. Companion app은 `workbranch list --json`의 `notiCount`, `status`, `progressDone`, `progressTotal`, `currentItem`을 읽고, 상세/확인은 `noti list` / `noti clear`를 호출할 수 있습니다.
+Notification은 `<task>/.workbranch/notifications.jsonl`의 append-only JSON Lines입니다. `workbranch noti add <task> "text"`는 event를 추가하고, `workbranch noti list <task>`는 오래된 순서대로 text를 출력하며, `workbranch noti clear <task>`는 inbox를 비웁니다. Companion app은 `workbranch list --json`의 `notiCount`, `status`, `progressDone`, `progressTotal`, `currentItem`, `updatedAt`을 읽고, 상세/확인은 `noti list` / `noti clear`를 호출할 수 있습니다.
 
-`workbranch remove <task>`는 task worktree, local task branch, known generated task-root state(`TASK-WORKBRANCH.md`, generated `AGENTS.md`, `.workbranch/`, `.omx/`, `.omc/`)를 제거합니다. Unrelated 파일이 남으면 normal remove는 warning과 남은 항목 이름을 출력하고, interactive shell에서는 이어서 남은 task root를 즉시 삭제할지 묻습니다. No/EOF는 task root를 보존합니다. `workbranch remove <task> --force`는 일반 safety preflight를 그대로 실행한 뒤 묻지 않고 task root를 삭제합니다.
+`workbranch remove <task>`는 task worktree, local task branch, known generated task-root state(`TASK-WORKBRANCH.md`, generated `AGENTS.md`, `.workbranch/`, `.workbranch.task`)를 제거합니다. 그 밖에 task root에 남은 항목은 `.omx/`, `.omc/`를 포함해 git으로 관리되지 않는 잔여물입니다. Normal remove는 남은 항목 이름을 출력하고, interactive shell에서는 task root 전체를 삭제할지 한 번 묻습니다. No/EOF는 task root를 보존합니다. `workbranch remove <task> --force`는 일반 safety preflight를 그대로 실행한 뒤 묻지 않고 task root를 삭제합니다.
 
 ## Project health
 
@@ -123,19 +124,20 @@ workbranch completion fish > ~/.config/fish/completions/workbranch.fish
 
 ## 작업 workspace 열기
 
-프로젝트에서 공통으로 사용할 IDE와 terminal 명령을 설정합니다.
+프로젝트에서 공통으로 사용할 IDE/terminal 명령과 generated task guidance 언어를 설정합니다.
 
 ```bash
 workbranch config ide
 workbranch config terminal
+workbranch config language
 ```
 
-작업 workspace 안의 모든 repo를 엽니다.
+Task surface를 엽니다.
 
 ```bash
-workbranch finder login
-workbranch ide login
-workbranch terminal login
+workbranch finder login      # Finder로 task root 열기
+workbranch ide login         # IDE로 repo worktree 열기
+workbranch terminal login    # terminal로 task root 열기
 ```
 
 내장 macOS IDE preset은 VS Code 계열 app에서 repo path마다 별도 IDE window를 엽니다. config directive는 `IDE <command>`입니다. preset 순서는 Cursor, Antigravity, Windsurf, Zed, Sublime Text, Xcode, VS Code입니다. `IDE open -a Cursor`, `IDE open -a "Antigravity IDE"`, `IDE open -a "Visual Studio Code"`, `IDE open -a Windsurf` 형태는 실행 시 `open -na ... --args --new-window`로 보정됩니다. Zed는 검증 전까지 `open -na Zed`로 유지합니다.
@@ -154,7 +156,7 @@ workbranch path login
 workbranch path login --repo frontend
 ```
 
-Launcher 명령은 repo별로 순서대로 실행됩니다. foreground에 계속 머무는 TUI terminal 명령은 `--repo`를 쓰거나 non-blocking custom wrapper로 설정하세요.
+`workbranch ide <task>`는 repo별로 실행됩니다. `workbranch terminal <task>`는 agent가 `AGENTS.md`, `TASK-WORKBRANCH.md`, 모든 repo를 볼 수 있도록 task root를 한 번 엽니다. 의도적으로 repo 하나만 열 때는 `--repo`를 사용하세요.
 
 ## Setup command
 

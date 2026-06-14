@@ -46,6 +46,7 @@ public struct MenuRow: Equatable, Identifiable, Sendable {
     public let progressDone: Int
     public let progressTotal: Int
     public let currentItem: String
+    public let updatedAt: Int
     public let isExpandedByDefault: Bool
 
     public var id: String {
@@ -73,6 +74,7 @@ public struct MenuRow: Equatable, Identifiable, Sendable {
         progressDone: Int = 0,
         progressTotal: Int = 0,
         currentItem: String = "",
+        updatedAt: Int = 0,
         isExpandedByDefault: Bool = false
     ) {
         self.kind = kind
@@ -89,6 +91,7 @@ public struct MenuRow: Equatable, Identifiable, Sendable {
         self.progressDone = progressDone
         self.progressTotal = progressTotal
         self.currentItem = currentItem
+        self.updatedAt = updatedAt
         self.isExpandedByDefault = isExpandedByDefault
     }
 
@@ -269,6 +272,7 @@ public struct MenuState: Equatable, Sendable {
             progressDone: task.progressDone,
             progressTotal: task.progressTotal,
             currentItem: task.currentItem,
+            updatedAt: task.updatedAt,
             isExpandedByDefault: task.status == "blocked" || task.notiCount > 0
         )
     }

@@ -104,6 +104,7 @@ reset_config() {
   TASK_SETUP=""
   IDE_COMMAND=""
   TERMINAL_COMMAND=""
+  PREFERRED_LANGUAGE="en"
   REPO_NAMES=()
   REPO_URLS=()
   REPO_BASE_BRANCHES=()
@@ -140,6 +141,34 @@ set_terminal_command() {
 
 clear_terminal_command() {
   TERMINAL_COMMAND=""
+}
+
+validate_preferred_language() {
+  case "$1" in
+    en|ko) return 0 ;;
+    *) die "invalid PREFERRED_LANGUAGE '$1' (expected en or ko)" ;;
+  esac
+}
+
+set_preferred_language() {
+  validate_preferred_language "$1"
+  PREFERRED_LANGUAGE=$1
+}
+
+preferred_language_label() {
+  case "${PREFERRED_LANGUAGE:-en}" in
+    ko) printf '%s' '한글' ;;
+    *) printf '%s' 'English' ;;
+  esac
+}
+
+normalize_preferred_language_choice() {
+  case "$1" in
+    "" ) printf '%s' "${PREFERRED_LANGUAGE:-en}" ;;
+    en|EN|English|english|1) printf '%s' 'en' ;;
+    ko|KO|Korean|korean|Hangul|hangul|한글) printf '%s' 'ko' ;;
+    *) die "invalid preferred language: $1 (expected English or 한글)" ;;
+  esac
 }
 
 set_repo_setup() {
@@ -233,6 +262,10 @@ parse_config() {
         [ -z "$TERMINAL_COMMAND" ] || die "duplicate TERMINAL directive in config"
         set_terminal_command "$(task_setup_from_line "$line")"
         ;;
+      PREFERRED_LANGUAGE)
+        [ $# -eq 2 ] || die "invalid config line $line_no: PREFERRED_LANGUAGE expects 1 value"
+        set_preferred_language "$2"
+        ;;
       TASK_SETUP)
         [ -z "$TASK_SETUP" ] || die "duplicate TASK_SETUP directive in config"
         TASK_SETUP=$(task_setup_from_line "$line")
@@ -296,6 +329,10 @@ parse_config_for_rewrite() {
         [ -z "$TERMINAL_COMMAND" ] || die "duplicate TERMINAL directive in config"
         set_terminal_command "$(task_setup_from_line "$line")"
         ;;
+      PREFERRED_LANGUAGE|preferred_language|language)
+        [ $# -eq 2 ] || die "invalid config line $line_no: PREFERRED_LANGUAGE expects 1 value"
+        set_preferred_language "$2"
+        ;;
       TASK_SETUP|task_setup)
         [ -z "$TASK_SETUP" ] || die "duplicate TASK_SETUP directive in config"
         TASK_SETUP=$(task_setup_from_line "$line")
@@ -345,6 +382,7 @@ write_config() {
     printf 'PROJECT_NAME %s\n' "$PROJECT_NAME"
     printf 'MAIN_WORKTREES_DIR %s\n' "$BASE_DIR"
     printf 'BRANCH_PREFIX %s\n' "${BRANCH_PREFIX:-feature}"
+    printf 'PREFERRED_LANGUAGE %s\n' "${PREFERRED_LANGUAGE:-en}"
     if [ -n "$IDE_COMMAND" ]; then
       printf 'IDE %s\n' "$IDE_COMMAND"
     fi

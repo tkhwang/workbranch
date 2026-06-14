@@ -38,10 +38,40 @@ CONFIG
 
   : > "$WORKBRANCH_FAKE_TOOL_LOG"
   out=$(WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" terminal login)
-  assert_contains "$out" "[*] Opening terminal: login/frontend"
-  assert_contains "$out" "[*] Opening terminal: login/backend"
-  assert_contains "$(cat "$WORKBRANCH_FAKE_TOOL_LOG")" "$canonical_project/login/frontend|$canonical_project/login/frontend"
-  assert_contains "$(cat "$WORKBRANCH_FAKE_TOOL_LOG")" "$canonical_project/login/backend|$canonical_project/login/backend"
+  assert_contains "$out" "[*] Opening terminal: login"
+  assert_not_contains "$out" "[*] Opening terminal: login/frontend"
+  assert_not_contains "$out" "[*] Opening terminal: login/backend"
+  log=$(cat "$WORKBRANCH_FAKE_TOOL_LOG")
+  assert_contains "$log" "$canonical_project/login|$canonical_project/login"
+  assert_not_contains "$log" "$canonical_project/login/frontend|$canonical_project/login/frontend"
+  assert_not_contains "$log" "$canonical_project/login/backend|$canonical_project/login/backend"
+}
+
+
+test_terminal_opens_task_root_without_repo_filter() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  canonical_project=$(pwd -P)
+  fake_tool="$TMP_ROOT/fake-tool.sh"
+  append_fake_tool_script "$fake_tool"
+  export WORKBRANCH_FAKE_TOOL_LOG="$TMP_ROOT/terminal.log"
+
+  cat >> "$project/.workbranch.config" <<CONFIG
+TERMINAL $fake_tool
+CONFIG
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  printf '
+
+' | run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  out=$(WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" terminal login)
+  assert_contains "$out" "[*] Opening terminal: login"
+  log=$(cat "$WORKBRANCH_FAKE_TOOL_LOG")
+  assert_contains "$log" "$canonical_project/login|$canonical_project/login"
+  assert_not_contains "$log" "$canonical_project/login/frontend"
+  assert_not_contains "$log" "$canonical_project/login/backend"
 }
 
 

@@ -213,12 +213,13 @@ test_help_groups_commands() {
   assert_contains "$out" "path <task>       Print a task workspace path"
   assert_contains "$out" "finder <task>     Open a task workspace in Finder"
   assert_contains "$out" "ide <task>        Open task repo worktrees in the configured IDE"
-  assert_contains "$out" "terminal <task>   Open task repo worktrees in the configured terminal"
+  assert_contains "$out" "terminal <task>   Open the task root in the configured terminal"
   assert_contains "$out" "Config:"
   assert_contains "$out" "config            Create or update .workbranch.config without cloning repos"
   assert_contains "$out" "config base       Update base branch settings and checkout base worktrees"
   assert_contains "$out" "config ide        Update only the configured IDE command"
-  assert_contains "$out" "config terminal   Update only the configured terminal command"
+  assert_contains "$out" "config terminal   Update only the configured terminal command
+  config language   Update preferred language for generated task guidance"
   assert_contains "$out" "config --rewrite  Rewrite config to current format without prompts"
   assert_not_contains "$out" "Completion:"
   assert_not_contains "$out" "completion <shell>   Print a shell completion script (bash, zsh, fish)"
@@ -236,7 +237,8 @@ test_help_groups_commands() {
 '*) fail "expected compact help without blank lines; got: $out" ;;
   esac
   case "$out" in
-    *"Workspace:"*"init              Initialize a workbranch project"*"list [--global] [--json]  List configured repos and task workspaces"*"add [<task>] [--from <ref>]  Create a task workspace"*"remove <task> [--force]  Remove task worktrees, branches, and task-root state"*"Git:"*"status            Show remote diff, task diff, and dirty state"*"  vertical"*"land <task>       Land task branches into base branches"*"Combined:"*"refresh           Pull base branches, then update every task workspace"*"refresh <task>    Pull base branches, then update one task workspace"*"finalize <task>   Pull base, update task, then land task"*"prune             Remove fully merged task workspaces"*"Tool:"*"path <task>       Print a task workspace path"*"finder <task>     Open a task workspace in Finder"*"ide <task>        Open task repo worktrees in the configured IDE"*"terminal <task>   Open task repo worktrees in the configured terminal"*"Config:"*"config            Create or update .workbranch.config without cloning repos"*"config base       Update base branch settings and checkout base worktrees"*"config ide        Update only the configured IDE command"*"config terminal   Update only the configured terminal command"*"config --rewrite  Rewrite config to current format without prompts"*"Other:"*"doctor            Diagnose project health; --fix applies safe repairs"*) ;;
+    *"Workspace:"*"init              Initialize a workbranch project"*"list [--global] [--json]  List configured repos and task workspaces"*"add [<task>] [--from <ref>]  Create a task workspace"*"remove <task> [--force]  Remove task worktrees, branches, and task-root state"*"Git:"*"status            Show remote diff, task diff, and dirty state"*"  vertical"*"land <task>       Land task branches into base branches"*"Combined:"*"refresh           Pull base branches, then update every task workspace"*"refresh <task>    Pull base branches, then update one task workspace"*"finalize <task>   Pull base, update task, then land task"*"prune             Remove fully merged task workspaces"*"Tool:"*"path <task>       Print a task workspace path"*"finder <task>     Open a task workspace in Finder"*"ide <task>        Open task repo worktrees in the configured IDE"*"terminal <task>   Open the task root in the configured terminal"*"Config:"*"config            Create or update .workbranch.config without cloning repos"*"config base       Update base branch settings and checkout base worktrees"*"config ide        Update only the configured IDE command"*"config terminal   Update only the configured terminal command
+  config language   Update preferred language for generated task guidance"*"config --rewrite  Rewrite config to current format without prompts"*"Other:"*"doctor            Diagnose project health; --fix applies safe repairs"*) ;;
     *) fail "expected workspace, git, tool, config, and other group ordering; got: $out" ;;
   esac
 }

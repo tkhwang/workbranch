@@ -32,6 +32,7 @@ The config file is `.workbranch.config` in the project root.
 PROJECT_NAME fullstack
 MAIN_WORKTREES_DIR _base
 BRANCH_PREFIX feature
+PREFERRED_LANGUAGE en
 IDE open -na Cursor --args --new-window
 TERMINAL open -a Warp
 TASK_SETUP sh scripts/workbranch-setup.sh
@@ -46,6 +47,7 @@ REPO_SETUP backend ./gradlew dependencies
 Format:
 
 ```text
+PREFERRED_LANGUAGE en|ko
 IDE <command>
 TERMINAL <command>
 TASK_SETUP <command>
@@ -58,6 +60,7 @@ Rules:
 - `PROJECT_NAME` must be a safe directory name.
 - `MAIN_WORKTREES_DIR` must be a safe directory name.
 - `BRANCH_PREFIX` is retained for compatibility with explicit task keys that do not use the conventional `type-detail` form. New interactive setup does not ask for it; config writing keeps `BRANCH_PREFIX feature` as an internal compatibility default.
+- `PREFERRED_LANGUAGE` is optional in older configs and defaults to `en`. Current config writing emits `PREFERRED_LANGUAGE en|ko`; it controls generated task briefs and generated agent guidance, not full CLI localization.
 - `IDE` is optional. It stores one project-level IDE launch command text after the directive.
 - `TERMINAL` is optional. It stores one project-level terminal launch command text after the directive.
 - `TASK_SETUP` is optional. It stores one project-level command text after the directive.
@@ -67,7 +70,7 @@ Rules:
 - Git URLs and branch names must be non-empty and contain no whitespace.
 - Config values are split on whitespace except `IDE`, `TERMINAL`, `TASK_SETUP`, and `REPO_SETUP`, which preserve command text.
 - The file is not a shell script.
-- Safety: `.workbranch.config` is trusted project configuration. Running `workbranch add <task>` executes configured setup commands with `sh -c`; running `workbranch ide <task>` or `workbranch terminal <task>` executes configured tool commands with the resolved repo path appended. Review configs from untrusted projects before running those commands.
+- Safety: `.workbranch.config` is trusted project configuration. Running `workbranch add <task>` executes configured setup commands with `sh -c`; running `workbranch ide <task>` or `workbranch terminal <task>` executes configured tool commands with the resolved path appended. Review configs from untrusted projects before running those commands.
 
 ## Branch names
 
@@ -104,11 +107,11 @@ Git operation internals are defined in [`docs/git-operations.md`](../git-operati
 
 Create or update config without cloning repos.
 
-If `.workbranch.config` or legacy `.tasktree.config` / `.monotree.config` already exists in the current project, load it, then prompt for the project name, main worktrees directory, IDE command, terminal command, each repo's base branch, and each repo-level setup command. Press Enter to keep the current value. Type `--clear` at a tool or repo setup prompt to remove that command.
+If `.workbranch.config` or legacy `.tasktree.config` / `.monotree.config` already exists in the current project, load it, then prompt for the project name, main worktrees directory, preferred language for generated task guidance, IDE command, terminal command, each repo's base branch, and each repo-level setup command. Press Enter to keep the current value. Type `--clear` at a tool or repo setup prompt to remove that command.
 
 Changing a repo base branch in the full `workbranch config` flow updates config and, for existing `_base/<repo>` worktrees, fetches `origin`, checks out the selected base branch, and pulls it with `--ff-only`. `workbranch config` does not clone, move, or rename existing worktrees. Existing `BRANCH_PREFIX` values are preserved silently; it is no longer an interactive setting. Changing `MAIN_WORKTREES_DIR` is allowed only before base worktrees exist. Once matching base worktrees exist, `workbranch config` rejects that change.
 
-Existing project-level `TASK_SETUP` values remain supported for `workbranch add` and are preserved by `workbranch config` unless another explicit flow clears or migrates them. `workbranch config ide` and `workbranch config terminal` update only the matching tool command.
+Existing project-level `TASK_SETUP` values remain supported for `workbranch add` and are preserved by `workbranch config` unless another explicit flow clears or migrates them. `workbranch config ide` and `workbranch config terminal` update only the matching tool command. `workbranch config language` updates only `PREFERRED_LANGUAGE`.
 
 When a base branch changes after repos are cloned, `workbranch config` preflights each existing base worktree for a clean state and no rebase in progress before changing checkout state. Missing base worktrees are still handled by later `workbranch init`.
 
@@ -128,14 +131,14 @@ If no config exists, run interactive config setup:
 4. Explain that new tasks are created with `workbranch add`, which asks for task type and detail name, derives folder `type-detail`, then suggests each repo's task branch from that repo's configured base branch.
 5. Ask for one or more repos: name, Git URL, base branch for this repo, and optional repo-level setup command.
 6. For config-only setup, ask for optional IDE and terminal commands from presets or custom input.
-7. Write `.workbranch.config` with `BRANCH_PREFIX feature` retained as a compatibility default.
+7. Write `.workbranch.config` with `BRANCH_PREFIX feature` retained as a compatibility default and `PREFERRED_LANGUAGE en` by default.
 
 ### `workbranch init`
 
 Initialize main worktrees from config.
 
 - If `.workbranch.config` exists in the current directory, read it and clone each repo into `_base/<repo>` on its base repo branch. Legacy `.tasktree.config` / `.monotree.config` are also accepted by `workbranch init` and can be rewritten with `workbranch config`.
-- If `.workbranch.config` does not exist, run interactive setup, then clone repos. After successful cloning from this interactive setup, ask whether to add the first task. Accepting enters the same task creation flow as `workbranch add`; EOF or a declined answer leaves the initialized project without creating a task. After the first-task prompt or task creation finishes, ask for optional IDE and terminal commands from presets or custom input and rewrite `.workbranch.config` with those tool settings.
+- If `.workbranch.config` does not exist, run interactive setup, then clone repos. After successful cloning from this interactive setup, ask whether to add the first task. Accepting enters the same task creation flow as `workbranch add`; EOF or a declined answer leaves the initialized project without creating a task. After the first-task prompt or task creation finishes, ask for preferred language for generated task guidance, then ask for optional IDE and terminal commands from presets or custom input and rewrite `.workbranch.config` with those settings.
 - If cloning fails, remove paths created by the failed command.
 
 ### `workbranch path <task>`
@@ -156,19 +159,19 @@ Tool app launcher commands are macOS-only: `finder`, `ide`, and `terminal`. Tool
 
 ### `workbranch finder <task>` / `workbranch ide <task>` / `workbranch terminal <task>`
 
-`finder` opens the task root folder by default and one repo folder with `--repo <repo>`. `ide` and `terminal` run the configured command once per matching task repo worktree. The resolved repo path is appended as the final argument. With `--repo <repo>`, run only for that repo. Tool launchers do not modify repositories.
+`finder` opens the task root folder by default and one repo folder with `--repo <repo>`. `ide` runs the configured command once per matching task repo worktree by default. `terminal` opens the task root once by default so agent sessions can see `AGENTS.md`, `TASK-WORKBRANCH.md`, and every repo. With `--repo <repo>`, both `ide` and `terminal` run only for that repo and append the resolved repo path as the final argument. Tool launchers do not modify repositories.
 
 Built-in macOS IDE app presets use `open -n` plus `--args --new-window` for VS Code-like apps so each matching repo path opens in a separate IDE window instead of being folded into an existing workspace. `IDE open -a Cursor`, `IDE open -a "Antigravity IDE"`, `IDE open -a "Visual Studio Code"`, and `IDE open -a Windsurf` are normalized to the matching `open -na ... --args --new-window` command at launch time. Zed remains `open -na Zed` until its CLI contract is verified.
 
 ### `workbranch list` / `workbranch list --json`
 
-Show configured repos, base branches, current branches, and task workspaces. `--json` emits a single machine-readable document with `schemaVersion`, `project`, `root`, and registered task workspaces only. Schema version 1 includes additive task progress fields for companion apps: `status`, `progressDone`, `progressTotal`, and `currentItem`, alongside existing `memoTitle`, `notiCount`, and `repos`. Stale or partial task-shaped directories are excluded from JSON and remain diagnostic concerns for `doctor`/status-style flows.
+Show configured repos, base branches, current branches, and task workspaces. `--json` emits a single machine-readable document with `schemaVersion`, `project`, `root`, and registered task workspaces only. Schema version 1 includes additive task progress fields for companion apps: `status`, `progressDone`, `progressTotal`, `currentItem`, and `updatedAt`, alongside existing `memoTitle`, `notiCount`, and `repos`. `updatedAt` is the task brief mtime as epoch seconds. Stale or partial task-shaped directories are excluded from JSON and remain diagnostic concerns for `doctor`/status-style flows.
 
 ### `workbranch memo` / `workbranch noti`
 
-`workbranch add <task>` creates workbranch-managed task-root state outside repo worktrees: `<task>/TASK-WORKBRANCH.md`, generated `<task>/AGENTS.md`, and `<task>/.workbranch/` as needed. Workbranch does not create repo-local task-state files and does not edit repo `.gitignore`.
+`workbranch add <task>` creates workbranch-managed task-root state outside repo worktrees: `<task>/TASK-WORKBRANCH.md`, generated `<task>/AGENTS.md`, and `<task>/.workbranch/` as needed. The task root is a non-git workbranch metadata/agent workspace; actual Git repositories live under `<task>/<repo>`. Workbranch does not create repo-local task-state files and does not edit repo `.gitignore`.
 
-The generated task brief starts with a `#` memo title, may include a separated `status: planning|in-progress|review|blocked|done` line, and uses Markdown checklist items for progress. When `status:` is absent, progress may be derived from the checklist (`planning` for no started work, `in-progress` for partial progress, `done` for all checklist items complete). The first unchecked checklist item is the current item.
+The generated task brief starts with a `#` memo title, may include a separated `status: planning|in-progress|review|blocked|done` line, and uses Markdown checklist items for progress. When `status:` is absent, progress may be derived from the checklist (`planning` for no started work, `in-progress` for partial progress, `done` for all checklist items complete). The first unchecked checklist item is the current item. When `PREFERRED_LANGUAGE ko` is configured, generated task brief and AGENTS guidance text use Korean while preserving machine-readable `status:` values.
 
 `workbranch memo <task>` prints the task brief, `workbranch memo <task> "text"` overwrites it, and `workbranch memo <task> --clear` removes it. From inside a registered task workspace, the task may be omitted only for reading; `workbranch memo` reads the current task. Writes and clears require an explicit task argument.
 
@@ -359,6 +362,8 @@ Remove linked worktrees and local task branches for a task.
 Remote task branches are not deleted.
 
 If the task worktree directory was removed manually, `workbranch remove <task>` still deletes the local task branch when workbranch can identify it from metadata, an existing task worktree, stale Git worktree registration, or the default branch rule.
+
+After repo worktrees and known task state are removed, any remaining task-root entries are non-git leftovers. Normal remove lists them and asks once before deleting the entire task root; `--force` removes the task root without that prompt after safety preflights pass. Agent runtime folders such as `.omx/` and `.omc/` are treated like other non-git leftovers and are not silently deleted by the known-state cleanup step.
 
 Fails if any task worktree is dirty.
 Use `workbranch remove <task> --force` to discard dirty local task worktrees and local task branches.

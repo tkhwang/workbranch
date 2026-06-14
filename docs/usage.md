@@ -21,6 +21,7 @@ macOS-only: `finder`, `ide`, `terminal`, `config ide`, and `config terminal`. On
 | `workbranch config base`                 | Update only base branch settings and checkout base worktrees                 |
 | `workbranch config ide`                  | Update only the configured IDE command                                       |
 | `workbranch config terminal`             | Update only the configured terminal command                                  |
+| `workbranch config language`             | Update preferred language for generated task guidance                        |
 | `workbranch add [<task>] [--from <ref>]` | Create a task workspace                                                      |
 | `workbranch list [--json]`               | Show repos and task workspaces; `--json` emits the companion-facing contract |
 | `workbranch remove <task>`               | Remove task worktrees and local task branches                                |
@@ -53,7 +54,7 @@ macOS-only: `finder`, `ide`, `terminal`, `config ide`, and `config terminal`. On
 | `workbranch path <task>`     | Print a task workspace or repo path                 |
 | `workbranch finder <task>`   | Open the task workspace folder in Finder            |
 | `workbranch ide <task>`      | Open task repo worktrees in the configured IDE      |
-| `workbranch terminal <task>` | Open task repo worktrees in the configured terminal |
+| `workbranch terminal <task>` | Open the task root in the configured terminal       |
 
 ### Other
 
@@ -79,7 +80,7 @@ WORKBRANCH_COLOR=always workbranch help # force enhanced display
 
 ## Task brief and notifications
 
-`workbranch add <task>` creates `<task>/TASK-WORKBRANCH.md` and generated `<task>/AGENTS.md` at the task root, outside repo worktrees. Users and agents may run from either `<task>` or `<task>/<repo>`; the generated guidance points both cases at the same task brief. Workbranch does not edit repo `.gitignore` for this state.
+`workbranch add <task>` creates `<task>/TASK-WORKBRANCH.md` and generated `<task>/AGENTS.md` at the task root, outside repo worktrees. Agents should run from `<task>` by default; code changes and Git commands belong in `<task>/<repo>`. The generated guidance points both locations at the same task brief. Workbranch does not edit repo `.gitignore` for this state. `PREFERRED_LANGUAGE en|ko` controls the generated task brief and agent guidance language; set it with `workbranch config language`.
 
 The default task brief format is shared by humans, agents, `workbranch list --json`, and companion apps:
 
@@ -96,9 +97,9 @@ The first `#` heading is the memo title. A separated `status:` line may be `plan
 
 Use `workbranch memo <task>` to print the task brief, `workbranch memo <task> "text"` to overwrite it, and `workbranch memo <task> --clear` to remove it. From inside a registered task workspace, the task may be omitted only for reading: `workbranch memo` prints the current task brief. Writes and clears require an explicit task argument.
 
-Notifications are append-only JSON Lines at `<task>/.workbranch/notifications.jsonl`. `workbranch noti add <task> "text"` appends one event, `workbranch noti list <task>` prints notification text oldest-first, and `workbranch noti clear <task>` clears the inbox. Companion apps should read `notiCount`, `status`, `progressDone`, `progressTotal`, and `currentItem` from `workbranch list --json` and may call `noti list` / `noti clear` for details and acknowledgement.
+Notifications are append-only JSON Lines at `<task>/.workbranch/notifications.jsonl`. `workbranch noti add <task> "text"` appends one event, `workbranch noti list <task>` prints notification text oldest-first, and `workbranch noti clear <task>` clears the inbox. Companion apps should read `notiCount`, `status`, `progressDone`, `progressTotal`, `currentItem`, and `updatedAt` from `workbranch list --json` and may call `noti list` / `noti clear` for details and acknowledgement.
 
-`workbranch remove <task>` removes task worktrees, local task branches, and known generated task-root state: `TASK-WORKBRANCH.md`, generated `AGENTS.md`, `.workbranch/`, `.omx/`, and `.omc/`. If unrelated files remain, normal remove prints a warning with the remaining item names and, in an interactive shell, asks whether to delete the remaining task root immediately. No/EOF keeps the task root. `workbranch remove <task> --force` still runs the normal safety preflights, then deletes the task root without prompting.
+`workbranch remove <task>` removes task worktrees, local task branches, and known generated task-root state: `TASK-WORKBRANCH.md`, generated `AGENTS.md`, `.workbranch/`, and `.workbranch.task`. Everything else left in the task root, including `.omx/` and `.omc/`, is not git-managed. Normal remove prints those remaining item names and, in an interactive shell, asks once whether to delete the entire task root. No/EOF keeps the task root. `workbranch remove <task> --force` still runs the normal safety preflights, then deletes the task root without prompting.
 
 ## Project health
 
@@ -123,19 +124,20 @@ workbranch completion fish > ~/.config/fish/completions/workbranch.fish
 
 ## Opening task workspaces
 
-Configure one IDE and one terminal command for the project:
+Configure one IDE and one terminal command for the project, and optionally the language used by generated task guidance:
 
 ```bash
 workbranch config ide
 workbranch config terminal
+workbranch config language
 ```
 
-Then open every repo in a task workspace:
+Then open task surfaces:
 
 ```bash
-workbranch finder login
-workbranch ide login
-workbranch terminal login
+workbranch finder login      # task root in Finder
+workbranch ide login         # repo worktrees in the IDE
+workbranch terminal login    # task root in the terminal
 ```
 
 Built-in macOS IDE presets open each repo path in a separate IDE window for VS Code-like apps. The config directive is `IDE <command>`; preset order is Cursor, Antigravity, Windsurf, Zed, Sublime Text, Xcode, then VS Code. Existing `IDE open -a Cursor`, `IDE open -a "Antigravity IDE"`, `IDE open -a "Visual Studio Code"`, or `IDE open -a Windsurf` command shapes are launched as `open -na ... --args --new-window` for the same behavior. Zed remains `open -na Zed` until its CLI contract is verified.
@@ -154,7 +156,7 @@ workbranch path login
 workbranch path login --repo frontend
 ```
 
-Launcher commands run repo-by-repo. Commands that keep running in the foreground, such as a raw TUI terminal command, should use `--repo` or a custom non-blocking wrapper.
+`workbranch ide <task>` runs repo-by-repo. `workbranch terminal <task>` opens the task root once so an agent can see `AGENTS.md`, `TASK-WORKBRANCH.md`, and all repos. Use `--repo` when you intentionally want either launcher scoped to one repo.
 
 ## Setup commands
 
