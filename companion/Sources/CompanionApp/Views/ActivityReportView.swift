@@ -40,7 +40,7 @@ struct ActivityReportView: View {
             if report.projects.isEmpty {
                 TerminalLine(prefix: "#", command: "No activity recorded \(title.lowercased())", tone: .muted)
             } else {
-                ForEach(report.projects, id: \.root) { project in
+                ForEach(report.projects, id: \.identity) { project in
                     projectBlock(project, showsPlanDetails: showsPlanDetails)
                 }
             }

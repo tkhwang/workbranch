@@ -52,6 +52,8 @@ public struct ActivityReportProject: Codable, Equatable, Sendable {
     public let totalSeconds: Int
     public let tasks: [ActivityReportTask]
 
+    public var identity: String { "\(root)\u{0}\(project)" }
+
     public init(project: String, root: String, totalSeconds: Int, tasks: [ActivityReportTask]) {
         self.project = project
         self.root = root
@@ -93,10 +95,11 @@ public struct ActivityReport: Codable, Equatable, Sendable {
         generatedAt: Int,
         calendar: Calendar = .current
     ) -> ActivityReport {
+        let scopeInterval = dateInterval(for: scope, generatedAt: generatedAt, calendar: calendar)
         let filtered = events.filter { event in
             guard event.editedAt > 0 else { return false }
             if let projectFilter, event.project != projectFilter { return false }
-            return includes(event.editedAt, in: scope, generatedAt: generatedAt, calendar: calendar)
+            return true
         }
         guard !filtered.isEmpty else { return empty(scope: scope, generatedAt: generatedAt) }
 
@@ -110,17 +113,19 @@ public struct ActivityReport: Codable, Equatable, Sendable {
                 if lhs.editedAt != rhs.editedAt { return lhs.editedAt < rhs.editedAt }
                 return lhs.observedAt < rhs.observedAt
             }
-            let rollup = rollupSessions(sorted.map(\.editedAt))
+            let rollup = rollupSessions(sorted.map(\.editedAt), in: scopeInterval)
             guard rollup.seconds > 0 else { continue }
+            let detailEvents = sorted.filter { includes($0.editedAt, in: scopeInterval) }
+            let latest = detailEvents.last ?? sorted.last
             let task = ActivityReportTask(
                 task: first.task,
-                planTitle: sorted.last?.planTitle ?? first.planTitle,
+                planTitle: latest?.planTitle ?? first.planTitle,
                 seconds: rollup.seconds,
                 sessions: rollup.sessions,
-                lastEditedAt: sorted.last?.editedAt ?? first.editedAt,
-                status: sorted.last?.status ?? first.status,
-                progressDone: sorted.last?.progressDone ?? first.progressDone,
-                progressTotal: sorted.last?.progressTotal ?? first.progressTotal
+                lastEditedAt: latest?.editedAt ?? first.editedAt,
+                status: latest?.status ?? first.status,
+                progressDone: latest?.progressDone ?? first.progressDone,
+                progressTotal: latest?.progressTotal ?? first.progressTotal
             )
             let projectKey = "\(first.root)\u{0}\(first.project)"
             var existing = projectsByKey[projectKey] ?? (project: first.project, root: first.root, tasks: [])
@@ -174,28 +179,26 @@ public struct ActivityReport: Codable, Equatable, Sendable {
         return "\(hours)h\(remainingMinutes)m"
     }
 
-    private static func includes(_ timestamp: Int, in scope: ActivityReportScope, generatedAt: Int, calendar: Calendar) -> Bool {
+    private static func dateInterval(for scope: ActivityReportScope, generatedAt: Int, calendar: Calendar) -> DateInterval? {
         switch scope {
         case .all:
-            return true
+            return nil
         case .today:
-            return calendar.isDate(Date(timeIntervalSince1970: TimeInterval(timestamp)), inSameDayAs: Date(timeIntervalSince1970: TimeInterval(generatedAt)))
+            return calendar.dateInterval(of: .day, for: Date(timeIntervalSince1970: TimeInterval(generatedAt)))
         case .week:
-            guard
-                let week = calendar.dateInterval(of: .weekOfYear, for: Date(timeIntervalSince1970: TimeInterval(generatedAt)))
-            else { return true }
-            let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
-            return date >= week.start && date < week.end
+            return calendar.dateInterval(of: .weekOfYear, for: Date(timeIntervalSince1970: TimeInterval(generatedAt)))
         case .month:
-            guard
-                let month = calendar.dateInterval(of: .month, for: Date(timeIntervalSince1970: TimeInterval(generatedAt)))
-            else { return true }
-            let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
-            return date >= month.start && date < month.end
+            return calendar.dateInterval(of: .month, for: Date(timeIntervalSince1970: TimeInterval(generatedAt)))
         }
     }
 
-    private static func rollupSessions(_ editedAts: [Int]) -> (seconds: Int, sessions: Int) {
+    private static func includes(_ timestamp: Int, in interval: DateInterval?) -> Bool {
+        guard let interval else { return true }
+        let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
+        return date >= interval.start && date < interval.end
+    }
+
+    private static func rollupSessions(_ editedAts: [Int], in interval: DateInterval?) -> (seconds: Int, sessions: Int) {
         let unique = Array(Set(editedAts)).sorted()
         guard let first = unique.first else { return (0, 0) }
         var sessionStart = first
@@ -206,14 +209,31 @@ public struct ActivityReport: Codable, Equatable, Sendable {
             if editedAt - sessionLast <= idleGapSeconds {
                 sessionLast = editedAt
             } else {
-                seconds += sessionLast - sessionStart + leadPadSeconds
-                sessions += 1
+                let sessionSeconds = clippedSessionSeconds(start: sessionStart, last: sessionLast, in: interval)
+                if sessionSeconds > 0 {
+                    seconds += sessionSeconds
+                    sessions += 1
+                }
                 sessionStart = editedAt
                 sessionLast = editedAt
             }
         }
-        seconds += sessionLast - sessionStart + leadPadSeconds
-        sessions += 1
+        let sessionSeconds = clippedSessionSeconds(start: sessionStart, last: sessionLast, in: interval)
+        if sessionSeconds > 0 {
+            seconds += sessionSeconds
+            sessions += 1
+        }
         return (seconds, sessions)
+    }
+
+    private static func clippedSessionSeconds(start: Int, last: Int, in interval: DateInterval?) -> Int {
+        let sessionStart = start
+        let sessionEnd = last + leadPadSeconds
+        guard let interval else { return max(0, sessionEnd - sessionStart) }
+        let intervalStart = Int(interval.start.timeIntervalSince1970)
+        let intervalEnd = Int(interval.end.timeIntervalSince1970)
+        let clippedStart = max(sessionStart, intervalStart)
+        let clippedEnd = min(sessionEnd, intervalEnd)
+        return max(0, clippedEnd - clippedStart)
     }
 }

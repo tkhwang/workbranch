@@ -73,7 +73,8 @@ public struct ActivityEvent: Codable, Equatable, Sendable {
         var events: [ActivityEvent] = []
         var seen = Set<String>()
         for document in documents {
-            let previousTasks = Dictionary(uniqueKeysWithValues: (previous[document.root]?.tasks ?? []).map { ($0.name, $0) })
+            guard let previousDocument = previous[document.root] else { continue }
+            let previousTasks = Dictionary(uniqueKeysWithValues: previousDocument.tasks.map { ($0.name, $0) })
             for task in document.tasks {
                 guard task.updatedAt > 0 else { continue }
                 if let previousTask = previousTasks[task.name] {

@@ -21,6 +21,10 @@ func expectThrows(_ message: String, _ body: () throws -> Void) throws {
     }
 }
 
+func writeStandardError(_ message: String) {
+    FileHandle.standardError.write(Data(message.utf8))
+}
+
 func runHarnessHelperTests() throws {
     do {
         try expectThrows("outer expectation") {
@@ -352,10 +356,10 @@ func runActivityEventTests() throws {
     try expect(sameSecondEvents == [ActivityEvent(editedAt: 100, observedAt: 205, root: root, project: "fullstack", task: "task-a", planTitle: "Checkout plan", status: "in-progress", progressDone: 2, progressTotal: 3)], "same-second progress/status change creates activity event")
 
     let events = ActivityEvent.diff(previous: [root: baseline], next: [increased, otherRoot], observedAt: 220, isBaseline: false)
-    try expect(events.count == 3, "updated, new task, and other root events")
+    try expect(events.count == 2, "updated and new tasks under previously seen roots create events")
     try expect(events.contains(ActivityEvent(editedAt: 160, observedAt: 220, root: root, project: "fullstack", task: "task-a", planTitle: "Checkout plan", status: "in-progress", progressDone: 2, progressTotal: 3)), "updated task event captures editedAt, plan, and status")
-    try expect(events.contains(ActivityEvent(editedAt: 170, observedAt: 220, root: root, project: "fullstack", task: "task-b", status: "todo", progressDone: 0, progressTotal: 1)), "new non-baseline task creates event")
-    try expect(events.contains(ActivityEvent(editedAt: 180, observedAt: 220, root: "/tmp/other", project: "other", task: "task-a", status: "review", progressDone: 1, progressTotal: 1)), "same task name under different root is independent")
+    try expect(events.contains(ActivityEvent(editedAt: 170, observedAt: 220, root: root, project: "fullstack", task: "task-b", status: "todo", progressDone: 0, progressTotal: 1)), "new non-baseline task under a previously seen root creates event")
+    try expect(ActivityEvent.diff(previous: [:], next: [otherRoot], observedAt: 221, isBaseline: false).isEmpty, "root first success after a failed baseline does not backfill existing tasks")
 
     let encoded = try events[0].jsonLine()
     try expect(encoded.hasSuffix("\n"), "activity event JSONL ends with newline")
@@ -367,6 +371,20 @@ func runActivityEventTests() throws {
 func runActivityReportTests() throws {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    func timestamp(year: Int, month: Int, day: Int, hour: Int, minute: Int) throws -> Int {
+        var components = DateComponents()
+        components.calendar = calendar
+        components.timeZone = calendar.timeZone
+        components.year = year
+        components.month = month
+        components.day = day
+        components.hour = hour
+        components.minute = minute
+        guard let date = calendar.date(from: components) else {
+            throw TestFailure(message: "timestamp date creation failed")
+        }
+        return Int(date.timeIntervalSince1970)
+    }
     let events = [
         ActivityEvent(editedAt: 1_700_000_100, observedAt: 1_700_000_101, root: "/tmp/a", project: "alpha", task: "task-one", status: "in-progress", progressDone: 1, progressTotal: 2),
         ActivityEvent(editedAt: 1_700_000_700, observedAt: 1_700_000_701, root: "/tmp/a", project: "alpha", task: "task-one", planTitle: "Alpha launch plan", status: "in-progress", progressDone: 2, progressTotal: 2),
@@ -394,6 +412,15 @@ func runActivityReportTests() throws {
     let filtered = ActivityReport.make(events: events, scope: .month, project: "beta", generatedAt: 1_700_005_000, calendar: calendar)
     try expect(filtered.projects.map(\.project) == ["beta"], "project filter")
 
+    let boundaryEvents = [
+        ActivityEvent(editedAt: try timestamp(year: 2026, month: 1, day: 1, hour: 23, minute: 55), observedAt: 1, root: "/tmp/boundary", project: "boundary", task: "task", status: "in-progress", progressDone: 1, progressTotal: 2),
+        ActivityEvent(editedAt: try timestamp(year: 2026, month: 1, day: 2, hour: 0, minute: 5), observedAt: 2, root: "/tmp/boundary", project: "boundary", task: "task", status: "in-progress", progressDone: 2, progressTotal: 2),
+    ]
+    let previousDay = ActivityReport.make(events: boundaryEvents, scope: .today, generatedAt: try timestamp(year: 2026, month: 1, day: 1, hour: 12, minute: 0), calendar: calendar)
+    let nextDay = ActivityReport.make(events: boundaryEvents, scope: .today, generatedAt: try timestamp(year: 2026, month: 1, day: 2, hour: 12, minute: 0), calendar: calendar)
+    try expect(previousDay.totals.seconds == 300, "scope boundary split keeps pre-midnight activity only in previous day")
+    try expect(nextDay.totals.seconds == 600, "scope boundary split keeps post-midnight interval and lead pad in next day")
+
     let parsed = ActivityReport.parseEvents(fromJSONL: """
     {"v":1,"editedAt":1700000100,"observedAt":1700000101,"root":"/tmp/a","project":"alpha","task":"task-one","status":"in-progress","progressDone":1,"progressTotal":2}
     not-json
@@ -403,6 +430,14 @@ func runActivityReportTests() throws {
     try expect(ActivityReport.empty(scope: .week, generatedAt: 1).totals.seconds == 0, "empty report has zero total")
     let nextMonth = ActivityReport.make(events: events, scope: .month, generatedAt: 1_702_700_000, calendar: calendar)
     try expect(nextMonth.totals.seconds == 0, "month scope excludes other months")
+
+    let renamedProjectEvents = [
+        ActivityEvent(editedAt: 1_700_000_100, observedAt: 1_700_000_101, root: "/tmp/renamed", project: "old-name", task: "task", status: "done", progressDone: 1, progressTotal: 1),
+        ActivityEvent(editedAt: 1_700_000_200, observedAt: 1_700_000_201, root: "/tmp/renamed", project: "new-name", task: "task", status: "done", progressDone: 1, progressTotal: 1),
+    ]
+    let renamedProjectReport = ActivityReport.make(events: renamedProjectEvents, scope: .month, generatedAt: 1_700_005_000, calendar: calendar)
+    try expect(renamedProjectReport.projects.count == 2, "same root with different project names remains separate report groups")
+    try expect(Set(renamedProjectReport.projects.map(\.identity)).count == 2, "project report identities include project name")
 
     let midnightEvents = [
         ActivityEvent(editedAt: 1_700_006_300, observedAt: 1_700_006_301, root: "/tmp/m", project: "midnight", task: "task", status: "in-progress", progressDone: 0, progressTotal: 1),
@@ -660,6 +695,7 @@ func runAppSourceInvariantTests() throws {
     let settingsViewPath = "Sources/CompanionApp/Views/AppearanceSettingsView.swift"
     let loginItemControllerPath = "Sources/CompanionApp/LoginItemController.swift"
     let coreLoginItemPath = "Sources/CompanionCore/LoginItem.swift"
+    let runnerPath = "Sources/CompanionCoreTestRunner/CompanionCoreTestRunnerTests.swift"
     let stateStore = try String(contentsOfFile: stateStorePath, encoding: .utf8)
     let rootWatcher = try String(contentsOfFile: rootWatcherPath, encoding: .utf8)
     let popover = try String(contentsOfFile: popoverPath, encoding: .utf8)
@@ -669,6 +705,7 @@ func runAppSourceInvariantTests() throws {
     let settingsView = try String(contentsOfFile: settingsViewPath, encoding: .utf8)
     let loginItemController = try String(contentsOfFile: loginItemControllerPath, encoding: .utf8)
     let coreLoginItem = try String(contentsOfFile: coreLoginItemPath, encoding: .utf8)
+    let runner = try String(contentsOfFile: runnerPath, encoding: .utf8)
     try expect(fm.fileExists(atPath: stateStorePath), "StateStore source exists")
     try expect(fm.fileExists(atPath: rootWatcherPath), "RootWatcher source exists")
     try expect(fm.fileExists(atPath: popoverPath), "popover source exists")
@@ -678,6 +715,9 @@ func runAppSourceInvariantTests() throws {
     try expect(fm.fileExists(atPath: settingsViewPath), "settings source exists")
     try expect(fm.fileExists(atPath: loginItemControllerPath), "login item controller source exists")
     try expect(fm.fileExists(atPath: coreLoginItemPath), "core login item source exists")
+    try expect(fm.fileExists(atPath: runnerPath), "runner source exists")
+    let cStderrWrite = "fpu" + "ts("
+    try expect(!runner.contains(cStderrWrite), "runner avoids C stderr writes that can fail Swift 6 concurrency checks")
     guard
         let initStart = stateStore.range(of: "init(configURL:"),
         let initEnd = stateStore[initStart.lowerBound...].range(of: "static func defaultConfigURL")
@@ -727,6 +767,7 @@ func runAppSourceInvariantTests() throws {
     try expect(activityReportView.contains("sectionBlock(title: \"Weekly\""), "ActivityReportView renders Weekly section")
     try expect(activityReportView.contains("sectionBlock(title: \"Monthly\""), "ActivityReportView renders Monthly section")
     try expect(activityReportView.contains("sectionSpacing"), "ActivityReportView separates sections with visible spacing")
+    try expect(activityReportView.contains("ForEach(report.projects, id: \\.identity)"), "ActivityReportView keys project rows by root and project")
     try expect(activityReportView.contains("planTitleText(task)"), "ActivityReportView renders concrete plan title when available")
     try expect(activityReportView.contains("taskLine(task)"), "ActivityReportView keeps task workspace visible under concrete plan title")
     try expect(activityReportView.contains("statusLine(task)"), "ActivityReportView renders task status detail")
@@ -987,7 +1028,7 @@ struct CompanionCoreTestRunnerTests {
             try runAppSourceInvariantTests()
             print("CompanionCoreTestRunner: PASS")
         } catch {
-            fputs("CompanionCoreTestRunner: FAIL: \(error)\n", stderr)
+            writeStandardError("CompanionCoreTestRunner: FAIL: \(error)\n")
             exit(1)
         }
     }
