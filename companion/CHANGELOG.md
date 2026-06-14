@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.9.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v1.8.0...workbranch-companion-v1.9.0) (2026-06-14)
+
+
+### Features
+
+* **companion:** add launch at login setting ([63f1bf5](https://github.com/tkhwang/workbranch/commit/63f1bf57da12ca79ebc575235e78b2bbfbffe47e))
+* **companion:** add launch at login setting ([3f80b4e](https://github.com/tkhwang/workbranch/commit/3f80b4eb35a09d7f7c4a6a4d08a7a9507c329b20))
+
 ## [1.8.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v1.7.0...workbranch-companion-v1.8.0) (2026-06-14)
 
 
