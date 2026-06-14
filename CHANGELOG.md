@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.19.0](https://github.com/tkhwang/workbranch/compare/v1.18.0...v1.19.0) (2026-06-14)
+
+
+### Features
+
+* **companion:** add status read markers and language presets ([3c4583c](https://github.com/tkhwang/workbranch/commit/3c4583c24a59e638f10909438453ca614ae426ab))
+* **companion:** add status read markers and language presets ([1c1242a](https://github.com/tkhwang/workbranch/commit/1c1242a6b02d848977be6d196862c5ba6120f9bf))
+
 ## [1.18.0](https://github.com/tkhwang/workbranch/compare/v1.17.0...v1.18.0) (2026-06-14)
 
 
