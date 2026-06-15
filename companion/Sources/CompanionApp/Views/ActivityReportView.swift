@@ -1,6 +1,25 @@
 import SwiftUI
 import CompanionCore
 
+private enum ReportDetailLevel {
+    case projectOnly
+    case taskPlans
+
+    var includesTasks: Bool {
+        switch self {
+        case .projectOnly: return false
+        case .taskPlans: return true
+        }
+    }
+
+    var includesPlans: Bool {
+        switch self {
+        case .projectOnly: return false
+        case .taskPlans: return true
+        }
+    }
+}
+
 struct ActivityReportView: View {
     let today: ActivityReport
     let week: ActivityReport
@@ -11,9 +30,9 @@ struct ActivityReportView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: sectionSpacing) {
             TerminalLine(prefix: "[*]", command: "Activity report", tone: .accent)
-            sectionBlock(title: "Today", report: today, showsPlanDetails: true)
-            sectionBlock(title: "Weekly", report: week, showsPlanDetails: false)
-            sectionBlock(title: "Monthly", report: month, showsPlanDetails: false)
+            sectionBlock(title: "Today", report: today, detailLevel: .taskPlans)
+            sectionBlock(title: "Weekly", report: week, detailLevel: .taskPlans)
+            sectionBlock(title: "Monthly", report: month, detailLevel: .projectOnly)
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -24,7 +43,7 @@ struct ActivityReportView: View {
         )
     }
 
-    private func sectionBlock(title: String, report: ActivityReport, showsPlanDetails: Bool) -> some View {
+    private func sectionBlock(title: String, report: ActivityReport, detailLevel: ReportDetailLevel) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text("[+]")
@@ -41,16 +60,16 @@ struct ActivityReportView: View {
                 TerminalLine(prefix: "#", command: "No activity recorded \(title.lowercased())", tone: .muted)
             } else {
                 ForEach(report.projects, id: \.identity) { project in
-                    projectBlock(project, showsPlanDetails: showsPlanDetails)
+                    projectBlock(project, detailLevel: detailLevel)
                 }
             }
         }
     }
 
-    private func projectBlock(_ project: ActivityReportProject, showsPlanDetails: Bool) -> some View {
+    private func projectBlock(_ project: ActivityReportProject, detailLevel: ReportDetailLevel) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("│ project")
+                Text("│")
                     .foregroundStyle(palette.accent)
                 Text(project.project)
                     .foregroundStyle(palette.command)
@@ -61,39 +80,38 @@ struct ActivityReportView: View {
                     .fontWeight(.semibold)
                     .monospacedDigit()
             }
-            ForEach(project.tasks, id: \.task) { task in
-                taskBlock(task)
-                if showsPlanDetails {
-                    ForEach(task.plans, id: \.index) { plan in
-                        planLine(plan)
+            if detailLevel.includesTasks {
+                ForEach(project.tasks, id: \.task) { task in
+                    if detailLevel.includesPlans {
+                        ForEach(task.plans, id: \.identity) { plan in
+                            planBlock(plan)
+                        }
                     }
-                    statusLine(task)
                 }
             }
         }
     }
 
-    private func taskBlock(_ task: ActivityReportTask) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("│  • task")
-                .foregroundStyle(palette.muted)
-            Text(task.task)
-                .foregroundStyle(palette.text)
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Text(durationText(task.seconds))
-                .foregroundStyle(palette.warning)
-                .fontWeight(.semibold)
-                .monospacedDigit()
+    private func planBlock(_ plan: ActivityReportPlan) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            planLine(plan)
+            if !plan.items.isEmpty {
+                ForEach(Array(plan.items.enumerated()), id: \.offset) { _, item in
+                    planStepLine(item)
+                }
+            }
         }
     }
 
     private func planLine(_ plan: ActivityReportPlan) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("│    plan")
+            Text("│")
                 .foregroundStyle(palette.muted)
+            Text("[*]")
+                .foregroundStyle(palette.accent)
             Text(plan.title)
                 .foregroundStyle(palette.text)
+                .fontWeight(.semibold)
                 .lineLimit(1)
                 .truncationMode(.middle)
             Text(durationText(plan.seconds))
@@ -106,31 +124,16 @@ struct ActivityReportView: View {
         }
     }
 
-    private func statusLine(_ task: ActivityReportTask) -> some View {
+    private func planStepLine(_ item: WorkbranchChecklistItem) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("│    status")
+            Text("│")
                 .foregroundStyle(palette.muted)
-            Text(statusText(task))
-                .foregroundStyle(palette.warning)
-                .fontWeight(.semibold)
+            Text(indentedStepText(item))
+                .foregroundStyle(item.checked ? palette.muted : palette.text)
+                .strikethrough(item.checked, color: palette.muted)
                 .lineLimit(1)
-            Text("│ sessions")
-                .foregroundStyle(palette.muted)
-            Text("\(task.sessions)")
-                .foregroundStyle(palette.text)
-                .monospacedDigit()
-            Text("│ last")
-                .foregroundStyle(palette.muted)
-            Text(lastEditedText(task.lastEditedAt))
-                .foregroundStyle(palette.text)
-                .monospacedDigit()
+                .truncationMode(.middle)
         }
-    }
-
-    private func statusText(_ task: ActivityReportTask) -> String {
-        let status = task.status.isEmpty ? "unknown" : task.status.uppercased()
-        guard task.progressTotal > 0 else { return status }
-        return "\(status) \(task.progressDone)/\(task.progressTotal)"
     }
 
     private func planStatusText(_ plan: ActivityReportPlan) -> String {
@@ -139,11 +142,8 @@ struct ActivityReportView: View {
         return "\(status) \(plan.progressDone)/\(plan.progressTotal)"
     }
 
-    private func lastEditedText(_ timestamp: Int) -> String {
-        guard timestamp > 0 else { return "--:--" }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: Date(timeIntervalSince1970: TimeInterval(timestamp)))
+    private func indentedStepText(_ item: WorkbranchChecklistItem) -> String {
+        String(repeating: "  ", count: max(0, item.depth)) + item.text
     }
 
     private func durationText(_ seconds: Int) -> String {

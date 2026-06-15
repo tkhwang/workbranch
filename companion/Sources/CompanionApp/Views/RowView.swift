@@ -137,7 +137,7 @@ struct RowView: View {
                 if let memo = row.memoTitle, !memo.isEmpty {
                     detailLine(label: "memo", value: memo, tone: .muted)
                 }
-                if row.plans.count > 1 {
+                if !renderablePlans.isEmpty {
                     ForEach(Array(renderablePlans.enumerated()), id: \.offset) { _, plan in
                         planBlock(plan)
                     }
@@ -175,23 +175,30 @@ struct RowView: View {
 
     private func planHeaderLine(_ plan: WorkbranchPlan) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 7) {
-            Text("│ plan")
+            Text("│")
                 .foregroundStyle(palette.muted)
-            Text(plan.title)
+            Text("[*]")
+                .foregroundStyle(palette.accent)
+            Text(planHeaderStatusText(plan))
                 .foregroundStyle(palette.command)
                 .fontWeight(.semibold)
                 .lineLimit(1)
                 .truncationMode(.tail)
-            if plan.progressTotal > 0 {
-                Text("\(plan.progressDone)/\(plan.progressTotal)")
-                    .foregroundStyle(palette.warning)
-                    .monospacedDigit()
-            }
-            Text(plan.status.uppercased())
-                .foregroundStyle(palette.color(for: tone(for: plan.status)))
-                .fontWeight(.semibold)
-                .lineLimit(1)
         }
+    }
+
+    private func planHeaderStatusText(_ plan: WorkbranchPlan) -> String {
+        var segments: [String] = []
+        if plan.progressTotal > 0 {
+            segments.append("\(plan.progressDone)/\(plan.progressTotal)")
+        }
+        if !plan.title.isEmpty {
+            segments.append(plan.title)
+        }
+        if !plan.status.isEmpty {
+            segments.append(plan.status.uppercased())
+        }
+        return segments.joined(separator: " ")
     }
 
     private func statusItemLine(_ item: WorkbranchChecklistItem) -> some View {
@@ -210,7 +217,7 @@ struct RowView: View {
 
     private var hasStatusDetails: Bool {
         if let memo = row.memoTitle, !memo.isEmpty { return true }
-        if row.plans.count > 1 { return !renderablePlans.isEmpty }
+        if !renderablePlans.isEmpty { return true }
         return !row.checklistItems.isEmpty
     }
 

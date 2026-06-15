@@ -170,6 +170,17 @@ func runModelsAndMenuStateTests() throws {
     try expect(state.sections[0].rows[2].title.contains("·"), "todo status icon")
     try expect(state.sections[0].rows[2].status == "todo", "todo status remains row data")
     try expect(state.sections[0].rows[2].currentItem == "설계 시작", "todo current item remains row data")
+
+    let duplicateMemoDocument = try WorkbranchListDocument.decode(Data("""
+    {"schemaVersion":1,"project":"fullstack","root":"/tmp/fullstack","tasks":[
+      {"name":"same-memo","path":"/tmp/fullstack/same-memo","memoTitle":"same-memo","status":"in-progress","progressDone":1,"progressTotal":1,"currentItem":"","updatedAt":1760000200,"notiCount":0,"repos":[]}
+    ]}
+    """.utf8))
+    var duplicateMemoTracker = NotificationTracker()
+    let duplicateMemoState = MenuState.make(configuredRoots: ["/tmp/fullstack"], results: [.success(duplicateMemoDocument)], previous: nil, tracker: &duplicateMemoTracker, isBaseline: true)
+    try expect(!duplicateMemoState.sections[0].rows[0].title.contains("same-memo — same-memo"), "task header suppresses memo title when it duplicates task name")
+    try expect(duplicateMemoState.sections[0].rows[0].memoTitle == nil, "detail memo line suppresses memo title when it duplicates task name")
+
     try expect(state.sections[0].rows[0].primaryAction == .editMemo(root: "/tmp/fullstack", task: "task3"), "primary action")
     try expect(state.sections[1].rows[0].title.contains("workbranch list failed"), "error row")
     try expect(state.notificationsToSend.isEmpty, "baseline no notifications")
@@ -388,7 +399,8 @@ func runActivityEventTests() throws {
     ]}
     """.utf8))
     let planEvents = ActivityEvent.diff(previous: [root: planBaseline], next: [planChanged], observedAt: 400, isBaseline: false)
-    try expect(planEvents == [ActivityEvent(editedAt: 360, observedAt: 400, root: root, project: "fullstack", task: "task-plans", plan: "Review", planIndex: 1, planTitle: "Review", status: "done", taskProgressDone: 2, taskProgressTotal: 2, progressDone: 1, progressTotal: 1)], "per-plan diff emits only the changed duplicate-title plan index")
+    let secondStepDone = WorkbranchChecklistItem(text: "second", checked: true, depth: 0)
+    try expect(planEvents == [ActivityEvent(editedAt: 360, observedAt: 400, root: root, project: "fullstack", task: "task-plans", plan: "Review", planIndex: 1, planTitle: "Review", status: "done", taskProgressDone: 2, taskProgressTotal: 2, progressDone: 1, progressTotal: 1, items: [secondStepDone])], "per-plan diff emits only the changed duplicate-title plan index with step snapshot")
 
     let plannedStatusOnly = try WorkbranchListDocument.decode(Data("""
     {"schemaVersion":1,"project":"fullstack","root":"/tmp/fullstack","tasks":[
@@ -396,7 +408,8 @@ func runActivityEventTests() throws {
     ]}
     """.utf8))
     let plannedStatusEvents = ActivityEvent.diff(previous: [root: planBaseline], next: [plannedStatusOnly], observedAt: 430, isBaseline: false)
-    try expect(plannedStatusEvents == [ActivityEvent(editedAt: 420, observedAt: 430, root: root, project: "fullstack", task: "task-plans", plan: "Review", planIndex: 0, planTitle: "Review", planStatus: "done", status: "blocked", taskProgressDone: 1, taskProgressTotal: 2, progressDone: 1, progressTotal: 1)], "planned task status-only change creates an activity event with task status")
+    let firstStepDone = WorkbranchChecklistItem(text: "first", checked: true, depth: 0)
+    try expect(plannedStatusEvents == [ActivityEvent(editedAt: 420, observedAt: 430, root: root, project: "fullstack", task: "task-plans", plan: "Review", planIndex: 0, planTitle: "Review", planStatus: "done", status: "blocked", taskProgressDone: 1, taskProgressTotal: 2, progressDone: 1, progressTotal: 1, items: [firstStepDone])], "planned task status-only change creates an activity event with task status and step snapshot")
 
     let aggregateBaseline = try WorkbranchListDocument.decode(Data("""
     {"schemaVersion":1,"project":"fullstack","root":"/tmp/fullstack","tasks":[
@@ -416,6 +429,7 @@ func runActivityEventTests() throws {
     try expect(aggregateReport.projects[0].tasks[0].plans[0].status == "done", "multi-plan report still keeps changed plan status")
     try expect(aggregateReport.projects[0].tasks[0].plans[0].progressDone == 1, "multi-plan report still keeps changed plan progress done")
     try expect(aggregateReport.projects[0].tasks[0].plans[0].progressTotal == 1, "multi-plan report still keeps changed plan progress total")
+    try expect(aggregateReport.projects[0].tasks[0].plans[0].items == [WorkbranchChecklistItem(text: "contract", checked: true, depth: 0)], "multi-plan report carries the changed plan step snapshot")
 
     let explicitEmptyPlanBaseline = try WorkbranchListDocument.decode(Data("""
     {"schemaVersion":1,"project":"fullstack","root":"/tmp/fullstack","tasks":[
@@ -431,8 +445,13 @@ func runActivityEventTests() throws {
 
     let encoded = try events[0].jsonLine()
     try expect(encoded.hasSuffix("\n"), "activity event JSONL ends with newline")
+    try expect(!encoded.contains("\"items\""), "empty step snapshots are omitted from activity JSONL")
     let decoded = try ActivityEvent.decodeLine(encoded)
     try expect(decoded == events[0], "activity event JSON line round trip")
+    let encodedWithItems = try planEvents[0].jsonLine()
+    try expect(encodedWithItems.contains("\"items\""), "non-empty step snapshots are stored in activity JSONL")
+    let legacyDecoded = try ActivityEvent.decodeLine("{\"v\":1,\"editedAt\":1,\"observedAt\":2,\"root\":\"/tmp\",\"project\":\"p\",\"task\":\"t\",\"status\":\"todo\",\"progressDone\":0,\"progressTotal\":1}")
+    try expect(legacyDecoded.items.isEmpty, "legacy activity JSONL without items decodes with an empty step snapshot")
 }
 
 
@@ -472,6 +491,7 @@ func runActivityReportTests() throws {
     try expect(report.projects[0].tasks[0].progressTotal == 2, "latest task progress total is retained for plan detail")
     try expect(report.projects[0].tasks[0].plans.map { "\($0.title)|\($0.index)|\($0.seconds)" } == ["Alpha setup|0|300", "Alpha launch plan|1|600"], "task report includes independent per-plan rollups while task seconds remains union")
     try expect(report.projects[0].tasks[0].plans[1].status == "review", "legacy events use status as plan status fallback")
+    try expect(report.projects[0].tasks[0].plans[1].items.isEmpty, "legacy events have no plan step snapshot")
     try expect(report.projects[1].tasks[0].seconds == 300, "single event receives lead pad")
     try expect(report.totals.seconds == 1_500, "report total seconds")
 
@@ -491,6 +511,25 @@ func runActivityReportTests() throws {
     let sameEditedAtReport = ActivityReport.make(events: sameEditedAtEvents, scope: .month, generatedAt: 1_700_005_000, calendar: calendar)
     try expect(sameEditedAtReport.projects[0].tasks[0].planTitle == "late observation", "latest task detail uses observedAt before planIndex when editedAt ties")
     try expect(sameEditedAtReport.projects[0].tasks[0].status == "review", "latest task status uses latest observed event when editedAt ties")
+
+    let stepSnapshotEvents = [
+        ActivityEvent(editedAt: 1_700_000_100, observedAt: 1_700_000_101, root: "/tmp/steps", project: "steps", task: "task", plan: "Implementation", planIndex: 0, status: "in-progress", progressDone: 0, progressTotal: 2, items: [WorkbranchChecklistItem(text: "Draft API", checked: false, depth: 0)]),
+        ActivityEvent(editedAt: 1_700_000_700, observedAt: 1_700_000_701, root: "/tmp/steps", project: "steps", task: "task", plan: "Implementation", planIndex: 0, status: "review", progressDone: 1, progressTotal: 2, items: [WorkbranchChecklistItem(text: "Draft API", checked: true, depth: 0), WorkbranchChecklistItem(text: "Smoke UI", checked: false, depth: 1)]),
+    ]
+    let stepSnapshotReport = ActivityReport.make(events: stepSnapshotEvents, scope: .month, generatedAt: 1_700_005_000, calendar: calendar)
+    try expect(stepSnapshotReport.projects[0].tasks[0].plans[0].items == [WorkbranchChecklistItem(text: "Draft API", checked: true, depth: 0), WorkbranchChecklistItem(text: "Smoke UI", checked: false, depth: 1)], "plan report uses the latest available step snapshot")
+
+    let manySameIndexEvents = [
+        ActivityEvent(editedAt: 1_700_000_100, observedAt: 1_700_000_101, root: "/tmp/many", project: "many", task: "task", plan: "Zeta kickoff", planIndex: 0, planStatus: "done", status: "in-progress", progressDone: 1, progressTotal: 1),
+        ActivityEvent(editedAt: 1_700_000_700, observedAt: 1_700_000_701, root: "/tmp/many", project: "many", task: "task", plan: "Alpha review", planIndex: 0, planStatus: "done", status: "in-progress", progressDone: 1, progressTotal: 1),
+        ActivityEvent(editedAt: 1_700_001_300, observedAt: 1_700_001_301, root: "/tmp/many", project: "many", task: "task", plan: "Middle verify", planIndex: 0, planStatus: "review", status: "review", progressDone: 1, progressTotal: 2),
+        ActivityEvent(editedAt: 1_700_001_900, observedAt: 1_700_001_901, root: "/tmp/many", project: "many", task: "task", plan: "", planIndex: 0, status: "review", progressDone: 0, progressTotal: 0),
+    ]
+    let manySameIndexReport = ActivityReport.make(events: manySameIndexEvents, scope: .today, generatedAt: 1_700_005_000, calendar: calendar)
+    let manySameIndexPlans = manySameIndexReport.projects[0].tasks[0].plans
+    try expect(manySameIndexPlans.map(\.title) == ["Zeta kickoff", "Alpha review", "Middle verify"], "same-index plan rows stay in first-activity order and omit empty plan titles")
+    try expect(manySameIndexPlans.map(\.firstEditedAt) == [1_700_000_100, 1_700_000_700, 1_700_001_300], "plan firstEditedAt records scope-local first activity")
+    try expect(Set(manySameIndexPlans.map(\.identity)).count == 3, "same-index plan rows have stable distinct identities")
 
     let today = ActivityReport.make(events: events, scope: .today, generatedAt: 1_700_005_000, calendar: calendar)
     try expect(today.totals.seconds == 1_500, "today scope includes same UTC day")
@@ -850,16 +889,32 @@ func runAppSourceInvariantTests() throws {
     }
     let reportGateBody = String(popover[reportGateStart.lowerBound..<reportGateEnd.lowerBound])
     try expect(reportGateBody.contains("ActivityReportView(today: store.activityReport, week: store.weeklyActivityReport, month: store.monthlyActivityReport)"), "activity report is inside report toggle branch")
-    try expect(activityReportView.contains("sectionBlock(title: \"Today\""), "ActivityReportView renders Today section")
-    try expect(activityReportView.contains("sectionBlock(title: \"Weekly\""), "ActivityReportView renders Weekly section")
-    try expect(activityReportView.contains("sectionBlock(title: \"Monthly\""), "ActivityReportView renders Monthly section")
+    try expect(activityReportView.contains("sectionBlock(title: \"Today\", report: today, detailLevel: .taskPlans)"), "ActivityReportView renders Today with task-plan granularity")
+    try expect(activityReportView.contains("sectionBlock(title: \"Weekly\", report: week, detailLevel: .taskPlans)"), "ActivityReportView renders Weekly with task-plan granularity")
+    try expect(activityReportView.contains("sectionBlock(title: \"Monthly\", report: month, detailLevel: .projectOnly)"), "ActivityReportView renders Monthly with project-only granularity")
+    try expect(activityReportView.contains("enum ReportDetailLevel"), "ActivityReportView uses an explicit report detail level enum")
+    try expect(!activityReportView.contains("showsPlanDetails"), "ActivityReportView no longer uses a boolean detail flag")
     try expect(activityReportView.contains("sectionSpacing"), "ActivityReportView separates sections with visible spacing")
     try expect(activityReportView.contains("ForEach(report.projects, id: \\.identity)"), "ActivityReportView keys project rows by root and project")
+    try expect(activityReportView.contains("if detailLevel.includesTasks"), "ActivityReportView can suppress task rows for project-only reports")
+    try expect(activityReportView.contains("if detailLevel.includesPlans"), "ActivityReportView can show plan rows for task-plan reports")
     try expect(activityReportView.contains("ForEach(task.plans"), "ActivityReportView renders per-plan rows when available")
-    try expect(activityReportView.contains("planLine(plan)"), "ActivityReportView delegates per-plan duration rows")
-    try expect(activityReportView.contains("statusLine(task)"), "ActivityReportView renders task status detail")
-    try expect(activityReportView.contains("│    plan"), "ActivityReportView labels concrete plan rows")
-    try expect(activityReportView.contains("│  • task"), "ActivityReportView keeps task workspace visible")
+    try expect(activityReportView.contains("id: \\.identity"), "ActivityReportView keys plan rows with stable plan identity")
+    try expect(activityReportView.contains("planBlock(plan)"), "ActivityReportView delegates per-plan blocks")
+    try expect(activityReportView.contains("planStepLine(item)"), "ActivityReportView renders step rows under plan rows")
+    try expect(activityReportView.contains("ForEach(Array(plan.items.enumerated())"), "ActivityReportView iterates plan step snapshots")
+    try expect(!activityReportView.contains("statusLine(task)"), "ActivityReportView does not render task status detail noise")
+    try expect(!activityReportView.contains("│ project"), "ActivityReportView omits redundant project label text")
+    try expect(!activityReportView.contains("│  • task"), "ActivityReportView omits redundant task label rows")
+    try expect(!activityReportView.contains("│    plan"), "ActivityReportView omits redundant plan label text")
+    try expect(activityReportView.contains("Text(\"│\")"), "ActivityReportView keeps compact guide pipe rows")
+    try expect(activityReportView.contains("Text(\"[*]\")"), "ActivityReportView marks plan rows with a compact icon")
+    guard let reportStepStart = activityReportView.range(of: "private func planStepLine"), let reportStepEnd = activityReportView[reportStepStart.lowerBound...].range(of: "private func planStatusText") else {
+        throw TestFailure(message: "ActivityReportView planStepLine body not found")
+    }
+    let reportStepBody = String(activityReportView[reportStepStart.lowerBound..<reportStepEnd.lowerBound])
+    try expect(!reportStepBody.contains("[*]"), "ActivityReportView leaf step rows never use the plan marker")
+    try expect(!reportStepBody.contains("Text(\"-\")"), "ActivityReportView leaf step rows avoid standalone marker icons")
     try expect(activityReportView.contains("No activity recorded"), "ActivityReportView has empty state")
     try expect(rowView.contains("row.activeTimeText"), "RowView renders active time text")
     try expect(!rowView.contains("activeTimeColumnWidth"), "RowView does not use fixed-width active-time column")
@@ -1023,8 +1078,17 @@ func runAppSourceInvariantTests() throws {
     try expect(rowView.contains("detailLine(label: \"memo\""), "task rows render list --global memoTitle in the detail area")
     try expect(rowView.contains("row.plans"), "task rows render TASK-WORKBRANCH plan groups")
     try expect(rowView.contains("renderablePlans"), "task details visibility is based on plans with renderable content")
+    try expect(rowView.contains("if !renderablePlans.isEmpty"), "single renderable plans render through the plan header path")
+    try expect(!rowView.contains("if row.plans.count > 1"), "single-plan tasks do not fall back to flat checklist rendering")
     try expect(!rowView.contains("return !row.plans.isEmpty || !row.checklistItems.isEmpty"), "empty single plans do not force an empty details block")
     try expect(rowView.contains("statusItemLine"), "task status content renders as checklist lines")
+    try expect(!rowView.contains("Text(\"│ plan\")"), "Home plan header omits redundant plan label text")
+    try expect(rowView.contains("planHeaderStatusText"), "Home plan header renders compact plan progress/title/status text")
+    guard let homeStepStart = rowView.range(of: "private func statusItemLine"), let homeStepEnd = rowView[homeStepStart.lowerBound...].range(of: "private var hasStatusDetails") else {
+        throw TestFailure(message: "RowView statusItemLine body not found")
+    }
+    let homeStepBody = String(rowView[homeStepStart.lowerBound..<homeStepEnd.lowerBound])
+    try expect(!homeStepBody.contains("[*]"), "Home leaf step rows never use the plan marker")
     try expect(rowView.contains("currentWorkLine"), "task rows render current work as a primary fixed line")
     try expect(rowView.contains("statusReadAction"), "current work line owns status-read action")
     try expect(rowView.contains("store.perform(statusReadAction)"), "current work line click marks status read")
