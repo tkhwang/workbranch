@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.12.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v1.11.0...workbranch-companion-v1.12.0) (2026-06-15)
+
+
+### Features
+
+* display done plan and step better ([28fbeef](https://github.com/tkhwang/workbranch/commit/28fbeef5c33d1747bc041eb01e7be0c1507f414f))
+* update activity report description ([9709946](https://github.com/tkhwang/workbranch/commit/970994679a08a840d7ba89326e8939a791b3a185))
+
 ## [1.11.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v1.10.0...workbranch-companion-v1.11.0) (2026-06-15)
 
 
