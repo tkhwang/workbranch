@@ -138,7 +138,7 @@ struct RowView: View {
                     detailLine(label: "memo", value: memo, tone: .muted)
                 }
                 if row.plans.count > 1 {
-                    ForEach(Array(row.plans.enumerated()), id: \.offset) { _, plan in
+                    ForEach(Array(renderablePlans.enumerated()), id: \.offset) { _, plan in
                         planBlock(plan)
                     }
                 } else {
@@ -210,7 +210,18 @@ struct RowView: View {
 
     private var hasStatusDetails: Bool {
         if let memo = row.memoTitle, !memo.isEmpty { return true }
-        return !row.plans.isEmpty || !row.checklistItems.isEmpty
+        if row.plans.count > 1 { return !renderablePlans.isEmpty }
+        return !row.checklistItems.isEmpty
+    }
+
+    private var renderablePlans: [WorkbranchPlan] {
+        row.plans.filter { plan in
+            !plan.title.isEmpty ||
+                !plan.status.isEmpty ||
+                plan.progressTotal > 0 ||
+                !plan.currentItem.isEmpty ||
+                !plan.items.isEmpty
+        }
     }
 
     private var statusMessageText: String {

@@ -168,6 +168,7 @@ main() {
   run_test test_list_json_plan_sections_shape_and_aggregate
   run_test test_list_json_implicit_and_empty_plans
   run_test test_list_json_duplicate_plan_titles_keep_distinct_indexes
+  run_test test_list_json_nested_headings_stay_inside_current_plan
   run_test test_list_global_json_projects_and_errors
   run_test test_list_global_uses_stable_launcher_after_changing_directory
   run_test test_list_global_json_all_roots_failure_is_nonzero

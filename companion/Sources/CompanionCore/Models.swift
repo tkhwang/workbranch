@@ -172,8 +172,9 @@ public struct WorkbranchTask: Codable, Equatable, Sendable {
         currentItem = try container.decodeIfPresent(String.self, forKey: .currentItem) ?? ""
         updatedAt = try container.decodeIfPresent(Int.self, forKey: .updatedAt) ?? 0
         items = try container.decodeIfPresent([WorkbranchChecklistItem].self, forKey: .items) ?? []
+        let hasPlansKey = container.contains(.plans)
         let decodedPlans = try container.decodeIfPresent([WorkbranchPlan].self, forKey: .plans) ?? []
-        plans = decodedPlans.isEmpty ? Self.fallbackPlans(planTitle: planTitle, status: status, progressDone: progressDone, progressTotal: progressTotal, currentItem: currentItem, items: items) : decodedPlans
+        plans = hasPlansKey ? decodedPlans : Self.fallbackPlans(planTitle: planTitle, status: status, progressDone: progressDone, progressTotal: progressTotal, currentItem: currentItem, items: items)
         notiCount = try container.decode(Int.self, forKey: .notiCount)
         repos = try container.decode([WorkbranchRepo].self, forKey: .repos)
     }

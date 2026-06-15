@@ -92,6 +92,20 @@ func runModelsAndMenuStateTests() throws {
     try expect(progressDocument.tasks[0].updatedAt == 1760000040, "updatedAt decode")
     try expect(progressDocument.tasks[0].items == [WorkbranchChecklistItem(text: "Major", checked: true, depth: 0), WorkbranchChecklistItem(text: "Child", checked: false, depth: 1)], "items decode")
 
+    let explicitEmptyPlansDocument = try WorkbranchListDocument.decode(Data("""
+    {"schemaVersion":1,"project":"fullstack","root":"/tmp/fullstack","tasks":[
+      {"name":"empty-plan","path":"/tmp/fullstack/empty-plan","memoTitle":"","planTitle":"Compatibility label","status":"todo","progressDone":0,"progressTotal":0,"currentItem":"","updatedAt":1760000050,"items":[],"plans":[],"notiCount":0,"repos":[]}
+    ]}
+    """.utf8))
+    try expect(explicitEmptyPlansDocument.tasks[0].plans.isEmpty, "present empty plans array does not synthesize legacy fallback plan")
+
+    let legacyFallbackDocument = try WorkbranchListDocument.decode(Data("""
+    {"schemaVersion":1,"project":"fullstack","root":"/tmp/fullstack","tasks":[
+      {"name":"legacy-plan","path":"/tmp/fullstack/legacy-plan","memoTitle":"","planTitle":"Legacy label","status":"in-progress","progressDone":1,"progressTotal":2,"currentItem":"finish","updatedAt":1760000060,"items":[{"text":"start","checked":true,"depth":0},{"text":"finish","checked":false,"depth":0}],"notiCount":0,"repos":[]}
+    ]}
+    """.utf8))
+    try expect(legacyFallbackDocument.tasks[0].plans == [WorkbranchPlan(title: "Legacy label", index: 0, status: "in-progress", progressDone: 1, progressTotal: 2, currentItem: "finish", items: [WorkbranchChecklistItem(text: "start", checked: true, depth: 0), WorkbranchChecklistItem(text: "finish", checked: false, depth: 0)])], "missing plans key still synthesizes legacy fallback plan")
+
     let globalDocument = try WorkbranchGlobalDocument.decode(Data("""
     {"schemaVersion":1,"projects":[{"schemaVersion":1,"project":"fullstack","root":"/tmp/fullstack","tasks":[]}],"errors":[{"root":"/tmp/missing","message":"not inside project"}]}
     """.utf8))
@@ -374,7 +388,46 @@ func runActivityEventTests() throws {
     ]}
     """.utf8))
     let planEvents = ActivityEvent.diff(previous: [root: planBaseline], next: [planChanged], observedAt: 400, isBaseline: false)
-    try expect(planEvents == [ActivityEvent(editedAt: 360, observedAt: 400, root: root, project: "fullstack", task: "task-plans", plan: "Review", planIndex: 1, planTitle: "Review", status: "done", progressDone: 1, progressTotal: 1)], "per-plan diff emits only the changed duplicate-title plan index")
+    try expect(planEvents == [ActivityEvent(editedAt: 360, observedAt: 400, root: root, project: "fullstack", task: "task-plans", plan: "Review", planIndex: 1, planTitle: "Review", status: "done", taskProgressDone: 2, taskProgressTotal: 2, progressDone: 1, progressTotal: 1)], "per-plan diff emits only the changed duplicate-title plan index")
+
+    let plannedStatusOnly = try WorkbranchListDocument.decode(Data("""
+    {"schemaVersion":1,"project":"fullstack","root":"/tmp/fullstack","tasks":[
+      {"name":"task-plans","path":"/tmp/fullstack/task-plans","memoTitle":"","planTitle":"Review","status":"blocked","progressDone":1,"progressTotal":2,"updatedAt":420,"items":[{"text":"first","checked":true,"depth":0},{"text":"second","checked":false,"depth":0}],"plans":[{"title":"Review","index":0,"status":"done","progressDone":1,"progressTotal":1,"items":[{"text":"first","checked":true,"depth":0}]}],"notiCount":0,"repos":[]}
+    ]}
+    """.utf8))
+    let plannedStatusEvents = ActivityEvent.diff(previous: [root: planBaseline], next: [plannedStatusOnly], observedAt: 430, isBaseline: false)
+    try expect(plannedStatusEvents == [ActivityEvent(editedAt: 420, observedAt: 430, root: root, project: "fullstack", task: "task-plans", plan: "Review", planIndex: 0, planTitle: "Review", planStatus: "done", status: "blocked", taskProgressDone: 1, taskProgressTotal: 2, progressDone: 1, progressTotal: 1)], "planned task status-only change creates an activity event with task status")
+
+    let aggregateBaseline = try WorkbranchListDocument.decode(Data("""
+    {"schemaVersion":1,"project":"fullstack","root":"/tmp/fullstack","tasks":[
+      {"name":"task-aggregate","path":"/tmp/fullstack/task-aggregate","memoTitle":"","planTitle":"Backend","status":"todo","progressDone":0,"progressTotal":2,"updatedAt":460,"items":[{"text":"contract","checked":false,"depth":0},{"text":"smoke","checked":false,"depth":0}],"plans":[{"title":"Backend","index":0,"status":"todo","progressDone":0,"progressTotal":1,"currentItem":"contract","items":[{"text":"contract","checked":false,"depth":0}]},{"title":"Frontend","index":1,"status":"todo","progressDone":0,"progressTotal":1,"currentItem":"smoke","items":[{"text":"smoke","checked":false,"depth":0}]}],"notiCount":0,"repos":[]}
+    ]}
+    """.utf8))
+    let aggregateChanged = try WorkbranchListDocument.decode(Data("""
+    {"schemaVersion":1,"project":"fullstack","root":"/tmp/fullstack","tasks":[
+      {"name":"task-aggregate","path":"/tmp/fullstack/task-aggregate","memoTitle":"","planTitle":"Frontend","status":"in-progress","progressDone":1,"progressTotal":2,"updatedAt":520,"items":[{"text":"contract","checked":true,"depth":0},{"text":"smoke","checked":false,"depth":0}],"plans":[{"title":"Backend","index":0,"status":"done","progressDone":1,"progressTotal":1,"items":[{"text":"contract","checked":true,"depth":0}]},{"title":"Frontend","index":1,"status":"todo","progressDone":0,"progressTotal":1,"currentItem":"smoke","items":[{"text":"smoke","checked":false,"depth":0}]}],"notiCount":0,"repos":[]}
+    ]}
+    """.utf8))
+    let aggregateEvents = ActivityEvent.diff(previous: [root: aggregateBaseline], next: [aggregateChanged], observedAt: 530, isBaseline: false)
+    let aggregateReport = ActivityReport.make(events: aggregateEvents, scope: .all, generatedAt: 540)
+    try expect(aggregateReport.projects[0].tasks[0].status == "in-progress", "multi-plan report keeps aggregate task status")
+    try expect(aggregateReport.projects[0].tasks[0].progressDone == 1, "multi-plan report keeps aggregate task progress done")
+    try expect(aggregateReport.projects[0].tasks[0].progressTotal == 2, "multi-plan report keeps aggregate task progress total")
+    try expect(aggregateReport.projects[0].tasks[0].plans[0].status == "done", "multi-plan report still keeps changed plan status")
+    try expect(aggregateReport.projects[0].tasks[0].plans[0].progressDone == 1, "multi-plan report still keeps changed plan progress done")
+    try expect(aggregateReport.projects[0].tasks[0].plans[0].progressTotal == 1, "multi-plan report still keeps changed plan progress total")
+
+    let explicitEmptyPlanBaseline = try WorkbranchListDocument.decode(Data("""
+    {"schemaVersion":1,"project":"fullstack","root":"/tmp/fullstack","tasks":[
+      {"name":"task-empty-plan","path":"/tmp/fullstack/task-empty-plan","memoTitle":"","planTitle":"Compatibility label","status":"todo","progressDone":0,"progressTotal":0,"updatedAt":600,"items":[],"plans":[],"notiCount":0,"repos":[]}
+    ]}
+    """.utf8))
+    let explicitEmptyPlanChanged = try WorkbranchListDocument.decode(Data("""
+    {"schemaVersion":1,"project":"fullstack","root":"/tmp/fullstack","tasks":[
+      {"name":"task-empty-plan","path":"/tmp/fullstack/task-empty-plan","memoTitle":"","planTitle":"Compatibility label","status":"review","progressDone":0,"progressTotal":0,"updatedAt":660,"items":[],"plans":[],"notiCount":0,"repos":[]}
+    ]}
+    """.utf8))
+    try expect(ActivityEvent.diff(previous: [root: explicitEmptyPlanBaseline], next: [explicitEmptyPlanChanged], observedAt: 670, isBaseline: false).isEmpty, "present empty plans array does not create synthetic plan activity events")
 
     let encoded = try events[0].jsonLine()
     try expect(encoded.hasSuffix("\n"), "activity event JSONL ends with newline")
@@ -418,8 +471,26 @@ func runActivityReportTests() throws {
     try expect(report.projects[0].tasks[0].progressDone == 2, "latest task progress done is retained for plan detail")
     try expect(report.projects[0].tasks[0].progressTotal == 2, "latest task progress total is retained for plan detail")
     try expect(report.projects[0].tasks[0].plans.map { "\($0.title)|\($0.index)|\($0.seconds)" } == ["Alpha setup|0|300", "Alpha launch plan|1|600"], "task report includes independent per-plan rollups while task seconds remains union")
+    try expect(report.projects[0].tasks[0].plans[1].status == "review", "legacy events use status as plan status fallback")
     try expect(report.projects[1].tasks[0].seconds == 300, "single event receives lead pad")
     try expect(report.totals.seconds == 1_500, "report total seconds")
+
+    let plannedStatusReport = ActivityReport.make(
+        events: [ActivityEvent(editedAt: 1_700_000_100, observedAt: 1_700_000_101, root: "/tmp/planned", project: "planned", task: "task", plan: "Review", planIndex: 0, planTitle: "Review", planStatus: "done", status: "blocked", progressDone: 1, progressTotal: 1)],
+        scope: .month,
+        generatedAt: 1_700_010_000,
+        calendar: calendar
+    )
+    try expect(plannedStatusReport.projects[0].tasks[0].status == "blocked", "planned task report keeps task-level badge status")
+    try expect(plannedStatusReport.projects[0].tasks[0].plans[0].status == "done", "planned task report keeps plan-level status separate")
+
+    let sameEditedAtEvents = [
+        ActivityEvent(editedAt: 1_700_000_900, observedAt: 1_700_000_950, root: "/tmp/same", project: "same", task: "task", plan: "late observation", planIndex: 0, planTitle: "late observation", status: "review", progressDone: 1, progressTotal: 2),
+        ActivityEvent(editedAt: 1_700_000_900, observedAt: 1_700_000_910, root: "/tmp/same", project: "same", task: "task", plan: "larger index older observation", planIndex: 1, planTitle: "larger index older observation", status: "blocked", progressDone: 0, progressTotal: 2),
+    ]
+    let sameEditedAtReport = ActivityReport.make(events: sameEditedAtEvents, scope: .month, generatedAt: 1_700_005_000, calendar: calendar)
+    try expect(sameEditedAtReport.projects[0].tasks[0].planTitle == "late observation", "latest task detail uses observedAt before planIndex when editedAt ties")
+    try expect(sameEditedAtReport.projects[0].tasks[0].status == "review", "latest task status uses latest observed event when editedAt ties")
 
     let today = ActivityReport.make(events: events, scope: .today, generatedAt: 1_700_005_000, calendar: calendar)
     try expect(today.totals.seconds == 1_500, "today scope includes same UTC day")
@@ -951,6 +1022,8 @@ func runAppSourceInvariantTests() throws {
     try expect(!rowView.contains("TextField(\"memo text\""), "task rows do not expose memo editing")
     try expect(rowView.contains("detailLine(label: \"memo\""), "task rows render list --global memoTitle in the detail area")
     try expect(rowView.contains("row.plans"), "task rows render TASK-WORKBRANCH plan groups")
+    try expect(rowView.contains("renderablePlans"), "task details visibility is based on plans with renderable content")
+    try expect(!rowView.contains("return !row.plans.isEmpty || !row.checklistItems.isEmpty"), "empty single plans do not force an empty details block")
     try expect(rowView.contains("statusItemLine"), "task status content renders as checklist lines")
     try expect(rowView.contains("currentWorkLine"), "task rows render current work as a primary fixed line")
     try expect(rowView.contains("statusReadAction"), "current work line owns status-read action")

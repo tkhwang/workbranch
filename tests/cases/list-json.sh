@@ -342,6 +342,33 @@ assert login["planTitle"] == "Review", login
 assert [(p["title"], p["index"], p["status"], p["currentItem"]) for p in login["plans"]] == [("Review", 0, "done", ""), ("Review", 1, "todo", "second review")], login'
 }
 
+test_list_json_nested_headings_stay_inside_current_plan() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  cat > "$project/login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
+# Login work
+
+## Plan: Backend
+### API
+- [x] contract
+- [ ] smoke test
+EOF_BRIEF
+
+  out=$(run_expect_success "$WORKBRANCH" list --json)
+  printf '%s' "$out" | python3 -c 'import json,sys
+login=json.load(sys.stdin)["tasks"][0]
+assert login["progressDone"] == 1, login
+assert login["progressTotal"] == 2, login
+assert login["currentItem"] == "smoke test", login
+assert len(login["plans"]) == 1, login
+plan=login["plans"][0]
+assert (plan["title"], plan["index"], plan["status"], plan["progressDone"], plan["progressTotal"], plan["currentItem"]) == ("Backend", 0, "in-progress", 1, 2, "smoke test"), login
+assert [item["text"] for item in plan["items"]] == ["contract", "smoke test"], login'
+}
+
 
 test_list_global_json_projects_and_errors() {
   new_fixture

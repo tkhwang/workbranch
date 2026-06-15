@@ -145,8 +145,8 @@ public struct ActivityReport: Codable, Equatable, Sendable {
             guard let first = events.first else { continue }
             let sorted = events.sorted { lhs, rhs in
                 if lhs.editedAt != rhs.editedAt { return lhs.editedAt < rhs.editedAt }
-                if lhs.planIndex != rhs.planIndex { return lhs.planIndex < rhs.planIndex }
-                return lhs.observedAt < rhs.observedAt
+                if lhs.observedAt != rhs.observedAt { return lhs.observedAt < rhs.observedAt }
+                return lhs.planIndex < rhs.planIndex
             }
             let rollup = rollupSessions(sorted.map(\.editedAt), in: scopeInterval)
             guard rollup.seconds > 0 else { continue }
@@ -160,8 +160,8 @@ public struct ActivityReport: Codable, Equatable, Sendable {
                 sessions: rollup.sessions,
                 lastEditedAt: latest?.editedAt ?? first.editedAt,
                 status: latest?.status ?? first.status,
-                progressDone: latest?.progressDone ?? first.progressDone,
-                progressTotal: latest?.progressTotal ?? first.progressTotal,
+                progressDone: latest?.taskProgressDone ?? first.taskProgressDone,
+                progressTotal: latest?.taskProgressTotal ?? first.taskProgressTotal,
                 plans: planReports
             )
             let projectKey = "\(first.root)\u{0}\(first.project)"
@@ -236,7 +236,7 @@ public struct ActivityReport: Codable, Equatable, Sendable {
                 seconds: rollup.seconds,
                 sessions: rollup.sessions,
                 lastEditedAt: latest?.editedAt ?? first.editedAt,
-                status: latest?.status ?? first.status,
+                status: latest?.planStatus ?? first.planStatus,
                 progressDone: latest?.progressDone ?? first.progressDone,
                 progressTotal: latest?.progressTotal ?? first.progressTotal
             )

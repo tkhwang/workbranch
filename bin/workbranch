@@ -1419,7 +1419,7 @@ task_load_plans() {
       current_plan=$TASK_PLAN_ADDED_INDEX
       continue
     fi
-    if [ "$has_explicit_plan" -eq 1 ] && [[ $line =~ ^[[:space:]]*#+[[:space:]]+ ]]; then
+    if [ "$has_explicit_plan" -eq 1 ] && [[ $line =~ ^[[:space:]]*#{1,2}[[:space:]]+ ]]; then
       current_plan=-1
       continue
     fi
