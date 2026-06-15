@@ -82,6 +82,9 @@ struct ActivityReportView: View {
             }
             if detailLevel.includesTasks {
                 ForEach(project.tasks, id: \.task) { task in
+                    if shouldShowTaskIdentity(in: project) {
+                        taskIdentityLine(task)
+                    }
                     if detailLevel.includesPlans {
                         ForEach(task.plans, id: \.identity) { plan in
                             planBlock(plan)
@@ -89,6 +92,28 @@ struct ActivityReportView: View {
                     }
                 }
             }
+        }
+    }
+
+    private func shouldShowTaskIdentity(in project: ActivityReportProject) -> Bool {
+        project.tasks.count > 1
+    }
+
+    private func taskIdentityLine(_ task: ActivityReportTask) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("│")
+                .foregroundStyle(palette.muted)
+            Text("•")
+                .foregroundStyle(palette.muted)
+            Text(task.task)
+                .foregroundStyle(palette.text)
+                .fontWeight(.semibold)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Text(durationText(task.seconds))
+                .foregroundStyle(palette.warning)
+                .fontWeight(.semibold)
+                .monospacedDigit()
         }
     }
 
