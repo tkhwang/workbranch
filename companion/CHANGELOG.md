@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.11.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v1.10.0...workbranch-companion-v1.11.0) (2026-06-15)
+
+
+### Features
+
+* **companion:** add plan-based task progress tracking ([2a486f7](https://github.com/tkhwang/workbranch/commit/2a486f7faaabaa35a78182fcb9e6d9594d772d68))
+* **companion:** add plan-based task progress tracking ([99324a4](https://github.com/tkhwang/workbranch/commit/99324a48ba71bf02bd4f48f946f06d123d0c5260))
+
+
+### Bug Fixes
+
+* update plan structure and companion app data ([bc994c9](https://github.com/tkhwang/workbranch/commit/bc994c9d1c378d0fcdd0c76c5c11b7ac0d989f05))
+
 ## [1.10.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v1.9.0...workbranch-companion-v1.10.0) (2026-06-14)
 
 
