@@ -344,7 +344,8 @@ public struct MenuState: Equatable, Sendable {
     private static func taskRow(for task: WorkbranchTask, root: String, isStatusUnread: Bool, activeTimeText: String) -> MenuRow {
         var parts: [String] = []
         if let icon = statusIcon(task.status) { parts.append(icon) }
-        let label = task.memoTitle.isEmpty ? task.name : "\(task.name) — \(task.memoTitle)"
+        let memoTitle = visibleMemoTitle(for: task)
+        let label = memoTitle.map { "\(task.name) — \($0)" } ?? task.name
         parts.append(label)
         if task.notiCount > 0 { parts.append("🔔\(task.notiCount)") }
         if task.progressTotal > 0 { parts.append("\(task.progressDone)/\(task.progressTotal)") }
@@ -363,7 +364,7 @@ public struct MenuState: Equatable, Sendable {
                 .copyPath(path: task.path),
             ],
             taskName: task.name,
-            memoTitle: task.memoTitle,
+            memoTitle: memoTitle,
             notificationCount: task.notiCount,
             checklistItems: task.items,
             plans: task.plans,
@@ -377,6 +378,12 @@ public struct MenuState: Equatable, Sendable {
             isStatusUnread: isStatusUnread,
             isExpandedByDefault: task.status == "blocked" || task.notiCount > 0 || isStatusUnread
         )
+    }
+
+    private static func visibleMemoTitle(for task: WorkbranchTask) -> String? {
+        let memoTitle = task.memoTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !memoTitle.isEmpty, memoTitle != task.name else { return nil }
+        return memoTitle
     }
 
     private static func statusIcon(_ status: String) -> String? {

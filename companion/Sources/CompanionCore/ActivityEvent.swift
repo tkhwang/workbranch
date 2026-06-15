@@ -16,6 +16,7 @@ public struct ActivityEvent: Codable, Equatable, Sendable {
     public let taskProgressTotal: Int
     public let progressDone: Int
     public let progressTotal: Int
+    public let items: [WorkbranchChecklistItem]
 
     private enum CodingKeys: String, CodingKey {
         case v
@@ -33,6 +34,7 @@ public struct ActivityEvent: Codable, Equatable, Sendable {
         case taskProgressTotal
         case progressDone
         case progressTotal
+        case items
     }
 
     public init(
@@ -50,7 +52,8 @@ public struct ActivityEvent: Codable, Equatable, Sendable {
         taskProgressDone: Int? = nil,
         taskProgressTotal: Int? = nil,
         progressDone: Int,
-        progressTotal: Int
+        progressTotal: Int,
+        items: [WorkbranchChecklistItem] = []
     ) {
         self.v = v
         self.editedAt = editedAt
@@ -67,6 +70,7 @@ public struct ActivityEvent: Codable, Equatable, Sendable {
         self.taskProgressTotal = taskProgressTotal ?? progressTotal
         self.progressDone = progressDone
         self.progressTotal = progressTotal
+        self.items = items
     }
 
     public init(from decoder: Decoder) throws {
@@ -90,6 +94,29 @@ public struct ActivityEvent: Codable, Equatable, Sendable {
         taskProgressTotal = try container.decodeIfPresent(Int.self, forKey: .taskProgressTotal) ?? decodedProgressTotal
         progressDone = decodedProgressDone
         progressTotal = decodedProgressTotal
+        items = try container.decodeIfPresent([WorkbranchChecklistItem].self, forKey: .items) ?? []
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(v, forKey: .v)
+        try container.encode(editedAt, forKey: .editedAt)
+        try container.encode(observedAt, forKey: .observedAt)
+        try container.encode(root, forKey: .root)
+        try container.encode(project, forKey: .project)
+        try container.encode(task, forKey: .task)
+        try container.encode(plan, forKey: .plan)
+        try container.encode(planIndex, forKey: .planIndex)
+        try container.encode(planTitle, forKey: .planTitle)
+        try container.encode(planStatus, forKey: .planStatus)
+        try container.encode(status, forKey: .status)
+        try container.encode(taskProgressDone, forKey: .taskProgressDone)
+        try container.encode(taskProgressTotal, forKey: .taskProgressTotal)
+        try container.encode(progressDone, forKey: .progressDone)
+        try container.encode(progressTotal, forKey: .progressTotal)
+        if !items.isEmpty {
+            try container.encode(items, forKey: .items)
+        }
     }
 
     public static func diff(
@@ -131,7 +158,8 @@ public struct ActivityEvent: Codable, Equatable, Sendable {
                         taskProgressDone: task.progressDone,
                         taskProgressTotal: task.progressTotal,
                         progressDone: plan.progressDone,
-                        progressTotal: plan.progressTotal
+                        progressTotal: plan.progressTotal,
+                        items: plan.items
                     ))
                 }
                 if !emittedPlanChange, let previousTask, task.status != previousTask.status, let plan = task.activityPlans.first {
@@ -151,7 +179,8 @@ public struct ActivityEvent: Codable, Equatable, Sendable {
                         taskProgressDone: task.progressDone,
                         taskProgressTotal: task.progressTotal,
                         progressDone: plan.progressDone,
-                        progressTotal: plan.progressTotal
+                        progressTotal: plan.progressTotal,
+                        items: plan.items
                     ))
                 }
             }

@@ -20,29 +20,64 @@ public struct ActivityReportPlan: Codable, Equatable, Sendable {
     public let index: Int
     public let seconds: Int
     public let sessions: Int
+    public let firstEditedAt: Int
     public let lastEditedAt: Int
     public let status: String
     public let progressDone: Int
     public let progressTotal: Int
+    public let items: [WorkbranchChecklistItem]
+
+    private enum CodingKeys: String, CodingKey {
+        case title
+        case index
+        case seconds
+        case sessions
+        case firstEditedAt
+        case lastEditedAt
+        case status
+        case progressDone
+        case progressTotal
+        case items
+    }
+
+    public var identity: String { "\(firstEditedAt)\u{0}\(index)\u{0}\(title)" }
 
     public init(
         title: String,
         index: Int,
         seconds: Int,
         sessions: Int,
+        firstEditedAt: Int? = nil,
         lastEditedAt: Int,
         status: String = "",
         progressDone: Int = 0,
-        progressTotal: Int = 0
+        progressTotal: Int = 0,
+        items: [WorkbranchChecklistItem] = []
     ) {
         self.title = title
         self.index = index
         self.seconds = seconds
         self.sessions = sessions
+        self.firstEditedAt = firstEditedAt ?? lastEditedAt
         self.lastEditedAt = lastEditedAt
         self.status = status
         self.progressDone = progressDone
         self.progressTotal = progressTotal
+        self.items = items
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        title = try container.decode(String.self, forKey: .title)
+        index = try container.decode(Int.self, forKey: .index)
+        seconds = try container.decode(Int.self, forKey: .seconds)
+        sessions = try container.decode(Int.self, forKey: .sessions)
+        lastEditedAt = try container.decode(Int.self, forKey: .lastEditedAt)
+        firstEditedAt = try container.decodeIfPresent(Int.self, forKey: .firstEditedAt) ?? lastEditedAt
+        status = try container.decodeIfPresent(String.self, forKey: .status) ?? ""
+        progressDone = try container.decodeIfPresent(Int.self, forKey: .progressDone) ?? 0
+        progressTotal = try container.decodeIfPresent(Int.self, forKey: .progressTotal) ?? 0
+        items = try container.decodeIfPresent([WorkbranchChecklistItem].self, forKey: .items) ?? []
     }
 }
 
@@ -222,6 +257,8 @@ public struct ActivityReport: Codable, Equatable, Sendable {
         }
         return grouped.values.compactMap { planEvents in
             guard let first = planEvents.first else { return nil }
+            let title = first.plan.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !title.isEmpty else { return nil }
             let sorted = planEvents.sorted { lhs, rhs in
                 if lhs.editedAt != rhs.editedAt { return lhs.editedAt < rhs.editedAt }
                 return lhs.observedAt < rhs.observedAt
@@ -230,20 +267,33 @@ public struct ActivityReport: Codable, Equatable, Sendable {
             guard rollup.seconds > 0 else { return nil }
             let detailEvents = sorted.filter { includes($0.editedAt, in: interval) }
             let latest = detailEvents.last ?? sorted.last
+            let latestWithItems = detailEvents.last(where: { !$0.items.isEmpty }) ?? sorted.last(where: { !$0.items.isEmpty })
             return ActivityReportPlan(
-                title: first.plan,
+                title: title,
                 index: first.planIndex,
                 seconds: rollup.seconds,
                 sessions: rollup.sessions,
+                firstEditedAt: firstEditedAt(from: sorted, in: interval),
                 lastEditedAt: latest?.editedAt ?? first.editedAt,
                 status: latest?.planStatus ?? first.planStatus,
                 progressDone: latest?.progressDone ?? first.progressDone,
-                progressTotal: latest?.progressTotal ?? first.progressTotal
+                progressTotal: latest?.progressTotal ?? first.progressTotal,
+                items: latestWithItems?.items ?? []
             )
         }.sorted { lhs, rhs in
+            if lhs.firstEditedAt != rhs.firstEditedAt { return lhs.firstEditedAt < rhs.firstEditedAt }
+            if lhs.lastEditedAt != rhs.lastEditedAt { return lhs.lastEditedAt < rhs.lastEditedAt }
             if lhs.index != rhs.index { return lhs.index < rhs.index }
             return lhs.title < rhs.title
         }
+    }
+
+    private static func firstEditedAt(from events: [ActivityEvent], in interval: DateInterval?) -> Int {
+        guard let interval else { return events.first?.editedAt ?? 0 }
+        if let first = events.first(where: { includes($0.editedAt, in: interval) }) {
+            return first.editedAt
+        }
+        return Int(interval.start.timeIntervalSince1970)
     }
 
     private static func dateInterval(for scope: ActivityReportScope, generatedAt: Int, calendar: Calendar) -> DateInterval? {
