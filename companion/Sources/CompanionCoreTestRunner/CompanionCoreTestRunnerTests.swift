@@ -519,6 +519,13 @@ func runActivityReportTests() throws {
     let stepSnapshotReport = ActivityReport.make(events: stepSnapshotEvents, scope: .month, generatedAt: 1_700_005_000, calendar: calendar)
     try expect(stepSnapshotReport.projects[0].tasks[0].plans[0].items == [WorkbranchChecklistItem(text: "Draft API", checked: true, depth: 0), WorkbranchChecklistItem(text: "Smoke UI", checked: false, depth: 1)], "plan report uses the latest available step snapshot")
 
+    let clearedStepSnapshotEvents = [
+        ActivityEvent(editedAt: 1_700_000_100, observedAt: 1_700_000_101, root: "/tmp/clear", project: "clear", task: "task", plan: "Implementation", planIndex: 0, status: "in-progress", progressDone: 1, progressTotal: 2, items: [WorkbranchChecklistItem(text: "Deleted step", checked: false, depth: 0)]),
+        ActivityEvent(editedAt: 1_700_000_700, observedAt: 1_700_000_701, root: "/tmp/clear", project: "clear", task: "task", plan: "Implementation", planIndex: 0, status: "review", progressDone: 0, progressTotal: 0, items: []),
+    ]
+    let clearedStepSnapshotReport = ActivityReport.make(events: clearedStepSnapshotEvents, scope: .month, generatedAt: 1_700_005_000, calendar: calendar)
+    try expect(clearedStepSnapshotReport.projects[0].tasks[0].plans[0].items.isEmpty, "latest empty plan step snapshot clears older rendered steps")
+
     let manySameIndexEvents = [
         ActivityEvent(editedAt: 1_700_000_100, observedAt: 1_700_000_101, root: "/tmp/many", project: "many", task: "task", plan: "Zeta kickoff", planIndex: 0, planStatus: "done", status: "in-progress", progressDone: 1, progressTotal: 1),
         ActivityEvent(editedAt: 1_700_000_700, observedAt: 1_700_000_701, root: "/tmp/many", project: "many", task: "task", plan: "Alpha review", planIndex: 0, planStatus: "done", status: "in-progress", progressDone: 1, progressTotal: 1),
@@ -899,6 +906,9 @@ func runAppSourceInvariantTests() throws {
     try expect(activityReportView.contains("if detailLevel.includesTasks"), "ActivityReportView can suppress task rows for project-only reports")
     try expect(activityReportView.contains("if detailLevel.includesPlans"), "ActivityReportView can show plan rows for task-plan reports")
     try expect(activityReportView.contains("ForEach(task.plans"), "ActivityReportView renders per-plan rows when available")
+    try expect(activityReportView.contains("shouldShowTaskIdentity(in: project)"), "ActivityReportView decides when compact task identity is needed")
+    try expect(activityReportView.contains("project.tasks.count > 1"), "ActivityReportView only adds task identity when a project has multiple tasks")
+    try expect(activityReportView.contains("taskIdentityLine(task)"), "ActivityReportView renders compact task identity before a task plan list")
     try expect(activityReportView.contains("id: \\.identity"), "ActivityReportView keys plan rows with stable plan identity")
     try expect(activityReportView.contains("planBlock(plan)"), "ActivityReportView delegates per-plan blocks")
     try expect(activityReportView.contains("planStepLine(item)"), "ActivityReportView renders step rows under plan rows")

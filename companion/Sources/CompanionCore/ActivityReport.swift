@@ -267,7 +267,6 @@ public struct ActivityReport: Codable, Equatable, Sendable {
             guard rollup.seconds > 0 else { return nil }
             let detailEvents = sorted.filter { includes($0.editedAt, in: interval) }
             let latest = detailEvents.last ?? sorted.last
-            let latestWithItems = detailEvents.last(where: { !$0.items.isEmpty }) ?? sorted.last(where: { !$0.items.isEmpty })
             return ActivityReportPlan(
                 title: title,
                 index: first.planIndex,
@@ -278,7 +277,7 @@ public struct ActivityReport: Codable, Equatable, Sendable {
                 status: latest?.planStatus ?? first.planStatus,
                 progressDone: latest?.progressDone ?? first.progressDone,
                 progressTotal: latest?.progressTotal ?? first.progressTotal,
-                items: latestWithItems?.items ?? []
+                items: latest?.items ?? []
             )
         }.sorted { lhs, rhs in
             if lhs.firstEditedAt != rhs.firstEditedAt { return lhs.firstEditedAt < rhs.firstEditedAt }
