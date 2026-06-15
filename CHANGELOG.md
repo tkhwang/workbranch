@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.24.0](https://github.com/tkhwang/workbranch/compare/v1.23.0...v1.24.0) (2026-06-15)
+
+
+### Features
+
+* display done plan and step better ([28fbeef](https://github.com/tkhwang/workbranch/commit/28fbeef5c33d1747bc041eb01e7be0c1507f414f))
+* update activity report description ([9709946](https://github.com/tkhwang/workbranch/commit/970994679a08a840d7ba89326e8939a791b3a185))
+
 ## [1.23.0](https://github.com/tkhwang/workbranch/compare/v1.22.0...v1.23.0) (2026-06-15)
 
 
