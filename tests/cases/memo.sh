@@ -78,6 +78,7 @@ test_add_creates_task_brief_and_agent_guidance() {
   brief=$(cat "$project/login/TASK-WORKBRANCH.md")
   assert_contains "$brief" "# login"
   assert_contains "$brief" "status: todo"
+  assert_contains "$brief" "## Plan: login"
   assert_contains "$brief" "- [ ] Major: Start work"
   guidance=$(cat "$project/login/AGENTS.md")
   assert_contains "$guidance" "TASK-WORKBRANCH.md"
@@ -255,6 +256,7 @@ CONFIG
   brief=$(cat "$project/login/TASK-WORKBRANCH.md")
   assert_contains "$brief" "상태: todo"
   assert_contains "$brief" "status: todo"
+  assert_contains "$brief" "## Plan: login"
   assert_contains "$brief" "- [ ] 주요: 작업 시작"
   guidance=$(cat "$project/login/AGENTS.md")
   assert_contains "$guidance" "Workbranch 작업 안내"

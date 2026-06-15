@@ -43,6 +43,7 @@ public struct MenuRow: Equatable, Identifiable, Sendable {
     public let memoTitle: String?
     public let notificationCount: Int
     public let checklistItems: [WorkbranchChecklistItem]
+    public let plans: [WorkbranchPlan]
     public let repos: [WorkbranchRepo]
     public let status: String
     public let progressDone: Int
@@ -74,6 +75,7 @@ public struct MenuRow: Equatable, Identifiable, Sendable {
         memoTitle: String? = nil,
         notificationCount: Int = 0,
         checklistItems: [WorkbranchChecklistItem] = [],
+        plans: [WorkbranchPlan] = [],
         repos: [WorkbranchRepo] = [],
         status: String = "",
         progressDone: Int = 0,
@@ -94,6 +96,7 @@ public struct MenuRow: Equatable, Identifiable, Sendable {
         self.memoTitle = memoTitle
         self.notificationCount = notificationCount
         self.checklistItems = checklistItems
+        self.plans = plans
         self.repos = repos
         self.status = status
         self.progressDone = progressDone
@@ -363,6 +366,7 @@ public struct MenuState: Equatable, Sendable {
             memoTitle: task.memoTitle,
             notificationCount: task.notiCount,
             checklistItems: task.items,
+            plans: task.plans,
             repos: task.repos,
             status: task.status,
             progressDone: task.progressDone,

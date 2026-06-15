@@ -15,6 +15,37 @@ public struct ActivityReportTotals: Codable, Equatable, Sendable {
     }
 }
 
+public struct ActivityReportPlan: Codable, Equatable, Sendable {
+    public let title: String
+    public let index: Int
+    public let seconds: Int
+    public let sessions: Int
+    public let lastEditedAt: Int
+    public let status: String
+    public let progressDone: Int
+    public let progressTotal: Int
+
+    public init(
+        title: String,
+        index: Int,
+        seconds: Int,
+        sessions: Int,
+        lastEditedAt: Int,
+        status: String = "",
+        progressDone: Int = 0,
+        progressTotal: Int = 0
+    ) {
+        self.title = title
+        self.index = index
+        self.seconds = seconds
+        self.sessions = sessions
+        self.lastEditedAt = lastEditedAt
+        self.status = status
+        self.progressDone = progressDone
+        self.progressTotal = progressTotal
+    }
+}
+
 public struct ActivityReportTask: Codable, Equatable, Sendable {
     public let task: String
     public let planTitle: String
@@ -24,6 +55,7 @@ public struct ActivityReportTask: Codable, Equatable, Sendable {
     public let status: String
     public let progressDone: Int
     public let progressTotal: Int
+    public let plans: [ActivityReportPlan]
 
     public init(
         task: String,
@@ -33,7 +65,8 @@ public struct ActivityReportTask: Codable, Equatable, Sendable {
         lastEditedAt: Int,
         status: String = "",
         progressDone: Int = 0,
-        progressTotal: Int = 0
+        progressTotal: Int = 0,
+        plans: [ActivityReportPlan] = []
     ) {
         self.task = task
         self.planTitle = planTitle
@@ -43,6 +76,7 @@ public struct ActivityReportTask: Codable, Equatable, Sendable {
         self.status = status
         self.progressDone = progressDone
         self.progressTotal = progressTotal
+        self.plans = plans
     }
 }
 
@@ -111,12 +145,14 @@ public struct ActivityReport: Codable, Equatable, Sendable {
             guard let first = events.first else { continue }
             let sorted = events.sorted { lhs, rhs in
                 if lhs.editedAt != rhs.editedAt { return lhs.editedAt < rhs.editedAt }
-                return lhs.observedAt < rhs.observedAt
+                if lhs.observedAt != rhs.observedAt { return lhs.observedAt < rhs.observedAt }
+                return lhs.planIndex < rhs.planIndex
             }
             let rollup = rollupSessions(sorted.map(\.editedAt), in: scopeInterval)
             guard rollup.seconds > 0 else { continue }
             let detailEvents = sorted.filter { includes($0.editedAt, in: scopeInterval) }
             let latest = detailEvents.last ?? sorted.last
+            let planReports = makePlanReports(from: sorted, in: scopeInterval)
             let task = ActivityReportTask(
                 task: first.task,
                 planTitle: latest?.planTitle ?? first.planTitle,
@@ -124,8 +160,9 @@ public struct ActivityReport: Codable, Equatable, Sendable {
                 sessions: rollup.sessions,
                 lastEditedAt: latest?.editedAt ?? first.editedAt,
                 status: latest?.status ?? first.status,
-                progressDone: latest?.progressDone ?? first.progressDone,
-                progressTotal: latest?.progressTotal ?? first.progressTotal
+                progressDone: latest?.taskProgressDone ?? first.taskProgressDone,
+                progressTotal: latest?.taskProgressTotal ?? first.taskProgressTotal,
+                plans: planReports
             )
             let projectKey = "\(first.root)\u{0}\(first.project)"
             var existing = projectsByKey[projectKey] ?? (project: first.project, root: first.root, tasks: [])
@@ -177,6 +214,36 @@ public struct ActivityReport: Codable, Equatable, Sendable {
         if hours == 0 { return "\(minutes)m" }
         if remainingMinutes == 0 { return "\(hours)h" }
         return "\(hours)h\(remainingMinutes)m"
+    }
+
+    private static func makePlanReports(from events: [ActivityEvent], in interval: DateInterval?) -> [ActivityReportPlan] {
+        let grouped = Dictionary(grouping: events) { event in
+            "\(event.plan)\u{0}\(event.planIndex)"
+        }
+        return grouped.values.compactMap { planEvents in
+            guard let first = planEvents.first else { return nil }
+            let sorted = planEvents.sorted { lhs, rhs in
+                if lhs.editedAt != rhs.editedAt { return lhs.editedAt < rhs.editedAt }
+                return lhs.observedAt < rhs.observedAt
+            }
+            let rollup = rollupSessions(sorted.map(\.editedAt), in: interval)
+            guard rollup.seconds > 0 else { return nil }
+            let detailEvents = sorted.filter { includes($0.editedAt, in: interval) }
+            let latest = detailEvents.last ?? sorted.last
+            return ActivityReportPlan(
+                title: first.plan,
+                index: first.planIndex,
+                seconds: rollup.seconds,
+                sessions: rollup.sessions,
+                lastEditedAt: latest?.editedAt ?? first.editedAt,
+                status: latest?.planStatus ?? first.planStatus,
+                progressDone: latest?.progressDone ?? first.progressDone,
+                progressTotal: latest?.progressTotal ?? first.progressTotal
+            )
+        }.sorted { lhs, rhs in
+            if lhs.index != rhs.index { return lhs.index < rhs.index }
+            return lhs.title < rhs.title
+        }
     }
 
     private static func dateInterval(for scope: ActivityReportScope, generatedAt: Int, calendar: Calendar) -> DateInterval? {

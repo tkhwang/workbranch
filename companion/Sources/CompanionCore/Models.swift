@@ -76,6 +76,45 @@ public struct WorkbranchListDocument: Codable, Equatable, Sendable {
     }
 }
 
+public struct WorkbranchPlan: Codable, Equatable, Sendable {
+    public let title: String
+    public let index: Int
+    public let status: String
+    public let progressDone: Int
+    public let progressTotal: Int
+    public let currentItem: String
+    public let items: [WorkbranchChecklistItem]
+
+    public init(
+        title: String,
+        index: Int = 0,
+        status: String = "",
+        progressDone: Int = 0,
+        progressTotal: Int = 0,
+        currentItem: String = "",
+        items: [WorkbranchChecklistItem] = []
+    ) {
+        self.title = title
+        self.index = index
+        self.status = status
+        self.progressDone = progressDone
+        self.progressTotal = progressTotal
+        self.currentItem = currentItem
+        self.items = items
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        title = try container.decodeIfPresent(String.self, forKey: .title) ?? ""
+        index = try container.decodeIfPresent(Int.self, forKey: .index) ?? 0
+        status = try container.decodeIfPresent(String.self, forKey: .status) ?? ""
+        progressDone = try container.decodeIfPresent(Int.self, forKey: .progressDone) ?? 0
+        progressTotal = try container.decodeIfPresent(Int.self, forKey: .progressTotal) ?? 0
+        currentItem = try container.decodeIfPresent(String.self, forKey: .currentItem) ?? ""
+        items = try container.decodeIfPresent([WorkbranchChecklistItem].self, forKey: .items) ?? []
+    }
+}
+
 public struct WorkbranchTask: Codable, Equatable, Sendable {
     public let name: String
     public let path: String
@@ -87,6 +126,7 @@ public struct WorkbranchTask: Codable, Equatable, Sendable {
     public let currentItem: String
     public let updatedAt: Int
     public let items: [WorkbranchChecklistItem]
+    public let plans: [WorkbranchPlan]
     public let notiCount: Int
     public let repos: [WorkbranchRepo]
 
@@ -101,6 +141,7 @@ public struct WorkbranchTask: Codable, Equatable, Sendable {
         currentItem: String = "",
         updatedAt: Int = 0,
         items: [WorkbranchChecklistItem] = [],
+        plans: [WorkbranchPlan]? = nil,
         notiCount: Int,
         repos: [WorkbranchRepo]
     ) {
@@ -114,6 +155,7 @@ public struct WorkbranchTask: Codable, Equatable, Sendable {
         self.currentItem = currentItem
         self.updatedAt = updatedAt
         self.items = items
+        self.plans = plans ?? Self.fallbackPlans(planTitle: planTitle, status: status, progressDone: progressDone, progressTotal: progressTotal, currentItem: currentItem, items: items)
         self.notiCount = notiCount
         self.repos = repos
     }
@@ -130,8 +172,31 @@ public struct WorkbranchTask: Codable, Equatable, Sendable {
         currentItem = try container.decodeIfPresent(String.self, forKey: .currentItem) ?? ""
         updatedAt = try container.decodeIfPresent(Int.self, forKey: .updatedAt) ?? 0
         items = try container.decodeIfPresent([WorkbranchChecklistItem].self, forKey: .items) ?? []
+        let hasPlansKey = container.contains(.plans)
+        let decodedPlans = try container.decodeIfPresent([WorkbranchPlan].self, forKey: .plans) ?? []
+        plans = hasPlansKey ? decodedPlans : Self.fallbackPlans(planTitle: planTitle, status: status, progressDone: progressDone, progressTotal: progressTotal, currentItem: currentItem, items: items)
         notiCount = try container.decode(Int.self, forKey: .notiCount)
         repos = try container.decode([WorkbranchRepo].self, forKey: .repos)
+    }
+
+    private static func fallbackPlans(
+        planTitle: String,
+        status: String,
+        progressDone: Int,
+        progressTotal: Int,
+        currentItem: String,
+        items: [WorkbranchChecklistItem]
+    ) -> [WorkbranchPlan] {
+        guard !items.isEmpty || progressTotal > 0 || !planTitle.isEmpty else { return [] }
+        return [WorkbranchPlan(
+            title: planTitle,
+            index: 0,
+            status: status,
+            progressDone: progressDone,
+            progressTotal: progressTotal,
+            currentItem: currentItem,
+            items: items
+        )]
     }
 }
 
