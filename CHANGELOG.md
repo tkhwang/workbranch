@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.24.1](https://github.com/tkhwang/workbranch/compare/v1.24.0...v1.24.1) (2026-06-15)
+
+
+### Bug Fixes
+
+* fix some bug ([45d6b8c](https://github.com/tkhwang/workbranch/commit/45d6b8c40d23a00eca3161c8ac83dc2409082688))
+
 ## [1.24.0](https://github.com/tkhwang/workbranch/compare/v1.23.0...v1.24.0) (2026-06-15)
 
 
