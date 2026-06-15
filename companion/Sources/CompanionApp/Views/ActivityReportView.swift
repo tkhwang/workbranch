@@ -64,8 +64,8 @@ struct ActivityReportView: View {
             ForEach(project.tasks, id: \.task) { task in
                 taskBlock(task)
                 if showsPlanDetails {
-                    if !task.planTitle.isEmpty {
-                        taskLine(task)
+                    ForEach(task.plans, id: \.index) { plan in
+                        planLine(plan)
                     }
                     statusLine(task)
                 }
@@ -75,9 +75,9 @@ struct ActivityReportView: View {
 
     private func taskBlock(_ task: ActivityReportTask) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(task.planTitle.isEmpty ? "│  • task" : "│  • plan")
+            Text("│  • task")
                 .foregroundStyle(palette.muted)
-            Text(planTitleText(task))
+            Text(task.task)
                 .foregroundStyle(palette.text)
                 .lineLimit(1)
                 .truncationMode(.middle)
@@ -88,18 +88,21 @@ struct ActivityReportView: View {
         }
     }
 
-    private func planTitleText(_ task: ActivityReportTask) -> String {
-        task.planTitle.isEmpty ? task.task : task.planTitle
-    }
-
-    private func taskLine(_ task: ActivityReportTask) -> some View {
+    private func planLine(_ plan: ActivityReportPlan) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("│    task")
+            Text("│    plan")
                 .foregroundStyle(palette.muted)
-            Text(task.task)
+            Text(plan.title)
                 .foregroundStyle(palette.text)
                 .lineLimit(1)
                 .truncationMode(.middle)
+            Text(durationText(plan.seconds))
+                .foregroundStyle(palette.warning)
+                .fontWeight(.semibold)
+                .monospacedDigit()
+            Text(planStatusText(plan))
+                .foregroundStyle(palette.muted)
+                .lineLimit(1)
         }
     }
 
@@ -128,6 +131,12 @@ struct ActivityReportView: View {
         let status = task.status.isEmpty ? "unknown" : task.status.uppercased()
         guard task.progressTotal > 0 else { return status }
         return "\(status) \(task.progressDone)/\(task.progressTotal)"
+    }
+
+    private func planStatusText(_ plan: ActivityReportPlan) -> String {
+        let status = plan.status.isEmpty ? "unknown" : plan.status.uppercased()
+        guard plan.progressTotal > 0 else { return status }
+        return "\(status) \(plan.progressDone)/\(plan.progressTotal)"
     }
 
     private func lastEditedText(_ timestamp: Int) -> String {

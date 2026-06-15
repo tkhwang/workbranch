@@ -235,6 +235,114 @@ assert login["items"] == [
 ], login'
 }
 
+test_list_json_plan_sections_shape_and_aggregate() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  cat > "$project/login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
+# Login work
+
+status: in-progress
+plan: Legacy label
+
+- [x] preface done
+
+## Plan: Backend
+- [x] API contract
+- [x] Mapper
+
+## Plan: Frontend
+- [x] Package sync
+  - [x] Generated types
+- [ ] Smoke test
+
+## Notes
+- [ ] this checkbox is a note, not a step
+EOF_BRIEF
+
+  out=$(run_expect_success "$WORKBRANCH" list --json)
+  printf '%s' "$out" | python3 -c 'import json,sys
+login=json.load(sys.stdin)["tasks"][0]
+assert login["planTitle"] == "Frontend", login
+assert login["status"] == "in-progress", login
+assert login["progressDone"] == 5, login
+assert login["progressTotal"] == 6, login
+assert login["currentItem"] == "Smoke test", login
+assert [item["text"] for item in login["items"]] == ["preface done", "API contract", "Mapper", "Package sync", "Generated types", "Smoke test"], login
+assert len(login["plans"]) == 3, login
+assert [(p["title"], p["index"], p["status"], p["progressDone"], p["progressTotal"], p["currentItem"]) for p in login["plans"]] == [
+    ("Legacy label", 0, "done", 1, 1, ""),
+    ("Backend", 1, "done", 2, 2, ""),
+    ("Frontend", 2, "in-progress", 2, 3, "Smoke test"),
+], login
+assert [item["text"] for item in login["plans"][2]["items"]] == ["Package sync", "Generated types", "Smoke test"], login'
+}
+
+test_list_json_implicit_and_empty_plans() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  cat > "$project/login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
+# Login work
+
+plan: Auth hardening
+
+- [x] inspect
+- [ ] implement
+EOF_BRIEF
+
+  out=$(run_expect_success "$WORKBRANCH" list --json)
+  printf '%s' "$out" | python3 -c 'import json,sys
+login=json.load(sys.stdin)["tasks"][0]
+assert login["planTitle"] == "Auth hardening", login
+assert len(login["plans"]) == 1, login
+plan=login["plans"][0]
+assert (plan["title"], plan["index"], plan["status"], plan["progressDone"], plan["progressTotal"], plan["currentItem"]) == ("Auth hardening", 0, "in-progress", 1, 2, "implement"), login'
+
+  cat > "$project/login/TASK-WORKBRANCH.md" <<'EOF_EMPTY'
+# Empty work
+
+plan: Empty plan
+
+## Notes
+-
+EOF_EMPTY
+  out=$(run_expect_success "$WORKBRANCH" list --json)
+  printf '%s' "$out" | python3 -c 'import json,sys
+login=json.load(sys.stdin)["tasks"][0]
+assert login["plans"] == [], login
+assert login["progressDone"] == 0 and login["progressTotal"] == 0, login
+assert login["currentItem"] == "", login'
+}
+
+test_list_json_duplicate_plan_titles_keep_distinct_indexes() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  cat > "$project/login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
+# Login work
+
+## Plan: Review
+- [x] first review
+
+## Plan: Review
+- [ ] second review
+EOF_BRIEF
+
+  out=$(run_expect_success "$WORKBRANCH" list --json)
+  printf '%s' "$out" | python3 -c 'import json,sys
+login=json.load(sys.stdin)["tasks"][0]
+assert login["planTitle"] == "Review", login
+assert [(p["title"], p["index"], p["status"], p["currentItem"]) for p in login["plans"]] == [("Review", 0, "done", ""), ("Review", 1, "todo", "second review")], login'
+}
+
+
 test_list_global_json_projects_and_errors() {
   new_fixture
   project="$FIXTURE_PROJECT"

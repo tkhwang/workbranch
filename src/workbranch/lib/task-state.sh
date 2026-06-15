@@ -35,17 +35,118 @@ task_updated_at() {
   fi
 }
 
+task_plan_reset() {
+  TASK_PLAN_COUNT=0
+  TASK_PLAN_TITLES=()
+  TASK_PLAN_DONE=()
+  TASK_PLAN_TOTAL=()
+  TASK_PLAN_CURRENT=()
+  TASK_ITEM_PLAN_INDEXES=()
+  TASK_ITEM_TEXTS=()
+  TASK_ITEM_CHECKED=()
+  TASK_ITEM_DEPTHS=()
+}
+
+task_plan_add() {
+  local title index
+  title=$1
+  index=$TASK_PLAN_COUNT
+  TASK_PLAN_TITLES[$index]=$title
+  TASK_PLAN_DONE[$index]=0
+  TASK_PLAN_TOTAL[$index]=0
+  TASK_PLAN_CURRENT[$index]=''
+  TASK_PLAN_ADDED_INDEX=$index
+  TASK_PLAN_COUNT=$((TASK_PLAN_COUNT + 1))
+}
+
+task_load_plans() {
+  local task file fallback line in_code has_explicit_plan current_plan leading mark item_text depth item_index title
+  task=$1
+  task_plan_reset
+  file=$(task_brief_file "$task") || true
+  [ -n "${file:-}" ] || return 0
+  fallback=$(task_plan_title "$task")
+  [ -n "$fallback" ] || fallback=$task
+  in_code=0
+  has_explicit_plan=0
+  current_plan=-1
+  while IFS= read -r line || [ -n "$line" ]; do
+    if [[ $line =~ ^[[:space:]]*\`\`\` ]]; then
+      if [ "$in_code" -eq 0 ]; then in_code=1; else in_code=0; fi
+      continue
+    fi
+    [ "$in_code" -eq 0 ] || continue
+    if [[ $line =~ ^[[:space:]]*##[[:space:]]*[Pp][Ll][Aa][Nn]:[[:space:]]*(.*)$ ]]; then
+      title=${BASH_REMATCH[1]}
+      title=${title%$'\r'}
+      title=$(printf '%s' "$title" | sed 's/[[:space:]]*$//')
+      [ -n "$title" ] || title=$fallback
+      has_explicit_plan=1
+      task_plan_add "$title"
+      current_plan=$TASK_PLAN_ADDED_INDEX
+      continue
+    fi
+    if [ "$has_explicit_plan" -eq 1 ] && [[ $line =~ ^[[:space:]]*#+[[:space:]]+ ]]; then
+      current_plan=-1
+      continue
+    fi
+    if [[ $line =~ ^([[:space:]]*)-[[:space:]]*\[([xX[:space:]])\][[:space:]]*(.*)$ ]]; then
+      if [ "$current_plan" -lt 0 ]; then
+        if [ "$has_explicit_plan" -eq 1 ]; then
+          continue
+        fi
+        task_plan_add "$fallback"
+        current_plan=$TASK_PLAN_ADDED_INDEX
+      fi
+      leading=${BASH_REMATCH[1]}
+      mark=${BASH_REMATCH[2]}
+      item_text=${BASH_REMATCH[3]}
+      depth=$((${#leading} / 2))
+      item_index=${#TASK_ITEM_TEXTS[@]}
+      TASK_ITEM_PLAN_INDEXES[$item_index]=$current_plan
+      TASK_ITEM_TEXTS[$item_index]=$item_text
+      TASK_ITEM_DEPTHS[$item_index]=$depth
+      TASK_PLAN_TOTAL[$current_plan]=$((TASK_PLAN_TOTAL[$current_plan] + 1))
+      if [ "$mark" = "x" ] || [ "$mark" = "X" ]; then
+        TASK_ITEM_CHECKED[$item_index]=1
+        TASK_PLAN_DONE[$current_plan]=$((TASK_PLAN_DONE[$current_plan] + 1))
+      else
+        TASK_ITEM_CHECKED[$item_index]=0
+        if [ -z "${TASK_PLAN_CURRENT[$current_plan]:-}" ]; then
+          TASK_PLAN_CURRENT[$current_plan]=$item_text
+        fi
+      fi
+    fi
+  done < "$file"
+}
+
+task_plan_status_at() {
+  local index done total
+  index=$1
+  done=${TASK_PLAN_DONE[$index]:-0}
+  total=${TASK_PLAN_TOTAL[$index]:-0}
+  if [ "$done" -eq 0 ]; then
+    printf 'todo'
+  elif [ "$done" -eq "$total" ]; then
+    printf 'done'
+  else
+    printf 'in-progress'
+  fi
+}
+
 task_checklist_counts() {
-  local file
-  file=$(task_brief_file "$1") || true
-  [ -n "${file:-}" ] || { printf '0 0'; return 0; }
-  awk '
-    /^[[:space:]]*```/ { in_code = !in_code; next }
-    in_code { next }
-    /^[[:space:]]*-[[:space:]]*\[[xX]\][[:space:]]*/ { done++; total++; next }
-    /^[[:space:]]*-[[:space:]]*\[[[:space:]]\][[:space:]]*/ { total++; next }
-    END { printf "%d %d", done + 0, total + 0 }
-  ' "$file"
+  local task done total i
+  task=$1
+  task_load_plans "$task"
+  done=0
+  total=0
+  i=0
+  while [ $i -lt $TASK_PLAN_COUNT ]; do
+    done=$((done + ${TASK_PLAN_DONE[$i]:-0}))
+    total=$((total + ${TASK_PLAN_TOTAL[$i]:-0}))
+    i=$((i + 1))
+  done
+  printf '%d %d' "$done" "$total"
 }
 
 task_explicit_status() {
@@ -89,6 +190,28 @@ task_plan_title() {
   ' "$file"
 }
 
+task_active_plan_title() {
+  local task i last status fallback
+  task=$1
+  task_load_plans "$task"
+  if [ "$TASK_PLAN_COUNT" -eq 0 ]; then
+    fallback=$(task_plan_title "$task")
+    printf '%s' "$fallback"
+    return 0
+  fi
+  last=$((TASK_PLAN_COUNT - 1))
+  i=0
+  while [ $i -lt $TASK_PLAN_COUNT ]; do
+    status=$(task_plan_status_at "$i")
+    if [ "$status" != "done" ]; then
+      printf '%s' "${TASK_PLAN_TITLES[$i]}"
+      return 0
+    fi
+    i=$((i + 1))
+  done
+  printf '%s' "${TASK_PLAN_TITLES[$last]}"
+}
+
 task_status() {
   local task explicit status_counts done_count total_count
   task=$1
@@ -109,53 +232,89 @@ task_status() {
 }
 
 task_current_item() {
-  local file
-  file=$(task_brief_file "$1") || true
-  [ -n "${file:-}" ] || return 0
-  awk '
-    /^[[:space:]]*```/ { in_code = !in_code; next }
-    in_code { next }
-    /^[[:space:]]*-[[:space:]]*\[[[:space:]]\][[:space:]]*/ {
-      value = $0
-      sub(/^[[:space:]]*-[[:space:]]*\[[[:space:]]\][[:space:]]*/, "", value)
-      print value
-      exit
-    }
-  ' "$file"
+  local task i current
+  task=$1
+  task_load_plans "$task"
+  i=0
+  while [ $i -lt $TASK_PLAN_COUNT ]; do
+    current=${TASK_PLAN_CURRENT[$i]:-}
+    if [ -n "$current" ]; then
+      printf '%s' "$current"
+      return 0
+    fi
+    i=$((i + 1))
+  done
 }
 
 
 task_checklist_items_json() {
-  local file line in_code first leading mark text depth
-  file=$(task_brief_file "$1") || true
+  local task i first
+  task=$1
+  task_load_plans "$task"
   printf '['
-  [ -n "${file:-}" ] || { printf ']'; return 0; }
-  in_code=0
   first=1
-  while IFS= read -r line || [ -n "$line" ]; do
-    case "$line" in
-      [[:space:]]*\`\`\`*)
-        if [ "$in_code" -eq 0 ]; then in_code=1; else in_code=0; fi
-        continue
-        ;;
-    esac
-    [ "$in_code" -eq 0 ] || continue
-    if [[ $line =~ ^([[:space:]]*)-[[:space:]]*\[([xX[:space:]])\][[:space:]]*(.*)$ ]]; then
-      leading=${BASH_REMATCH[1]}
-      mark=${BASH_REMATCH[2]}
-      text=${BASH_REMATCH[3]}
-      depth=$((${#leading} / 2))
+  i=0
+  while [ $i -lt ${#TASK_ITEM_TEXTS[@]} ]; do
+    if [ "$first" -eq 1 ]; then first=0; else printf ','; fi
+    printf '{"text":'
+    json_string "${TASK_ITEM_TEXTS[$i]}"
+    if [ "${TASK_ITEM_CHECKED[$i]}" -eq 1 ]; then
+      printf ',"checked":true'
+    else
+      printf ',"checked":false'
+    fi
+    printf ',"depth":%d}' "${TASK_ITEM_DEPTHS[$i]}"
+    i=$((i + 1))
+  done
+  printf ']'
+}
+
+task_plan_items_json() {
+  local plan_index i first
+  plan_index=$1
+  printf '['
+  first=1
+  i=0
+  while [ $i -lt ${#TASK_ITEM_TEXTS[@]} ]; do
+    if [ "${TASK_ITEM_PLAN_INDEXES[$i]}" -eq "$plan_index" ]; then
       if [ "$first" -eq 1 ]; then first=0; else printf ','; fi
       printf '{"text":'
-      json_string "$text"
-      if [ "$mark" = "x" ] || [ "$mark" = "X" ]; then
+      json_string "${TASK_ITEM_TEXTS[$i]}"
+      if [ "${TASK_ITEM_CHECKED[$i]}" -eq 1 ]; then
         printf ',"checked":true'
       else
         printf ',"checked":false'
       fi
-      printf ',"depth":%d}' "$depth"
+      printf ',"depth":%d}' "${TASK_ITEM_DEPTHS[$i]}"
     fi
-  done < "$file"
+    i=$((i + 1))
+  done
+  printf ']'
+}
+
+task_plans_json() {
+  local task i first status
+  task=$1
+  task_load_plans "$task"
+  printf '['
+  first=1
+  i=0
+  while [ $i -lt $TASK_PLAN_COUNT ]; do
+    if [ "$first" -eq 1 ]; then first=0; else printf ','; fi
+    status=$(task_plan_status_at "$i")
+    printf '{"title":'
+    json_string "${TASK_PLAN_TITLES[$i]}"
+    printf ',"index":%d' "$i"
+    printf ',"status":'
+    json_string "$status"
+    printf ',"progressDone":%d,"progressTotal":%d' "${TASK_PLAN_DONE[$i]:-0}" "${TASK_PLAN_TOTAL[$i]:-0}"
+    printf ',"currentItem":'
+    json_string "${TASK_PLAN_CURRENT[$i]:-}"
+    printf ',"items":'
+    task_plan_items_json "$i"
+    printf '}'
+    i=$((i + 1))
+  done
   printf ']'
 }
 
@@ -172,6 +331,7 @@ write_default_task_brief() {
 status: todo
 plan: $task
 
+## Plan: $task
 - [ ] 주요: 작업 시작
   - [ ] 변경 구현
   - [ ] 검증 실행
@@ -186,6 +346,7 @@ EOF_BRIEF
 status: todo
 plan: $task
 
+## Plan: $task
 - [ ] Major: Start work
   - [ ] Implement change
   - [ ] Run verification
@@ -214,7 +375,7 @@ write_task_agent_guidance() {
 - 현재 작업 디렉터리가 task root이면 `TASK-WORKBRANCH.md`를 갱신합니다.
 - 현재 작업 디렉터리가 이 task 아래의 repo folder이면 `../TASK-WORKBRANCH.md`를 갱신합니다.
 - 현재 작업, blocker, 다음 action을 사람이 읽을 수 있게 task brief에 남깁니다.
-- `plan:`은 Step들을 묶는 구체적인 Plan 이름으로 유지합니다.
+- `plan:`은 현재/active Plan 호환 라벨로 유지하고, Step은 `## Plan: <name>` 섹션 아래에 둡니다.
 - 사용자가 명시적으로 요청하지 않는 한 repo-local task-state file을 만들지 않습니다.
 
 ## 작업 진행 업데이트 규칙
@@ -229,7 +390,7 @@ write_task_agent_guidance() {
 
 규칙:
 - `status:`는 todo | planning | in-progress | review | blocked | done 중 하나로 유지합니다.
-- `plan:`은 Step들을 묶는 구체적인 Plan 이름으로 유지합니다.
+- `plan:`은 현재/active Plan 호환 라벨로 유지하고, Step은 `## Plan: <name>` 섹션 아래에 둡니다.
 - 계획(planning)을 포함해 의미 있는 작업을 시작하면 즉시 `todo`에서 `planning`으로 status를 갱신합니다. 초기 planning 단계에서도 status와 Step을 갱신합니다.
 - Step은 작고 실행 가능한 단위로 유지합니다.
 - 완료한 Step은 즉시 `[x]`로 표시합니다.
@@ -250,7 +411,7 @@ This file is generated by workbranch for this task workspace.
 - If your current working directory is the task root, update `TASK-WORKBRANCH.md`.
 - If your current working directory is a repo folder under this task, update `../TASK-WORKBRANCH.md`.
 - Use the task brief for human-readable current work, blockers, and next actions.
-- Keep `plan:` set to the concrete Plan name that groups the Steps.
+- Keep `plan:` as the current/active Plan compatibility label, and put Steps under `## Plan: <name>` sections.
 - Do not create repo-local task-state files unless the user explicitly asks.
 
 ## Task progress update protocol
@@ -265,7 +426,8 @@ Update `TASK-WORKBRANCH.md` when:
 
 Rules:
 - keep `status:` current: todo | planning | in-progress | review | blocked | done
-- keep `plan:` current as the concrete Plan name for the Steps
+- keep `plan:` current as the current/active Plan compatibility label
+- express actual Plan groups with `## Plan: <name>` headings, with Markdown checklist Steps under each Plan
 - when starting meaningful work, including planning, move status from todo to planning immediately; keep status and Steps current during the initial planning phase
 - keep Steps small and actionable
 - mark completed Steps immediately with `[x]`

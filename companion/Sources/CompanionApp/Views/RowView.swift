@@ -137,8 +137,14 @@ struct RowView: View {
                 if let memo = row.memoTitle, !memo.isEmpty {
                     detailLine(label: "memo", value: memo, tone: .muted)
                 }
-                ForEach(Array(row.checklistItems.enumerated()), id: \.offset) { _, item in
-                    statusItemLine(item)
+                if row.plans.count > 1 {
+                    ForEach(Array(row.plans.enumerated()), id: \.offset) { _, plan in
+                        planBlock(plan)
+                    }
+                } else {
+                    ForEach(Array(row.checklistItems.enumerated()), id: \.offset) { _, item in
+                        statusItemLine(item)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -154,6 +160,37 @@ struct RowView: View {
                 .foregroundStyle(palette.color(for: tone))
                 .lineLimit(2)
                 .truncationMode(.tail)
+        }
+    }
+
+
+    private func planBlock(_ plan: WorkbranchPlan) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            planHeaderLine(plan)
+            ForEach(Array(plan.items.enumerated()), id: \.offset) { _, item in
+                statusItemLine(item)
+            }
+        }
+    }
+
+    private func planHeaderLine(_ plan: WorkbranchPlan) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 7) {
+            Text("│ plan")
+                .foregroundStyle(palette.muted)
+            Text(plan.title)
+                .foregroundStyle(palette.command)
+                .fontWeight(.semibold)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            if plan.progressTotal > 0 {
+                Text("\(plan.progressDone)/\(plan.progressTotal)")
+                    .foregroundStyle(palette.warning)
+                    .monospacedDigit()
+            }
+            Text(plan.status.uppercased())
+                .foregroundStyle(palette.color(for: tone(for: plan.status)))
+                .fontWeight(.semibold)
+                .lineLimit(1)
         }
     }
 
@@ -173,7 +210,7 @@ struct RowView: View {
 
     private var hasStatusDetails: Bool {
         if let memo = row.memoTitle, !memo.isEmpty { return true }
-        return !row.checklistItems.isEmpty
+        return !row.plans.isEmpty || !row.checklistItems.isEmpty
     }
 
     private var statusMessageText: String {
@@ -203,7 +240,11 @@ struct RowView: View {
     }
 
     private var statusTone: TerminalTone {
-        switch row.status {
+        tone(for: row.status)
+    }
+
+    private func tone(for status: String) -> TerminalTone {
+        switch status {
         case "done": return .accent
         case "in-progress": return .normal
         case "review": return .warning

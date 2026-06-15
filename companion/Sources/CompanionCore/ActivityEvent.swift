@@ -7,6 +7,8 @@ public struct ActivityEvent: Codable, Equatable, Sendable {
     public let root: String
     public let project: String
     public let task: String
+    public let plan: String
+    public let planIndex: Int
     public let planTitle: String
     public let status: String
     public let progressDone: Int
@@ -19,6 +21,8 @@ public struct ActivityEvent: Codable, Equatable, Sendable {
         case root
         case project
         case task
+        case plan
+        case planIndex
         case planTitle
         case status
         case progressDone
@@ -32,6 +36,8 @@ public struct ActivityEvent: Codable, Equatable, Sendable {
         root: String,
         project: String,
         task: String,
+        plan: String? = nil,
+        planIndex: Int = 0,
         planTitle: String = "",
         status: String,
         progressDone: Int,
@@ -43,7 +49,9 @@ public struct ActivityEvent: Codable, Equatable, Sendable {
         self.root = root
         self.project = project
         self.task = task
-        self.planTitle = planTitle
+        self.plan = plan ?? planTitle
+        self.planIndex = planIndex
+        self.planTitle = planTitle.isEmpty ? (plan ?? "") : planTitle
         self.status = status
         self.progressDone = progressDone
         self.progressTotal = progressTotal
@@ -57,7 +65,11 @@ public struct ActivityEvent: Codable, Equatable, Sendable {
         root = try container.decode(String.self, forKey: .root)
         project = try container.decode(String.self, forKey: .project)
         task = try container.decode(String.self, forKey: .task)
-        planTitle = try container.decodeIfPresent(String.self, forKey: .planTitle) ?? ""
+        let decodedPlanTitle = try container.decodeIfPresent(String.self, forKey: .planTitle) ?? ""
+        let decodedPlan = try container.decodeIfPresent(String.self, forKey: .plan) ?? decodedPlanTitle
+        plan = decodedPlan
+        planIndex = try container.decodeIfPresent(Int.self, forKey: .planIndex) ?? 0
+        planTitle = decodedPlanTitle.isEmpty ? decodedPlan : decodedPlanTitle
         status = try container.decode(String.self, forKey: .status)
         progressDone = try container.decode(Int.self, forKey: .progressDone)
         progressTotal = try container.decode(Int.self, forKey: .progressTotal)
@@ -77,23 +89,29 @@ public struct ActivityEvent: Codable, Equatable, Sendable {
             let previousTasks = Dictionary(uniqueKeysWithValues: previousDocument.tasks.map { ($0.name, $0) })
             for task in document.tasks {
                 guard task.updatedAt > 0 else { continue }
-                if let previousTask = previousTasks[task.name] {
-                    if task.updatedAt < previousTask.updatedAt { continue }
-                    if task.updatedAt == previousTask.updatedAt, task.activityEventKey == previousTask.activityEventKey { continue }
+                let previousTask = previousTasks[task.name]
+                if let previousTask, task.updatedAt < previousTask.updatedAt { continue }
+                let previousPlans = Dictionary(uniqueKeysWithValues: (previousTask?.activityPlans ?? []).map { ($0.identityKey, $0) })
+                for plan in task.activityPlans {
+                    if let previousPlan = previousPlans[plan.identityKey], plan.activityEventKey == previousPlan.activityEventKey {
+                        continue
+                    }
+                    let key = "\(document.root)\u{0}\(task.name)\u{0}\(plan.title)\u{0}\(plan.index)\u{0}\(task.updatedAt)\u{0}\(plan.activityEventKey)"
+                    guard seen.insert(key).inserted else { continue }
+                    events.append(ActivityEvent(
+                        editedAt: task.updatedAt,
+                        observedAt: observedAt,
+                        root: document.root,
+                        project: document.project,
+                        task: task.name,
+                        plan: plan.title,
+                        planIndex: plan.index,
+                        planTitle: plan.title,
+                        status: plan.status,
+                        progressDone: plan.progressDone,
+                        progressTotal: plan.progressTotal
+                    ))
                 }
-                let key = "\(document.root)\u{0}\(task.name)\u{0}\(task.activityEventKey)"
-                guard seen.insert(key).inserted else { continue }
-                events.append(ActivityEvent(
-                    editedAt: task.updatedAt,
-                    observedAt: observedAt,
-                    root: document.root,
-                    project: document.project,
-                    task: task.name,
-                    planTitle: task.planTitle,
-                    status: task.status,
-                    progressDone: task.progressDone,
-                    progressTotal: task.progressTotal
-                ))
             }
         }
         return events
@@ -117,12 +135,28 @@ public struct ActivityEvent: Codable, Equatable, Sendable {
 }
 
 private extension WorkbranchTask {
+    var activityPlans: [WorkbranchPlan] {
+        if !plans.isEmpty { return plans }
+        return [WorkbranchPlan(
+            title: planTitle,
+            index: 0,
+            status: status,
+            progressDone: progressDone,
+            progressTotal: progressTotal,
+            currentItem: currentItem,
+            items: items
+        )]
+    }
+}
+
+private extension WorkbranchPlan {
+    var identityKey: String { "\(title)\u{0}\(index)" }
+
     var activityEventKey: String {
         let stepKey = items.map { "\($0.depth)\u{1}\($0.checked)\u{1}\($0.text)" }.joined(separator: "\u{2}")
         return [
-            "\(updatedAt)",
-            memoTitle,
-            planTitle,
+            title,
+            "\(index)",
             status,
             "\(progressDone)",
             "\(progressTotal)",

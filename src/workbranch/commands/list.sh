@@ -23,7 +23,7 @@ cmd_list_json() {
     json_string "$path"
     printf ',"memoTitle":'
     json_string "$title"
-    plan_title=$(task_plan_title "$task")
+    plan_title=$(task_active_plan_title "$task")
     printf ',"planTitle":'
     json_string "$plan_title"
     status=$(task_status "$task")
@@ -41,6 +41,8 @@ cmd_list_json() {
     printf ',"updatedAt":%s' "$updated_at"
     printf ',"items":'
     task_checklist_items_json "$task"
+    printf ',"plans":'
+    task_plans_json "$task"
     printf ',"notiCount":%s' "$(noti_count "$task")"
     printf ',"repos":['
     first_repo=1

@@ -2,7 +2,7 @@
 
 Native macOS menu bar companion and status monitor for workbranch task workspaces.
 
-The app is a read-only status monitor and presentation client for the existing `workbranch` CLI. It does not read Git state directly; every refresh pulls `workbranch list --json` from each configured project root, then renders a compact project/task memo/repo branch/status summary with the task's `TASK-WORKBRANCH.md` Steps. It also records observed `updatedAt` changes to a Companion-local activity log and renders active-time summaries inline in the default task rows and behind a footer report icon; no `workbranch report` CLI command is added.
+The app is a read-only status monitor and presentation client for the existing `workbranch` CLI. It does not read Git state directly; every refresh pulls `workbranch list --json` from each configured project root, then renders a compact project/task memo/repo branch/status summary with the task's `TASK-WORKBRANCH.md` Plan groups and Steps. It also records observed `updatedAt` changes to a Companion-local activity log and renders active-time summaries inline in the default task rows and behind a footer report icon; no `workbranch report` CLI command is added.
 
 ## Requirements
 
@@ -121,7 +121,7 @@ The app's **Open config** action creates an empty project-list skeleton if the f
 
 - Menu title still reflects aggregate task state for the macOS menu bar item.
 - Popover rows use a terminal-style layout with project name, task name, task memo, repo name, repo branch, a warm current status line with `HH:mm` update time, the task status Steps, and today's task-level active-time label inline with the task name when available.
-- The default popover main view stays task-focused; the footer navigation is Home, Report, Setting, and the report icon opens the today/weekly/monthly activity report grouped by project and the task brief Plan (`plan:`) when present, falling back to task workspace. Today also shows task-level status/progress, session count, and last edit time. The report uses the same `ActivityReport` model as the task-row active-time labels.
+- The default popover main view stays task-focused; the footer navigation is Home, Report, Setting, and the report icon opens the today/weekly/monthly activity report grouped by project, task workspace, and task brief `## Plan:` sections when present, falling back to a single legacy Plan bucket. Today also shows task-level status/progress, session count, and last edit time. The report uses the same `ActivityReport` model as the task-row active-time labels.
 - Activity events are appended to `~/.local/state/workbranch/activity.jsonl` when Companion observes a task's second-resolution `updatedAt` increase. Fast repeated saves in the same second or debounce window may collapse into one event.
 - Activity history is not pruned or deleted by v1; it is preserved even if the related project root or task workspace is later removed.
 - Task rows are display-only: clicking a task does not edit memo text and no per-task action menu is shown.

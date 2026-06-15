@@ -37,7 +37,7 @@ A task root (`<task>`) is a workbranch metadata/agent workspace outside Git. The
 
 ## Companion activity boundary
 
-Workbranch Companion owns activity-time tracking as local presentation state. The CLI continues to expose task state through `workbranch list --json`; there is no `workbranch report` command. Companion observes second-resolution `updatedAt` increases from `TASK-WORKBRANCH.md`, appends activity events to `~/.local/state/workbranch/activity.jsonl`, and computes today/week/month rollups in `CompanionCore`.
+Workbranch Companion owns activity-time tracking as local presentation state. The CLI continues to expose task state through `workbranch list --json`; there is no `workbranch report` command. Companion observes second-resolution `updatedAt` increases from `TASK-WORKBRANCH.md`, appends activity events to `~/.local/state/workbranch/activity.jsonl`, and computes today/week/month rollups in `CompanionCore`. Task briefs may group Steps under `## Plan: <name>` sections; `workbranch list --json` keeps flat task fields for compatibility and adds `plans[]` with 0-based Plan indexes so duplicate Plan titles remain distinct. Activity events carry optional `plan` and `planIndex` fields for per-Plan time rows while task totals remain union rollups.
 
 The activity log is append-only history. It is not removed by `workbranch prune`, `workbranch remove`, or Companion root self-heal, because deleted repo/task workspaces may still matter for later retrospectives. v1 does not provide activity-log deletion, compression, or rotation; if long-term size becomes a real issue, add an archive/rotation plan that preserves history by default.
 
