@@ -121,13 +121,13 @@ task_load_plans() {
 }
 
 task_plan_status_at() {
-  local index done total
+  local index done_count total_count
   index=$1
-  done=${TASK_PLAN_DONE[$index]:-0}
-  total=${TASK_PLAN_TOTAL[$index]:-0}
-  if [ "$done" -eq 0 ]; then
+  done_count=${TASK_PLAN_DONE[$index]:-0}
+  total_count=${TASK_PLAN_TOTAL[$index]:-0}
+  if [ "$done_count" -eq 0 ]; then
     printf 'todo'
-  elif [ "$done" -eq "$total" ]; then
+  elif [ "$done_count" -eq "$total_count" ]; then
     printf 'done'
   else
     printf 'in-progress'
@@ -135,18 +135,18 @@ task_plan_status_at() {
 }
 
 task_checklist_counts() {
-  local task done total i
+  local task done_count total_count i
   task=$1
   task_load_plans "$task"
-  done=0
-  total=0
+  done_count=0
+  total_count=0
   i=0
   while [ $i -lt $TASK_PLAN_COUNT ]; do
-    done=$((done + ${TASK_PLAN_DONE[$i]:-0}))
-    total=$((total + ${TASK_PLAN_TOTAL[$i]:-0}))
+    done_count=$((done_count + ${TASK_PLAN_DONE[$i]:-0}))
+    total_count=$((total_count + ${TASK_PLAN_TOTAL[$i]:-0}))
     i=$((i + 1))
   done
-  printf '%d %d' "$done" "$total"
+  printf '%d %d' "$done_count" "$total_count"
 }
 
 task_explicit_status() {
