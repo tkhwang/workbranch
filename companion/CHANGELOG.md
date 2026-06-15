@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.1](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v1.12.0...workbranch-companion-v1.12.1) (2026-06-15)
+
+
+### Bug Fixes
+
+* fix some bug ([45d6b8c](https://github.com/tkhwang/workbranch/commit/45d6b8c40d23a00eca3161c8ac83dc2409082688))
+
 ## [1.12.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v1.11.0...workbranch-companion-v1.12.0) (2026-06-15)
 
 
