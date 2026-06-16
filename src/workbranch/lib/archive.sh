@@ -72,7 +72,7 @@ archive_remove_plan_block() {
 archive_plan_body_with_done_status() {
   awk '
     NR == 1 { print; print "status: done"; next }
-    NR == 2 && /^[[:space:]]*status:[[:space:]]*/ { next }
+    /^[[:space:]]*status:[[:space:]]*/ { next }
     { print }
   '
 }

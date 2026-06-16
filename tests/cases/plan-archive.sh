@@ -23,6 +23,7 @@ status: done
 - [x] old work
 
 # Active Plan
+
 status: review
 - [x] inspect
 - [ ] verify
@@ -44,6 +45,9 @@ EOF_BRIEF
   assert_contains "$archive" "completed_via: done"
   assert_contains "$archive" "# Active Plan"
   assert_contains "$archive" "status: done"
+  assert_not_contains "$archive" "status: review"
+  status_count=$(printf '%s' "$archive" | grep -c '^status: ')
+  [ "$status_count" = "1" ] || fail "expected one archived status line, got $status_count: $archive"
   assert_contains "$archive" "- [x] inspect"
   assert_contains "$archive" "- [ ] verify"
   assert_contains "$archive" "## Notes"
