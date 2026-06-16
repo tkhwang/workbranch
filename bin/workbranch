@@ -5270,7 +5270,7 @@ cmd_done() {
   [ $# -eq 1 ] || die "usage: workbranch done <task>"
   task=$(normalize_task_argument "$1")
   require_known_task_workspace "done" "$task"
-  archive_current_plan "$task" done
+  archive_current_plan "$task" "done"
 }
 
 # ----- src/workbranch/commands/remove.sh -----
@@ -5665,7 +5665,7 @@ cmd_complete_repos() {
 }
 
 cmd_complete_commands() {
-  printf '%s\n' add completion config destroy doctor done finalize finder help ide init land list memo noti path prune pull push refresh remove status terminal update version
+  printf '%s\n' add completion config destroy doctor "done" finalize finder help ide init land list memo noti path prune pull push refresh remove status terminal update version
 }
 
 print_completion_bash() {
