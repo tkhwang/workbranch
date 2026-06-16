@@ -1,23 +1,8 @@
 #!/usr/bin/env bash
 set -u
 
-script_dir_from_argv() {
-  case "${0##*/}" in
-    bash|sh|zsh|-) return 1 ;;
-  esac
-  [ -f "$0" ] || return 1
-  cd "$(dirname "$0")" && pwd -P
-}
-
-SCRIPT_DIR=$(script_dir_from_argv || printf '')
-SRC=""
-if [ -n "$SCRIPT_DIR" ]; then
-  if [ -f "$SCRIPT_DIR/apps/workbranch-cli/bin/workbranch" ]; then
-    SRC="$SCRIPT_DIR/apps/workbranch-cli/bin/workbranch"
-  else
-    SRC="$SCRIPT_DIR/bin/workbranch"
-  fi
-fi
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd -P)
+SRC="$SCRIPT_DIR/bin/workbranch"
 WORKBRANCH_DEFAULT_RAW_BASE_URL="https://raw.githubusercontent.com/tkhwang/workbranch/main"
 WORKBRANCH_RAW_BASE_URL="${WORKBRANCH_RAW_BASE_URL:-$WORKBRANCH_DEFAULT_RAW_BASE_URL}"
 DEFAULT_DEST_DIR="${HOME}/.local/bin"
@@ -36,18 +21,9 @@ prompt_read() {
   value=""
   if [ -t 0 ]; then
     IFS= read -r -e -p "$prompt" value || :
-  elif [ -z "$SCRIPT_DIR" ] && [ -r /dev/tty ] && { : </dev/tty; } 2>/dev/null; then
-    # When installed via `curl ... | bash`, stdin is the script body.
-    # Read interactive answers from the terminal instead of consuming script lines.
-    printf '%s' "$prompt" >/dev/tty
-    IFS= read -r value </dev/tty || :
-  elif [ -n "$SCRIPT_DIR" ]; then
+  else
     printf '%s' "$prompt" >&2
     IFS= read -r value || :
-  else
-    # Non-interactive stdin-script execution has no safe prompt stream.
-    # Return empty so callers use their defaults.
-    printf '%s' "$prompt" >&2
   fi
   printf '%s' "$value"
 }
@@ -98,12 +74,6 @@ download_file() {
   fi
 }
 
-is_checkout_install() {
-  [ -n "$SCRIPT_DIR" ] || return 1
-  [ -f "$SRC" ] || return 1
-  [ -d "$SCRIPT_DIR/.git" ] || [ -f "$SCRIPT_DIR/.git" ]
-}
-
 printf '[*] Install workbranch\n'
 input_dir=$(prompt_read "[*] Target directory [$DEFAULT_DEST_DIR]: ")
 if [ -z "$input_dir" ]; then
@@ -114,7 +84,7 @@ fi
 DEST="$DEST_DIR/workbranch"
 
 mkdir -p "$DEST_DIR" || { printf '[-] Error: failed to create %s\n' "$DEST_DIR" >&2; exit 1; }
-if is_checkout_install; then
+if [ -f "$SRC" ]; then
   cp "$SRC" "$DEST" || { printf '[-] Error: failed to install workbranch\n' >&2; exit 1; }
 else
   download_file "$WORKBRANCH_RAW_BASE_URL/apps/workbranch-cli/bin/workbranch" > "$DEST" \

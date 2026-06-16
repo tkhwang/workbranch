@@ -4,7 +4,7 @@ This file defines the Git commands behind each `workbranch` Git operation.
 
 `workbranch` keeps the user-facing model small, but the implementation still uses ordinary Git commands. Use this file as the maintenance contract for Git behavior.
 
-The source-level definitions live in `src/workbranch/git-ops.sh`.
+The source-level definitions live in `apps/workbranch-cli/src/workbranch/git-ops.sh`.
 `bin/workbranch` is the generated single-file install artifact.
 
 ## Direction model

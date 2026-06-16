@@ -36,6 +36,20 @@ curl -fsSL https://raw.githubusercontent.com/tkhwang/workbranch/main/install.sh 
 
 Homebrew는 published release를 설치하고, curl installer는 `main`을 따라갑니다.
 
+## Repo top에서 build/run
+
+Monorepo root script로 두 deployable app을 모두 build/run할 수 있습니다.
+
+```bash
+pnpm install
+pnpm cli:build
+pnpm cli:run -- version
+pnpm companion:build
+pnpm companion:run
+```
+
+명시적 app alias도 제공합니다: `pnpm apps:cli:build`, `pnpm apps:cli:run -- <args>`, `pnpm apps:companion:build`, `pnpm apps:companion:run`.
+
 ## Quick start
 
 `workbranch init`이 설정을 안내하고, 첫 task까지 바로 만들 수 있습니다.
@@ -185,7 +199,9 @@ Combined flow shortcut:
 
 ## Native menu bar companion
 
-`companion/`에는 local native macOS menu bar app인 `WorkbranchCompanion.app`이 있습니다. 이 app은 task 상태·알림·현재 작업·Companion-local 활동 시간을 보여주는 workbranch status monitor이며, `workbranch list --json`을 소비해서 현재 Plan 기준 task status/progress, repo/branch identity 아래 항상 보이는 warm color의 현재 작업/status 한 줄과 `HH:mm` update time, branch identity를 보여주는 repo child row, task별 inline active-time label, footer Home/Report/Setting navigation과 report icon으로 여는 activity view를 제공합니다. 이 view는 Today/Weekly에서는 label을 줄인 compact Plan별 시간 행을 보여주되 한 project에 task가 여러 개면 compact task identity 행을 추가하고, latest activity event의 step snapshot으로 indent된 Step 행을 보여주며, 이후 empty snapshot은 이전 Step 행을 지우고 Monthly에서는 project 합계로 접으며, inline memo edit, notification clear, 기존 Finder/IDE/terminal launch action도 제공합니다. Activity history는 `~/.local/state/workbranch/activity.jsonl`에 저장되고, 관련 repo/task workspace가 나중에 제거되어도 보존됩니다. Configured project root가 parent는 존재하지만 root 자체만 삭제된 true deletion 상태이면, app은 연속 2회 refresh 실패 뒤 해당 root를 config에서 제거하고 1회 알림을 보냅니다.
+`apps/workbranch-companion/`에는 Tauri v2 + React 기반 macOS menu bar app인 `WorkbranchCompanion.app`이 있습니다. 이 앱은 typed Tauri command 경계로 `workbranch list --global --json`을 호출하고, `packages/contract` Published Language를 통해 CLI JSON contract를 번역합니다. 범위는 기존 companion과 같은 presentation-first 운영 기능입니다: task status/progress, Plan/Step 표시, notification, memo edit, Finder/IDE/terminal launch, copy path, refresh/quit, local activity report. `add`, `done`, `land`, `push` 같은 task lifecycle/Git mutation은 계속 CLI 전용입니다.
+
+Activity history는 `~/.local/state/workbranch/activity.jsonl`에 저장되고, 관련 repo/task workspace가 나중에 제거되어도 보존됩니다. Root 설정은 `~/.config/workbranch-companion/projects.md`에서 합니다.
 
 Published release 설치:
 
@@ -199,14 +215,11 @@ Published companion release는 Developer ID 인증서로 서명되고 notarizati
 Local build:
 
 ```bash
-cd companion
-swift build
-swift run CompanionCoreTestRunner
-./scripts/build-app.sh
-open dist/WorkbranchCompanion.app
+pnpm install
+pnpm --filter @workbranch/companion test
+pnpm --filter @workbranch/companion tauri build
+open "apps/workbranch-companion/src-tauri/target/release/bundle/macos/WorkbranchCompanion.app"
 ```
-
-Root 설정은 `~/.config/workbranch-companion/projects.md`에서 합니다. Companion settings의 `Launch at login`은 app을 macOS Login Items에 즉시 등록하며, 필요한 경우 System Settings > General > Login Items에서 승인을 해야 합니다.
 
 ## More docs
 

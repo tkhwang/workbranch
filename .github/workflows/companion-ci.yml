@@ -3,14 +3,20 @@ name: Companion CI
 on:
   pull_request:
     paths:
-      - "companion/**"
+      - "apps/workbranch-companion/**"
       - ".github/workflows/companion-ci.yml"
+      - "packages/contract/**"
+      - "package.json"
+      - "pnpm-workspace.yaml"
   push:
     branches:
       - main
     paths:
-      - "companion/**"
+      - "apps/workbranch-companion/**"
       - ".github/workflows/companion-ci.yml"
+      - "packages/contract/**"
+      - "package.json"
+      - "pnpm-workspace.yaml"
 
 permissions:
   contents: read
@@ -19,23 +25,26 @@ jobs:
   test:
     name: Build and test companion
     runs-on: macos-15
-    defaults:
-      run:
-        working-directory: companion
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           persist-credentials: false
 
-      - name: Build
-        run: swift build
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile=false
+
+      - name: Typecheck
+        run: pnpm --filter @workbranch/companion typecheck
 
       - name: Test
-        run: swift test
+        run: pnpm --filter @workbranch/companion test
 
       - name: Core test runner
-        run: swift run CompanionCoreTestRunner
+        run: cargo test --manifest-path apps/workbranch-companion/src-tauri/Cargo.toml
 
       - name: App bundle smoke
-        run: ./scripts/build-app.sh
+        run: pnpm --filter @workbranch/companion tauri build

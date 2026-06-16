@@ -39,3 +39,11 @@ release/
 # Local workbranch sandboxes created during manual testing
 .workbranch-test/
 .tasktree-test/
+
+# JavaScript / TypeScript workspace
+node_modules/
+.turbo/
+
+# Tauri / Rust build artifacts
+target/
+apps/workbranch-companion/src-tauri/target/

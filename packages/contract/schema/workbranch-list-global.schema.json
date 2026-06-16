@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tkhwang.github.io/workbranch/schema/workbranch-list-global.schema.json",
+  "title": "WorkbranchGlobalListDocument",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "projects", "errors"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "projects": {
+      "type": "array",
+      "items": { "$ref": "workbranch-list.schema.json" }
+    },
+    "errors": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/globalError" }
+    }
+  },
+  "$defs": {
+    "globalError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "message"],
+      "properties": {
+        "root": { "type": "string" },
+        "message": { "type": "string" }
+      }
+    }
+  }
+}
