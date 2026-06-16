@@ -141,7 +141,7 @@ export function App() {
 			</header>
 			<section>
 				{model.rows.length === 0 ? (
-					<p className="empty">No workbranch tasks configured.</p>
+					<p className="empty">No workbranch tasks registered.</p>
 				) : null}
 				{model.rows.map((row) => (
 					<TaskRow

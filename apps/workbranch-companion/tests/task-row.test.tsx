@@ -71,6 +71,49 @@ const nestedChecklistTask: Task = {
 	],
 };
 
+const linearFixtureTask: Task = {
+	name: "feat-update-0617-part2",
+	path: "/tmp/workbranch/feat-update-0617-part2",
+	memoTitle: "Review companion UI",
+	notiCount: 1,
+	updatedAt: 30,
+	repos: [
+		{ name: "workbranch", branch: "feat/update-0617", dirty: true },
+		{ name: "docs", branch: "main", dirty: false },
+	],
+	plans: [
+		{
+			title: "Companion UI refresh",
+			index: 0,
+			status: "review",
+			progressDone: 2,
+			progressTotal: 4,
+			currentItem: "Review screenshot",
+			steps: [
+				{
+					text: "Companion UI refresh",
+					checked: true,
+					depth: 0,
+					children: [
+						{
+							text: "Write design contract",
+							checked: true,
+							depth: 1,
+							children: [],
+						},
+						{
+							text: "Review screenshot",
+							checked: false,
+							depth: 1,
+							children: [],
+						},
+					],
+				},
+			],
+		},
+	],
+};
+
 describe("TaskRow", () => {
 	it("renders nested checklist children for generated task briefs", () => {
 		const html = renderToStaticMarkup(
@@ -89,6 +132,25 @@ describe("TaskRow", () => {
 		expect(html.indexOf("☐ Generated Plan")).toBeLessThan(
 			html.indexOf("☐ Implement change"),
 		);
+	});
+	it("renders a Linear-style task summary with current step and repo state", () => {
+		const html = renderToStaticMarkup(
+			<TaskRow
+				project="workbranch"
+				root="/tmp/workbranch"
+				task={linearFixtureTask}
+				expanded={true}
+				onAction={() => {}}
+			/>,
+		);
+
+		expect(html).toContain("task-status-rail");
+		expect(html).toContain("Companion UI refresh");
+		expect(html).toContain("Review screenshot");
+		expect(html).toContain("2/4");
+		expect(html).toContain("repo-chip repo-dirty");
+		expect(html).toContain("workbranch");
+		expect(html).toContain("feat/update-0617");
 	});
 	it("exposes the allowed task actions from each row", () => {
 		const html = renderToStaticMarkup(
