@@ -20,6 +20,7 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'workbranch-companion-v') }}
     env:
       TAG_NAME: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}
+      APP_BUNDLE_PATH: apps/workbranch-companion/src-tauri/target/universal-apple-darwin/release/bundle/macos/WorkbranchCompanion.app
 
     steps:
       - name: Validate tag
@@ -39,8 +40,14 @@ jobs:
           ref: ${{ env.TAG_NAME }}
           persist-credentials: false
 
+      - name: Enable pnpm
+        run: corepack enable
+
       - name: Build universal app bundle
-        run: WORKBRANCH_COMPANION_UNIVERSAL=1 ./companion/scripts/build-app.sh
+        run: |
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
+          pnpm install --frozen-lockfile=false
+          pnpm --filter @workbranch/companion tauri build --target universal-apple-darwin
 
       - name: Sign with Developer ID (skipped until secrets are set)
         env:
@@ -66,7 +73,7 @@ jobs:
             -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
           /usr/bin/codesign --force --options runtime --timestamp \
-            --sign "$APPLE_SIGNING_IDENTITY" companion/dist/WorkbranchCompanion.app
+            --sign "$APPLE_SIGNING_IDENTITY" "$APP_BUNDLE_PATH"
           echo "APPLE_RELEASE_SIGNED=1" >> "$GITHUB_ENV"
 
       - name: Package zip
@@ -74,7 +81,7 @@ jobs:
           set -euo pipefail
           VERSION="${TAG_NAME#workbranch-companion-v}"
           ZIP_NAME="WorkbranchCompanion-${VERSION}.zip"
-          ditto -c -k --keepParent companion/dist/WorkbranchCompanion.app "$ZIP_NAME"
+          ditto -c -k --keepParent "$APP_BUNDLE_PATH" "$ZIP_NAME"
           {
             echo "VERSION=$VERSION"
             echo "ZIP_NAME=$ZIP_NAME"
@@ -98,8 +105,8 @@ jobs:
             --key-id "$APPLE_NOTARY_KEY_ID" \
             --issuer "$APPLE_NOTARY_ISSUER_ID" \
             --wait
-          xcrun stapler staple companion/dist/WorkbranchCompanion.app
-          ditto -c -k --keepParent companion/dist/WorkbranchCompanion.app "$ZIP_NAME"
+          xcrun stapler staple "$APP_BUNDLE_PATH"
+          ditto -c -k --keepParent "$APP_BUNDLE_PATH" "$ZIP_NAME"
           echo "APPLE_RELEASE_NOTARIZED=1" >> "$GITHUB_ENV"
 
       - name: Upload release asset

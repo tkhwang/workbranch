@@ -36,6 +36,20 @@ curl -fsSL https://raw.githubusercontent.com/tkhwang/workbranch/main/install.sh 
 
 Homebrew installs published releases. The curl installer tracks `main`.
 
+## Build and run from the repo top
+
+The monorepo exposes root scripts for both deployable apps:
+
+```bash
+pnpm install
+pnpm cli:build
+pnpm cli:run -- version
+pnpm companion:build
+pnpm companion:run
+```
+
+Equivalent explicit app aliases are also available: `pnpm apps:cli:build`, `pnpm apps:cli:run -- <args>`, `pnpm apps:companion:build`, and `pnpm apps:companion:run`.
+
 ## Quick start
 
 `workbranch init` walks you through setup and can create your first task on the spot.
@@ -185,7 +199,9 @@ Combined flow shortcuts:
 
 ## Native menu bar companion
 
-`companion/` contains a local native macOS menu bar app, `WorkbranchCompanion.app` — a workbranch status monitor for task status, notifications, current-work visibility, and Companion-local activity time tracking — that consumes `workbranch list --json` and provides a task cockpit for task status/progress, an always-visible warm-colored current-work/status line with `HH:mm` update time under repo/branch identity, repo child rows with branch identity, an inline active-time label per task, footer Home/Report/Setting navigation with a report-icon activity view where Today/Weekly show compact label-less per-Plan time rows, adding a compact task identity row only when a project has multiple tasks, with Step rows from the latest activity event snapshot, where a later empty snapshot clears old Step rows, and Monthly rolls up to project totals, inline memo edits, notification clearing, and existing Finder/IDE/terminal launch actions. Activity history is stored in `~/.local/state/workbranch/activity.jsonl` and is preserved even if the related repo/task workspace is later removed. If a configured project root is truly deleted while its parent still exists, the app forgets that root after two consecutive failed refreshes and sends one notification.
+`apps/workbranch-companion/` contains the Tauri v2 + React macOS menu bar app, `WorkbranchCompanion.app`. It consumes `workbranch list --global --json` through a typed Tauri command boundary, maps the CLI JSON contract through the `packages/contract` Published Language, and keeps the same presentation-first scope as the legacy companion: task status/progress, Plan/Step visibility, notifications, memo edits, Finder/IDE/terminal launch actions, copy path, refresh/quit, and local activity reports. Task lifecycle and Git mutation commands such as `add`, `done`, `land`, and `push` remain CLI-only.
+
+Activity history is stored in `~/.local/state/workbranch/activity.jsonl` and is preserved even if the related repo/task workspace is later removed. Configure roots in `~/.config/workbranch-companion/projects.md`.
 
 Install published releases with Homebrew:
 
@@ -199,14 +215,11 @@ Published companion releases are signed with a Developer ID certificate and nota
 Build it locally:
 
 ```bash
-cd companion
-swift build
-swift run CompanionCoreTestRunner
-./scripts/build-app.sh
-open dist/WorkbranchCompanion.app
+pnpm install
+pnpm --filter @workbranch/companion test
+pnpm --filter @workbranch/companion tauri build
+open "apps/workbranch-companion/src-tauri/target/release/bundle/macos/WorkbranchCompanion.app"
 ```
-
-Configure roots in `~/.config/workbranch-companion/projects.md`. In companion settings, `Launch at login` registers the app with macOS Login Items immediately and may require approval in System Settings > General > Login Items.
 
 ## More docs
 

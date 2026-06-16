@@ -1,0 +1,127 @@
+import type {
+	WorkbranchChecklistItem,
+	WorkbranchListDocument,
+	WorkbranchListGlobalDocument,
+	WorkbranchPlan,
+	WorkbranchRepo,
+	WorkbranchTask,
+} from "@workbranch/contract";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isString(value: unknown): value is string {
+	return typeof value === "string";
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+	return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+function isChecklistItem(value: unknown): value is WorkbranchChecklistItem {
+	if (!isRecord(value)) {
+		return false;
+	}
+	return (
+		isString(value["text"]) &&
+		typeof value["checked"] === "boolean" &&
+		isNonNegativeInteger(value["depth"])
+	);
+}
+
+function isRepo(value: unknown): value is WorkbranchRepo {
+	if (!isRecord(value)) {
+		return false;
+	}
+	return (
+		isString(value["name"]) &&
+		isString(value["branch"]) &&
+		typeof value["dirty"] === "boolean"
+	);
+}
+
+function isPlan(value: unknown): value is WorkbranchPlan {
+	if (!isRecord(value)) {
+		return false;
+	}
+	return (
+		isString(value["title"]) &&
+		isNonNegativeInteger(value["index"]) &&
+		isString(value["status"]) &&
+		isNonNegativeInteger(value["progressDone"]) &&
+		isNonNegativeInteger(value["progressTotal"]) &&
+		isString(value["currentItem"]) &&
+		Array.isArray(value["items"]) &&
+		value["items"].every(isChecklistItem)
+	);
+}
+
+function isTask(value: unknown): value is WorkbranchTask {
+	if (!isRecord(value)) {
+		return false;
+	}
+	return (
+		isString(value["name"]) &&
+		isString(value["path"]) &&
+		isString(value["memoTitle"]) &&
+		isString(value["planTitle"]) &&
+		isString(value["status"]) &&
+		isNonNegativeInteger(value["progressDone"]) &&
+		isNonNegativeInteger(value["progressTotal"]) &&
+		isString(value["currentItem"]) &&
+		isNonNegativeInteger(value["updatedAt"]) &&
+		Array.isArray(value["items"]) &&
+		value["items"].every(isChecklistItem) &&
+		Array.isArray(value["plans"]) &&
+		value["plans"].every(isPlan) &&
+		isNonNegativeInteger(value["notiCount"]) &&
+		Array.isArray(value["repos"]) &&
+		value["repos"].every(isRepo)
+	);
+}
+
+function isListDocument(value: unknown): value is WorkbranchListDocument {
+	if (!isRecord(value)) {
+		return false;
+	}
+	return (
+		value["schemaVersion"] === 1 &&
+		isString(value["project"]) &&
+		isString(value["root"]) &&
+		Array.isArray(value["tasks"]) &&
+		value["tasks"].every(isTask)
+	);
+}
+
+function isGlobalError(
+	value: unknown,
+): value is WorkbranchListGlobalDocument["errors"][number] {
+	if (!isRecord(value)) {
+		return false;
+	}
+	return isString(value["root"]) && isString(value["message"]);
+}
+
+function isGlobalDocument(
+	value: unknown,
+): value is WorkbranchListGlobalDocument {
+	if (!isRecord(value)) {
+		return false;
+	}
+	return (
+		value["schemaVersion"] === 1 &&
+		Array.isArray(value["projects"]) &&
+		value["projects"].every(isListDocument) &&
+		Array.isArray(value["errors"]) &&
+		value["errors"].every(isGlobalError)
+	);
+}
+
+export function parseGlobalDocument(raw: string): WorkbranchListGlobalDocument {
+	const parsed: unknown = JSON.parse(raw);
+	if (!isGlobalDocument(parsed)) {
+		throw new Error("invalid workbranch global list document");
+	}
+	return parsed;
+}

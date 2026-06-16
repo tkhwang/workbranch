@@ -9,6 +9,10 @@
 Icon?
 ._*
 
+# Tauri app icons are source assets, not macOS Icon? metadata.
+!apps/workbranch-companion/src-tauri/icons/
+!apps/workbranch-companion/src-tauri/icons/**
+
 # Editor / IDE
 .vscode/
 .idea/
@@ -39,3 +43,11 @@ release/
 # Local workbranch sandboxes created during manual testing
 .workbranch-test/
 .tasktree-test/
+
+# JavaScript / TypeScript workspace
+node_modules/
+.turbo/
+
+# Tauri / Rust build artifacts
+target/
+apps/workbranch-companion/src-tauri/target/

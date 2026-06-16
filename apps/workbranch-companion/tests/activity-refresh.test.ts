@@ -1,0 +1,129 @@
+import { describe, expect, it } from "vitest";
+import type { ActivityEvent } from "../src/application/activity";
+import { createActivityRefresh } from "../src/application/activity";
+import type { GlobalState, Plan, Project, Task } from "../src/domain/model";
+
+const BASELINE_PLAN: Plan = {
+	title: "Backend",
+	index: 0,
+	status: "in-progress",
+	progressDone: 0,
+	progressTotal: 2,
+	currentItem: "Implement API",
+	steps: [
+		{
+			text: "Backend",
+			checked: false,
+			depth: 0,
+			children: [],
+		},
+	],
+};
+
+const UPDATED_PLAN: Plan = {
+	...BASELINE_PLAN,
+	progressDone: 1,
+	currentItem: "Run verification",
+	steps: [
+		{
+			text: "Backend",
+			checked: true,
+			depth: 0,
+			children: [
+				{
+					text: "Run verification",
+					checked: false,
+					depth: 1,
+					children: [],
+				},
+			],
+		},
+	],
+};
+
+const BASELINE_TASK: Task = {
+	name: "feat-login",
+	path: "/tmp/workbranch/feat-login",
+	memoTitle: "Login",
+	notiCount: 0,
+	updatedAt: 10,
+	repos: [],
+	plans: [BASELINE_PLAN],
+};
+
+const UPDATED_TASK: Task = {
+	...BASELINE_TASK,
+	updatedAt: 20,
+	plans: [UPDATED_PLAN],
+};
+
+const BASELINE_PROJECT: Project = {
+	name: "workbranch",
+	root: "/tmp/workbranch",
+	tasks: [BASELINE_TASK],
+};
+
+const UPDATED_PROJECT: Project = {
+	...BASELINE_PROJECT,
+	tasks: [UPDATED_TASK],
+};
+
+const BASELINE_STATE: GlobalState = {
+	projects: [BASELINE_PROJECT],
+	errors: [],
+};
+
+const UPDATED_STATE: GlobalState = {
+	projects: [UPDATED_PROJECT],
+	errors: [],
+};
+
+describe("createActivityRefresh", () => {
+	it("appends plan activity after the per-root baseline refresh", async () => {
+		const states = [BASELINE_STATE, UPDATED_STATE];
+		const appended: ActivityEvent[][] = [];
+		const refresh = createActivityRefresh({
+			refresh: () => {
+				const state = states.shift();
+				if (state === undefined) {
+					throw new Error("unexpected refresh");
+				}
+				return Promise.resolve(state);
+			},
+			append: (events) => {
+				appended.push([...events]);
+				return Promise.resolve();
+			},
+			now: () => 100,
+		});
+
+		await refresh();
+		await refresh();
+
+		expect(appended).toEqual([
+			[
+				{
+					v: 1,
+					editedAt: 20,
+					observedAt: 100,
+					root: "/tmp/workbranch",
+					project: "workbranch",
+					task: "feat-login",
+					plan: "Backend",
+					planIndex: 0,
+					planTitle: "Backend",
+					planStatus: "in-progress",
+					status: "in-progress",
+					taskProgressDone: 1,
+					taskProgressTotal: 2,
+					progressDone: 1,
+					progressTotal: 2,
+					items: [
+						{ text: "Backend", checked: true, depth: 0 },
+						{ text: "Run verification", checked: false, depth: 1 },
+					],
+				},
+			],
+		]);
+	});
+});

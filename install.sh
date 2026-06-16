@@ -12,7 +12,11 @@ script_dir_from_argv() {
 SCRIPT_DIR=$(script_dir_from_argv || printf '')
 SRC=""
 if [ -n "$SCRIPT_DIR" ]; then
-  SRC="$SCRIPT_DIR/bin/workbranch"
+  if [ -f "$SCRIPT_DIR/apps/workbranch-cli/bin/workbranch" ]; then
+    SRC="$SCRIPT_DIR/apps/workbranch-cli/bin/workbranch"
+  else
+    SRC="$SCRIPT_DIR/bin/workbranch"
+  fi
 fi
 WORKBRANCH_DEFAULT_RAW_BASE_URL="https://raw.githubusercontent.com/tkhwang/workbranch/main"
 WORKBRANCH_RAW_BASE_URL="${WORKBRANCH_RAW_BASE_URL:-$WORKBRANCH_DEFAULT_RAW_BASE_URL}"
@@ -113,7 +117,9 @@ mkdir -p "$DEST_DIR" || { printf '[-] Error: failed to create %s\n' "$DEST_DIR" 
 if is_checkout_install; then
   cp "$SRC" "$DEST" || { printf '[-] Error: failed to install workbranch\n' >&2; exit 1; }
 else
-  download_file "$WORKBRANCH_RAW_BASE_URL/bin/workbranch" > "$DEST" || { rm -f "$DEST"; printf '[-] Error: failed to download workbranch\n' >&2; exit 1; }
+  download_file "$WORKBRANCH_RAW_BASE_URL/apps/workbranch-cli/bin/workbranch" > "$DEST" \
+    || download_file "$WORKBRANCH_RAW_BASE_URL/bin/workbranch" > "$DEST" \
+    || { rm -f "$DEST"; printf '[-] Error: failed to download workbranch\n' >&2; exit 1; }
   printf '[+] Downloaded workbranch from %s\n' "$WORKBRANCH_RAW_BASE_URL"
 fi
 

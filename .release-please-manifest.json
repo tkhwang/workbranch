@@ -1,4 +1,4 @@
 {
   ".": "1.25.0",
-  "companion": "1.13.0"
+  "apps/workbranch-companion": "1.13.0"
 }

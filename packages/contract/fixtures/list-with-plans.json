@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "project": "fullstack",
+  "root": "/tmp/fullstack",
+  "tasks": [
+    {
+      "name": "feat-login",
+      "path": "/tmp/fullstack/feat-login",
+      "memoTitle": "Login rollout",
+      "planTitle": "Backend",
+      "status": "in-progress",
+      "progressDone": 1,
+      "progressTotal": 2,
+      "currentItem": "wire API",
+      "updatedAt": 1760000000,
+      "items": [
+        { "text": "Backend", "checked": true, "depth": 0 },
+        { "text": "wire API", "checked": false, "depth": 1 }
+      ],
+      "plans": [
+        {
+          "title": "Backend",
+          "index": 0,
+          "status": "in-progress",
+          "progressDone": 1,
+          "progressTotal": 2,
+          "currentItem": "wire API",
+          "items": [
+            { "text": "Backend", "checked": true, "depth": 0 },
+            { "text": "wire API", "checked": false, "depth": 1 }
+          ]
+        }
+      ],
+      "notiCount": 1,
+      "repos": [
+        { "name": "backend", "branch": "feature/feat-login", "dirty": false }
+      ]
+    }
+  ]
+}

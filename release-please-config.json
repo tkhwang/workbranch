@@ -9,7 +9,8 @@
       "component": "workbranch",
       "include-component-in-tag": false,
       "exclude-paths": [
-        "companion/**",
+        "apps/workbranch-companion/**",
+        "packages/contract/**",
         ".github/**",
         "docs/**",
         "README.md",
@@ -20,19 +21,34 @@
       "extra-files": [
         {
           "type": "generic",
+          "path": "apps/workbranch-cli/bin/workbranch"
+        },
+        {
+          "type": "generic",
           "path": "bin/workbranch"
         }
       ]
     },
-    "companion": {
+    "apps/workbranch-companion": {
       "package-name": "workbranch-companion",
       "component": "workbranch-companion",
       "release-type": "simple",
       "include-component-in-tag": true,
       "extra-files": [
         {
-          "type": "generic",
-          "path": "scripts/build-app.sh"
+          "type": "json",
+          "path": "src-tauri/tauri.conf.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "package.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "toml",
+          "path": "src-tauri/Cargo.toml",
+          "jsonpath": "$.package.version"
         }
       ]
     }
