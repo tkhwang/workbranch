@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.13.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v1.12.1...workbranch-companion-v1.13.0) (2026-06-16)
+
+
+### Features
+
+* **plan:** standardize plan title and splits into steps ([4c10bd3](https://github.com/tkhwang/workbranch/commit/4c10bd3701d6a12f9f82205fab48f997be5a8749))
+* **plan:** standardize plan title and splits into steps ([9e7b3e1](https://github.com/tkhwang/workbranch/commit/9e7b3e10f21c62de9aa7aa3d0f86b72fc1993394))
+
 ## [1.12.1](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v1.12.0...workbranch-companion-v1.12.1) (2026-06-15)
 
 
