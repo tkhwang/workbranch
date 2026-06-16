@@ -1,22 +1,22 @@
-use std::collections::HashMap;
+use notify::RecommendedWatcher;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
-
-use notify::{RecommendedWatcher, RecursiveMode, Watcher};
-use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, State};
+use std::sync::Mutex;
+use tauri::{AppHandle, State};
 use thiserror::Error;
 
 mod activity_store;
 mod process_env;
 mod tray;
+mod watch_filter;
+mod watch_roots;
 mod workbranch_bin;
 #[cfg(test)]
 mod workbranch_command_tests;
 
 use process_env::gui_safe_path;
+use watch_roots::build_watchers;
 use workbranch_bin::resolve_workbranch_bin;
 
 #[derive(Debug, Error)]
@@ -82,14 +82,20 @@ fn workbranch_args_for(action: &CompanionCommand) -> Option<Vec<&str>> {
 }
 
 #[tauri::command]
-fn workbranch_list(root: String) -> Result<String, CompanionError> {
-    let bin = resolve_workbranch_bin(None)?;
-    run_workbranch_stdout(&bin, &["list", "--json"], Path::new(&root))
+async fn workbranch_list(root: String) -> Result<String, CompanionError> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let bin = resolve_workbranch_bin(None)?;
+        run_workbranch_stdout(&bin, &["list", "--json"], Path::new(&root))
+    })
+    .await
+    .map_err(|error| std::io::Error::other(error.to_string()))?
 }
 
 #[tauri::command]
-fn workbranch_list_global() -> Result<String, CompanionError> {
-    workbranch_list_global_with_config_home(None)
+async fn workbranch_list_global() -> Result<String, CompanionError> {
+    tauri::async_runtime::spawn_blocking(|| workbranch_list_global_with_config_home(None))
+        .await
+        .map_err(|error| std::io::Error::other(error.to_string()))?
 }
 
 fn workbranch_list_global_with_config_home(
@@ -101,53 +107,50 @@ fn workbranch_list_global_with_config_home(
 }
 
 #[tauri::command]
-fn append_activity_events(
+async fn append_activity_events(
     events: Vec<activity_store::ActivityEvent>,
 ) -> Result<(), CompanionError> {
-    activity_store::append_activity_events_default(&events)
+    tauri::async_runtime::spawn_blocking(move || {
+        activity_store::append_activity_events_default(&events)
+    })
+    .await
+    .map_err(|error| std::io::Error::other(error.to_string()))?
 }
 
 #[tauri::command]
-fn workbranch_run(action: CompanionCommand, cwd: String) -> Result<RunResult, CompanionError> {
-    let cwd_path = PathBuf::from(cwd);
-    match action {
-        CompanionCommand::CopyPath { path } => run_pbcopy(&path),
-        command => {
-            let args = workbranch_args_for(&command)
-                .ok_or_else(|| std::io::Error::other("companion command has no workbranch argv"))?;
-            run_workbranch(&resolve_workbranch_bin(None)?, &args, &cwd_path)
+async fn workbranch_run(
+    action: CompanionCommand,
+    cwd: String,
+) -> Result<RunResult, CompanionError> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let cwd_path = PathBuf::from(cwd);
+        match action {
+            CompanionCommand::CopyPath { path } => run_pbcopy(&path),
+            command => {
+                let args = workbranch_args_for(&command).ok_or_else(|| {
+                    std::io::Error::other("companion command has no workbranch argv")
+                })?;
+                run_workbranch(&resolve_workbranch_bin(None)?, &args, &cwd_path)
+            }
         }
-    }
+    })
+    .await
+    .map_err(|error| std::io::Error::other(error.to_string()))?
 }
 
 #[tauri::command]
-fn watch_roots(
+async fn watch_roots(
     app: AppHandle,
     roots: Vec<String>,
     watchers: State<'_, WatcherStore>,
 ) -> Result<WatchResult, CompanionError> {
-    let debounce = Arc::new(Mutex::new(HashMap::<String, Instant>::new()));
-    let mut next_watchers = Vec::with_capacity(roots.len());
-
-    for root in &roots {
-        let root_path = PathBuf::from(root);
-        let root_label = root.clone();
-        let app_handle = app.clone();
-        let debounce_state = Arc::clone(&debounce);
-        let mut watcher =
-            notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
-                if event.is_err() {
-                    return;
-                }
-                if should_emit_root_change(&debounce_state, &root_label) {
-                    let _ = app_handle.emit("roots-changed", root_label.clone());
-                }
-            })?;
-        watcher.watch(&root_path, RecursiveMode::Recursive)?;
-        next_watchers.push(watcher);
-        app.emit("roots-changed", root)
-            .map_err(std::io::Error::other)?;
-    }
+    let app_for_watchers = app.clone();
+    let roots_for_watchers = roots.clone();
+    let next_watchers = tauri::async_runtime::spawn_blocking(move || {
+        build_watchers(app_for_watchers, &roots_for_watchers)
+    })
+    .await
+    .map_err(|error| std::io::Error::other(error.to_string()))??;
 
     let mut guard = watchers
         .watchers
@@ -155,21 +158,6 @@ fn watch_roots(
         .map_err(|_| std::io::Error::other("watcher store lock poisoned"))?;
     *guard = next_watchers;
     Ok(WatchResult { roots })
-}
-
-fn should_emit_root_change(debounce: &Arc<Mutex<HashMap<String, Instant>>>, root: &str) -> bool {
-    const DEBOUNCE_WINDOW: Duration = Duration::from_millis(500);
-    let now = Instant::now();
-    let Ok(mut last_by_root) = debounce.lock() else {
-        return true;
-    };
-    if let Some(last) = last_by_root.get(root)
-        && now.duration_since(*last) < DEBOUNCE_WINDOW
-    {
-        return false;
-    }
-    last_by_root.insert(root.to_string(), now);
-    true
 }
 
 fn run_workbranch_global_json_stdout(

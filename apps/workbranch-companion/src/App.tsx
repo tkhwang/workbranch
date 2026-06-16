@@ -106,6 +106,12 @@ export function App() {
 			onError: showError,
 			watchRoots,
 			onRootChanged,
+			heartbeatMs: 5 * 60 * 1000,
+			setTimer: (callback, milliseconds) =>
+				window.setInterval(callback, milliseconds),
+			clearTimer: (handle) => {
+				window.clearInterval(handle);
+			},
 		})
 			.then((monitor) => {
 				if (cancelled) {
