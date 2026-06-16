@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.25.0](https://github.com/tkhwang/workbranch/compare/v1.24.1...v1.25.0) (2026-06-16)
+
+
+### Features
+
+* **plan:** standardize plan title and splits into steps ([4c10bd3](https://github.com/tkhwang/workbranch/commit/4c10bd3701d6a12f9f82205fab48f997be5a8749))
+* **plan:** standardize plan title and splits into steps ([9e7b3e1](https://github.com/tkhwang/workbranch/commit/9e7b3e10f21c62de9aa7aa3d0f86b72fc1993394))
+
+
+### Bug Fixes
+
+* **archive:** ensure only one status line in archived plan ([0b2fe34](https://github.com/tkhwang/workbranch/commit/0b2fe344f5b2233eda35a203f2fc167535a51a02))
+* **completion:** quote "done" argument in archive_current_plan and cmd_complete_commands ([1e600e6](https://github.com/tkhwang/workbranch/commit/1e600e6b3dd4e184275ba6c925ce51b56ef73b12))
+
 ## [1.24.1](https://github.com/tkhwang/workbranch/compare/v1.24.0...v1.24.1) (2026-06-15)
 
 
