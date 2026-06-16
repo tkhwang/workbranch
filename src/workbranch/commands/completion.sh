@@ -19,7 +19,7 @@ cmd_complete_repos() {
 }
 
 cmd_complete_commands() {
-  printf '%s\n' add completion config destroy doctor finalize finder help ide init land list memo noti path prune pull push refresh remove status terminal update version
+  printf '%s\n' add completion config destroy doctor "done" finalize finder help ide init land list memo noti path prune pull push refresh remove status terminal update version
 }
 
 print_completion_bash() {
@@ -72,6 +72,7 @@ _workbranch() {
         list) words='--json --global' ;;
         memo) words='--clear' ;;
         config) words='--rewrite' ;;
+        done) words='' ;;
         remove|destroy) words='--force' ;;
         doctor) words='--fix --repo' ;;
         update) words='--all --repo' ;;
@@ -84,7 +85,7 @@ _workbranch() {
   esac
 
   case "$cmd" in
-    memo|remove|update|push|land|finalize|refresh|path|finder|ide|terminal)
+    done|memo|remove|update|push|land|finalize|refresh|path|finder|ide|terminal)
       words=$($wb_bin __complete-tasks 2>/dev/null || true)
       COMPREPLY=( $(compgen -W "$words" -- "$cur") )
       return 0
@@ -150,7 +151,7 @@ _workbranch() {
   fi
 
   case "$cmd" in
-    memo|remove|update|push|land|finalize|refresh|path|finder|ide|terminal)
+    done|memo|remove|update|push|land|finalize|refresh|path|finder|ide|terminal)
       tasks=(${(f)"$($wb_bin __complete-tasks 2>/dev/null)"})
       _describe 'task' tasks
       return
@@ -214,6 +215,7 @@ complete -c workbranch -f -n '__workbranch_completing_noti_subcommand' -a 'add l
 complete -c workbranch -f -n '__workbranch_completing_noti_task' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command refresh' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command remove' -a '(__workbranch_complete_tasks)'
+complete -c workbranch -f -n '__workbranch_seen_command done' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command push' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command land' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command finalize' -a '(__workbranch_complete_tasks)'

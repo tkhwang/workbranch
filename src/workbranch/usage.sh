@@ -21,6 +21,7 @@ Workspace:
   list [--global] [--json]  List configured repos and task workspaces
   add [<task>] [--from <ref>]  Create a task workspace
   remove <task> [--force]  Remove task worktrees, branches, and task-root state
+  done <task>      Mark the current Plan done and archive it
   destroy [--force]  Destroy the current workbranch project
 Git:
   status            Show remote diff, task diff, and dirty state
@@ -69,6 +70,7 @@ usage_enhanced() {
   printf '  list [--global] [--json]  List configured repos and task workspaces\n'
   printf '  add [<task>] [--from <ref>]  Create a task workspace\n'
   printf '  remove <task> [--force]  Remove task worktrees, branches, and task-root state\n'
+  printf '  done <task>      Mark the current Plan done and archive it\n'
   printf '  destroy [--force]  Destroy the current workbranch project\n'
   section "Git"
   printf '  status            Show remote diff, task diff, and dirty state\n'

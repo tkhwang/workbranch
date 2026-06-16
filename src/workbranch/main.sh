@@ -24,6 +24,7 @@ main() {
     finalize) cmd_finalize "$@" ;;
     push) cmd_push "$@" ;;
     land) cmd_land "$@" ;;
+    done) cmd_done "$@" ;;
     remove) cmd_remove "$@" ;;
     destroy) cmd_destroy "$@" ;;
     prune) cmd_prune "$@" ;;

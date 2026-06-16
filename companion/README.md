@@ -2,7 +2,7 @@
 
 Native macOS menu bar companion and status monitor for workbranch task workspaces.
 
-The app is a read-only status monitor and presentation client for the existing `workbranch` CLI. It does not read Git state directly; every refresh pulls `workbranch list --json` from each configured project root, then renders a compact project/task memo/repo branch/status summary with the task's `TASK-WORKBRANCH.md` Plan groups and Steps. It also records observed `updatedAt` changes to a Companion-local activity log and renders active-time summaries inline in the default task rows and behind a footer report icon; no `workbranch report` CLI command is added.
+The app is a read-only status monitor and presentation client for the existing `workbranch` CLI. It does not read Git state directly; every refresh pulls `workbranch list --json` from each configured project root, then renders a compact project/task memo/repo branch/status summary with the task's active `TASK-WORKBRANCH.md` Plan and Steps. It renders only the current Plan on Home (first non-done, or the last Plan if all are done) and records observed `updatedAt` changes to a Companion-local activity log and renders active-time summaries inline in the default task rows and behind a footer report icon; no `workbranch report` CLI command is added.
 
 ## Requirements
 
