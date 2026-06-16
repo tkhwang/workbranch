@@ -222,13 +222,18 @@ struct RowView: View {
     }
 
     private var renderablePlans: [WorkbranchPlan] {
-        row.plans.filter { plan in
+        let candidates = row.plans.filter { plan in
             !plan.title.isEmpty ||
                 !plan.status.isEmpty ||
                 plan.progressTotal > 0 ||
                 !plan.currentItem.isEmpty ||
                 !plan.items.isEmpty
         }
+        guard !candidates.isEmpty else { return [] }
+        if let activePlan = candidates.first(where: { $0.status != "done" }) {
+            return [activePlan]
+        }
+        return [candidates[candidates.count - 1]]
     }
 
     private var statusMessageText: String {

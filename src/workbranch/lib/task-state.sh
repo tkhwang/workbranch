@@ -7,14 +7,7 @@ task_agents_path() { printf '%s/%s/AGENTS.md' "$PROJECT_ROOT" "$1"; }
 task_noti_path() { printf '%s/notifications.jsonl' "$(task_state_dir_path "$1")"; }
 
 task_brief_title() {
-  local file line
-  file=$(task_brief_path "$1")
-  [ -f "$file" ] || return 0
-  while IFS= read -r line || [ -n "$line" ]; do
-    [ -n "$line" ] || continue
-    printf '%s' "$line" | sed 's/^#\{1,\}[[:space:]]*//'
-    return 0
-  done < "$file"
+  task_active_plan_title "$1"
 }
 
 task_brief_file() {
@@ -41,6 +34,7 @@ task_plan_reset() {
   TASK_PLAN_DONE=()
   TASK_PLAN_TOTAL=()
   TASK_PLAN_CURRENT=()
+  TASK_PLAN_STATUSES=()
   TASK_ITEM_PLAN_INDEXES=()
   TASK_ITEM_TEXTS=()
   TASK_ITEM_CHECKED=()
@@ -55,20 +49,18 @@ task_plan_add() {
   TASK_PLAN_DONE[$index]=0
   TASK_PLAN_TOTAL[$index]=0
   TASK_PLAN_CURRENT[$index]=''
+  TASK_PLAN_STATUSES[$index]=''
   TASK_PLAN_ADDED_INDEX=$index
   TASK_PLAN_COUNT=$((TASK_PLAN_COUNT + 1))
 }
 
 task_load_plans() {
-  local task file fallback line in_code has_explicit_plan current_plan leading mark item_text depth item_index title
+  local task file line in_code current_plan leading mark item_text depth item_index title status_value
   task=$1
   task_plan_reset
   file=$(task_brief_file "$task") || true
   [ -n "${file:-}" ] || return 0
-  fallback=$(task_plan_title "$task")
-  [ -n "$fallback" ] || fallback=$task
   in_code=0
-  has_explicit_plan=0
   current_plan=-1
   while IFS= read -r line || [ -n "$line" ]; do
     if [[ $line =~ ^[[:space:]]*\`\`\` ]]; then
@@ -76,28 +68,30 @@ task_load_plans() {
       continue
     fi
     [ "$in_code" -eq 0 ] || continue
-    if [[ $line =~ ^[[:space:]]*##[[:space:]]*[Pp][Ll][Aa][Nn]:[[:space:]]*(.*)$ ]]; then
+    if [[ $line =~ ^#[[:space:]]+(.*)$ ]]; then
       title=${BASH_REMATCH[1]}
       title=${title%$'\r'}
       title=$(printf '%s' "$title" | sed 's/[[:space:]]*$//')
-      [ -n "$title" ] || title=$fallback
-      has_explicit_plan=1
+      [ -n "$title" ] || title="Untitled Plan"
       task_plan_add "$title"
       current_plan=$TASK_PLAN_ADDED_INDEX
       continue
     fi
-    if [ "$has_explicit_plan" -eq 1 ] && [[ $line =~ ^[[:space:]]*#{1,2}[[:space:]]+ ]]; then
+    if [[ $line =~ ^#{2,}[[:space:]]+ ]]; then
       current_plan=-1
       continue
     fi
+    if [ "$current_plan" -ge 0 ] && [ "${TASK_PLAN_TOTAL[$current_plan]:-0}" -eq 0 ] && [[ $line =~ ^[[:space:]]*status:[[:space:]]*([^[:space:]]+) ]]; then
+      status_value=${BASH_REMATCH[1]}
+      status_value=$(printf '%s' "$status_value" | tr '[:upper:]' '[:lower:]')
+      case "$status_value" in
+        todo|planning|in-progress|review|blocked|done) TASK_PLAN_STATUSES[$current_plan]=$status_value ;;
+        *) TASK_PLAN_STATUSES[$current_plan]='' ;;
+      esac
+      continue
+    fi
     if [[ $line =~ ^([[:space:]]*)-[[:space:]]*\[([xX[:space:]])\][[:space:]]*(.*)$ ]]; then
-      if [ "$current_plan" -lt 0 ]; then
-        if [ "$has_explicit_plan" -eq 1 ]; then
-          continue
-        fi
-        task_plan_add "$fallback"
-        current_plan=$TASK_PLAN_ADDED_INDEX
-      fi
+      [ "$current_plan" -ge 0 ] || continue
       leading=${BASH_REMATCH[1]}
       mark=${BASH_REMATCH[2]}
       item_text=${BASH_REMATCH[3]}
@@ -121,8 +115,13 @@ task_load_plans() {
 }
 
 task_plan_status_at() {
-  local index done_count total_count
+  local index done_count total_count explicit
   index=$1
+  explicit=${TASK_PLAN_STATUSES[$index]:-}
+  if [ -n "$explicit" ]; then
+    printf '%s' "$explicit"
+    return 0
+  fi
   done_count=${TASK_PLAN_DONE[$index]:-0}
   total_count=${TASK_PLAN_TOTAL[$index]:-0}
   if [ "$done_count" -eq 0 ]; then
@@ -134,139 +133,63 @@ task_plan_status_at() {
   fi
 }
 
-task_checklist_counts() {
-  local task done_count total_count i
-  task=$1
-  task_load_plans "$task"
-  done_count=0
-  total_count=0
-  i=0
-  while [ $i -lt $TASK_PLAN_COUNT ]; do
-    done_count=$((done_count + ${TASK_PLAN_DONE[$i]:-0}))
-    total_count=$((total_count + ${TASK_PLAN_TOTAL[$i]:-0}))
-    i=$((i + 1))
-  done
-  printf '%d %d' "$done_count" "$total_count"
-}
-
-task_explicit_status() {
-  local file
-  file=$(task_brief_file "$1") || true
-  [ -n "${file:-}" ] || return 1
-  awk '
-    function lower(value) { return tolower(value) }
-    /^[[:space:]]*```/ { in_code = !in_code; next }
-    in_code { next }
-    /^[[:space:]]*-[[:space:]]*\[[ xX]\][[:space:]]*/ { exit }
-    /^[[:space:]]*status:[[:space:]]*/ {
-      value = $0
-      sub(/^[[:space:]]*status:[[:space:]]*/, "", value)
-      sub(/[[:space:]]+.*/, "", value)
-      value = lower(value)
-      if (value == "todo" || value == "planning" || value == "in-progress" || value == "review" || value == "blocked" || value == "done") print value
-      else print ""
-      found = 1
-      exit
-    }
-    END { if (!found) exit 1 }
-  ' "$file"
-}
-
-task_plan_title() {
-  local file
-  file=$(task_brief_file "$1") || true
-  [ -n "${file:-}" ] || return 0
-  awk '
-    /^[[:space:]]*```/ { in_code = !in_code; next }
-    in_code { next }
-    /^[[:space:]]*-[[:space:]]*\[[ xX]\][[:space:]]*/ { exit }
-    /^[[:space:]]*plan:[[:space:]]*/ {
-      value = $0
-      sub(/^[[:space:]]*plan:[[:space:]]*/, "", value)
-      sub(/[[:space:]]+$/, "", value)
-      print value
-      exit
-    }
-  ' "$file"
-}
-
-task_active_plan_title() {
-  local task i last status fallback
-  task=$1
-  task_load_plans "$task"
+task_active_plan_index_loaded() {
+  local i last status
   if [ "$TASK_PLAN_COUNT" -eq 0 ]; then
-    fallback=$(task_plan_title "$task")
-    printf '%s' "$fallback"
-    return 0
+    return 1
   fi
   last=$((TASK_PLAN_COUNT - 1))
   i=0
   while [ $i -lt $TASK_PLAN_COUNT ]; do
     status=$(task_plan_status_at "$i")
     if [ "$status" != "done" ]; then
-      printf '%s' "${TASK_PLAN_TITLES[$i]}"
+      printf '%d' "$i"
       return 0
     fi
     i=$((i + 1))
   done
-  printf '%s' "${TASK_PLAN_TITLES[$last]}"
+  printf '%d' "$last"
+}
+
+task_checklist_counts() {
+  local task plan_index
+  task=$1
+  task_load_plans "$task"
+  plan_index=$(task_active_plan_index_loaded) || { printf '0 0'; return 0; }
+  printf '%d %d' "${TASK_PLAN_DONE[$plan_index]:-0}" "${TASK_PLAN_TOTAL[$plan_index]:-0}"
+}
+
+task_active_plan_title() {
+  local task plan_index
+  task=$1
+  task_load_plans "$task"
+  plan_index=$(task_active_plan_index_loaded) || return 0
+  printf '%s' "${TASK_PLAN_TITLES[$plan_index]}"
 }
 
 task_status() {
-  local task explicit status_counts done_count total_count
+  local task plan_index
   task=$1
-  if explicit=$(task_explicit_status "$task"); then
-    printf '%s' "$explicit"
-    return 0
-  fi
-  status_counts=$(task_checklist_counts "$task")
-  done_count=${status_counts%% *}
-  total_count=${status_counts##* }
-  if [ "$done_count" -eq 0 ]; then
-    printf 'todo'
-  elif [ "$done_count" -eq "$total_count" ]; then
-    printf 'done'
-  else
-    printf 'in-progress'
-  fi
+  task_load_plans "$task"
+  plan_index=$(task_active_plan_index_loaded) || { printf 'todo'; return 0; }
+  task_plan_status_at "$plan_index"
 }
 
 task_current_item() {
-  local task i current
+  local task plan_index
   task=$1
   task_load_plans "$task"
-  i=0
-  while [ $i -lt $TASK_PLAN_COUNT ]; do
-    current=${TASK_PLAN_CURRENT[$i]:-}
-    if [ -n "$current" ]; then
-      printf '%s' "$current"
-      return 0
-    fi
-    i=$((i + 1))
-  done
+  plan_index=$(task_active_plan_index_loaded) || return 0
+  printf '%s' "${TASK_PLAN_CURRENT[$plan_index]:-}"
 }
 
 
 task_checklist_items_json() {
-  local task i first
+  local task plan_index
   task=$1
   task_load_plans "$task"
-  printf '['
-  first=1
-  i=0
-  while [ $i -lt ${#TASK_ITEM_TEXTS[@]} ]; do
-    if [ "$first" -eq 1 ]; then first=0; else printf ','; fi
-    printf '{"text":'
-    json_string "${TASK_ITEM_TEXTS[$i]}"
-    if [ "${TASK_ITEM_CHECKED[$i]}" -eq 1 ]; then
-      printf ',"checked":true'
-    else
-      printf ',"checked":false'
-    fi
-    printf ',"depth":%d}' "${TASK_ITEM_DEPTHS[$i]}"
-    i=$((i + 1))
-  done
-  printf ']'
+  plan_index=$(task_active_plan_index_loaded) || { printf '[]'; return 0; }
+  task_plan_items_json "$plan_index"
 }
 
 task_plan_items_json() {
@@ -326,12 +249,7 @@ write_default_task_brief() {
   if [ "${PREFERRED_LANGUAGE:-en}" = "ko" ]; then
     cat > "$file" <<EOF_BRIEF
 # $task
-
-상태: todo
 status: todo
-plan: $task
-
-## Plan: $task
 - [ ] 주요: 작업 시작
   - [ ] 변경 구현
   - [ ] 검증 실행
@@ -342,11 +260,7 @@ EOF_BRIEF
   else
     cat > "$file" <<EOF_BRIEF
 # $task
-
 status: todo
-plan: $task
-
-## Plan: $task
 - [ ] Major: Start work
   - [ ] Implement change
   - [ ] Run verification
@@ -375,7 +289,8 @@ write_task_agent_guidance() {
 - 현재 작업 디렉터리가 task root이면 `TASK-WORKBRANCH.md`를 갱신합니다.
 - 현재 작업 디렉터리가 이 task 아래의 repo folder이면 `../TASK-WORKBRANCH.md`를 갱신합니다.
 - 현재 작업, blocker, 다음 action을 사람이 읽을 수 있게 task brief에 남깁니다.
-- `plan:`은 현재/active Plan 호환 라벨로 유지하고, Step은 `## Plan: <name>` 섹션 아래에 둡니다.
+- Plan은 `# <name>` H1 heading으로 시작하고, 바로 아래 `status:`와 Step checklist를 둡니다.
+- 완료된 현재 Plan은 `workbranch done <task>` 또는 land/finalize/pull archive 프롬프트로 `.workbranch/plans/done/`에 보관합니다.
 - 사용자가 명시적으로 요청하지 않는 한 repo-local task-state file을 만들지 않습니다.
 
 ## 작업 진행 업데이트 규칙
@@ -389,13 +304,14 @@ write_task_agent_guidance() {
 - final response 직전
 
 규칙:
-- `status:`는 todo | planning | in-progress | review | blocked | done 중 하나로 유지합니다.
-- `plan:`은 현재/active Plan 호환 라벨로 유지하고, Step은 `## Plan: <name>` 섹션 아래에 둡니다.
+- H1 `# <name>`은 현재 Plan 이름입니다. Task 이름은 workspace에서 이미 알 수 있으므로 brief에 반복하지 않습니다.
+- Plan heading 바로 아래 `status:`는 todo | planning | in-progress | review | blocked | done 중 하나로 유지합니다.
 - 계획(planning)을 포함해 의미 있는 작업을 시작하면 즉시 `todo`에서 `planning`으로 status를 갱신합니다. 초기 planning 단계에서도 status와 Step을 갱신합니다.
 - Step은 작고 실행 가능한 단위로 유지합니다.
 - 완료한 Step은 즉시 `[x]`로 표시합니다.
 - 첫 번째 미완료 Step이 현재 또는 다음 작업을 나타내야 합니다.
 - 하위 Step은 Markdown checklist 항목을 두 칸 들여써 표현합니다.
+- `## 메모` 같은 H2 이하 heading은 HUD Step이 아닌 note/archive 내용으로 취급합니다.
 EOF_GUIDANCE
   else
     cat > "$file" <<'EOF_GUIDANCE'
@@ -411,7 +327,8 @@ This file is generated by workbranch for this task workspace.
 - If your current working directory is the task root, update `TASK-WORKBRANCH.md`.
 - If your current working directory is a repo folder under this task, update `../TASK-WORKBRANCH.md`.
 - Use the task brief for human-readable current work, blockers, and next actions.
-- Keep `plan:` as the current/active Plan compatibility label, and put Steps under `## Plan: <name>` sections.
+- Start each Plan with a `# <name>` H1 heading, followed by its `status:` line and Step checklist.
+- Archive the completed current Plan with `workbranch done <task>` or the land/finalize/pull archive prompt; archives live under `.workbranch/plans/done/`.
 - Do not create repo-local task-state files unless the user explicitly asks.
 
 ## Task progress update protocol
@@ -425,14 +342,14 @@ Update `TASK-WORKBRANCH.md` when:
 - before final response
 
 Rules:
-- keep `status:` current: todo | planning | in-progress | review | blocked | done
-- keep `plan:` current as the current/active Plan compatibility label
-- express actual Plan groups with `## Plan: <name>` headings, with Markdown checklist Steps under each Plan
+- keep the Plan-local `status:` current: todo | planning | in-progress | review | blocked | done
+- use the H1 `# <name>` as the current Plan name; do not repeat the task name as a separate heading
 - when starting meaningful work, including planning, move status from todo to planning immediately; keep status and Steps current during the initial planning phase
 - keep Steps small and actionable
 - mark completed Steps immediately with `[x]`
 - the first unchecked Step should represent the current or next work
 - express substeps by indenting Markdown checklist items with two spaces per level
+- treat `## Notes` and other H2+ headings as notes/archive content, not HUD Steps
 EOF_GUIDANCE
   fi
 }
@@ -458,7 +375,7 @@ remove_task_state_files() {
   [ ! -f "$brief" ] || rm -f "$brief" || die "failed to remove task brief: $brief"
   [ ! -f "$agents" ] || rm -f "$agents" || die "failed to remove task agent guidance: $agents"
   [ ! -f "$noti" ] || rm -f "$noti" || die "failed to remove task notifications: $noti"
-  rmdir "$state_dir" 2>/dev/null || true
+  [ ! -d "$state_dir" ] || rm -rf "$state_dir" || die "failed to remove task state directory: $state_dir"
 }
 
 resolve_current_task_from_cwd() {

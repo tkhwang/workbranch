@@ -160,6 +160,7 @@ workbranch push                  # local feat/login -> origin/feat/login
 | `workbranch status`        | base remote diff, task diff, dirty state 확인           |
 | `workbranch update [task]` | local base 기준으로 task의 모든 repo update (pull 없음) |
 | `workbranch land <task>`   | task 작업을 local base branch로 fast-forward 반영       |
+| `workbranch done <task>`   | 현재 Plan을 done 처리하고 archive로 이동                |
 | `workbranch push [task]`   | base 또는 task branch push                              |
 
 Combined flow shortcut:
@@ -176,7 +177,7 @@ Combined flow shortcut:
 
 `workbranch add <task>`는 repo worktree 밖의 task root에 workbranch-managed state를 생성합니다.
 
-- `<task>/TASK-WORKBRANCH.md`는 사람/AI agent가 함께 갱신하는 task brief입니다. 생성 템플릿은 첫 `#` heading, 선택적 `status: todo|planning|in-progress|review|blocked|done` 줄, legacy consumer를 위한 active compatibility label인 `plan:` 줄을 사용합니다. 구체적인 Plan container는 `## Plan: <name>` 섹션이며, 각 섹션 아래 Markdown checklist 항목이 그 Plan의 Step입니다. `## Plan:` 섹션이 없는 brief는 `plan:` 또는 task 이름을 쓰는 암묵 단일 Plan으로 정규화됩니다. `workbranch memo <task> [text]`로 읽거나 덮어쓰고, `workbranch memo <task> --clear`로 삭제합니다. Task workspace 안에서는 읽기일 때만 `workbranch memo`처럼 `<task>`를 생략할 수 있습니다.
+- `<task>/TASK-WORKBRANCH.md`는 사람/AI agent가 함께 갱신하는 현재 Plan brief입니다. 생성 템플릿은 `# <plan>` H1을 Plan 이름으로 쓰고, 바로 아래 Plan-local `status: todo|planning|in-progress|review|blocked|done` 줄과 Markdown checklist Step을 둡니다. `plan:`과 `## Plan:`은 더 이상 지원 brief 형식이 아닙니다. `workbranch done <task>`는 현재 Plan을 done 처리한 뒤 `.workbranch/plans/done/<timestamp>-<slug>.md`로 이동하고 brief를 다음 Plan용으로 비웁니다. `land`/`finalize` 성공 후와 `pull` 뒤 안전하게 merged task를 감지했을 때도 확인 프롬프트 후 같은 archive 동작을 수행합니다. `workbranch memo <task> [text]`로 읽거나 덮어쓰고, `workbranch memo <task> --clear`로 삭제합니다. Task workspace 안에서는 읽기일 때만 `workbranch memo`처럼 `<task>`를 생략할 수 있습니다.
 - `<task>/AGENTS.md`는 `<task>` 또는 `<task>/<repo>`에서 실행되는 AI agent가 같은 task brief를 갱신하도록 안내합니다. 갱신 시점은 시작/재개, active step 변경, 검증 전후, blocked, final response 직전입니다.
 - `<task>/.workbranch/notifications.jsonl`은 append-only local inbox입니다. `workbranch noti add/list/clear`가 관리하고, `workbranch list --json`은 companion app용 `notiCount`, `plans`, `planTitle`, `status`, `progressDone`, `progressTotal`, `currentItem`, `updatedAt`을 노출합니다.
 
@@ -184,7 +185,7 @@ Combined flow shortcut:
 
 ## Native menu bar companion
 
-`companion/`에는 local native macOS menu bar app인 `WorkbranchCompanion.app`이 있습니다. 이 app은 task 상태·알림·현재 작업·Companion-local 활동 시간을 보여주는 workbranch status monitor이며, `workbranch list --json`을 소비해서 task status/progress, repo/branch identity 아래 항상 보이는 warm color의 현재 작업/status 한 줄과 `HH:mm` update time, branch identity를 보여주는 repo child row, task별 inline active-time label, footer Home/Report/Setting navigation과 report icon으로 여는 activity view를 제공합니다. 이 view는 Today/Weekly에서는 label을 줄인 compact Plan별 시간 행을 보여주되 한 project에 task가 여러 개면 compact task identity 행을 추가하고, latest activity event의 step snapshot으로 indent된 Step 행을 보여주며, 이후 empty snapshot은 이전 Step 행을 지우고 Monthly에서는 project 합계로 접으며, inline memo edit, notification clear, 기존 Finder/IDE/terminal launch action도 제공합니다. Activity history는 `~/.local/state/workbranch/activity.jsonl`에 저장되고, 관련 repo/task workspace가 나중에 제거되어도 보존됩니다. Configured project root가 parent는 존재하지만 root 자체만 삭제된 true deletion 상태이면, app은 연속 2회 refresh 실패 뒤 해당 root를 config에서 제거하고 1회 알림을 보냅니다.
+`companion/`에는 local native macOS menu bar app인 `WorkbranchCompanion.app`이 있습니다. 이 app은 task 상태·알림·현재 작업·Companion-local 활동 시간을 보여주는 workbranch status monitor이며, `workbranch list --json`을 소비해서 현재 Plan 기준 task status/progress, repo/branch identity 아래 항상 보이는 warm color의 현재 작업/status 한 줄과 `HH:mm` update time, branch identity를 보여주는 repo child row, task별 inline active-time label, footer Home/Report/Setting navigation과 report icon으로 여는 activity view를 제공합니다. 이 view는 Today/Weekly에서는 label을 줄인 compact Plan별 시간 행을 보여주되 한 project에 task가 여러 개면 compact task identity 행을 추가하고, latest activity event의 step snapshot으로 indent된 Step 행을 보여주며, 이후 empty snapshot은 이전 Step 행을 지우고 Monthly에서는 project 합계로 접으며, inline memo edit, notification clear, 기존 Finder/IDE/terminal launch action도 제공합니다. Activity history는 `~/.local/state/workbranch/activity.jsonl`에 저장되고, 관련 repo/task workspace가 나중에 제거되어도 보존됩니다. Configured project root가 parent는 존재하지만 root 자체만 삭제된 true deletion 상태이면, app은 연속 2회 refresh 실패 뒤 해당 root를 config에서 제거하고 1회 알림을 보냅니다.
 
 Published release 설치:
 

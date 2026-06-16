@@ -38,6 +38,7 @@ preflight_land_task() {
 
 execute_land_task() {
   task=$1
+  completed_via=${2:-land}
   i=0
   repo_log_seen=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
@@ -56,6 +57,7 @@ execute_land_task() {
     repo_log_seen=1
     i=$((i + 1))
   done
+  archive_prompt_current_plan "$task" "$completed_via"
 }
 
 cmd_land() {
@@ -68,5 +70,5 @@ cmd_land() {
   reset_preflight
   preflight_land_task "$task"
   preflight_die_if_errors "land"
-  execute_land_task "$task"
+  execute_land_task "$task" land
 }

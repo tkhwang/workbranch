@@ -78,7 +78,8 @@ test_add_creates_task_brief_and_agent_guidance() {
   brief=$(cat "$project/login/TASK-WORKBRANCH.md")
   assert_contains "$brief" "# login"
   assert_contains "$brief" "status: todo"
-  assert_contains "$brief" "## Plan: login"
+  assert_not_contains "$brief" "plan: login"
+  assert_not_contains "$brief" "## Plan: login"
   assert_contains "$brief" "- [ ] Major: Start work"
   guidance=$(cat "$project/login/AGENTS.md")
   assert_contains "$guidance" "TASK-WORKBRANCH.md"
@@ -178,7 +179,7 @@ EOF_BRIEF
   out=$(run_expect_success "$WORKBRANCH" list --json)
   printf '%s' "$out" | python3 -c 'import json,sys
 login=json.load(sys.stdin)["tasks"][0]
-assert login["status"] == "", login'
+assert login["status"] == "todo", login'
 }
 
 test_task_checklist_counts() {
@@ -239,6 +240,8 @@ test_add_agents_md_describes_status_update_protocol() {
   assert_contains "$guidance" "before running verification"
   assert_contains "$guidance" "before final response"
   assert_contains "$guidance" "todo | planning | in-progress | review | blocked | done"
+  assert_contains "$guidance" "# <name>"
+  assert_contains "$guidance" "workbranch done <task>"
   assert_contains "$guidance" "starting meaningful work, including planning, move status from todo to planning"
 }
 
@@ -254,9 +257,9 @@ CONFIG
   run_expect_success "$WORKBRANCH" add login >/dev/null
 
   brief=$(cat "$project/login/TASK-WORKBRANCH.md")
-  assert_contains "$brief" "상태: todo"
+  assert_not_contains "$brief" "상태: todo"
   assert_contains "$brief" "status: todo"
-  assert_contains "$brief" "## Plan: login"
+  assert_not_contains "$brief" "## Plan: login"
   assert_contains "$brief" "- [ ] 주요: 작업 시작"
   guidance=$(cat "$project/login/AGENTS.md")
   assert_contains "$guidance" "Workbranch 작업 안내"

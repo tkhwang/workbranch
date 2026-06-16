@@ -27,3 +27,4 @@ Use plain Conventional Commit style with scopes, without emoji prefixes, for exa
 
 For generated-surface changes, update source first, rebuild `bin/workbranch`, then verify both syntax and tests. Keep docs and specs synchronized when command behavior changes.
 When updating generated task guidance, keep task status values synchronized as `todo | planning | in-progress | review | blocked | done`; starting meaningful work, including planning, should move a task from `todo` to `planning` immediately.
+Generated task briefs use `# <plan>` as the current Plan H1 with a Plan-local `status:` line and checklist Steps; completed Plans move to `.workbranch/plans/done/` through `workbranch done` or confirmed land/finalize/pull archive prompts.

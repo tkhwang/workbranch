@@ -27,5 +27,5 @@ cmd_finalize() {
   preflight_die_if_errors "finalize"
 
   section "Landing task"
-  execute_land_task "$task"
+  execute_land_task "$task" finalize
 }

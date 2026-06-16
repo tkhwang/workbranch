@@ -11,7 +11,11 @@ test_list_json_shape() {
   cd "$project" || return 1
   run_expect_success "$WORKBRANCH" init >/dev/null
   run_expect_success "$WORKBRANCH" add login >/dev/null
-  run_expect_success "$WORKBRANCH" memo login "견적 \"API\" \\ 경로" >/dev/null
+  cat > "$project/login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
+# 견적 "API" \ 경로
+status: todo
+- [ ] shape check
+EOF_BRIEF
   run_expect_success "$WORKBRANCH" noti add login "tests passed" >/dev/null
   run_expect_success "$WORKBRANCH" noti add login "needs input" >/dev/null
 
@@ -54,7 +58,7 @@ test_list_json_escapes_control_characters() {
   cd "$project" || return 1
   run_expect_success "$WORKBRANCH" init >/dev/null
   run_expect_success "$WORKBRANCH" add login >/dev/null
-  run_expect_success "$WORKBRANCH" memo login $'needs\aattention' >/dev/null
+  printf '# needs\aattention\nstatus: todo\n' > "$project/login/TASK-WORKBRANCH.md"
 
   out=$(run_expect_success "$WORKBRANCH" list --json)
   printf '%s' "$out" | python3 -c 'import json, sys
@@ -152,9 +156,7 @@ test_list_json_plan_title() {
   run_expect_success "$WORKBRANCH" init >/dev/null
   run_expect_success "$WORKBRANCH" add login >/dev/null
   cat > "$project/login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
-# Login work
-
-plan: Authentication hardening slice
+# Authentication hardening slice
 status: in-progress
 
 - [x] inspect current auth flow
@@ -165,7 +167,7 @@ EOF_BRIEF
   printf '%s' "$out" | python3 -c 'import json,sys
 login=json.load(sys.stdin)["tasks"][0]
 assert login["planTitle"] == "Authentication hardening slice", login
-assert login["memoTitle"] == "Login work", login
+assert login["memoTitle"] == "Authentication hardening slice", login
 assert login["currentItem"] == "implement session expiry guard", login'
 }
 
@@ -242,18 +244,12 @@ test_list_json_plan_sections_shape_and_aggregate() {
   run_expect_success "$WORKBRANCH" init >/dev/null
   run_expect_success "$WORKBRANCH" add login >/dev/null
   cat > "$project/login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
-# Login work
-
-status: in-progress
-plan: Legacy label
-
-- [x] preface done
-
-## Plan: Backend
+# Backend
+status: done
 - [x] API contract
 - [x] Mapper
 
-## Plan: Frontend
+# Frontend
 - [x] Package sync
   - [x] Generated types
 - [ ] Smoke test
@@ -265,19 +261,19 @@ EOF_BRIEF
   out=$(run_expect_success "$WORKBRANCH" list --json)
   printf '%s' "$out" | python3 -c 'import json,sys
 login=json.load(sys.stdin)["tasks"][0]
+assert login["memoTitle"] == "Frontend", login
 assert login["planTitle"] == "Frontend", login
 assert login["status"] == "in-progress", login
-assert login["progressDone"] == 5, login
-assert login["progressTotal"] == 6, login
+assert login["progressDone"] == 2, login
+assert login["progressTotal"] == 3, login
 assert login["currentItem"] == "Smoke test", login
-assert [item["text"] for item in login["items"]] == ["preface done", "API contract", "Mapper", "Package sync", "Generated types", "Smoke test"], login
-assert len(login["plans"]) == 3, login
+assert [item["text"] for item in login["items"]] == ["Package sync", "Generated types", "Smoke test"], login
+assert len(login["plans"]) == 2, login
 assert [(p["title"], p["index"], p["status"], p["progressDone"], p["progressTotal"], p["currentItem"]) for p in login["plans"]] == [
-    ("Legacy label", 0, "done", 1, 1, ""),
-    ("Backend", 1, "done", 2, 2, ""),
-    ("Frontend", 2, "in-progress", 2, 3, "Smoke test"),
+    ("Backend", 0, "done", 2, 2, ""),
+    ("Frontend", 1, "in-progress", 2, 3, "Smoke test"),
 ], login
-assert [item["text"] for item in login["plans"][2]["items"]] == ["Package sync", "Generated types", "Smoke test"], login'
+assert [item["text"] for item in login["plans"][1]["items"]] == ["Package sync", "Generated types", "Smoke test"], login'
 }
 
 test_list_json_implicit_and_empty_plans() {
@@ -287,8 +283,6 @@ test_list_json_implicit_and_empty_plans() {
   run_expect_success "$WORKBRANCH" init >/dev/null
   run_expect_success "$WORKBRANCH" add login >/dev/null
   cat > "$project/login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
-# Login work
-
 plan: Auth hardening
 
 - [x] inspect
@@ -298,15 +292,15 @@ EOF_BRIEF
   out=$(run_expect_success "$WORKBRANCH" list --json)
   printf '%s' "$out" | python3 -c 'import json,sys
 login=json.load(sys.stdin)["tasks"][0]
-assert login["planTitle"] == "Auth hardening", login
-assert len(login["plans"]) == 1, login
-plan=login["plans"][0]
-assert (plan["title"], plan["index"], plan["status"], plan["progressDone"], plan["progressTotal"], plan["currentItem"]) == ("Auth hardening", 0, "in-progress", 1, 2, "implement"), login'
+assert login["memoTitle"] == "", login
+assert login["planTitle"] == "", login
+assert login["plans"] == [], login
+assert login["progressDone"] == 0 and login["progressTotal"] == 0, login
+assert login["currentItem"] == "", login'
 
   cat > "$project/login/TASK-WORKBRANCH.md" <<'EOF_EMPTY'
 # Empty work
-
-plan: Empty plan
+status: review
 
 ## Notes
 -
@@ -314,8 +308,9 @@ EOF_EMPTY
   out=$(run_expect_success "$WORKBRANCH" list --json)
   printf '%s' "$out" | python3 -c 'import json,sys
 login=json.load(sys.stdin)["tasks"][0]
-assert login["plans"] == [], login
+assert login["plans"] == [{"title":"Empty work","index":0,"status":"review","progressDone":0,"progressTotal":0,"currentItem":"","items":[]}], login
 assert login["progressDone"] == 0 and login["progressTotal"] == 0, login
+assert login["status"] == "review", login
 assert login["currentItem"] == "", login'
 }
 
@@ -326,12 +321,11 @@ test_list_json_duplicate_plan_titles_keep_distinct_indexes() {
   run_expect_success "$WORKBRANCH" init >/dev/null
   run_expect_success "$WORKBRANCH" add login >/dev/null
   cat > "$project/login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
-# Login work
-
-## Plan: Review
+# Review
+status: done
 - [x] first review
 
-## Plan: Review
+# Review
 - [ ] second review
 EOF_BRIEF
 
@@ -349,24 +343,23 @@ test_list_json_nested_headings_stay_inside_current_plan() {
   run_expect_success "$WORKBRANCH" init >/dev/null
   run_expect_success "$WORKBRANCH" add login >/dev/null
   cat > "$project/login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
-# Login work
-
-## Plan: Backend
-### API
+# Backend
 - [x] contract
-- [ ] smoke test
+
+### Notes end plan
+- [ ] not a step
 EOF_BRIEF
 
   out=$(run_expect_success "$WORKBRANCH" list --json)
   printf '%s' "$out" | python3 -c 'import json,sys
 login=json.load(sys.stdin)["tasks"][0]
 assert login["progressDone"] == 1, login
-assert login["progressTotal"] == 2, login
-assert login["currentItem"] == "smoke test", login
+assert login["progressTotal"] == 1, login
+assert login["currentItem"] == "", login
 assert len(login["plans"]) == 1, login
 plan=login["plans"][0]
-assert (plan["title"], plan["index"], plan["status"], plan["progressDone"], plan["progressTotal"], plan["currentItem"]) == ("Backend", 0, "in-progress", 1, 2, "smoke test"), login
-assert [item["text"] for item in plan["items"]] == ["contract", "smoke test"], login'
+assert (plan["title"], plan["index"], plan["status"], plan["progressDone"], plan["progressTotal"], plan["currentItem"]) == ("Backend", 0, "done", 1, 1, ""), login
+assert [item["text"] for item in plan["items"]] == ["contract"], login'
 }
 
 
