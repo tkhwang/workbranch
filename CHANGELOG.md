@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.26.1](https://github.com/tkhwang/workbranch/compare/v1.26.0...v1.26.1) (2026-06-16)
+
+
+### Bug Fixes
+
+* **release:** ensure companion cask quits app on upgrade ([b4d8c36](https://github.com/tkhwang/workbranch/commit/b4d8c368792c19464a3d08691c6b3cc07cabe1ab))
+* **release:** ensure companion cask quits app on upgrade ([0a6fff8](https://github.com/tkhwang/workbranch/commit/0a6fff8a4029757df52ca819032582a1dccb8a06))
+
 ## [1.26.0](https://github.com/tkhwang/workbranch/compare/v1.25.0...v1.26.0) (2026-06-16)
 
 
