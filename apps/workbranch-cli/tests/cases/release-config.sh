@@ -32,11 +32,14 @@ if 'companion' in cfg['packages'] or 'companion' in manifest:
     raise SystemExit('legacy companion release package key must be migrated')
 if 'apps/workbranch-companion' not in manifest:
     raise SystemExit('manifest must carry companion version under moved app path')
-companion_files = {item['path'] for item in companion.get('extra-files', [])}
-if 'scripts/build-app.sh' in companion_files:
-    raise SystemExit('Swift build script must not remain a Tauri release extra-file')
-if 'src-tauri/tauri.conf.json' not in companion_files:
-    raise SystemExit('Tauri config version source must be release-managed')
+companion_extra_files = companion.get('extra-files', [])
+expected_companion_extra_files = [
+    {'type': 'json', 'path': 'src-tauri/tauri.conf.json', 'jsonpath': '$.version'},
+    {'type': 'json', 'path': 'package.json', 'jsonpath': '$.version'},
+    {'type': 'toml', 'path': 'src-tauri/Cargo.toml', 'jsonpath': '$.package.version'},
+]
+if companion_extra_files != expected_companion_extra_files:
+    raise SystemExit(f'companion extra-files mismatch: {companion_extra_files}')
 
 sample_companion_only_files = [
     'apps/workbranch-companion/src/App.tsx',

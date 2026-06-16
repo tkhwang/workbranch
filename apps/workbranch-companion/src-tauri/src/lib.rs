@@ -9,7 +9,15 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
 use thiserror::Error;
 
+mod activity_store;
+mod process_env;
 mod tray;
+mod workbranch_bin;
+#[cfg(test)]
+mod workbranch_command_tests;
+
+use process_env::gui_safe_path;
+use workbranch_bin::resolve_workbranch_bin;
 
 #[derive(Debug, Error)]
 enum CompanionError {
@@ -61,48 +69,54 @@ struct WatchResult {
     roots: Vec<String>,
 }
 
+fn workbranch_args_for(action: &CompanionCommand) -> Option<Vec<&str>> {
+    match action {
+        CompanionCommand::Memo { task, text } => Some(vec!["memo", task.as_str(), text.as_str()]),
+        CompanionCommand::MemoClear { task } => Some(vec!["memo", task.as_str(), "--clear"]),
+        CompanionCommand::NotiClear { task } => Some(vec!["noti", "clear", task.as_str()]),
+        CompanionCommand::Finder { task } => Some(vec!["finder", task.as_str()]),
+        CompanionCommand::Ide { task } => Some(vec!["ide", task.as_str()]),
+        CompanionCommand::Terminal { task } => Some(vec!["terminal", task.as_str()]),
+        CompanionCommand::CopyPath { .. } => None,
+    }
+}
+
 #[tauri::command]
 fn workbranch_list(root: String) -> Result<String, CompanionError> {
-    let bin = locate_workbranch(None)?;
+    let bin = resolve_workbranch_bin(None)?;
     run_workbranch_stdout(&bin, &["list", "--json"], Path::new(&root))
 }
 
 #[tauri::command]
 fn workbranch_list_global() -> Result<String, CompanionError> {
-    let bin = locate_workbranch(None)?;
+    workbranch_list_global_with_config_home(None)
+}
+
+fn workbranch_list_global_with_config_home(
+    config_home: Option<&Path>,
+) -> Result<String, CompanionError> {
+    let bin = resolve_workbranch_bin(config_home)?;
     let cwd = std::env::var_os("HOME").map_or_else(|| PathBuf::from("/"), PathBuf::from);
-    run_workbranch_stdout(&bin, &["list", "--global", "--json"], &cwd)
+    run_workbranch_global_json_stdout(&bin, &["list", "--global", "--json"], &cwd)
+}
+
+#[tauri::command]
+fn append_activity_events(
+    events: Vec<activity_store::ActivityEvent>,
+) -> Result<(), CompanionError> {
+    activity_store::append_activity_events_default(&events)
 }
 
 #[tauri::command]
 fn workbranch_run(action: CompanionCommand, cwd: String) -> Result<RunResult, CompanionError> {
     let cwd_path = PathBuf::from(cwd);
     match action {
-        CompanionCommand::Memo { task, text } => run_workbranch(
-            &locate_workbranch(None)?,
-            &["memo", &task, &text],
-            &cwd_path,
-        ),
-        CompanionCommand::MemoClear { task } => run_workbranch(
-            &locate_workbranch(None)?,
-            &["memo", "--clear", &task],
-            &cwd_path,
-        ),
-        CompanionCommand::NotiClear { task } => run_workbranch(
-            &locate_workbranch(None)?,
-            &["noti", "clear", &task],
-            &cwd_path,
-        ),
-        CompanionCommand::Finder { task } => {
-            run_workbranch(&locate_workbranch(None)?, &["finder", &task], &cwd_path)
-        }
-        CompanionCommand::Ide { task } => {
-            run_workbranch(&locate_workbranch(None)?, &["ide", &task], &cwd_path)
-        }
-        CompanionCommand::Terminal { task } => {
-            run_workbranch(&locate_workbranch(None)?, &["terminal", &task], &cwd_path)
-        }
         CompanionCommand::CopyPath { path } => run_pbcopy(&path),
+        command => {
+            let args = workbranch_args_for(&command)
+                .ok_or_else(|| std::io::Error::other("companion command has no workbranch argv"))?;
+            run_workbranch(&resolve_workbranch_bin(None)?, &args, &cwd_path)
+        }
     }
 }
 
@@ -158,31 +172,34 @@ fn should_emit_root_change(debounce: &Arc<Mutex<HashMap<String, Instant>>>, root
     true
 }
 
-fn locate_workbranch(configured: Option<&str>) -> Result<PathBuf, CompanionError> {
-    let mut candidates = Vec::new();
-    if let Some(path) = configured {
-        candidates.push(PathBuf::from(path));
+fn run_workbranch_global_json_stdout(
+    bin: &Path,
+    args: &[&str],
+    cwd: &Path,
+) -> Result<String, CompanionError> {
+    let result = run_workbranch(bin, args, cwd)?;
+    if result.exit_code == 0 || is_global_list_document(&result.stdout) {
+        Ok(result.stdout)
+    } else {
+        Err(CompanionError::CommandFailed {
+            exit_code: result.exit_code,
+            stderr: result.stderr,
+        })
     }
-    candidates.push(PathBuf::from("/opt/homebrew/bin/workbranch"));
-    candidates.push(PathBuf::from("/usr/local/bin/workbranch"));
-    if let Some(home) = std::env::var_os("HOME") {
-        candidates.push(PathBuf::from(home).join(".local/bin/workbranch"));
-    }
-    candidates.push(
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../workbranch-cli/bin/workbranch"),
-    );
+}
 
-    for candidate in &candidates {
-        if candidate.is_file() {
-            return Ok(candidate.clone());
-        }
-    }
-    Err(CompanionError::WorkbranchNotFound(
-        candidates
-            .iter()
-            .map(|path| path.display().to_string())
-            .collect(),
-    ))
+fn is_global_list_document(stdout: &str) -> bool {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(stdout) else {
+        return false;
+    };
+    value
+        .get("schemaVersion")
+        .and_then(serde_json::Value::as_u64)
+        == Some(1)
+        && value
+            .get("projects")
+            .is_some_and(serde_json::Value::is_array)
+        && value.get("errors").is_some_and(serde_json::Value::is_array)
 }
 
 fn run_workbranch_stdout(bin: &Path, args: &[&str], cwd: &Path) -> Result<String, CompanionError> {
@@ -198,7 +215,14 @@ fn run_workbranch_stdout(bin: &Path, args: &[&str], cwd: &Path) -> Result<String
 }
 
 fn run_workbranch(bin: &Path, args: &[&str], cwd: &Path) -> Result<RunResult, CompanionError> {
-    let output = Command::new(bin).args(args).current_dir(cwd).output()?;
+    let home = std::env::var_os("HOME").map(PathBuf::from);
+    let path = gui_safe_path(std::env::var_os("PATH").as_deref(), home.as_deref())
+        .map_err(std::io::Error::other)?;
+    let output = Command::new(bin)
+        .args(args)
+        .current_dir(cwd)
+        .env("PATH", path)
+        .output()?;
     Ok(RunResult {
         exit_code: output.status.code().unwrap_or(1),
         stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
@@ -235,20 +259,10 @@ pub fn run() {
             workbranch_list,
             workbranch_list_global,
             workbranch_run,
+            append_activity_events,
             watch_roots,
         ]);
     if let Err(error) = builder.run(tauri::generate_context!()) {
         eprintln!("error while running tauri application: {error}");
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn locate_workbranch_finds_local_cli_when_available() {
-        let found = locate_workbranch(None);
-        assert!(found.is_ok(), "expected local workbranch binary: {found:?}");
     }
 }

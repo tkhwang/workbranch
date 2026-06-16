@@ -36,16 +36,19 @@
       "include-component-in-tag": true,
       "extra-files": [
         {
-          "type": "generic",
-          "path": "src-tauri/tauri.conf.json"
+          "type": "json",
+          "path": "src-tauri/tauri.conf.json",
+          "jsonpath": "$.version"
         },
         {
-          "type": "generic",
-          "path": "package.json"
+          "type": "json",
+          "path": "package.json",
+          "jsonpath": "$.version"
         },
         {
-          "type": "generic",
-          "path": "src-tauri/Cargo.toml"
+          "type": "toml",
+          "path": "src-tauri/Cargo.toml",
+          "jsonpath": "$.package.version"
         }
       ]
     }

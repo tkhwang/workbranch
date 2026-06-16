@@ -1,7 +1,37 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import type { ActivityEvent } from "../application/activity";
 import type { GlobalState } from "../domain/model";
 import { mapGlobalDocumentToState } from "./acl";
 import { parseGlobalDocument } from "./parseContract";
+
+export type RunResult = {
+	readonly exit_code: number;
+	readonly stdout: string;
+	readonly stderr: string;
+};
+
+export class CompanionActionError extends Error {
+	readonly exitCode: number;
+	readonly stdout: string;
+	readonly stderr: string;
+
+	constructor(result: RunResult) {
+		super(
+			result.stderr || `workbranch action failed with exit ${result.exit_code}`,
+		);
+		this.name = "CompanionActionError";
+		this.exitCode = result.exit_code;
+		this.stdout = result.stdout;
+		this.stderr = result.stderr;
+	}
+}
+
+export function ensureRunSucceeded(result: RunResult): void {
+	if (result.exit_code !== 0) {
+		throw new CompanionActionError(result);
+	}
+}
 
 export type CompanionCommand =
 	| { readonly kind: "memo"; readonly task: string; readonly text: string }
@@ -17,9 +47,30 @@ export async function refreshStatus(): Promise<GlobalState> {
 	return mapGlobalDocumentToState(parseGlobalDocument(raw));
 }
 
+export async function appendActivityEvents(
+	events: readonly ActivityEvent[],
+): Promise<void> {
+	if (events.length === 0) {
+		return;
+	}
+	await invoke("append_activity_events", { events });
+}
+
 export async function runAction(
 	command: CompanionCommand,
 	cwd: string,
 ): Promise<void> {
-	await invoke("workbranch_run", { action: command, cwd });
+	const result = await invoke<RunResult>("workbranch_run", {
+		action: command,
+		cwd,
+	});
+	ensureRunSucceeded(result);
+}
+
+export async function watchRoots(roots: readonly string[]): Promise<void> {
+	await invoke("watch_roots", { roots });
+}
+
+export async function onRootChanged(callback: () => void): Promise<() => void> {
+	return listen<string>("roots-changed", callback);
 }

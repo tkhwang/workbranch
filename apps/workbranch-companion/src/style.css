@@ -84,3 +84,29 @@ footer {
 .error {
 	color: #ff9b9b;
 }
+
+.task-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-top: 10px;
+}
+
+.task-action {
+	font-size: 12px;
+	min-height: 40px;
+	touch-action: manipulation;
+	transition-property: background-color, border-color, transform;
+	transition-duration: 120ms;
+	transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.task-action:active {
+	transform: scale(0.96);
+}
+
+.task-action:disabled {
+	color: #83776a;
+	cursor: not-allowed;
+	opacity: 0.55;
+}

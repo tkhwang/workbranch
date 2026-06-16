@@ -72,7 +72,8 @@ export function isPlanStatus(value: string): value is PlanStatus {
 }
 
 export function activePlan(task: Task): Plan | undefined {
-	return task.plans.find((plan) => plan.status !== "done") ?? task.plans[0];
+	const firstIncompletePlan = task.plans.find((plan) => plan.status !== "done");
+	return firstIncompletePlan ?? task.plans.at(-1);
 }
 
 export function taskStatus(task: Task): PlanStatus {
