@@ -56,6 +56,8 @@ main() {
   run_test test_display_forced_color_preflight_guidance_is_colored
   run_test test_display_forced_color_task_setup_failure_is_colored
   run_test test_release_please_root_excludes_companion_only_paths
+  run_test test_companion_release_cask_quits_running_app_on_upgrade
+  run_test test_companion_release_versions_stay_in_sync
   run_test test_version_reports_release_manifest_version
   run_test test_help_and_version_work_on_unsupported_platform
   run_test test_core_commands_reject_unsupported_platform

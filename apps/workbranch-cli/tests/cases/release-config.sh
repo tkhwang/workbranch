@@ -60,3 +60,49 @@ if not_excluded:
     raise SystemExit(f"root package would still see companion-only files: {not_excluded}")
 PY
 }
+
+test_companion_release_cask_quits_running_app_on_upgrade() {
+  python3 - <<'PY'
+from pathlib import Path
+
+workflow = Path('.github/workflows/companion-release.yml').read_text()
+expected = 'uninstall quit: "dev.tkhwang.workbranch.companion"'
+if expected not in workflow:
+    raise SystemExit('companion cask generation must quit the running menu-bar app during upgrades')
+
+if workflow.count(expected) != 2:
+    raise SystemExit('companion cask quit stanza must be maintained for both existing and newly-created casks')
+PY
+}
+
+test_companion_release_versions_stay_in_sync() {
+  python3 - <<'PY'
+import json
+import re
+from pathlib import Path
+
+manifest_version = json.loads(Path('.release-please-manifest.json').read_text())['apps/workbranch-companion']
+package_version = json.loads(Path('apps/workbranch-companion/package.json').read_text())['version']
+tauri_version = json.loads(Path('apps/workbranch-companion/src-tauri/tauri.conf.json').read_text())['version']
+cargo_toml = Path('apps/workbranch-companion/src-tauri/Cargo.toml').read_text()
+cargo_toml_version = re.search(r'^version = "([^"]+)"$', cargo_toml, flags=re.MULTILINE).group(1)
+cargo_lock = Path('apps/workbranch-companion/src-tauri/Cargo.lock').read_text()
+cargo_lock_match = re.search(
+    r'(?ms)^\[\[package\]\]\nname = "workbranch-companion"\nversion = "([^"]+)"$',
+    cargo_lock,
+)
+if cargo_lock_match is None:
+    raise SystemExit('Cargo.lock must include the workbranch-companion package entry')
+cargo_lock_version = cargo_lock_match.group(1)
+
+versions = {
+    'release manifest': manifest_version,
+    'package.json': package_version,
+    'tauri.conf.json': tauri_version,
+    'Cargo.toml': cargo_toml_version,
+    'Cargo.lock': cargo_lock_version,
+}
+if len(set(versions.values())) != 1:
+    raise SystemExit(f'companion release versions are out of sync: {versions}')
+PY
+}

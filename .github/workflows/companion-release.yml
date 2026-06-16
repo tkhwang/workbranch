@@ -137,6 +137,7 @@ jobs:
           version = os.environ["CASK_VERSION"]
           sha = os.environ["CASK_SHA"]
           notarized = os.environ.get("APPLE_RELEASE_NOTARIZED") == "1"
+          quit_stanza = '  uninstall quit: "dev.tkhwang.workbranch.companion"'
           if cask.exists():
               text = cask.read_text()
               text, version_count = re.subn(
@@ -164,6 +165,16 @@ jobs:
               )
               if '  depends_on macos: :ventura' not in text:
                   raise SystemExit("expected cask to declare depends_on macos: :ventura")
+              if quit_stanza not in text:
+                  text, app_count = re.subn(
+                      r'^(  app "WorkbranchCompanion\.app")$',
+                      rf'\1\n\n{quit_stanza}',
+                      text,
+                      count=1,
+                      flags=re.MULTILINE,
+                  )
+                  if app_count != 1:
+                      raise SystemExit("expected exactly one app stanza in cask")
               if notarized:
                   text = re.sub(
                       r'\n  caveats <<~EOS\n(?:    .*\n)*?  EOS\n',
@@ -195,7 +206,9 @@ jobs:
 
             depends_on macos: :ventura
 
-            app "WorkbranchCompanion.app"{caveat}
+            app "WorkbranchCompanion.app"
+
+            uninstall quit: "dev.tkhwang.workbranch.companion"{caveat}
           end
           '''
           cask.write_text(text)
