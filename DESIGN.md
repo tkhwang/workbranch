@@ -12,14 +12,14 @@
   - `apps/workbranch-companion/src/style.css`
 
 ## Brand
-- Personality: precise, quiet, developer-native, task-focused.
-- Trust signals: fast refresh, clear current step, visible repo dirty/branch state, restrained UI chrome.
-- Avoid: marketing hero layouts, oversized cards, heavy gradients, generic shadcn dashboard look, decorative animation.
+- Personality: fast, focused, developer-native, command-oriented.
+- Trust signals: fast refresh, clear current step, visible repo dirty/branch state, sleek dark chrome, restrained accent glow.
+- Avoid: marketing hero layouts, oversized cards, large SaaS rows, generic dashboard cards, generic shadcn look, decorative animation.
 
 ## Product goals
 - Goals:
   - Show active worktree tasks and their active plan status at a glance.
-  - Make the current plan step more prominent than secondary metadata.
+  - Make the current plan step feel like the selected command/result in a launcher.
   - Keep repo branch/dirty state visible without competing with task progress.
   - Keep actions discoverable but visually secondary.
 - Non-goals:
@@ -52,23 +52,23 @@
   6. Nested plan steps.
 
 ## Design principles
-- Principle 1: Status is a rail, not a paragraph. Use compact dots, counts, and labels.
+- Principle 1: Status is a launcher signal, not a paragraph. Use compact dots, counts, and labels.
 - Principle 2: Current work beats historical detail. The active/current step is always above the full checklist.
 - Principle 3: Developer metadata should be monospace and subdued until dirty/blocked.
 - Tradeoffs: density is preferred over spaciousness, but tap/click targets remain at least 32px high where practical.
 
 ## Visual language
-- Color: near-black neutral surfaces with indigo/purple active accents, red blocked accent, green done accent, amber notification accent.
+- Color: Raycast-style dark chrome with restrained red-pink/violet active accents, red blocked accent, green done accent, amber notification accent.
 - Typography: system UI for labels; monospace only for repo/branch/path-like metadata.
-- Spacing/layout rhythm: compact 8px grid, row-first grouping, no large cards.
-- Shape/radius/elevation: one fixed radius scale (`6px` controls, `10px` rows, `14px` shell); depth from background steps and hairline borders.
+- Spacing/layout rhythm: compact command-palette rhythm, 8px grid, row-first grouping, no large cards.
+- Shape/radius/elevation: one fixed radius scale (`6px` controls, `10px` rows, `14px` shell); depth from dark chrome background steps, soft inset highlights, and hairline borders.
 - Motion: 120ms press/reveal feedback only; respect reduced motion.
 - Imagery/iconography: text glyphs and status dots only; no decorative illustration.
 
 ## Components
 - Existing components to reuse: `TaskRow`, action buttons, native `details/summary` disclosure.
 - New/changed components:
-  - task summary line,
+  - launcher-like task summary line,
   - current-step strip,
   - repo chips,
   - action bar,
@@ -102,7 +102,7 @@
 - Microcopy rules: prefer short labels (`IDE`, `Terminal`, `Copy`) over sentences; avoid emoji except where already part of compact rollup.
 
 ## Implementation constraints
-- Framework/styling system: React 18 + plain CSS; no Tailwind/shadcn in this refresh.
+- Framework/styling system: React 18 + plain CSS; no Tailwind/shadcn in this refresh. Primary reference is Raycast; Linear remains only a secondary status-hierarchy cue.
 - Design-token constraints: CSS custom properties in `style.css`.
 - Performance constraints: no extra runtime package; no animation loops; preserve 0033 responsiveness fixes.
 - Compatibility constraints: no CLI/contract/Rust port changes.
@@ -110,3 +110,7 @@
 
 ## Open questions
 - [ ] Whether a later v2 should add shadcn/Radix primitives after the plain CSS refresh proves the needed component gaps.
+
+
+## Direction revision
+- 2026-06-17: Primary reference changed from Linear to Raycast after implementation review. Keep Linear only as a secondary cue for compact status hierarchy; the dominant feel should be a Raycast-like menu command/status popover, not a SaaS issue-list dashboard.

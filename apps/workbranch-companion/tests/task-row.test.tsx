@@ -133,7 +133,7 @@ describe("TaskRow", () => {
 			html.indexOf("☐ Implement change"),
 		);
 	});
-	it("renders a Linear-style task summary with current step and repo state", () => {
+	it("renders a Raycast-style task summary with current step and repo state", () => {
 		const html = renderToStaticMarkup(
 			<TaskRow
 				project="workbranch"

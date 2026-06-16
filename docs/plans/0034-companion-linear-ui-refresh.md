@@ -1,8 +1,8 @@
-# 0034 Companion Linear-Inspired UI Refresh Implementation Plan
+# 0034 Companion Raycast-Inspired UI Refresh Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` or `$plan-execute auto` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. For `.ts`/`.tsx` edits, use `omo:programming` TypeScript guidance before editing. For visual changes, use the `design` skill and drive the built app through a browser/app screenshot before claiming completion.
 
-**Goal:** Refresh Workbranch Companion into a simple Linear-inspired menu bar task cockpit that shows each task's active plan, current step, progress, repo state, and available actions with strong scan hierarchy.
+**Goal:** Refresh Workbranch Companion into a Raycast-inspired menu bar task cockpit that shows each task's active plan, current step, progress, repo state, and available actions with strong scan hierarchy.
 
 **Architecture:** Keep the existing React + TypeScript + plain CSS architecture. Add a repo-root `DESIGN.md` as the durable UI contract, then refactor only the companion presentation layer (`TaskRow.tsx`, `App.tsx`, `style.css`) around small semantic view parts. Do not change the CLI, `list --json` contract, Rust ports, activity storage, or watcher behavior.
 
@@ -19,11 +19,11 @@ Workbranch Companion is not a dashboard or landing page. It is a macOS menu bar 
 3. What repo/branch/dirty state matters?
 4. What immediate action can I take?
 
-The chosen visual direction is **Linear-inspired compact issue tracker**:
+The revised visual direction is **Raycast-inspired compact command/status popover**:
 
-- compact dark surfaces, crisp typography, low-noise borders;
-- purple/indigo accent for active work, red for blocked, green for done;
-- row-first information hierarchy, not card-heavy dashboard layout;
+- sleek dark chrome, crisp typography, low-noise borders;
+- restrained red-pink/violet active accent, red for blocked, green for done;
+- command-palette information hierarchy, not card-heavy SaaS dashboard layout;
 - subtle depth through background steps and hairline borders;
 - motion limited to press/reveal feedback, not decorative animation.
 
@@ -37,7 +37,7 @@ The chosen visual direction is **Linear-inspired compact issue tracker**:
 
 ## Decision gates
 
-- [x] **Primary design reference:** Linear-inspired compact status hierarchy.
+- [x] **Primary design reference:** revised to Raycast-inspired compact command/status popover. Linear remains a secondary cue for status hierarchy only.
 - [x] **UI library:** no shadcn/Tailwind in v1. Current companion has no Tailwind/Radix dependencies and the required UI can be achieved with semantic React and plain CSS.
 - [x] **Design source artifact location:** resolved A — create one repo-root `DESIGN.md`. Do not create an app-local `apps/workbranch-companion/DESIGN.md`, and do not keep multiple imported design docs active.
 - [x] **Data contract:** UI consumes existing domain `Task`, `Plan`, `Step`, `Repo`; no DTO or CLI contract changes.
@@ -45,6 +45,7 @@ The chosen visual direction is **Linear-inspired compact issue tracker**:
 
 Decision 1 result: `DESIGN.md` lives at the repository root so future UI/UX/frontend work has one discoverable design contract. Companion-local design docs are rejected for v1 because they reduce agent discoverability and create avoidable source-of-truth ambiguity.
 Decision 2 result: conditional helper extraction uses `apps/workbranch-companion/src/ui/taskRowParts.tsx`. This keeps the extracted module private-ish and role-based rather than implying a new public React component surface.
+Direction revision result: after visual review, primary reference changed from Linear to Raycast. The plan file name remains unchanged for continuity, but implementation guidance now treats Linear as a secondary status-hierarchy cue only.
 
 ## File structure
 
@@ -54,7 +55,7 @@ Create:
 Modify:
 - `apps/workbranch-companion/src/App.tsx` — app shell copy and structural class names only; keep monitor/action logic intact.
 - `apps/workbranch-companion/src/ui/TaskRow.tsx` — split rendering into focused private components inside the same file unless it exceeds 250 pure LOC; preserve public `TaskRow`, `TaskActionKind`, `taskActionsFor` API.
-- `apps/workbranch-companion/src/style.css` — Linear-inspired tokens, layout, status colors, action buttons, step tree, responsive/narrow popover behavior.
+- `apps/workbranch-companion/src/style.css` — Raycast-inspired dark-chrome tokens, layout, status colors, action buttons, step tree, responsive/narrow popover behavior.
 - `apps/workbranch-companion/tests/task-row.test.tsx` — static markup tests for plan/status/repo/action semantics.
 - `TASK-WORKBRANCH.md` — task progress updates only.
 
@@ -70,7 +71,7 @@ Do not modify:
 - Create: `DESIGN.md` at repo root
 - Modify: `TASK-WORKBRANCH.md`
 
-- [x] **Step 1: Write `DESIGN.md` from the confirmed Linear direction**
+- [x] **Step 1: Write `DESIGN.md` from the confirmed Raycast direction**
 
 Create `DESIGN.md` with this content:
 
@@ -89,14 +90,14 @@ Create `DESIGN.md` with this content:
   - `apps/workbranch-companion/src/style.css`
 
 ## Brand
-- Personality: precise, quiet, developer-native, task-focused.
-- Trust signals: fast refresh, clear current step, visible repo dirty/branch state, restrained UI chrome.
+- Personality: fast, focused, developer-native, command-oriented.
+- Trust signals: fast refresh, clear current step, visible repo dirty/branch state, sleek dark chrome, restrained accent glow.
 - Avoid: marketing hero layouts, oversized cards, heavy gradients, generic shadcn dashboard look, decorative animation.
 
 ## Product goals
 - Goals:
   - Show active worktree tasks and their active plan status at a glance.
-  - Make the current plan step more prominent than secondary metadata.
+  - Make the current plan step feel like the selected command/result in a launcher.
   - Keep repo branch/dirty state visible without competing with task progress.
   - Keep actions discoverable but visually secondary.
 - Non-goals:
@@ -129,23 +130,23 @@ Create `DESIGN.md` with this content:
   6. Nested plan steps.
 
 ## Design principles
-- Principle 1: Status is a rail, not a paragraph. Use compact dots, counts, and labels.
+- Principle 1: Status is a launcher signal, not a paragraph. Use compact dots, counts, and labels.
 - Principle 2: Current work beats historical detail. The active/current step is always above the full checklist.
 - Principle 3: Developer metadata should be monospace and subdued until dirty/blocked.
 - Tradeoffs: density is preferred over spaciousness, but tap/click targets remain at least 32px high where practical.
 
 ## Visual language
-- Color: near-black neutral surfaces with indigo/purple active accents, red blocked accent, green done accent, amber notification accent.
+- Color: Raycast-style dark chrome with restrained red-pink/violet active accents, red blocked accent, green done accent, amber notification accent.
 - Typography: system UI for labels; monospace only for repo/branch/path-like metadata.
-- Spacing/layout rhythm: compact 8px grid, row-first grouping, no large cards.
-- Shape/radius/elevation: one fixed radius scale (`6px` controls, `10px` rows, `14px` shell); depth from background steps and hairline borders.
+- Spacing/layout rhythm: compact command-palette rhythm, 8px grid, row-first grouping, no large cards.
+- Shape/radius/elevation: one fixed radius scale (`6px` controls, `10px` rows, `14px` shell); depth from dark chrome background steps, soft inset highlights, and hairline borders.
 - Motion: 120ms press/reveal feedback only; respect reduced motion.
 - Imagery/iconography: text glyphs and status dots only; no decorative illustration.
 
 ## Components
 - Existing components to reuse: `TaskRow`, action buttons, native `details/summary` disclosure.
 - New/changed components:
-  - task summary line,
+  - launcher-like task summary line,
   - current-step strip,
   - repo chips,
   - action bar,
@@ -179,7 +180,7 @@ Create `DESIGN.md` with this content:
 - Microcopy rules: prefer short labels (`IDE`, `Terminal`, `Copy`) over sentences; avoid emoji except where already part of compact rollup.
 
 ## Implementation constraints
-- Framework/styling system: React 18 + plain CSS; no Tailwind/shadcn in this refresh.
+- Framework/styling system: React 18 + plain CSS; no Tailwind/shadcn in this refresh. Primary reference is Raycast; Linear remains only a secondary status-hierarchy cue.
 - Design-token constraints: CSS custom properties in `style.css`.
 - Performance constraints: no extra runtime package; no animation loops; preserve 0033 responsiveness fixes.
 - Compatibility constraints: no CLI/contract/Rust port changes.
@@ -255,7 +256,7 @@ const linearFixtureTask: Task = {
 Add this test before the action tests:
 
 ```ts
-it("renders a Linear-style task summary with current step and repo state", () => {
+it("renders a Raycast-style task summary with current step and repo state", () => {
 	const html = renderToStaticMarkup(
 		<TaskRow
 			project="workbranch"
@@ -288,7 +289,7 @@ Expected: FAIL because `task-status-rail` and `repo-chip repo-dirty` do not exis
 
 Task 2 evidence: `pnpm --filter @workbranch/companion test -- tests/task-row.test.tsx` failed as expected because current markup does not contain `task-status-rail`.
 
-## Task 3: Refactor TaskRow into Linear-style view parts
+## Task 3: Refactor TaskRow into Raycast-style view parts
 
 **Files:**
 - Modify: `apps/workbranch-companion/src/ui/TaskRow.tsx`
@@ -463,9 +464,9 @@ PY
 
 Expected: `TaskRow.tsx` is at or below 250 pure LOC. If it exceeds 250, split helpers into the resolved path `apps/workbranch-companion/src/ui/taskRowParts.tsx` before continuing.
 
-Task 3 evidence: `pnpm --filter @workbranch/companion test -- tests/task-row.test.tsx` passed (6 files / 16 tests reported); `TaskRow.tsx` measured 202 pure LOC, so no `taskRowParts.tsx` split was needed.
+Task 3 evidence: `pnpm --filter @workbranch/companion test -- tests/task-row.test.tsx` passed (6 files / 16 tests reported); `TaskRow.tsx` measured 202 pure LOC at that point, so no `taskRowParts.tsx` split was needed.
 
-## Task 4: Apply Linear-inspired CSS tokens and layout
+## Task 4: Apply Raycast-inspired CSS tokens and layout
 
 **Files:**
 - Modify: `apps/workbranch-companion/src/style.css`
@@ -818,7 +819,7 @@ pnpm --filter @workbranch/companion exec biome check src/App.tsx src/ui/TaskRow.
 
 Expected: no errors.
 
-Task 4 evidence: Linear-inspired CSS tokens/layout applied. `pnpm --filter @workbranch/companion test -- tests/task-row.test.tsx` passed; targeted `biome check src/App.tsx src/ui/TaskRow.tsx tests/task-row.test.tsx` passed after converting repo chips to semantic `ul/li`.
+Task 4 evidence: Raycast-inspired CSS tokens/layout applied. `pnpm --filter @workbranch/companion test -- tests/task-row.test.tsx` passed; targeted `biome check src/App.tsx src/ui/TaskRow.tsx tests/task-row.test.tsx` passed after converting repo chips to semantic `ul/li`.
 
 ## Task 5: Polish app shell copy and status line
 
@@ -998,3 +999,26 @@ Set `TASK-WORKBRANCH.md` status:
 - [x] Includes exact file paths and commands.
 - [x] Includes visual/manual gate for a UI task.
 - [x] Avoids placeholders such as TBD/TODO.
+
+
+## 구현 결과
+
+- Files changed: `DESIGN.md`, `apps/workbranch-companion/src/App.tsx`, `apps/workbranch-companion/src/ui/TaskRow.tsx`, `apps/workbranch-companion/src/style.css`, `apps/workbranch-companion/tests/task-row.test.tsx`, and this plan.
+- Automated verification passed:
+  - `pnpm --filter @workbranch/companion exec biome check src/style.css src/App.tsx src/ui/TaskRow.tsx tests/task-row.test.tsx`
+  - `pnpm --filter @workbranch/companion test` — 6 files / 16 tests passed.
+  - `pnpm --filter @workbranch/companion typecheck`
+  - `pnpm --filter @workbranch/companion lint` — exit 0; existing `parseContract.ts` info diagnostics still print and are outside this UI change.
+  - `pnpm --filter @workbranch/companion tauri build`
+  - Isolated release smoke: release binary stayed running for 5 seconds with a temporary `XDG_CONFIG_HOME` and emitted no logs.
+  - `git diff --check`
+- LOC evidence after Raycast revision: `App.tsx` 157, `TaskRow.tsx` 203, `style.css` 301, `task-row.test.tsx` 186. TS/TSX files remain below the 250 pure LOC ceiling; CSS remains one cohesive stylesheet for this small app and can be split later only if reviewability declines.
+- Remaining risk: visible macOS menu-bar popover hierarchy/focus/wrapping still requires human visual confirmation because this CLI session cannot observe the rendered menu-bar UI.
+
+## Raycast revision 결과 (2026-06-17)
+
+- [x] Updated `DESIGN.md` from Linear primary to Raycast primary.
+- [x] Kept Linear only as secondary compact status-hierarchy cue.
+- [x] Adjusted CSS tokens/surfaces toward dark chrome command/status popover.
+- [x] Updated TaskRow test wording from Linear-style to Raycast-style.
+- [x] Formatted `style.css` and reran changed-file Biome, full companion tests, typecheck, lint, Tauri build, release smoke, and `git diff --check`.
