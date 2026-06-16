@@ -1,10 +1,13 @@
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem};
 
 use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
 use tauri::{App, AppHandle, Manager, WindowEvent};
 use tauri_plugin_positioner::{Position, WindowExt};
+
+const TRAY_TEMPLATE_ICON: &[u8] = include_bytes!("../icons/tray-template.png");
 
 pub(crate) fn install(app: &mut App) -> tauri::Result<()> {
     #[cfg(target_os = "macos")]
@@ -28,9 +31,11 @@ pub(crate) fn install(app: &mut App) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, "show", "Show Companion", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show, &quit])?;
-    let icon = app.default_window_icon().cloned();
+    let icon = Image::from_bytes(TRAY_TEMPLATE_ICON)?;
     let click_gate = Arc::new(Mutex::new(TrayClickGate::default()));
-    let mut tray = TrayIconBuilder::with_id("workbranch-companion")
+    TrayIconBuilder::with_id("workbranch-companion")
+        .icon(icon)
+        .icon_as_template(true)
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
@@ -43,11 +48,8 @@ pub(crate) fn install(app: &mut App) -> tauri::Result<()> {
             if should_toggle_from_tray_event(&click_gate, &event) {
                 toggle_main_window(tray.app_handle());
             }
-        });
-    if let Some(icon) = icon {
-        tray = tray.icon(icon);
-    }
-    tray.build(app)?;
+        })
+        .build(app)?;
     Ok(())
 }
 

@@ -9,6 +9,10 @@
 Icon?
 ._*
 
+# Tauri app icons are source assets, not macOS Icon? metadata.
+!apps/workbranch-companion/src-tauri/icons/
+!apps/workbranch-companion/src-tauri/icons/**
+
 # Editor / IDE
 .vscode/
 .idea/
