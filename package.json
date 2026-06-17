@@ -11,11 +11,8 @@
     "cli:run": "bash -lc 'while [ \"${1:-}\" = \"--\" ]; do shift; done; exec apps/workbranch-cli/bin/workbranch \"$@\"' --",
     "cli:test": "apps/workbranch-cli/tests/run.sh",
     "companion:build": "pnpm --filter @workbranch/companion tauri build",
-    "companion:run": "open \"apps/workbranch-companion/src-tauri/target/release/bundle/macos/WorkbranchCompanion.app\"",
     "companion:dev": "pnpm --filter @workbranch/companion tauri dev",
-    "apps:cli:build": "pnpm run cli:build",
-    "apps:cli:run": "pnpm run cli:run --",
-    "apps:companion:build": "pnpm run companion:build",
-    "apps:companion:run": "pnpm run companion:run"
+    "companion:run": "open \"apps/workbranch-companion/src-tauri/target/release/bundle/macos/WorkbranchCompanion.app\"",
+    "companion:test": "pnpm --filter @workbranch/companion test"
   }
 }
