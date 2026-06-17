@@ -121,6 +121,71 @@ test_doctor_reports_stale_directory_with_remove_hint() {
   assert_contains "$out" "status=1"
 }
 
+test_doctor_flags_unparseable_brief() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add feat-login >/dev/null
+  cat > "$project/feat-login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
+status: done
+- [x] did the work
+- [ ] verify
+EOF_BRIEF
+
+  out=$(doctor_with_status)
+  assert_contains "$out" "Task briefs"
+  assert_contains "$out" "feat-login brief not parseable"
+  assert_contains "$out" "fix: workbranch doctor --fix"
+  assert_contains "$out" "status=1"
+}
+
+test_doctor_brief_false_positive_guards() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add feat-login >/dev/null
+  run_expect_success "$WORKBRANCH" add feat-notes >/dev/null
+  cat > "$project/feat-login/TASK-WORKBRANCH.md" <<'EOF_HEALTHY'
+# Login work
+status: review
+- [x] implemented
+EOF_HEALTHY
+  cat > "$project/feat-notes/TASK-WORKBRANCH.md" <<'EOF_NOTES'
+Loose notes only
+
+Some scratch text without tracked status or checklist.
+EOF_NOTES
+
+  out=$(doctor_with_status)
+  assert_contains "$out" "doctor found no issues"
+  assert_not_contains "$out" "brief not parseable"
+  assert_contains "$out" "status=0"
+}
+
+test_doctor_flags_multi_h2_unparseable_brief() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add feat-login >/dev/null
+  cat > "$project/feat-login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
+status: done
+
+## Current work
+- [x] did the work
+- [ ] verify
+EOF_BRIEF
+
+  out=$(doctor_with_status)
+  assert_contains "$out" "feat-login brief not parseable"
+  assert_contains "$out" "status=1"
+}
+
 test_doctor_rejects_unexpected_args_and_flags() {
   new_fixture
   project="$FIXTURE_PROJECT"
@@ -154,6 +219,84 @@ test_doctor_fix_prunes_stale_worktree_registration() {
   assert_contains "$fix_out" "status=0"
   worktrees=$(git -C "$project/_base/frontend" worktree list --porcelain)
   assert_not_contains "$worktrees" "prunable"
+}
+
+test_doctor_fix_prepends_h1_heading() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add feat-login >/dev/null
+  cat > "$project/feat-login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
+status: done
+- [x] did the work
+- [ ] verify
+EOF_BRIEF
+
+  fix_out=$(doctor_with_status --fix)
+  assert_contains "$fix_out" "Repaired task briefs"
+  assert_contains "$fix_out" "status=0"
+  head -n 1 "$project/feat-login/TASK-WORKBRANCH.md" | grep -q '^# feat-login$' || fail "no H1 prepended"
+  out=$(run_expect_success "$WORKBRANCH" list --json)
+  printf '%s' "$out" | python3 -c 'import json,sys
+t=json.load(sys.stdin)["tasks"][0]
+assert len(t["plans"]) == 1, t
+assert t["progressTotal"] == 2 and t["progressDone"] == 1, t'
+  clean_out=$(doctor_with_status)
+  assert_contains "$clean_out" "doctor found no issues"
+  assert_contains "$clean_out" "status=0"
+}
+
+test_doctor_fix_is_idempotent() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add feat-login >/dev/null
+  cat > "$project/feat-login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
+status: done
+- [x] did the work
+EOF_BRIEF
+
+  first_out=$(doctor_with_status --fix)
+  assert_contains "$first_out" "status=0"
+  second_out=$(doctor_with_status --fix)
+  assert_contains "$second_out" "doctor found no issues"
+  assert_contains "$second_out" "status=0"
+  h1_count=$(grep -c '^# feat-login$' "$project/feat-login/TASK-WORKBRANCH.md")
+  [ "$h1_count" -eq 1 ] || fail "expected one H1, got $h1_count"
+}
+
+test_doctor_fix_multi_h2_keeps_manual_follow_up_nonzero() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add feat-login >/dev/null
+  cat > "$project/feat-login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
+status: done
+
+## Current work
+- [x] did the work
+- [ ] verify
+EOF_BRIEF
+
+  fix_out=$(doctor_with_status --fix)
+  assert_contains "$fix_out" "Repaired task briefs"
+  assert_contains "$fix_out" "Manual task brief follow-up"
+  assert_contains "$fix_out" "doctor fixed 1 issue(s); 1 require manual action"
+  assert_contains "$fix_out" "status=1"
+  head -n 1 "$project/feat-login/TASK-WORKBRANCH.md" | grep -q '^# feat-login$' || fail "no H1 prepended"
+  h1_count=$(grep -c '^# feat-login$' "$project/feat-login/TASK-WORKBRANCH.md")
+  [ "$h1_count" -eq 1 ] || fail "expected one H1, got $h1_count"
+  out=$(run_expect_success "$WORKBRANCH" list --json)
+  printf '%s' "$out" | python3 -c 'import json,sys
+t=json.load(sys.stdin)["tasks"][0]
+assert len(t["plans"]) == 1, t
+assert t["progressTotal"] == 0 and t["progressDone"] == 0, t'
 }
 
 test_doctor_fix_does_not_delete_stale_task_directory() {
