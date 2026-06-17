@@ -3,13 +3,13 @@ import { currentItem } from "../application/state";
 import type { Step, Task } from "../domain/model";
 import { activePlan, taskProgress, taskStatus } from "../domain/model";
 
-const STATUS_ICON = {
-	todo: "·",
-	planning: "○",
-	"in-progress": "●",
-	review: "◐",
-	blocked: "⚠",
-	done: "✓",
+const STATUS_META = {
+	todo: { icon: "·", label: "Todo" },
+	planning: { icon: "○", label: "Planning" },
+	"in-progress": { icon: "●", label: "In progress" },
+	review: { icon: "◐", label: "Review" },
+	blocked: { icon: "!", label: "Blocked" },
+	done: { icon: "✓", label: "Done" },
 } as const;
 
 const TASK_ACTION_KINDS = [
@@ -33,12 +33,12 @@ export type TaskRowAction = {
 
 const TASK_ACTION_LABELS: Record<TaskActionKind, string> = {
 	memoEdit: "Memo",
-	memoClear: "Clear memo",
-	notiClear: "Clear noti",
+	memoClear: "Clear",
+	notiClear: "Noti",
 	finder: "Finder",
 	ide: "IDE",
 	terminal: "Terminal",
-	copyPath: "Copy path",
+	copyPath: "Copy",
 } as const;
 
 type Props = {
@@ -96,6 +96,88 @@ function StepItems({ steps, keyPrefix }: StepItemsProps) {
 	});
 }
 
+type TaskSummaryProps = {
+	readonly task: Task;
+	readonly status: ReturnType<typeof taskStatus>;
+	readonly progress: ReturnType<typeof taskProgress>;
+};
+
+function TaskSummary({ task, status, progress }: TaskSummaryProps) {
+	const meta = STATUS_META[status];
+	return (
+		<div className="task-summary-line">
+			<span
+				className="task-status-rail"
+				aria-label={meta.label}
+				role="img"
+				title={meta.label}
+			>
+				{meta.icon}
+			</span>
+			<span className="task-name" title={task.name}>
+				{task.name}
+			</span>
+			{progress.total > 0 ? (
+				<span className="progress-pill">
+					{progress.done}/{progress.total}
+				</span>
+			) : null}
+			{task.notiCount > 0 ? (
+				<span className="noti-pill" title={`${task.notiCount} notifications`}>
+					+{task.notiCount}
+				</span>
+			) : null}
+		</div>
+	);
+}
+
+type CurrentStepProps = {
+	readonly planTitle: string;
+	readonly currentItem: string;
+};
+
+function CurrentStep({ planTitle, currentItem }: CurrentStepProps) {
+	return (
+		<div className="current-step-strip">
+			<span className="plan-title" title={planTitle}>
+				{planTitle}
+			</span>
+			<span className="current-step" title={currentItem}>
+				{currentItem}
+			</span>
+		</div>
+	);
+}
+
+type RepoChipsProps = {
+	readonly repos: Task["repos"];
+};
+
+function RepoChips({ repos }: RepoChipsProps) {
+	if (repos.length === 0) {
+		return null;
+	}
+	return (
+		<ul className="repo-chips" aria-label="repositories">
+			{repos.map((repo) => (
+				<li
+					className={`repo-chip${repo.dirty ? " repo-dirty" : ""}`}
+					key={`${repo.name}:${repo.branch}`}
+					title={`${repo.name} ${repo.branch}${repo.dirty ? " dirty" : " clean"}`}
+				>
+					<span className="repo-name">{repo.name}</span>
+					<span className="repo-branch">{repo.branch}</span>
+					{repo.dirty ? (
+						<span className="repo-dot" aria-label="dirty" role="img">
+							●
+						</span>
+					) : null}
+				</li>
+			))}
+		</ul>
+	);
+}
+
 export function TaskRow({ project, root, task, expanded, onAction }: Props) {
 	const status = taskStatus(task);
 	const progress = taskProgress(task);
@@ -105,45 +187,34 @@ export function TaskRow({ project, root, task, expanded, onAction }: Props) {
 	return (
 		<details className={`task task-${status}`} open={expanded}>
 			<summary>
-				<span className="status">{STATUS_ICON[status]}</span>
-				<span className="task-name">{task.name}</span>
-				{progress.total > 0 ? (
-					<span className="progress">
-						{progress.done}/{progress.total}
-					</span>
-				) : null}
-				{task.notiCount > 0 ? (
-					<span className="noti">🔔{task.notiCount}</span>
-				) : null}
+				<TaskSummary task={task} status={status} progress={progress} />
 			</summary>
-			<div className="meta">{project}</div>
-			<div className="task-actions">
-				{actions.map((action) => (
-					<button
-						aria-label={action.ariaLabel}
-						className="task-action"
-						disabled={action.disabled}
-						key={action.kind}
-						onClick={() => onAction(root, task, action.kind)}
-						type="button"
-					>
-						{action.label}
-					</button>
-				))}
+			<div className="task-detail">
+				<div className="project-line">{project}</div>
+				{plan && now ? (
+					<CurrentStep planTitle={plan.title} currentItem={now} />
+				) : null}
+				<RepoChips repos={task.repos} />
+				<div className="task-actions">
+					{actions.map((action) => (
+						<button
+							aria-label={action.ariaLabel}
+							className="task-action"
+							disabled={action.disabled}
+							key={action.kind}
+							onClick={() => onAction(root, task, action.kind)}
+							type="button"
+						>
+							{action.label}
+						</button>
+					))}
+				</div>
+				{plan ? (
+					<ul className="steps">
+						<StepItems steps={plan.steps} keyPrefix="plan" />
+					</ul>
+				) : null}
 			</div>
-			{now ? <div className="now">now ▸ {now}</div> : null}
-			<div className="repos">
-				{task.repos.map((repo) => (
-					<div className="repo" key={repo.name}>
-						{repo.name} {repo.branch} {repo.dirty ? "●" : ""}
-					</div>
-				))}
-			</div>
-			{plan ? (
-				<ul className="steps">
-					<StepItems steps={plan.steps} keyPrefix="plan" />
-				</ul>
-			) : null}
 		</details>
 	);
 }

@@ -1,5 +1,7 @@
 import type { GlobalState } from "../domain/model";
 
+type TimerHandle = number;
+
 export type WorkspaceMonitor = {
 	readonly stop: () => void;
 	readonly settle: () => Promise<void>;
@@ -11,14 +13,24 @@ export type WorkspaceMonitorDeps = {
 	readonly onError: (error: unknown) => void;
 	readonly watchRoots: (roots: readonly string[]) => Promise<void>;
 	readonly onRootChanged: (callback: () => void) => Promise<() => void>;
+	readonly heartbeatMs?: number;
+	readonly setTimer?: (
+		callback: () => void,
+		milliseconds: number,
+	) => TimerHandle;
+	readonly clearTimer?: (handle: TimerHandle) => void;
 };
 
 export async function startWorkspaceMonitor(
 	deps: WorkspaceMonitorDeps,
 ): Promise<WorkspaceMonitor> {
 	let stopped = false;
+	let running = false;
+	let queued = false;
 	let watchedRoots: readonly string[] = [];
 	let pending = Promise.resolve();
+	let heartbeat: TimerHandle | undefined;
+
 	const refreshAndWatch = async (): Promise<void> => {
 		try {
 			const state = await deps.refresh();
@@ -35,17 +47,45 @@ export async function startWorkspaceMonitor(
 			deps.onError(error);
 		}
 	};
+
+	const drainRefreshQueue = async (): Promise<void> => {
+		running = true;
+		try {
+			do {
+				queued = false;
+				await refreshAndWatch();
+			} while (queued && !stopped);
+		} finally {
+			running = false;
+		}
+	};
+
 	const scheduleRefresh = (): void => {
-		pending = refreshAndWatch();
+		if (stopped) {
+			return;
+		}
+		if (running) {
+			queued = true;
+			return;
+		}
+		pending = drainRefreshQueue();
 	};
 
 	scheduleRefresh();
 	await pending;
 	const unlisten = await deps.onRootChanged(scheduleRefresh);
+	if (deps.heartbeatMs !== undefined) {
+		const setTimer = deps.setTimer ?? window.setInterval;
+		heartbeat = setTimer(scheduleRefresh, deps.heartbeatMs);
+	}
 
 	return {
 		stop: () => {
 			stopped = true;
+			if (heartbeat !== undefined) {
+				const clearTimer = deps.clearTimer ?? window.clearInterval;
+				clearTimer(heartbeat);
+			}
 			unlisten();
 		},
 		settle: () => pending,

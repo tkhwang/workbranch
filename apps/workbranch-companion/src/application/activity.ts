@@ -177,7 +177,8 @@ export function createActivityRefresh(
 	deps: ActivityRefreshDeps,
 ): () => Promise<GlobalState> {
 	let previousByRoot = new Map<string, Project>();
-	return async () => {
+	let queue = Promise.resolve();
+	const runRefresh = async (): Promise<GlobalState> => {
 		const state = await deps.refresh();
 		const previousProjects = [...previousByRoot.values()];
 		const events = activityEventsForRefresh(
@@ -190,6 +191,14 @@ export function createActivityRefresh(
 		}
 		previousByRoot = mergeProjectsByRoot(previousByRoot, state.projects);
 		return state;
+	};
+	return () => {
+		const result = queue.then(runRefresh);
+		queue = result.then(
+			() => undefined,
+			() => undefined,
+		);
+		return result;
 	};
 }
 
