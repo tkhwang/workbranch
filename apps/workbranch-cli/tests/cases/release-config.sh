@@ -122,7 +122,7 @@ cargo_lock_match = re.search(
 if cargo_lock_match is None:
     raise SystemExit('Cargo.lock must include the workbranch-companion package entry')
 if 'name = "workbranch-companion"\nversion = "' + cargo_lock_match.group(1) + '" # x-release-please-version' not in cargo_lock:
-    raise SystemExit('Cargo.lock workbranch-companion version must carry x-release-please-version marker')
+    raise SystemExit('[-] Error: Cargo.lock workbranch-companion version must carry x-release-please-version marker')
 cargo_lock_version = cargo_lock_match.group(1)
 
 versions = {
