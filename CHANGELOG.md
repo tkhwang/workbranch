@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.0.0](https://github.com/tkhwang/workbranch/compare/v1.26.1...v2.0.0) (2026-06-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* **design:** Visual design and color palette have been significantly altered. While no functional changes, the aesthetic is substantially different.
+
+### Features
+
+* **ui:** use DESIGN.md and update companion UI ([de04273](https://github.com/tkhwang/workbranch/commit/de042733e9eeb9a15981901280d464bbb776a0c0))
+
+
+### Bug Fixes
+
+* **watch_filter:** handle empty path events correctly ([0a6e91a](https://github.com/tkhwang/workbranch/commit/0a6e91a52d9edc71614076faf0c0917e06e7c68b))
+* **watcher:** correctly filter ignored paths ([d25c758](https://github.com/tkhwang/workbranch/commit/d25c758826549c23ce6101844056e76fbd02c5d3)), closes [#123](https://github.com/tkhwang/workbranch/issues/123)
+
+
+### Code Refactoring
+
+* **design:** update design principles to Raycast-like aesthetic ([e3a3788](https://github.com/tkhwang/workbranch/commit/e3a3788e24306c1b09b7df70640c1d9691ff5488))
+
 ## [1.26.1](https://github.com/tkhwang/workbranch/compare/v1.26.0...v1.26.1) (2026-06-16)
 
 
