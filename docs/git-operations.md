@@ -23,6 +23,7 @@ Composite:
 
 Maintenance:
   doctor      inspect project health; --fix prunes stale worktree registrations
+              and prepends a missing task brief H1 when safe
 
 Optional:
   push <task> task        -> remote task branch
@@ -155,9 +156,9 @@ Safety:
 
 ### `workbranch doctor [--fix]`
 
-Direction: inspect local filesystem and Git worktree metadata. With `--fix`, prune stale worktree registrations only.
+Direction: inspect local filesystem, Git worktree metadata, and task-root brief format. With `--fix`, prune stale worktree registrations and apply the safe task brief H1 repair.
 
-`workbranch doctor` reports base worktree issues, partial task workspaces, stale task directories, and prunable worktree registrations. It is read-only by default and exits `0` only when no issues are found.
+`workbranch doctor` reports base worktree issues, partial task workspaces, stale task directories, prunable worktree registrations, and content-bearing task briefs that parse to zero Plans because they have no `# <plan>` H1. It is read-only by default and exits `0` only when no issues are found.
 
 With `--fix`, for each in-scope base repo:
 
@@ -166,12 +167,21 @@ cd _base/<repo>
 git worktree prune
 ```
 
+For a content-bearing task brief with no H1, `--fix` may prepend a single heading:
+
+```markdown
+# <task>
+```
+
+It never rewrites, reorders, or promotes existing brief content. It creates no backup; undo is removing the inserted first line. If checklist items remain under `##` note sections, `doctor --fix` reports that manual promotion to `# ` Plan headings is still required and exits non-zero until that manual action is resolved.
+
 Safety:
 
 - `--fix` never deletes task directories or branches.
+- Task brief repair only prepends a missing `# <task>` H1 and leaves all existing content in place.
 - Stale task directories are reported with `workbranch remove <task>` guidance.
 - Base branch drift, dirty worktrees, rebases in progress, and partial workspaces are reported only.
-- `--repo <repo>` scopes both diagnosis and pruning to that repo.
+- `--repo <repo>` scopes repo/worktree diagnosis and pruning to that repo; task brief format checks remain per-task and are not repo-scoped.
 
 ### `workbranch push`
 

@@ -176,6 +176,7 @@ workbranch push                  # local feat/login -> origin/feat/login
 | `workbranch land <task>`   | task 작업을 local base branch로 fast-forward 반영       |
 | `workbranch done <task>`   | 현재 Plan을 done 처리하고 archive로 이동                |
 | `workbranch push [task]`   | base 또는 task branch push                              |
+| `workbranch doctor [--fix]` | project health 진단; safe fix는 stale worktree prune과 brief H1 repair 포함 |
 
 Combined flow shortcut:
 
@@ -196,6 +197,8 @@ Combined flow shortcut:
 - `<task>/.workbranch/notifications.jsonl`은 append-only local inbox입니다. `workbranch noti add/list/clear`가 관리하고, `workbranch list --json`은 companion app용 `notiCount`, `plans`, `planTitle`, `status`, `progressDone`, `progressTotal`, `currentItem`, `updatedAt`을 노출합니다.
 
 `workbranch remove <task>`는 workspace 제거가 성공한 뒤 known workbranch task state(`TASK-WORKBRANCH.md`, generated `AGENTS.md`, `.workbranch/`, `.workbranch.task`)를 삭제합니다. 그 외 task root에 남은 항목은 `.omx/`, `.omc/` 같은 agent runtime folder를 포함해 git으로 관리되지 않는 잔여물입니다. Normal remove는 이 목록을 보여주고 task root 전체를 삭제할지 한 번 묻습니다. `workbranch remove <task> --force`는 일반 safety preflight 통과 후 묻지 않고 task root를 제거합니다.
+
+`workbranch doctor`는 task brief format도 확인합니다. `status:` 또는 checklist item이 있는데 `# <plan>` H1이 없는 brief는 zero Plan으로 parse되어 CLI HUD와 companion app에서 보이지 않으므로 issue로 보고합니다. `workbranch doctor --fix`는 brief 본문을 rewrite하지 않고 맨 앞에 `# <task>` heading 한 줄만 추가할 수 있습니다. Backup은 만들지 않으며, 되돌리려면 삽입된 첫 줄을 삭제하면 됩니다. Checklist item이 계속 `##` note section 아래에 남아 있으면 intended Plan을 `# ` heading으로 승격하라는 manual follow-up을 보고하고, 그 조치가 끝날 때까지 non-zero로 종료합니다.
 
 ## Native menu bar companion
 

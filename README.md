@@ -111,7 +111,7 @@ To bring a single task up to the latest base, `pull` the base from its remote an
 
 ```bash
 workbranch pull               # pull base latest update
-workbranch update feat-login  # apply local base update to feat-login task 
+workbranch update feat-login  # apply local base update to feat-login task
 
 # combined: pull + update in one step
 workbranch refresh feat-login
@@ -176,6 +176,7 @@ workbranch push                    # local feat/login -> origin/feat/login
 | `workbranch land <task>`   | Fast-forward task work into local base branches         |
 | `workbranch done <task>`   | Mark the current Plan done and archive it               |
 | `workbranch push [task]`   | Push base or task branches                              |
+| `workbranch doctor [--fix]` | Diagnose project health; safe fixes include stale worktree pruning and brief H1 repair |
 
 Combined flow shortcuts:
 
@@ -196,6 +197,8 @@ Combined flow shortcuts:
 - `<task>/.workbranch/notifications.jsonl` is an append-only local inbox. `workbranch noti add/list/clear` manages it, and `workbranch list --json` exposes `notiCount`, `plans`, `planTitle`, `status`, `progressDone`, `progressTotal`, `currentItem`, and `updatedAt` for companion apps.
 
 `workbranch remove <task>` deletes known workbranch task state after successful workspace removal: `TASK-WORKBRANCH.md`, generated `AGENTS.md`, `.workbranch/`, and `.workbranch.task`. Everything else left in the task root, including agent runtime folders such as `.omx/` and `.omc/`, is not git-managed. Normal remove lists those leftovers and asks once whether to delete the entire task root. `workbranch remove <task> --force` removes the task root without prompting after the normal safety preflights pass.
+
+`workbranch doctor` also checks task brief format. A content-bearing brief with `status:` or checklist items but no `# <plan>` H1 is reported because it parses to zero Plans and stays invisible to the CLI HUD and companion apps. `workbranch doctor --fix` can prepend a single `# <task>` heading without rewriting the rest of the brief; it creates no backup, and undo is removing that inserted first line. If checklist items remain under `##` note sections, doctor reports a manual follow-up to promote intended Plans to `# ` headings and exits non-zero until that manual action is resolved.
 
 ## Native menu bar companion
 
