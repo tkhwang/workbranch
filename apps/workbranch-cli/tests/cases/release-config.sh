@@ -37,11 +37,7 @@ expected_companion_extra_files = [
     {'type': 'json', 'path': 'src-tauri/tauri.conf.json', 'jsonpath': '$.version'},
     {'type': 'json', 'path': 'package.json', 'jsonpath': '$.version'},
     {'type': 'toml', 'path': 'src-tauri/Cargo.toml', 'jsonpath': '$.package.version'},
-    {
-        'type': 'toml',
-        'path': 'src-tauri/Cargo.lock',
-        'jsonpath': '$.package[?(@.name=="workbranch-companion")].version',
-    },
+    {'type': 'generic', 'path': 'src-tauri/Cargo.lock'},
 ]
 if companion_extra_files != expected_companion_extra_files:
     raise SystemExit(f'companion extra-files mismatch: {companion_extra_files}')
@@ -50,6 +46,7 @@ sample_companion_only_files = [
     'apps/workbranch-companion/src/App.tsx',
     'packages/contract/src/index.ts',
     'docs/plans/0027-companion-launch-at-login.md',
+    'DESIGN.md',
     'README.md',
     'README.ko.md',
 ]
@@ -119,11 +116,13 @@ cargo_toml = Path('apps/workbranch-companion/src-tauri/Cargo.toml').read_text()
 cargo_toml_version = re.search(r'^version = "([^"]+)"$', cargo_toml, flags=re.MULTILINE).group(1)
 cargo_lock = Path('apps/workbranch-companion/src-tauri/Cargo.lock').read_text()
 cargo_lock_match = re.search(
-    r'(?ms)^\[\[package\]\]\nname = "workbranch-companion"\nversion = "([^"]+)"$',
+    r'(?m)^name = "workbranch-companion"\nversion = "([^"]+)"(?:\s+# x-release-please-version)?$',
     cargo_lock,
 )
 if cargo_lock_match is None:
     raise SystemExit('Cargo.lock must include the workbranch-companion package entry')
+if 'name = "workbranch-companion"\nversion = "' + cargo_lock_match.group(1) + '" # x-release-please-version' not in cargo_lock:
+    raise SystemExit('[-] Error: Cargo.lock workbranch-companion version must carry x-release-please-version marker')
 cargo_lock_version = cargo_lock_match.group(1)
 
 versions = {
