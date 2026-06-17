@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.1.0](https://github.com/tkhwang/workbranch/compare/v2.0.1...v2.1.0) (2026-06-17)
+
+
+### Features
+
+* **doctor:** add brief format checks and fixes ([28a6211](https://github.com/tkhwang/workbranch/commit/28a62115481b3c80971a2bc014463833eda8fc5f))
+
+
+### Bug Fixes
+
+* **doctor:** improve brief parsing and reporting ([8e487f9](https://github.com/tkhwang/workbranch/commit/8e487f99702217b1ada96abab121856082cf8ca5))
+
 ## [2.0.1](https://github.com/tkhwang/workbranch/compare/v2.0.0...v2.0.1) (2026-06-17)
 
 
