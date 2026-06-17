@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/tkhwang/workbranch/compare/v2.0.0...v2.0.1) (2026-06-17)
+
+
+### Bug Fixes
+
+* **ui:** add Cargo.lock version tracking to release-please configuration ([8d58b43](https://github.com/tkhwang/workbranch/commit/8d58b43c42234703d09eb005e3f2b34671848985))
+
 ## [2.0.0](https://github.com/tkhwang/workbranch/compare/v1.26.1...v2.0.0) (2026-06-17)
 
 
