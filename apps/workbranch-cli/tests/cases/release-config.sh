@@ -37,6 +37,11 @@ expected_companion_extra_files = [
     {'type': 'json', 'path': 'src-tauri/tauri.conf.json', 'jsonpath': '$.version'},
     {'type': 'json', 'path': 'package.json', 'jsonpath': '$.version'},
     {'type': 'toml', 'path': 'src-tauri/Cargo.toml', 'jsonpath': '$.package.version'},
+    {
+        'type': 'toml',
+        'path': 'src-tauri/Cargo.lock',
+        'jsonpath': '$.package[?(@.name=="workbranch-companion")].version',
+    },
 ]
 if companion_extra_files != expected_companion_extra_files:
     raise SystemExit(f'companion extra-files mismatch: {companion_extra_files}')
