@@ -15,6 +15,13 @@ jobs:
     if: ${{ !startsWith(github.event.release.tag_name, 'workbranch-companion-') }}
 
     steps:
+      - name: Checkout source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          path: workbranch
+          persist-credentials: false
+
       - name: Checkout Homebrew tap
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
@@ -41,8 +48,12 @@ jobs:
           tarball_path=$(mktemp)
           curl -fsSL "$tarball_url" -o "$tarball_path"
           tarball_sha=$(sha256sum "$tarball_path" | awk '{print $1}')
+          FORMULA_TEMPLATE="workbranch/packaging/homebrew/workbranch.rb"
+          FORMULA_PATH="homebrew-tap/Formula/workbranch.rb"
 
-          FORMULA_PATH="homebrew-tap/Formula/workbranch.rb" \
+          cp "$FORMULA_TEMPLATE" "$FORMULA_PATH"
+
+          FORMULA_PATH="$FORMULA_PATH" \
           TARBALL_URL="$tarball_url" \
           TARBALL_SHA="$tarball_sha" \
           python3 - <<'PY'

@@ -66,6 +66,32 @@ if not_excluded:
 PY
 }
 
+test_homebrew_formula_template_tracks_cli_layout() {
+  python3 - <<'PY'
+from pathlib import Path
+
+formula = Path('packaging/homebrew/workbranch.rb').read_text()
+workflow = Path('.github/workflows/homebrew-bump.yml').read_text()
+
+expected_formula_lines = [
+    'system "apps/workbranch-cli/scripts/build-workbranch.sh"',
+    'bin.install "apps/workbranch-cli/bin/workbranch"',
+]
+missing_formula_lines = [line for line in expected_formula_lines if line not in formula]
+if missing_formula_lines:
+    raise SystemExit(f'Homebrew formula template must build moved CLI layout: {missing_formula_lines}')
+
+expected_workflow_lines = [
+    'FORMULA_TEMPLATE="workbranch/packaging/homebrew/workbranch.rb"',
+    'cp "$FORMULA_TEMPLATE" "$FORMULA_PATH"',
+]
+missing_workflow_lines = [line for line in expected_workflow_lines if line not in workflow]
+if missing_workflow_lines:
+    raise SystemExit(f'Homebrew bump workflow must copy the formula template before stamping URL/SHA: {missing_workflow_lines}')
+PY
+}
+
+
 test_companion_release_cask_quits_running_app_on_upgrade() {
   python3 - <<'PY'
 from pathlib import Path
