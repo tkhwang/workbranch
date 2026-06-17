@@ -4487,23 +4487,48 @@ doctor_task_state() {
 }
 
 doctor_brief_has_tracked_content() {
-  local task file
+  local task file line in_code
   task=$1
   file=$(task_brief_file "$task") || true
   [ -n "${file:-}" ] || return 1
   [ -s "$file" ] || return 1
-  grep -Eq '^[[:space:]]*status:[[:space:]]*[^[:space:]]+|^[[:space:]]*-[[:space:]]*\[[xX[:space:]]\]' "$file"
+  in_code=0
+  while IFS= read -r line || [ -n "$line" ]; do
+    if [[ $line =~ ^[[:space:]]*\`\`\` ]]; then
+      if [ "$in_code" -eq 0 ]; then in_code=1; else in_code=0; fi
+      continue
+    fi
+    [ "$in_code" -eq 0 ] || continue
+    if [[ $line =~ ^[[:space:]]*status:[[:space:]]*[^[:space:]]+ ]]; then
+      return 0
+    fi
+    if [[ $line =~ ^[[:space:]]*-[[:space:]]*\[[xX[:space:]]\] ]]; then
+      return 0
+    fi
+  done < "$file"
+  return 1
 }
 
 doctor_brief_has_h1() {
-  local task file
+  local task file line in_code
   task=$1
   file=$(task_brief_file "$task") || true
   [ -n "${file:-}" ] || return 1
-  grep -Eq '^#[[:space:]]+' "$file"
+  in_code=0
+  while IFS= read -r line || [ -n "$line" ]; do
+    if [[ $line =~ ^[[:space:]]*\`\`\` ]]; then
+      if [ "$in_code" -eq 0 ]; then in_code=1; else in_code=0; fi
+      continue
+    fi
+    [ "$in_code" -eq 0 ] || continue
+    if [[ $line =~ ^#[[:space:]]+ ]]; then
+      return 0
+    fi
+  done < "$file"
+  return 1
 }
 
-doctor_brief_has_h2_checklist() {
+doctor_brief_has_h2_tracked_content() {
   local task file line in_code in_h2
   task=$1
   file=$(task_brief_file "$task") || true
@@ -4524,8 +4549,13 @@ doctor_brief_has_h2_checklist() {
       in_h2=1
       continue
     fi
-    if [ "$in_h2" -eq 1 ] && [[ $line =~ ^[[:space:]]*-[[:space:]]*\[[xX[:space:]]\] ]]; then
-      return 0
+    if [ "$in_h2" -eq 1 ]; then
+      if [[ $line =~ ^[[:space:]]*status:[[:space:]]*[^[:space:]]+ ]]; then
+        return 0
+      fi
+      if [[ $line =~ ^[[:space:]]*-[[:space:]]*\[[xX[:space:]]\] ]]; then
+        return 0
+      fi
     fi
   done < "$file"
   return 1
@@ -4537,6 +4567,21 @@ doctor_brief_unparseable() {
   doctor_brief_has_tracked_content "$task" || return 1
   task_load_plans "$task"
   [ "$TASK_PLAN_COUNT" -eq 0 ]
+}
+
+doctor_brief_h2_tracked_followup() {
+  local task i total_count
+  task=$1
+  doctor_brief_has_h2_tracked_content "$task" || return 1
+  task_load_plans "$task"
+  [ "$TASK_PLAN_COUNT" -gt 0 ] || return 1
+  total_count=0
+  i=0
+  while [ $i -lt $TASK_PLAN_COUNT ]; do
+    total_count=$((total_count + ${TASK_PLAN_TOTAL[$i]:-0}))
+    i=$((i + 1))
+  done
+  [ "$total_count" -eq 0 ]
 }
 
 doctor_report() {
@@ -4615,13 +4660,20 @@ doctor_report() {
   for task_path in "$PROJECT_ROOT"/*; do
     doctor_task_candidate_path "$task_path" || continue
     task=${task_path##*/}
-    doctor_brief_unparseable "$task" || continue
-    doctor_issue "$task brief not parseable: no '# <plan>' heading (HUD/Companion shows nothing)"
-    info "fix: workbranch doctor --fix"
-    if doctor_brief_has_h2_checklist "$task"; then
-      info "manual: promote intended '##' sections to '# ' headings"
+    if doctor_brief_unparseable "$task"; then
+      doctor_issue "$task brief not parseable: no '# <plan>' heading (HUD/Companion shows nothing)"
+      info "fix: workbranch doctor --fix"
+      if doctor_brief_has_h2_tracked_content "$task"; then
+        info "manual: promote intended '##' sections to '# ' headings"
+      fi
+      brief_found=1
+      continue
     fi
-    brief_found=1
+    if doctor_brief_h2_tracked_followup "$task"; then
+      doctor_issue "Manual task brief follow-up: $task has tracked content under '##' sections; promote intended plans to '# ' headings"
+      info "manual: promote intended '##' sections to '# ' headings"
+      brief_found=1
+    fi
   done
   [ "$brief_found" -eq 1 ] || info "(none)"
 
@@ -4703,8 +4755,7 @@ doctor_apply_brief_fix() {
     else
       repaired_names="$repaired_names, $task"
     fi
-    if doctor_brief_has_h2_checklist "$task"; then
-      doctor_manual_followup_count=$((doctor_manual_followup_count + 1))
+    if doctor_brief_has_h2_tracked_content "$task"; then
       if [ -z "$manual_names" ]; then
         manual_names="$task"
       else
@@ -4717,7 +4768,7 @@ doctor_apply_brief_fix() {
     info "undo: remove the inserted first '# <task>' line if needed"
   fi
   if [ -n "$manual_names" ]; then
-    info "Manual task brief follow-up: $manual_names has checklist items under '##' sections; promote intended plans to '# ' headings"
+    info "Manual task brief follow-up: $manual_names has tracked content under '##' sections; promote intended plans to '# ' headings"
   fi
   if [ -n "$repaired_names" ] || [ -n "$manual_names" ]; then
     printf '\n'

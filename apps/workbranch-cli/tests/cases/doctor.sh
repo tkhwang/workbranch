@@ -166,6 +166,36 @@ EOF_NOTES
   assert_contains "$out" "status=0"
 }
 
+test_doctor_ignores_fenced_brief_examples() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add feat-login >/dev/null
+  cat > "$project/feat-login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
+Example only:
+
+```markdown
+status: done
+- [x] did the work
+- [ ] verify
+```
+EOF_BRIEF
+
+  out=$(doctor_with_status)
+  assert_contains "$out" "doctor found no issues"
+  assert_not_contains "$out" "brief not parseable"
+  assert_contains "$out" "status=0"
+
+  fix_out=$(doctor_with_status --fix)
+  assert_contains "$fix_out" "doctor found no issues"
+  assert_contains "$fix_out" "status=0"
+  if grep -q '^# feat-login$' "$project/feat-login/TASK-WORKBRANCH.md"; then
+    fail "fenced-only example was incorrectly repaired"
+  fi
+}
+
 test_doctor_flags_multi_h2_unparseable_brief() {
   new_fixture
   project="$FIXTURE_PROJECT"
@@ -248,6 +278,37 @@ assert t["progressTotal"] == 2 and t["progressDone"] == 1, t'
   assert_contains "$clean_out" "status=0"
 }
 
+test_doctor_fix_ignores_fenced_h1_before_repair() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add feat-login >/dev/null
+  cat > "$project/feat-login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
+```markdown
+# example
+```
+
+status: done
+- [x] did the work
+- [ ] verify
+EOF_BRIEF
+
+  fix_out=$(doctor_with_status --fix)
+  assert_contains "$fix_out" "Repaired task briefs"
+  assert_contains "$fix_out" "status=0"
+  head -n 1 "$project/feat-login/TASK-WORKBRANCH.md" | grep -q '^# feat-login$' || fail "no H1 prepended"
+  out=$(run_expect_success "$WORKBRANCH" list --json)
+  printf '%s' "$out" | python3 -c 'import json,sys
+t=json.load(sys.stdin)["tasks"][0]
+assert len(t["plans"]) == 1, t
+assert t["progressTotal"] == 2 and t["progressDone"] == 1, t'
+  clean_out=$(doctor_with_status)
+  assert_contains "$clean_out" "doctor found no issues"
+  assert_contains "$clean_out" "status=0"
+}
+
 test_doctor_fix_is_idempotent() {
   new_fixture
   project="$FIXTURE_PROJECT"
@@ -297,6 +358,45 @@ EOF_BRIEF
 t=json.load(sys.stdin)["tasks"][0]
 assert len(t["plans"]) == 1, t
 assert t["progressTotal"] == 0 and t["progressDone"] == 0, t'
+
+  follow_up_out=$(doctor_with_status)
+  assert_contains "$follow_up_out" "Manual task brief follow-up"
+  assert_contains "$follow_up_out" "feat-login"
+  assert_contains "$follow_up_out" "status=1"
+}
+
+
+test_doctor_fix_h2_status_keeps_manual_follow_up_nonzero() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add feat-login >/dev/null
+  cat > "$project/feat-login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
+## Current status
+status: blocked
+EOF_BRIEF
+
+  fix_out=$(doctor_with_status --fix)
+  assert_contains "$fix_out" "Repaired task briefs"
+  assert_contains "$fix_out" "Manual task brief follow-up"
+  assert_contains "$fix_out" "doctor fixed 1 issue(s); 1 require manual action"
+  assert_contains "$fix_out" "status=1"
+  head -n 1 "$project/feat-login/TASK-WORKBRANCH.md" | grep -q '^# feat-login$' || fail "no H1 prepended"
+  h1_count=$(grep -c '^# feat-login$' "$project/feat-login/TASK-WORKBRANCH.md")
+  [ "$h1_count" -eq 1 ] || fail "expected one H1, got $h1_count"
+  out=$(run_expect_success "$WORKBRANCH" list --json)
+  printf '%s' "$out" | python3 -c 'import json,sys
+t=json.load(sys.stdin)["tasks"][0]
+assert len(t["plans"]) == 1, t
+assert t["status"] == "todo", t
+assert t["progressTotal"] == 0 and t["progressDone"] == 0, t'
+
+  follow_up_out=$(doctor_with_status)
+  assert_contains "$follow_up_out" "Manual task brief follow-up"
+  assert_contains "$follow_up_out" "feat-login"
+  assert_contains "$follow_up_out" "status=1"
 }
 
 test_doctor_fix_does_not_delete_stale_task_directory() {
