@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.1.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.0.0...workbranch-companion-v2.1.0) (2026-06-17)
+
+
+### Features
+
+* **ui:** redesign companion app layout and summary ([24f4d51](https://github.com/tkhwang/workbranch/commit/24f4d51aff27da9b278e786f1eb3018401e72df1))
+* **ui:** redesign companion app layout and summary ([cae49ca](https://github.com/tkhwang/workbranch/commit/cae49caded059a79be694c27263f14b2e5a81d7b))
+
+
+### Bug Fixes
+
+* revert version to 2.1.1, add DESIGN.md to release-please, and update Cargo.lock handling ([da77323](https://github.com/tkhwang/workbranch/commit/da773235f91a363fc1a5f2d917fa44e779637322))
+
 ## [2.0.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v1.14.1...workbranch-companion-v2.0.0) (2026-06-17)
 
 
