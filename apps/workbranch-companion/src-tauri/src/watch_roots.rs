@@ -19,6 +19,7 @@ pub(crate) fn build_watchers(
     for root in roots {
         let root_path = PathBuf::from(root);
         let root_label = root.clone();
+        let filter_root = root_path.clone();
         let app_handle = app.clone();
         let debounce_state = Arc::clone(&debounce);
         let mut watcher =
@@ -26,7 +27,7 @@ pub(crate) fn build_watchers(
                 let Ok(event) = event else {
                     return;
                 };
-                if !event_has_relevant_change(&event.paths, IGNORED_COMPONENTS) {
+                if !event_has_relevant_change(&filter_root, &event.paths, IGNORED_COMPONENTS) {
                     return;
                 }
                 if should_emit_root_change(&debounce_state, &root_label) {

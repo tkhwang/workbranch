@@ -78,7 +78,58 @@ const UPDATED_STATE: GlobalState = {
 	errors: [],
 };
 
+type Deferred<T> = {
+	readonly promise: Promise<T>;
+	readonly resolve: (value: T) => void;
+};
+
+function deferred<T>(): Deferred<T> {
+	let resolveValue: ((value: T) => void) | undefined;
+	const promise = new Promise<T>((resolve) => {
+		resolveValue = resolve;
+	});
+	if (resolveValue === undefined) {
+		throw new Error("deferred resolver was not initialized");
+	}
+	return { promise, resolve: resolveValue };
+}
+
+function nextMicrotask(): Promise<void> {
+	return Promise.resolve();
+}
+
 describe("createActivityRefresh", () => {
+	it("serializes overlapping refresh callers", async () => {
+		const firstRefresh = deferred<GlobalState>();
+		const appended: ActivityEvent[][] = [];
+		let refreshCalls = 0;
+		const refresh = createActivityRefresh({
+			refresh: () => {
+				refreshCalls += 1;
+				return refreshCalls === 1
+					? firstRefresh.promise
+					: Promise.resolve(UPDATED_STATE);
+			},
+			append: (events) => {
+				appended.push([...events]);
+				return Promise.resolve();
+			},
+			now: () => 100,
+		});
+
+		const firstResult = refresh();
+		const secondResult = refresh();
+		await nextMicrotask();
+
+		expect(refreshCalls).toBe(1);
+		firstRefresh.resolve(BASELINE_STATE);
+		await expect(firstResult).resolves.toBe(BASELINE_STATE);
+		await expect(secondResult).resolves.toBe(UPDATED_STATE);
+
+		expect(refreshCalls).toBe(2);
+		expect(appended).toHaveLength(1);
+	});
+
 	it("appends plan activity after the per-root baseline refresh", async () => {
 		const states = [BASELINE_STATE, UPDATED_STATE];
 		const appended: ActivityEvent[][] = [];

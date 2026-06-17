@@ -61,6 +61,9 @@ export async function startWorkspaceMonitor(
 	};
 
 	const scheduleRefresh = (): void => {
+		if (stopped) {
+			return;
+		}
 		if (running) {
 			queued = true;
 			return;

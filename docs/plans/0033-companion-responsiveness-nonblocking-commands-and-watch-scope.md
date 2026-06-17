@@ -27,7 +27,7 @@ Tauri v2에서 **`async`가 아닌 동기 `#[tauri::command]` 함수는 메인 �
 `watch_roots`가 **프로젝트 루트 전체를 `RecursiveMode::Recursive`로 감시**한다(`lib.rs:146`). 루트에는 `node_modules`, `target`, `dist` 등 변경이 끊임없지만 Companion 상태와 무관한 디렉터리가 들어있다. watcher 콜백(`lib.rs:138-145`)은 **이벤트 경로를 전혀 보지 않고**(`event.is_err()`만 체크) 무조건 `roots-changed`를 emit한다. 디바운스는 루트당 500ms(`should_emit_root_change`, `lib.rs:160`)뿐이라, 작업 중인 프로젝트에서는 노이즈성 변경이 500ms마다 한 번씩 통과한다. 반면 workbranch의 task root 자체는 git repo가 아니라 `TASK-WORKBRANCH.md`/`.workbranch/**` 같은 metadata를 담고, 실제 repo는 linked worktree인 `<task>/<repo>/`다. linked worktree의 `.git`은 파일일 수 있고 실제 gitdir은 `_base/<repo>/.git/worktrees/...`에 있을 수 있으므로, `.git` 전체를 ignore하면 일부 git command 이후 repo `branch`/`dirty` freshness를 heartbeat에 의존하게 될 수 있다.
 
 데이터 흐름:
-```
+```text
 node_modules/빌드 산출물 같은 무관한 변경
   → (경로 무필터) roots-changed emit (루트당 500ms 디바운스)
   → 프론트 scheduleRefresh (workspaceMonitor.ts:38)

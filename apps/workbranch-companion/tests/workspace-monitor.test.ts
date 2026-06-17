@@ -179,6 +179,34 @@ describe("startWorkspaceMonitor", () => {
 		monitor.stop();
 	});
 
+	it("ignores late root change callbacks after stop", async () => {
+		let rootChanged: (() => void) | undefined;
+		let refreshCalls = 0;
+
+		const monitor = await startWorkspaceMonitor({
+			refresh: () => {
+				refreshCalls += 1;
+				return Promise.resolve(FIRST_STATE);
+			},
+			onState: () => {},
+			onError: (error) => {
+				throw error;
+			},
+			watchRoots: () => Promise.resolve(),
+			onRootChanged: (callback) => {
+				rootChanged = callback;
+				return Promise.resolve(() => {});
+			},
+		});
+
+		expect(refreshCalls).toBe(1);
+		monitor.stop();
+		rootChanged?.();
+		await monitor.settle();
+
+		expect(refreshCalls).toBe(1);
+	});
+
 	it("starts heartbeat refreshes and clears the heartbeat on stop", async () => {
 		let heartbeatCallback: (() => void) | undefined;
 		let clearedHandle = 0;

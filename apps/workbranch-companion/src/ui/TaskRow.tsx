@@ -162,7 +162,7 @@ function RepoChips({ repos }: RepoChipsProps) {
 			{repos.map((repo) => (
 				<li
 					className={`repo-chip${repo.dirty ? " repo-dirty" : ""}`}
-					key={repo.name}
+					key={`${repo.name}:${repo.branch}`}
 					title={`${repo.name} ${repo.branch}${repo.dirty ? " dirty" : " clean"}`}
 				>
 					<span className="repo-name">{repo.name}</span>

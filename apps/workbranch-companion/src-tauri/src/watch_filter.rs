@@ -10,12 +10,19 @@ pub(crate) const IGNORED_COMPONENTS: &[&str] = &[
     ".cache",
 ];
 
-pub(crate) fn event_has_relevant_change(paths: &[PathBuf], ignored: &[&str]) -> bool {
-    paths.is_empty() || paths.iter().any(|path| !path_is_ignored(path, ignored))
+pub(crate) fn event_has_relevant_change(root: &Path, paths: &[PathBuf], ignored: &[&str]) -> bool {
+    paths.is_empty()
+        || paths
+            .iter()
+            .any(|path| !path_is_ignored(root, path, ignored))
 }
 
-pub(crate) fn path_is_ignored(path: &Path, ignored: &[&str]) -> bool {
-    path.components().any(|component| {
+pub(crate) fn path_is_ignored(root: &Path, path: &Path, ignored: &[&str]) -> bool {
+    let relative_path = match path.strip_prefix(root) {
+        Ok(relative_path) => relative_path,
+        Err(_) => path,
+    };
+    relative_path.components().any(|component| {
         let value = component.as_os_str();
         ignored
             .iter()
@@ -26,7 +33,13 @@ pub(crate) fn path_is_ignored(path: &Path, ignored: &[&str]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{IGNORED_COMPONENTS, event_has_relevant_change};
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
+
+    const ROOT: &str = "/project";
+
+    fn root() -> &'static Path {
+        Path::new(ROOT)
+    }
 
     fn paths(values: &[&str]) -> Vec<PathBuf> {
         values.iter().map(PathBuf::from).collect()
@@ -40,7 +53,26 @@ mod tests {
             "/project/.next/cache/file",
         ]);
 
-        assert!(!event_has_relevant_change(&event_paths, IGNORED_COMPONENTS));
+        assert!(!event_has_relevant_change(
+            root(),
+            &event_paths,
+            IGNORED_COMPONENTS
+        ));
+    }
+
+    #[test]
+    fn keeps_relevant_paths_when_watched_root_parent_is_ignored_name() {
+        let root = Path::new("/tmp/target/demo");
+        let event_paths = paths(&[
+            "/tmp/target/demo/TASK-WORKBRANCH.md",
+            "/tmp/target/demo/workbranch/src/lib.rs",
+        ]);
+
+        assert!(event_has_relevant_change(
+            root,
+            &event_paths,
+            IGNORED_COMPONENTS
+        ));
     }
 
     #[test]
@@ -50,7 +82,11 @@ mod tests {
             "/project/feat-login/frontend/src/App.tsx",
         ]);
 
-        assert!(event_has_relevant_change(&event_paths, IGNORED_COMPONENTS));
+        assert!(event_has_relevant_change(
+            root(),
+            &event_paths,
+            IGNORED_COMPONENTS
+        ));
     }
 
     #[test]
@@ -62,7 +98,11 @@ mod tests {
             "/project/_base/frontend/.git/packed-refs",
         ]);
 
-        assert!(event_has_relevant_change(&event_paths, IGNORED_COMPONENTS));
+        assert!(event_has_relevant_change(
+            root(),
+            &event_paths,
+            IGNORED_COMPONENTS
+        ));
     }
 
     #[test]
@@ -72,6 +112,10 @@ mod tests {
             "/project/feat-login/TASK-WORKBRANCH.md",
         ]);
 
-        assert!(event_has_relevant_change(&event_paths, IGNORED_COMPONENTS));
+        assert!(event_has_relevant_change(
+            root(),
+            &event_paths,
+            IGNORED_COMPONENTS
+        ));
     }
 }
