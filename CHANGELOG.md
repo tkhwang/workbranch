@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.1](https://github.com/tkhwang/workbranch/compare/v2.1.0...v2.1.1) (2026-06-17)
+
+
+### Bug Fixes
+
+* **homebrew:** update bump workflow for cli layout ([549ece2](https://github.com/tkhwang/workbranch/commit/549ece2360201f6eb36f49d19e389bf0ac094677))
+* **homebrew:** update bump workflow for cli layout ([b58b78d](https://github.com/tkhwang/workbranch/commit/b58b78dbe0c05a44d63fb99170129c002b088d2c))
+
 ## [2.1.0](https://github.com/tkhwang/workbranch/compare/v2.0.1...v2.1.0) (2026-06-17)
 
 
