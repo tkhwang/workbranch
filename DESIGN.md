@@ -2,19 +2,20 @@
 
 ## Source of truth
 - Status: Active
-- Last refreshed: 2026-06-17
+- Last refreshed: 2026-06-18
 - Primary product surfaces: Workbranch Companion macOS menu bar popover.
 - Evidence reviewed:
   - `docs/plans/0032-companion-tauri-react-rewrite.md`
   - `docs/plans/0033-companion-responsiveness-nonblocking-commands-and-watch-scope.md`
+  - `docs/plans/0037-companion-settings-cli-theme.md`
   - `apps/workbranch-companion/src/App.tsx`
   - `apps/workbranch-companion/src/ui/TaskRow.tsx`
   - `apps/workbranch-companion/src/style.css`
 
 ## Brand
-- Personality: fast, focused, developer-native, command-oriented.
-- Trust signals: fast refresh, clear current step, visible repo dirty/branch state, sleek dark chrome, restrained accent glow.
-- Avoid: marketing hero layouts, oversized cards, large SaaS rows, generic dashboard cards, generic shadcn look, decorative animation.
+- Personality: fast, focused, terminal-native, command-line HUD.
+- Trust signals: fast refresh, clear current step, visible repo dirty/branch state, fixed-width readability, restrained terminal accents.
+- Avoid: marketing hero layouts, oversized cards, large SaaS rows, generic dashboard cards, generic shadcn look, decorative animation, glossy app chrome.
 
 ## Product goals
 - Goals:
@@ -24,7 +25,7 @@
   - Keep actions discoverable but visually secondary.
 - Non-goals:
   - Task lifecycle mutation UI.
-  - Full project dashboard or report view redesign.
+  - Full activity report implementation.
   - New UI dependency stack.
 - Success signals:
   - A user can identify active/blocked work in under three seconds.
@@ -41,15 +42,15 @@
 - Key contexts of use: quick menu bar glance while coding, before switching tasks, during AI-agent execution.
 
 ## Information architecture
-- Primary navigation: single popover grouped by project, with groups sorted by most recent task update.
-- Core screens: project-grouped task list, expanded task details, error rows.
+- Primary navigation: bottom mobile-style view bar with three destinations: Main, Activity, Setting.
+- Core screens: Main task list, Activity report placeholder, Setting preferences view.
 - Content hierarchy:
-  1. Global inventory + status rollup and refresh.
-  2. Project group header (name + task count).
-  3. Task name + status dot + progress + notification.
-  4. Repo branch/dirty state.
-  5. Active plan / current step, then nested plan steps.
-  6. Actions (IDE, Terminal, Finder).
+  1. Global inventory + status rollup and icon-only refresh.
+  2. Active view content.
+  3. Main view: project group header, task name/status/progress/notification, repo branch/dirty state, active plan/current step, actions.
+  4. Activity view: future report placeholder only in this slice.
+  5. Setting view: launch-at-login, font, and theme controls.
+  6. Persistent live status footer and bottom view navigation.
 
 ## Design principles
 - Principle 1: Status is a launcher signal, not a paragraph. Use compact dots, counts, and labels.
@@ -58,10 +59,10 @@
 - Tradeoffs: density is preferred over spaciousness, but tap/click targets remain at least 32px high where practical.
 
 ## Visual language
-- Color: Raycast-style dark chrome with restrained red-pink/violet active accents, red blocked accent, green done accent, amber notification accent.
-- Typography: system UI for labels; monospace only for repo/branch/path-like metadata.
-- Spacing/layout rhythm: compact command-palette rhythm, 8px grid, row-first grouping, no large cards.
-- Shape/radius/elevation: one fixed radius scale (`6px` controls, `10px` rows, `14px` shell); depth from dark chrome background steps, soft inset highlights, and hairline borders.
+- Color: terminal-like theme presets (`terminal-dark`, `amber-crt`, `green-mono`, `high-contrast`) with complete token sets for surfaces, lines, text, accents, status colors, and shell/component backgrounds.
+- Typography: fixed-width UI by default; all labels, status rows, repo/branch/path-like metadata, and settings controls inherit the selected monospace stack.
+- Spacing/layout rhythm: compact terminal/preferences rhythm, 8px grid, row-first grouping, prompt-like separators, subtle grid or border lines, no large cards.
+- Shape/radius/elevation: one fixed radius scale (`6px` controls, `10px` rows, `14px` shell); depth from tonal terminal surfaces and hairline borders, not heavy gradients or glossy glow.
 - Motion: 120ms press/reveal feedback only; respect reduced motion.
 - Imagery/iconography: text glyphs and status dots only; no decorative illustration.
 
@@ -70,6 +71,13 @@
 - New/changed components:
   - global inventory/status summary,
   - project group header,
+  - top toolbar with icon-only refresh control,
+  - bottom view navigation for Main, Activity, and Setting,
+  - Setting view preferences panel,
+  - Activity report placeholder view,
+  - switch row for launch-at-login,
+  - font select row,
+  - theme select row with optional non-interactive preview chips,
   - launcher-like task summary line,
   - current-step strip,
   - repo chips,
@@ -82,7 +90,7 @@
 - Target standard: keyboard-operable popover controls and readable contrast.
 - Keyboard/focus behavior: buttons and `summary` expose clear focus rings.
 - Contrast/readability: status text and current step must pass practical dark-mode contrast; disabled action may be muted but legible.
-- Screen-reader semantics: preserve button `aria-label`s; use meaningful text labels for status where visible.
+- Screen-reader semantics: preserve button `aria-label`s; bottom view buttons expose destination labels and `aria-current`; settings controls use associated labels, switch state text, and a live status footer.
 - Reduced motion and sensory considerations: disable transform transitions under `prefers-reduced-motion: reduce`.
 
 ## Responsive behavior
@@ -104,7 +112,7 @@
 - Microcopy rules: prefer short row action labels (`IDE`, `Terminal`, `Finder`) over sentences; omit `Copy`/`Memo`/`Noti`/`Clear` row vocabulary because those companion actions are removed, not hidden.
 
 ## Implementation constraints
-- Framework/styling system: React 18 + plain CSS; no Tailwind/shadcn in this refresh. Primary reference is Raycast; Linear remains only a secondary status-hierarchy cue.
+- Framework/styling system: React 18 + plain CSS; no Tailwind/shadcn in this refresh. Primary reference is terminal/CLI HUD; Raycast remains only a secondary compact-popover cue.
 - Design-token constraints: CSS custom properties in `style.css`.
 - Performance constraints: no extra runtime package; no animation loops; preserve 0033 responsiveness fixes.
 - Compatibility constraints: no CLI/contract/Rust port changes.
@@ -116,3 +124,4 @@
 
 ## Direction revision
 - 2026-06-17: Primary reference changed from Linear to Raycast after implementation review. Keep Linear only as a secondary cue for compact status hierarchy; the dominant feel should be a Raycast-like menu command/status popover, not a SaaS issue-list dashboard.
+- 2026-06-18: Primary direction changed from Raycast-like chrome to a terminal/CLI developer HUD for companion settings, fonts, and theme presets. Treat the 2026-06-17 Raycast direction as superseded for shell color, typography, and settings components; keep only the compact status hierarchy lessons. Later on 2026-06-18, navigation changed to view-level bottom tabs: Main, Activity report placeholder, and Setting, while the top-right header keeps refresh as an icon-only control.

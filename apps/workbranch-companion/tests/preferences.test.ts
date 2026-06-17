@@ -1,0 +1,77 @@
+import { describe, expect, it } from "vitest";
+import {
+	COMPANION_FONT_OPTIONS,
+	COMPANION_THEME_OPTIONS,
+	DEFAULT_COMPANION_PREFERENCES,
+	preferencesToStoreEntries,
+	sanitizeCompanionPreferences,
+} from "../src/application/preferences";
+
+describe("companion preferences", () => {
+	it("defaults to terminal-dark and system-mono", () => {
+		// Given no stored preference values
+		// When the default preference contract is read
+		// Then the terminal HUD defaults are used
+		expect(DEFAULT_COMPANION_PREFERENCES).toEqual({
+			font: "system-mono",
+			theme: "terminal-dark",
+		});
+	});
+
+	it("sanitizes invalid stored font and theme values to defaults", () => {
+		// Given corrupted persisted preference values
+		const stored = { font: "comic-sans", theme: "rainbow" };
+
+		// When preferences are sanitized at the store boundary
+		const result = sanitizeCompanionPreferences(stored);
+
+		// Then defaults are applied and sanitization is reported
+		expect(result).toEqual({
+			preferences: DEFAULT_COMPANION_PREFERENCES,
+			sanitized: true,
+		});
+	});
+
+	it("exposes only fixed-width font choices", () => {
+		// Given the font option list used by the settings panel
+		// When option CSS stacks are inspected
+		// Then each stack ends in a monospace fallback and no arbitrary font input is present
+		expect(COMPANION_FONT_OPTIONS.map((option) => option.value)).toEqual([
+			"system-mono",
+			"sf-mono",
+			"menlo",
+			"monaco",
+			"jetbrains-mono",
+		]);
+		expect(
+			COMPANION_FONT_OPTIONS.every((option) =>
+				option.cssFamily.endsWith("monospace"),
+			),
+		).toBe(true);
+	});
+
+	it("exposes the four resolved theme presets", () => {
+		// Given the theme option list used by the settings panel
+		// When option values are read
+		// Then the fixed preset contract is preserved
+		expect(COMPANION_THEME_OPTIONS.map((option) => option.value)).toEqual([
+			"terminal-dark",
+			"amber-crt",
+			"green-mono",
+			"high-contrast",
+		]);
+	});
+
+	it("serializes only font and theme store keys", () => {
+		// Given a sanitized preference pair
+		// When the pair is converted for persistence
+		const entries = preferencesToStoreEntries({
+			font: "menlo",
+			theme: "green-mono",
+		});
+
+		// Then launch-at-login and other app state are excluded from the store contract
+		expect(entries).toEqual({ font: "menlo", theme: "green-mono" });
+		expect(Object.keys(entries)).toEqual(["font", "theme"]);
+	});
+});

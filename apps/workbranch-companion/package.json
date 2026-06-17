@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.9.0",
+    "@tauri-apps/plugin-autostart": "~2",
+    "@tauri-apps/plugin-store": "~2",
     "@workbranch/contract": "workspace:*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
