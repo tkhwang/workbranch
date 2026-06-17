@@ -11,10 +11,9 @@ pub(crate) const IGNORED_COMPONENTS: &[&str] = &[
 ];
 
 pub(crate) fn event_has_relevant_change(root: &Path, paths: &[PathBuf], ignored: &[&str]) -> bool {
-    paths.is_empty()
-        || paths
-            .iter()
-            .any(|path| !path_is_ignored(root, path, ignored))
+    paths
+        .iter()
+        .any(|path| !path_is_ignored(root, path, ignored))
 }
 
 pub(crate) fn path_is_ignored(root: &Path, path: &Path, ignored: &[&str]) -> bool {
@@ -43,6 +42,11 @@ mod tests {
 
     fn paths(values: &[&str]) -> Vec<PathBuf> {
         values.iter().map(PathBuf::from).collect()
+    }
+
+    #[test]
+    fn ignores_empty_path_events() {
+        assert!(!event_has_relevant_change(root(), &[], IGNORED_COMPONENTS));
     }
 
     #[test]
