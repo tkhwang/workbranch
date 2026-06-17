@@ -51,8 +51,103 @@ describe("ACL", () => {
 
 	it("builds a compact menu rollup", () => {
 		const model = buildMenuModel(mapGlobalDocumentToState(document));
-		expect(model.title).toBe("▶1 🔔2");
-		expect(model.rows[0]?.expanded).toBe(true);
+		expect(model.summary.projectCount).toBe(1);
+		expect(model.summary.taskCount).toBe(1);
+		expect(model.summary.active).toBe(1);
+		expect(model.summary.notifications).toBe(2);
+		expect(model.groups[0]?.rows[0]?.expanded).toBe(true);
+	});
+
+	it("groups non-empty projects by their latest task update", () => {
+		const multiProjectDocument: WorkbranchListGlobalDocument = {
+			schemaVersion: 1,
+			projects: [
+				{
+					schemaVersion: 1,
+					project: "alpha",
+					root: "/tmp/alpha",
+					tasks: [
+						{
+							name: "alpha-old",
+							path: "/tmp/alpha/alpha-old",
+							memoTitle: "",
+							planTitle: "Plan",
+							status: "todo",
+							progressDone: 0,
+							progressTotal: 1,
+							currentItem: "",
+							updatedAt: 10,
+							items: [],
+							plans: [],
+							notiCount: 0,
+							repos: [],
+						},
+						{
+							name: "alpha-new",
+							path: "/tmp/alpha/alpha-new",
+							memoTitle: "",
+							planTitle: "Plan",
+							status: "blocked",
+							progressDone: 0,
+							progressTotal: 1,
+							currentItem: "",
+							updatedAt: 40,
+							items: [],
+							plans: [],
+							notiCount: 0,
+							repos: [],
+						},
+					],
+				},
+				{
+					schemaVersion: 1,
+					project: "empty",
+					root: "/tmp/empty",
+					tasks: [],
+				},
+				{
+					schemaVersion: 1,
+					project: "beta",
+					root: "/tmp/beta",
+					tasks: [
+						{
+							name: "beta-task",
+							path: "/tmp/beta/beta-task",
+							memoTitle: "",
+							planTitle: "Plan",
+							status: "in-progress",
+							progressDone: 0,
+							progressTotal: 1,
+							currentItem: "",
+							updatedAt: 80,
+							items: [],
+							plans: [],
+							notiCount: 3,
+							repos: [],
+						},
+					],
+				},
+			],
+			errors: [],
+		};
+
+		const model = buildMenuModel(
+			mapGlobalDocumentToState(multiProjectDocument),
+		);
+
+		expect(model.summary.projectCount).toBe(2);
+		expect(model.summary.taskCount).toBe(3);
+		expect(model.summary.active).toBe(1);
+		expect(model.summary.blocked).toBe(1);
+		expect(model.summary.notifications).toBe(3);
+		expect(model.groups.map((group) => group.project)).toEqual([
+			"beta",
+			"alpha",
+		]);
+		expect(model.groups[1]?.rows.map((row) => row.task.name)).toEqual([
+			"alpha-new",
+			"alpha-old",
+		]);
 	});
 });
 
