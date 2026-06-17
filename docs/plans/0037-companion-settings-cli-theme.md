@@ -172,7 +172,16 @@ Do not modify:
   - `Theme` select/swatches with four presets.
 - [ ] The launch-at-login toggle is immediate-apply and calls `enable()`/`disable()` through an injected callback.
 - [ ] Font/theme updates save preferences and update the app immediately.
+- [ ] Font/theme update callbacks must report preference save or sanitization failures to the app shell; do not swallow errors inside the panel.
 - [ ] Static markup tests assert labels, option names, and accessible control names.
+
+### Accessibility Requirements
+
+- Use semantic grouping: render the `Startup`, `Font`, and `Theme` sections as `fieldset` elements, each with a visible `legend` child.
+- The top toolbar icon button that opens the settings panel must have an `aria-label` that names the action, e.g. `Open settings`.
+- Every form control must have an associated `label` element using the `for`/`id` pattern: launch-at-login toggle, font select, and theme select.
+- Keyboard focus order must start at the settings panel opener, then move through the panel controls in source order: launch-at-login toggle, font select, theme select, and any close/dismiss control.
+- State changes must be announced to screen readers: launch-at-login activation/deactivation and preference save/update results should use an appropriate ARIA live region or equivalent role/state change.
 
 ## Task 5: App shell wiring
 
@@ -182,6 +191,8 @@ Do not modify:
 - [ ] Add settings panel open/close state.
 - [ ] On app startup, load preferences from store and apply theme/font classes to the root shell.
 - [ ] On settings change, save preferences and update root shell immediately.
+- [ ] On font/theme preference failures, keep or restore the last valid applied preferences and set the existing footer/status message, matching the launch-at-login failure pattern.
+- [ ] If a stored or incoming font/theme value sanitizes to a fallback, apply the sanitized value and surface a concise footer/status message instead of silently changing the selection.
 - [ ] On app startup, call `isEnabled()` to initialize launch-at-login state.
 - [ ] On launch-at-login toggle:
   - true -> `enable()`, then refresh `isEnabled()`;
