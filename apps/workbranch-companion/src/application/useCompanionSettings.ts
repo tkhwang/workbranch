@@ -1,12 +1,14 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	type CompanionPreferenceStore,
 	type CompanionPreferences,
 	DEFAULT_COMPANION_PREFERENCES,
+	enqueuePreferenceSave,
 	loadCompanionPreferenceStore,
 	readCompanionPreferences,
+	shouldRestoreFailedPreferenceUpdate,
 	writeCompanionPreferences,
 } from "./preferences";
 
@@ -36,6 +38,7 @@ export function useCompanionSettings({
 		useState<CompanionPreferenceStore>();
 	const [launchAtLogin, setLaunchAtLogin] = useState(false);
 	const [launchAtLoginLoading, setLaunchAtLoginLoading] = useState(true);
+	const preferenceSaveQueue = useRef<Promise<void>>(Promise.resolve());
 	const tauriRuntimeAvailable = isTauri();
 
 	useEffect(() => {
@@ -54,7 +57,14 @@ export function useCompanionSettings({
 				setPreferences(result.preferences);
 				if (result.sanitized) {
 					onStatus("Preferences reset to supported defaults");
-					await writeCompanionPreferences(store, result.preferences);
+					const save = enqueuePreferenceSave(
+						preferenceSaveQueue.current,
+						async () => {
+							await writeCompanionPreferences(store, result.preferences);
+						},
+					);
+					preferenceSaveQueue.current = save;
+					await save;
 				}
 			} catch (error) {
 				if (!cancelled) {
@@ -104,13 +114,25 @@ export function useCompanionSettings({
 			}
 			const previous = preferences;
 			setPreferences(next);
+			const save = enqueuePreferenceSave(
+				preferenceSaveQueue.current,
+				async () => {
+					const store =
+						preferenceStore ?? (await loadCompanionPreferenceStore());
+					setPreferenceStore(store);
+					await writeCompanionPreferences(store, next);
+				},
+			);
+			preferenceSaveQueue.current = save;
 			try {
-				const store = preferenceStore ?? (await loadCompanionPreferenceStore());
-				setPreferenceStore(store);
-				await writeCompanionPreferences(store, next);
+				await save;
 				onStatus("Preferences updated");
 			} catch (error) {
-				setPreferences(previous);
+				setPreferences((current) =>
+					shouldRestoreFailedPreferenceUpdate(current, next)
+						? previous
+						: current,
+				);
 				onError(error);
 			}
 		},

@@ -8,10 +8,14 @@ type ButtonProps = {
 	readonly onClick?: () => void;
 };
 
+type TraversableProps = {
+	readonly children?: ReactNode;
+};
+
 function collectButtons(node: ReactNode): readonly ButtonProps[] {
 	const buttons: ButtonProps[] = [];
 	const visit = (child: ReactNode): void => {
-		if (!isValidElement<ButtonProps>(child)) {
+		if (!isValidElement<ButtonProps & TraversableProps>(child)) {
 			return;
 		}
 		if (child.type === "button") {
@@ -35,7 +39,7 @@ describe("ViewNav", () => {
 		expect(html).toContain('aria-label="Companion views"');
 		expect(html).toContain('aria-label="Open Main View"');
 		expect(html).toContain('aria-label="Open Activity report"');
-		expect(html).toContain('aria-label="Open Setting"');
+		expect(html).toContain('aria-label="Open Settings"');
 		expect(html).toContain('aria-current="page"');
 		expect(html).toContain("Main");
 		expect(html).toContain("Activity");
@@ -50,13 +54,13 @@ describe("ViewNav", () => {
 			onViewChange: (view) => calls.push(view),
 		});
 
-		// When the Activity and Setting buttons are clicked
+		// When the Activity and Settings buttons are clicked
 		const buttons = collectButtons(element);
 		buttons
 			.find((button) => button["aria-label"] === "Open Activity report")
 			?.onClick?.();
 		buttons
-			.find((button) => button["aria-label"] === "Open Setting")
+			.find((button) => button["aria-label"] === "Open Settings")
 			?.onClick?.();
 
 		// Then the parent shell receives route-level view changes

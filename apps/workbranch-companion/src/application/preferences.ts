@@ -136,6 +136,22 @@ export function sanitizeCompanionPreferences(input: {
 	};
 }
 
+export function shouldRestoreFailedPreferenceUpdate(
+	current: CompanionPreferences,
+	attempted: CompanionPreferences,
+): boolean {
+	return current.font === attempted.font && current.theme === attempted.theme;
+}
+
+export type PreferenceSaveOperation = () => Promise<void>;
+
+export function enqueuePreferenceSave(
+	currentQueue: Promise<void>,
+	save: PreferenceSaveOperation,
+): Promise<void> {
+	return currentQueue.catch(() => undefined).then(save);
+}
+
 export function preferencesToStoreEntries(
 	preferences: CompanionPreferences,
 ): PreferenceStoreEntries {

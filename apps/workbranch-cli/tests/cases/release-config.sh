@@ -107,7 +107,9 @@ test_companion_release_versions_stay_in_sync() {
   python3 - <<'PY'
 import json
 import re
+import subprocess
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 manifest_version = json.loads(Path('.release-please-manifest.json').read_text())['apps/workbranch-companion']
 package_version = json.loads(Path('apps/workbranch-companion/package.json').read_text())['version']
@@ -124,6 +126,23 @@ if cargo_lock_match is None:
 if 'name = "workbranch-companion"\nversion = "' + cargo_lock_match.group(1) + '" # x-release-please-version' not in cargo_lock:
     raise SystemExit('[-] Error: Cargo.lock workbranch-companion version must carry x-release-please-version marker')
 cargo_lock_version = cargo_lock_match.group(1)
+
+with TemporaryDirectory() as tmpdir:
+    markerless_lock = cargo_lock.replace(
+        'name = "workbranch-companion"\nversion = "' + cargo_lock_match.group(1) + '" # x-release-please-version',
+        'name = "workbranch-companion"\nversion = "' + cargo_lock_match.group(1) + '"',
+    )
+    temp_lock = Path(tmpdir) / 'Cargo.lock'
+    temp_lock.write_text(markerless_lock)
+    subprocess.run([
+        'node',
+        'apps/workbranch-companion/scripts/sync-release-markers.mjs',
+        '--file',
+        str(temp_lock),
+    ], check=True)
+    if 'name = "workbranch-companion"\nversion = "' + cargo_lock_match.group(1) + '" # x-release-please-version' not in temp_lock.read_text():
+        raise SystemExit('[-] Error: companion release marker sync script did not restore Cargo.lock marker')
+
 
 versions = {
     'release manifest': manifest_version,

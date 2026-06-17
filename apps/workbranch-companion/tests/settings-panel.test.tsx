@@ -25,13 +25,17 @@ type SelectProps = {
 	}) => void;
 };
 
+type TraversableProps = {
+	readonly children?: ReactNode;
+};
+
 function collectByType<TProps>(
 	node: ReactNode,
 	typeName: "input" | "select",
 ): readonly TProps[] {
 	const props: TProps[] = [];
 	const visit = (child: ReactNode): void => {
-		if (!isValidElement<TProps>(child)) {
+		if (!isValidElement<TProps & TraversableProps>(child)) {
 			return;
 		}
 		if (child.type === typeName) {
@@ -64,7 +68,7 @@ describe("SettingsPanel", () => {
 
 		// Then semantic groups, labels, and fixed choices are visible
 		expect(html).toContain("<fieldset");
-		expect(html).toContain("<h2>Setting</h2>");
+		expect(html).toContain("<h2>Settings</h2>");
 		expect(html).toContain("<legend>Startup</legend>");
 		expect(html).toContain("<legend>Font</legend>");
 		expect(html).toContain("<legend>Theme</legend>");
@@ -92,7 +96,6 @@ describe("SettingsPanel", () => {
 			onPreferencesChange: (next) => {
 				preferenceCalls.push(next);
 			},
-			onClose: () => {},
 		});
 
 		// When controls change

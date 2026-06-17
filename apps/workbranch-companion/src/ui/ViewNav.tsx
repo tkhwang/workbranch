@@ -18,7 +18,7 @@ const VIEW_NAV_ITEMS: readonly ViewNavItem[] = [
 		label: "Activity",
 		ariaLabel: "Open Activity report",
 	},
-	{ view: "settings", label: "Setting", ariaLabel: "Open Setting" },
+	{ view: "settings", label: "Settings", ariaLabel: "Open Settings" },
 ] as const;
 
 function ViewIcon({ view }: { readonly view: CompanionView }) {

@@ -6,10 +6,16 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.json && vite build",
+    "prebuild": "pnpm run sync:release-markers",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "pretypecheck": "pnpm run sync:release-markers",
     "lint": "biome check src tests",
     "test": "vitest run",
-    "tauri": "tauri"
+    "pretest": "pnpm run sync:release-markers",
+    "tauri": "tauri",
+    "pretauri": "pnpm run sync:release-markers",
+    "sync:release-markers": "node scripts/sync-release-markers.mjs",
+    "check:release-markers": "node scripts/sync-release-markers.mjs --check"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.9.0",

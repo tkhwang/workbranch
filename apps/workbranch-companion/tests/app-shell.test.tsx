@@ -17,7 +17,7 @@ describe("App shell settings wiring", () => {
 		expect(html).toContain('aria-label="Companion views"');
 		expect(html).toContain('aria-label="Open Main View"');
 		expect(html).toContain('aria-label="Open Activity report"');
-		expect(html).toContain('aria-label="Open Setting"');
+		expect(html).toContain('aria-label="Open Settings"');
 		expect(html).toContain('role="status"');
 		expect(html).toContain('aria-live="polite"');
 	});

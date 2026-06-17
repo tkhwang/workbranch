@@ -2,8 +2,8 @@
 	color: #f4f6ff;
 	background: #08090f;
 	font-family:
-		ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
-		monospace;
+		ui-monospace, "SFMono-Regular", "Menlo", "Monaco", "Consolas",
+		"Liberation Mono", monospace;
 }
 
 * {
@@ -18,8 +18,8 @@ body {
 
 main {
 	--app-font-family:
-		ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
-		monospace;
+		ui-monospace, "SFMono-Regular", "Menlo", "Monaco", "Consolas",
+		"Liberation Mono", monospace;
 	--surface-0: #08090f;
 	--surface-1: #0d1117;
 	--surface-2: #121820;
@@ -69,6 +69,7 @@ main {
 	--active-rail-bg: var(--accent-soft);
 	--radius-row: 10px;
 	--radius-shell: 14px;
+
 	position: relative;
 	background: var(--shell-bg);
 	color: var(--text);
@@ -162,21 +163,21 @@ main[data-theme="high-contrast"] {
 
 main[data-font="sf-mono"] {
 	--app-font-family:
-		SFMono-Regular, ui-monospace, Menlo, Monaco, Consolas, monospace;
+		"SFMono-Regular", ui-monospace, "Menlo", "Monaco", "Consolas", monospace;
 }
 
 main[data-font="menlo"] {
-	--app-font-family: Menlo, ui-monospace, Monaco, Consolas, monospace;
+	--app-font-family: "Menlo", ui-monospace, "Monaco", "Consolas", monospace;
 }
 
 main[data-font="monaco"] {
-	--app-font-family: Monaco, ui-monospace, Menlo, Consolas, monospace;
+	--app-font-family: "Monaco", ui-monospace, "Menlo", "Consolas", monospace;
 }
 
 main[data-font="jetbrains-mono"] {
 	--app-font-family:
-		"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-		monospace;
+		"JetBrains Mono", ui-monospace, "SFMono-Regular", "Menlo", "Monaco",
+		"Consolas", monospace;
 }
 
 main::before {
@@ -283,7 +284,8 @@ summary:focus-visible {
 .toolbar-icon,
 .view-nav-icon {
 	fill: none;
-	stroke: currentColor;
+
+	stroke: currentcolor;
 	stroke-linecap: round;
 	stroke-linejoin: round;
 	stroke-width: 1.8;
@@ -304,7 +306,7 @@ summary:focus-visible {
 
 .view-nav {
 	align-items: center;
-	background: color-mix(in srgb, var(--surface-1) 94%, transparent);
+	background: var(--surface-1);
 	border: 1px solid var(--line-strong);
 	border-radius: 16px;
 	bottom: 10px;
@@ -317,6 +319,12 @@ summary:focus-visible {
 	position: fixed;
 	right: 12px;
 	z-index: 5;
+}
+
+@supports (background: color-mix(in srgb, black, white)) {
+	.view-nav {
+		background: color-mix(in srgb, var(--surface-1) 94%, transparent);
+	}
 }
 
 .view-nav-button {

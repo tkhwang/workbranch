@@ -43,7 +43,7 @@ export function SettingsPanel({
 		<section className="settings-panel" aria-label="Settings">
 			<div className="settings-panel-header">
 				<div>
-					<h2>Setting</h2>
+					<h2>Settings</h2>
 					<p>Companion preferences</p>
 				</div>
 			</div>

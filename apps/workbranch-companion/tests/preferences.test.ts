@@ -3,8 +3,10 @@ import {
 	COMPANION_FONT_OPTIONS,
 	COMPANION_THEME_OPTIONS,
 	DEFAULT_COMPANION_PREFERENCES,
+	enqueuePreferenceSave,
 	preferencesToStoreEntries,
 	sanitizeCompanionPreferences,
+	shouldRestoreFailedPreferenceUpdate,
 } from "../src/application/preferences";
 
 describe("companion preferences", () => {
@@ -60,6 +62,53 @@ describe("companion preferences", () => {
 			"green-mono",
 			"high-contrast",
 		]);
+	});
+
+	it("restores a failed optimistic preference update only when no newer update won", () => {
+		// Given one failed optimistic update and a later successful update
+		const failedAttempt = { font: "menlo", theme: "terminal-dark" } as const;
+		const newerCurrent = { font: "menlo", theme: "green-mono" } as const;
+
+		// When deciding whether the failed request may roll back local state
+		const staleRollbackAllowed = shouldRestoreFailedPreferenceUpdate(
+			newerCurrent,
+			failedAttempt,
+		);
+		const currentRollbackAllowed = shouldRestoreFailedPreferenceUpdate(
+			failedAttempt,
+			failedAttempt,
+		);
+
+		// Then only the still-current failed attempt can restore the previous state
+		expect(staleRollbackAllowed).toBe(false);
+		expect(currentRollbackAllowed).toBe(true);
+	});
+
+	it("runs preference saves sequentially so the latest write lands last", async () => {
+		// Given two preference writes where the first write is still pending
+		const writes: string[] = [];
+		let releaseFirstWrite: (() => void) | undefined;
+		const firstWrite = new Promise<void>((resolve) => {
+			releaseFirstWrite = resolve;
+		});
+		let saveQueue = Promise.resolve();
+
+		// When a newer write is enqueued before the first write resolves
+		saveQueue = enqueuePreferenceSave(saveQueue, async () => {
+			writes.push("font");
+			await firstWrite;
+		});
+		saveQueue = enqueuePreferenceSave(saveQueue, async () => {
+			writes.push("theme");
+		});
+		await Promise.resolve();
+		await Promise.resolve();
+
+		// Then the newer write waits and lands after the older write
+		expect(writes).toEqual(["font"]);
+		releaseFirstWrite?.();
+		await saveQueue;
+		expect(writes).toEqual(["font", "theme"]);
 	});
 
 	it("serializes only font and theme store keys", () => {

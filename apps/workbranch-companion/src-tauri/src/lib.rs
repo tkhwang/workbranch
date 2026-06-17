@@ -236,12 +236,13 @@ fn run_pbcopy(path: &str) -> Result<RunResult, CompanionError> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let builder = tauri::Builder::default()
-        .plugin(tauri_plugin_store::Builder::new().build())
-        .plugin(tauri_plugin_autostart::init(
-            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            None,
-        ))
+    let builder = tauri::Builder::default().plugin(tauri_plugin_store::Builder::new().build());
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let builder = builder.plugin(tauri_plugin_autostart::init(
+        tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+        None,
+    ));
+    let builder = builder
         .plugin(tauri_plugin_positioner::init())
         .manage(WatcherStore::default())
         .setup(|app| {
