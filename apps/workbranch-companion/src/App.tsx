@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createActivityRefresh } from "./application/activity";
-import { buildMenuModel, type MenuModel } from "./application/state";
+import {
+	buildMenuModel,
+	type MenuModel,
+	type MenuSummary,
+} from "./application/state";
 import type { GlobalState, Task } from "./domain/model";
 import {
 	appendActivityEvents,
@@ -11,7 +15,8 @@ import {
 	watchRoots,
 } from "./infrastructure/tauriClient";
 import { startWorkspaceMonitor } from "./infrastructure/workspaceMonitor";
-import { type TaskActionKind, TaskRow } from "./ui/TaskRow";
+import { ProjectGroup } from "./ui/ProjectGroup";
+import type { TaskActionKind } from "./ui/TaskRow";
 
 const EMPTY_STATE: GlobalState = { projects: [], errors: [] };
 
@@ -22,27 +27,64 @@ function currentEpochSeconds(): number {
 function commandForTaskAction(
 	task: Task,
 	kind: TaskActionKind,
-): CompanionCommand | undefined {
+): CompanionCommand {
 	switch (kind) {
-		case "memoEdit": {
-			const text = window.prompt(`Memo for ${task.name}`, task.memoTitle);
-			return text === null
-				? undefined
-				: { kind: "memo", task: task.name, text };
-		}
-		case "memoClear":
-			return { kind: "memoClear", task: task.name };
-		case "notiClear":
-			return { kind: "notiClear", task: task.name };
-		case "finder":
-			return { kind: "finder", task: task.name };
 		case "ide":
 			return { kind: "ide", task: task.name };
 		case "terminal":
 			return { kind: "terminal", task: task.name };
-		case "copyPath":
-			return { kind: "copyPath", path: task.path };
+		case "finder":
+			return { kind: "finder", task: task.name };
 	}
+}
+
+function plural(count: number, word: string): string {
+	return count === 1 ? word : `${word}s`;
+}
+
+function AppSummary({ summary }: { readonly summary: MenuSummary }) {
+	const { projectCount, taskCount, active, blocked, notifications } = summary;
+	return (
+		<div className="app-summary">
+			<span className="app-inventory">
+				{taskCount === 0
+					? "No tasks"
+					: `${projectCount} ${plural(projectCount, "project")} · ${taskCount} ${plural(taskCount, "task")}`}
+			</span>
+			<span className="app-badges">
+				{active > 0 ? (
+					<span
+						className="badge badge-active"
+						title={`${active} in progress`}
+						aria-label={`${active} in progress`}
+						role="img"
+					>
+						▶ {active}
+					</span>
+				) : null}
+				{blocked > 0 ? (
+					<span
+						className="badge badge-blocked"
+						title={`${blocked} blocked`}
+						aria-label={`${blocked} blocked`}
+						role="img"
+					>
+						⚠ {blocked}
+					</span>
+				) : null}
+				{notifications > 0 ? (
+					<span
+						className="badge badge-noti"
+						title={`${notifications} notifications`}
+						aria-label={`${notifications} notifications`}
+						role="img"
+					>
+						🔔 {notifications}
+					</span>
+				) : null}
+			</span>
+		</div>
+	);
 }
 
 export function App() {
@@ -83,9 +125,6 @@ export function App() {
 	const handleTaskAction = useCallback(
 		async (root: string, task: Task, kind: TaskActionKind) => {
 			const command = commandForTaskAction(task, kind);
-			if (command === undefined) {
-				return;
-			}
 			try {
 				await runAction(command, root);
 				applyState(await refreshWithActivity());
@@ -130,7 +169,7 @@ export function App() {
 	return (
 		<main>
 			<header>
-				<h1>{model.title}</h1>
+				<AppSummary summary={model.summary} />
 				<button
 					type="button"
 					onClick={() => void refresh()}
@@ -140,16 +179,13 @@ export function App() {
 				</button>
 			</header>
 			<section>
-				{model.rows.length === 0 ? (
+				{model.groups.length === 0 ? (
 					<p className="empty">No workbranch tasks registered.</p>
 				) : null}
-				{model.rows.map((row) => (
-					<TaskRow
-						key={`${row.root}-${row.task.name}`}
-						project={row.project}
-						root={row.root}
-						task={row.task}
-						expanded={row.expanded}
+				{model.groups.map((group) => (
+					<ProjectGroup
+						key={group.root}
+						group={group}
 						onAction={(root, task, kind) =>
 							void handleTaskAction(root, task, kind)
 						}

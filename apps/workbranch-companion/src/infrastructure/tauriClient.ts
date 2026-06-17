@@ -34,13 +34,9 @@ export function ensureRunSucceeded(result: RunResult): void {
 }
 
 export type CompanionCommand =
-	| { readonly kind: "memo"; readonly task: string; readonly text: string }
-	| { readonly kind: "memoClear"; readonly task: string }
-	| { readonly kind: "notiClear"; readonly task: string }
 	| { readonly kind: "finder"; readonly task: string }
 	| { readonly kind: "ide"; readonly task: string }
-	| { readonly kind: "terminal"; readonly task: string }
-	| { readonly kind: "copyPath"; readonly path: string };
+	| { readonly kind: "terminal"; readonly task: string };
 
 export async function refreshStatus(): Promise<GlobalState> {
 	const raw = await invoke<string>("workbranch_list_global");

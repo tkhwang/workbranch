@@ -37,19 +37,19 @@
   - Check what is currently in progress.
   - See which repo/branch is dirty.
   - Open task in IDE/terminal/Finder.
-  - Clear memo/notifications when no longer needed.
+  - Notice notification counts as visible status without clearing them from this surface.
 - Key contexts of use: quick menu bar glance while coding, before switching tasks, during AI-agent execution.
 
 ## Information architecture
-- Primary navigation: single popover list sorted by recent update.
-- Core screens: task list, expanded task details, error rows.
+- Primary navigation: single popover grouped by project, with groups sorted by most recent task update.
+- Core screens: project-grouped task list, expanded task details, error rows.
 - Content hierarchy:
-  1. Global rollup title and refresh.
-  2. Task name + status dot + progress.
-  3. Active plan/current step.
+  1. Global inventory + status rollup and refresh.
+  2. Project group header (name + task count).
+  3. Task name + status dot + progress + notification.
   4. Repo branch/dirty state.
-  5. Actions.
-  6. Nested plan steps.
+  5. Active plan / current step, then nested plan steps.
+  6. Actions (IDE, Terminal, Finder).
 
 ## Design principles
 - Principle 1: Status is a launcher signal, not a paragraph. Use compact dots, counts, and labels.
@@ -68,12 +68,14 @@
 ## Components
 - Existing components to reuse: `TaskRow`, action buttons, native `details/summary` disclosure.
 - New/changed components:
+  - global inventory/status summary,
+  - project group header,
   - launcher-like task summary line,
   - current-step strip,
   - repo chips,
-  - action bar,
+  - action bar limited to IDE, Terminal, and Finder,
   - nested step tree.
-- Variants and states: todo, planning, in-progress, review, blocked, done, notification present, dirty repo, disabled action.
+- Variants and states: todo, planning, in-progress, review, blocked, done, notification present, dirty repo.
 - Token/component ownership: `style.css` owns CSS custom properties and component classes.
 
 ## Accessibility
@@ -99,7 +101,7 @@
 ## Content voice
 - Tone: terse, operational, developer-native.
 - Terminology: task, plan, step, repo, branch, dirty.
-- Microcopy rules: prefer short labels (`IDE`, `Terminal`, `Copy`) over sentences; avoid emoji except where already part of compact rollup.
+- Microcopy rules: prefer short row action labels (`IDE`, `Terminal`, `Finder`) over sentences; omit `Copy`/`Memo`/`Noti`/`Clear` row vocabulary because those companion actions are removed, not hidden.
 
 ## Implementation constraints
 - Framework/styling system: React 18 + plain CSS; no Tailwind/shadcn in this refresh. Primary reference is Raycast; Linear remains only a secondary status-hierarchy cue.

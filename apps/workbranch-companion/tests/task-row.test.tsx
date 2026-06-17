@@ -2,7 +2,11 @@ import { Children, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { Task } from "../src/domain/model";
-import { type TaskActionKind, TaskRow } from "../src/ui/TaskRow";
+import {
+	type TaskActionKind,
+	TaskRow,
+	taskActionsFor,
+} from "../src/ui/TaskRow";
 
 type ButtonProps = {
 	readonly children?: ReactNode;
@@ -118,7 +122,6 @@ describe("TaskRow", () => {
 	it("renders nested checklist children for generated task briefs", () => {
 		const html = renderToStaticMarkup(
 			<TaskRow
-				project="workbranch"
 				root="/tmp/workbranch"
 				task={nestedChecklistTask}
 				expanded={true}
@@ -136,7 +139,6 @@ describe("TaskRow", () => {
 	it("renders a Raycast-style task summary with current step and repo state", () => {
 		const html = renderToStaticMarkup(
 			<TaskRow
-				project="workbranch"
 				root="/tmp/workbranch"
 				task={linearFixtureTask}
 				expanded={true}
@@ -152,10 +154,9 @@ describe("TaskRow", () => {
 		expect(html).toContain("workbranch");
 		expect(html).toContain("feat/update-0617");
 	});
-	it("exposes the allowed task actions from each row", () => {
+	it("exposes only IDE, Terminal, and Finder actions", () => {
 		const html = renderToStaticMarkup(
 			<TaskRow
-				project="workbranch"
 				root="/tmp/workbranch"
 				task={nestedChecklistTask}
 				expanded={true}
@@ -163,20 +164,20 @@ describe("TaskRow", () => {
 			/>,
 		);
 
-		expect(html).toContain('aria-label="edit memo for generated-task"');
-		expect(html).toContain('aria-label="clear memo for generated-task"');
-		expect(html).toContain(
-			'aria-label="clear notifications for generated-task"',
-		);
-		expect(html).toContain('aria-label="open generated-task in Finder"');
 		expect(html).toContain('aria-label="open generated-task in IDE"');
 		expect(html).toContain('aria-label="open generated-task in terminal"');
-		expect(html).toContain('aria-label="copy path for generated-task"');
+		expect(html).toContain('aria-label="open generated-task in Finder"');
+		expect(html).not.toContain("edit memo for generated-task");
+		expect(html).not.toContain("clear memo for generated-task");
+		expect(html).not.toContain("clear notifications for generated-task");
+		expect(html).not.toContain("copy path for generated-task");
+		expect(
+			taskActionsFor(nestedChecklistTask).map((action) => action.label),
+		).toEqual(["IDE", "Terminal", "Finder"]);
 	});
 	it("passes the project root, task, and action kind when a row action is clicked", () => {
 		const calls: ActionCall[] = [];
 		const element = TaskRow({
-			project: "workbranch",
 			root: "/tmp/workbranch",
 			task: nestedChecklistTask,
 			expanded: true,

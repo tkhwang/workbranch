@@ -12,15 +12,7 @@ const STATUS_META = {
 	done: { icon: "✓", label: "Done" },
 } as const;
 
-const TASK_ACTION_KINDS = [
-	"memoEdit",
-	"memoClear",
-	"notiClear",
-	"finder",
-	"ide",
-	"terminal",
-	"copyPath",
-] as const;
+const TASK_ACTION_KINDS = ["ide", "terminal", "finder"] as const;
 
 export type TaskActionKind = (typeof TASK_ACTION_KINDS)[number];
 
@@ -32,17 +24,12 @@ export type TaskRowAction = {
 };
 
 const TASK_ACTION_LABELS: Record<TaskActionKind, string> = {
-	memoEdit: "Memo",
-	memoClear: "Clear",
-	notiClear: "Noti",
-	finder: "Finder",
 	ide: "IDE",
 	terminal: "Terminal",
-	copyPath: "Copy",
+	finder: "Finder",
 } as const;
 
 type Props = {
-	readonly project: string;
 	readonly root: string;
 	readonly task: Task;
 	readonly expanded: boolean;
@@ -56,20 +43,12 @@ type StepItemsProps = {
 
 function actionAriaLabel(kind: TaskActionKind, taskName: string): string {
 	switch (kind) {
-		case "memoEdit":
-			return `edit memo for ${taskName}`;
-		case "memoClear":
-			return `clear memo for ${taskName}`;
-		case "notiClear":
-			return `clear notifications for ${taskName}`;
-		case "finder":
-			return `open ${taskName} in Finder`;
 		case "ide":
 			return `open ${taskName} in IDE`;
 		case "terminal":
 			return `open ${taskName} in terminal`;
-		case "copyPath":
-			return `copy path for ${taskName}`;
+		case "finder":
+			return `open ${taskName} in Finder`;
 	}
 }
 
@@ -78,7 +57,7 @@ export function taskActionsFor(task: Task): readonly TaskRowAction[] {
 		kind,
 		label: TASK_ACTION_LABELS[kind],
 		ariaLabel: actionAriaLabel(kind, task.name),
-		disabled: kind === "notiClear" && task.notiCount === 0,
+		disabled: false,
 	}));
 }
 
@@ -178,7 +157,7 @@ function RepoChips({ repos }: RepoChipsProps) {
 	);
 }
 
-export function TaskRow({ project, root, task, expanded, onAction }: Props) {
+export function TaskRow({ root, task, expanded, onAction }: Props) {
 	const status = taskStatus(task);
 	const progress = taskProgress(task);
 	const now = currentItem(task);
@@ -190,11 +169,15 @@ export function TaskRow({ project, root, task, expanded, onAction }: Props) {
 				<TaskSummary task={task} status={status} progress={progress} />
 			</summary>
 			<div className="task-detail">
-				<div className="project-line">{project}</div>
+				<RepoChips repos={task.repos} />
 				{plan && now ? (
 					<CurrentStep planTitle={plan.title} currentItem={now} />
 				) : null}
-				<RepoChips repos={task.repos} />
+				{plan ? (
+					<ul className="steps">
+						<StepItems steps={plan.steps} keyPrefix="plan" />
+					</ul>
+				) : null}
 				<div className="task-actions">
 					{actions.map((action) => (
 						<button
@@ -209,11 +192,6 @@ export function TaskRow({ project, root, task, expanded, onAction }: Props) {
 						</button>
 					))}
 				</div>
-				{plan ? (
-					<ul className="steps">
-						<StepItems steps={plan.steps} keyPrefix="plan" />
-					</ul>
-				) : null}
 			</div>
 		</details>
 	);
