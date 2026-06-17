@@ -13,6 +13,7 @@
         "packages/contract/**",
         ".github/**",
         "docs/**",
+        "DESIGN.md",
         "README.md",
         "README.ko.md",
         "release-please-config.json",
@@ -51,9 +52,8 @@
           "jsonpath": "$.package.version"
         },
         {
-          "type": "toml",
-          "path": "src-tauri/Cargo.lock",
-          "jsonpath": "$.package[?(@.name==\"workbranch-companion\")].version"
+          "type": "generic",
+          "path": "src-tauri/Cargo.lock"
         }
       ]
     }
