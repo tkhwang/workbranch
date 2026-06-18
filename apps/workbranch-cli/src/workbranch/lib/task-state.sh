@@ -312,6 +312,7 @@ write_task_agent_guidance() {
 - 첫 번째 미완료 Step이 현재 또는 다음 작업을 나타내야 합니다.
 - 하위 Step은 Markdown checklist 항목을 두 칸 들여써 표현합니다.
 - `## 메모` 같은 H2 이하 heading은 HUD Step이 아닌 note/archive 내용으로 취급합니다.
+- Plan/Step 본문은 `.workbranch.config`의 `PREFERRED_LANGUAGE` 설정 언어로 작성합니다.
 EOF_GUIDANCE
   else
     cat > "$file" <<'EOF_GUIDANCE'
@@ -350,6 +351,7 @@ Rules:
 - the first unchecked Step should represent the current or next work
 - express substeps by indenting Markdown checklist items with two spaces per level
 - treat `## Notes` and other H2+ headings as notes/archive content, not HUD Steps
+- write Plan/Step body content in the language set by `PREFERRED_LANGUAGE` in `.workbranch.config`
 EOF_GUIDANCE
   fi
 }

@@ -147,6 +147,9 @@ run_test() {
   if (
     test_xdg_config=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test-xdg)
     export XDG_CONFIG_HOME="$test_xdg_config"
+    # The registry is isolated under TMPDIR here, so allow temp project roots to
+    # register; production keeps the temp guard (registry_path_is_temp) active.
+    export WORKBRANCH_ALLOW_TEMP_REGISTRY=1
     cleanup_test_env() {
       cleanup_fixture
       [ -z "${test_xdg_config:-}" ] || rm -rf "$test_xdg_config"
