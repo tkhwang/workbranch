@@ -15,7 +15,7 @@
 ## Brand
 - Personality: fast, focused, terminal-native, command-line HUD.
 - Trust signals: fast refresh, clear current step, visible repo dirty/branch state, fixed-width readability, restrained terminal accents.
-- Avoid: marketing hero layouts, oversized cards, large SaaS rows, generic dashboard cards, generic shadcn look, decorative animation, glossy app chrome.
+- Avoid: marketing hero layouts, oversized cards, large SaaS rows, generic dashboard cards, decorative animation, glossy neon chrome. Tasteful elevation and a sans/mono type hierarchy are welcome.
 
 ## Product goals
 - Goals:
@@ -60,9 +60,9 @@
 
 ## Visual language
 - Color: terminal-like theme presets (`terminal-dark`, `amber-crt`, `green-mono`, `high-contrast`) with complete token sets for surfaces, lines, text, accents, status colors, and shell/component backgrounds.
-- Typography: fixed-width UI by default; all labels, status rows, repo/branch/path-like metadata, and settings controls inherit the selected monospace stack.
+- Typography: dual-axis. UI chrome (task/project names, headings, button and nav labels, settings controls) uses a system sans stack for hierarchy and readability; developer data (repo/branch/path, counts, plan label) stays monospace. The user-selectable font preference controls the monospace data stack.
 - Spacing/layout rhythm: compact terminal/preferences rhythm, 8px grid, row-first grouping, prompt-like separators, subtle grid or border lines, no large cards.
-- Shape/radius/elevation: one fixed radius scale (`6px` controls, `10px` rows, `14px` shell); depth from tonal terminal surfaces and hairline borders, not heavy gradients or glossy glow.
+- Shape/radius/elevation: one fixed radius scale (`6px` controls, `10px` rows, `14px` shell); depth from clearly stepped tonal surfaces, soft elevation shadows on cards, and hairline borders; cards lift on hover. Avoid heavy gradients and glossy neon glow.
 - Motion: 120ms press/reveal feedback only; respect reduced motion.
 - Imagery/iconography: text glyphs and status dots only; no decorative illustration.
 
@@ -112,7 +112,7 @@
 - Microcopy rules: prefer short row action labels (`IDE`, `Terminal`, `Finder`) over sentences; omit `Copy`/`Memo`/`Noti`/`Clear` row vocabulary because those companion actions are removed, not hidden.
 
 ## Implementation constraints
-- Framework/styling system: React 18 + plain CSS; no Tailwind/shadcn in this refresh. Primary reference is terminal/CLI HUD; Raycast remains only a secondary compact-popover cue.
+- Framework/styling system: React 18 + plain CSS; no Tailwind/shadcn in this refresh. Primary reference is a modern developer HUD with a terminal core (mono data) and a modern shell (sans chrome, stepped surfaces, soft elevation); Raycast remains a secondary compact-popover cue.
 - Design-token constraints: CSS custom properties in `style.css`.
 - Performance constraints: no extra runtime package; no animation loops; preserve 0033 responsiveness fixes.
 - Compatibility constraints: no CLI/contract/Rust port changes.
@@ -125,3 +125,4 @@
 ## Direction revision
 - 2026-06-17: Primary reference changed from Linear to Raycast after implementation review. Keep Linear only as a secondary cue for compact status hierarchy; the dominant feel should be a Raycast-like menu command/status popover, not a SaaS issue-list dashboard.
 - 2026-06-18: Primary direction changed from Raycast-like chrome to a terminal/CLI developer HUD for companion settings, fonts, and theme presets. Treat the 2026-06-17 Raycast direction as superseded for shell color, typography, and settings components; keep only the compact status hierarchy lessons. Later on 2026-06-18, navigation changed to view-level bottom tabs: Main, Activity report placeholder, and Setting, while the top-right header keeps refresh as an icon-only control.
+- 2026-06-18 (refresh): Direction refined from a mono-only terminal HUD to a **modern developer HUD — terminal core, modern shell**. The strict mono-only typography and hairline-only depth produced a flat, low-contrast, drab popover. Corrections: (1) dual-axis typography — system sans for names/headings/controls, monospace kept for developer data; (2) clearly stepped tonal surfaces plus soft card elevation with hover lift, replacing near-invisible translucent cards; (3) accent (cyan in terminal-dark) stays the single signal color but appears on more touchpoints (project rail, current-step left rail, active states). This supersedes the mono-only typography line and the hairline-only depth line above. Identity, density, status-as-launcher, and the four theme presets are unchanged.

@@ -78,6 +78,8 @@ main() {
   run_test test_init_registers_companion_project_markdown
   run_test test_registry_serializes_concurrent_add_remove
   run_test test_init_no_companion_skips_registry
+  run_test test_registry_skips_temp_root_without_optin
+  run_test test_registry_adds_temp_root_with_optin
   run_test test_init_completes_partial_base_clones
   run_test test_init_rejects_existing_base_repo_on_wrong_branch_during_recovery
   run_test test_init_validates_existing_base_repos_before_cloning_missing_repos

@@ -296,3 +296,45 @@ test_init_no_companion_skips_registry() {
   assert_not_contains "$out" "Registered with companion:"
   assert_not_exists "$xdg/workbranch-companion/projects.md"
 }
+
+registry_add_helper_path() {
+  local helper
+  helper="$TMP_ROOT/registry-add-helper.sh"
+  cat > "$helper" <<'SCRIPT'
+#!/usr/bin/env bash
+set -eu
+APP_ROOT=$1
+root=$2
+die() { printf '%s\n' "[-] Error: $*" >&2; exit 1; }
+. "$APP_ROOT/src/workbranch/lib/registry.sh"
+registry_add_root "$root"
+SCRIPT
+  chmod +x "$helper"
+  printf '%s' "$helper"
+}
+
+test_registry_skips_temp_root_without_optin() {
+  TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
+  xdg="$TMP_ROOT/xdg"
+  root="$TMP_ROOT/roots/temp-proj"
+  mkdir -p "$root"
+  helper=$(registry_add_helper_path)
+  out=$(env -u WORKBRANCH_ALLOW_TEMP_REGISTRY XDG_CONFIG_HOME="$xdg" "$helper" "$APP_ROOT" "$root" 2>&1) \
+    || fail "registry add helper failed: $out"
+  assert_contains "$out" "Skipping companion registry for temporary path"
+  assert_not_exists "$xdg/workbranch-companion/projects.md"
+}
+
+test_registry_adds_temp_root_with_optin() {
+  TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
+  xdg="$TMP_ROOT/xdg"
+  root="$TMP_ROOT/roots/temp-proj"
+  mkdir -p "$root"
+  root_real=$(cd "$root" && pwd -P)
+  helper=$(registry_add_helper_path)
+  env WORKBRANCH_ALLOW_TEMP_REGISTRY=1 XDG_CONFIG_HOME="$xdg" "$helper" "$APP_ROOT" "$root" \
+    || fail "registry add helper failed with opt-in"
+  registry="$xdg/workbranch-companion/projects.md"
+  assert_file "$registry"
+  assert_contains "$(cat "$registry")" "- $root_real"
+}
