@@ -136,7 +136,9 @@ AFTER
     success "Initialized workbranch project: $PROJECT_ROOT"
     if [ "$register_companion" = "yes" ]; then
       registry_add_root "$PROJECT_ROOT"
-      info "Registered with companion: $PROJECT_ROOT"
+      if [ "${REGISTRY_ADD_ROOT_SKIPPED:-0}" != "1" ]; then
+        info "Registered with companion: $PROJECT_ROOT"
+      fi
     fi
     prompt_add_first_task_after_init || return 1
     prompt_language_config_after_init || return 1
@@ -228,7 +230,9 @@ cmd_init() {
     success "Initialized workbranch project: $PROJECT_ROOT"
     if [ "$register_companion" = "yes" ]; then
       registry_add_root "$PROJECT_ROOT"
-      info "Registered with companion: $PROJECT_ROOT"
+      if [ "${REGISTRY_ADD_ROOT_SKIPPED:-0}" != "1" ]; then
+        info "Registered with companion: $PROJECT_ROOT"
+      fi
     fi
   else
     cmd_init_interactive yes "$register_companion"

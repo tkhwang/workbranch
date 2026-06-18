@@ -73,6 +73,7 @@ registry_path_is_temp() {
   esac
   if [ -n "${TMPDIR:-}" ]; then
     tmpdir=${TMPDIR%/}
+    [ -n "$tmpdir" ] || return 1
     case "$path" in
       "$tmpdir"|"$tmpdir"/*) return 0 ;;
     esac
@@ -82,12 +83,14 @@ registry_path_is_temp() {
 
 registry_add_root() {
   local root file dir tmp lock
+  REGISTRY_ADD_ROOT_SKIPPED=0
   root=$(registry_normalize_root "$1")
   # Skip transient project roots so test/demo runs under TMPDIR do not pollute
   # the companion project list. Set WORKBRANCH_ALLOW_TEMP_REGISTRY=1 to opt in
   # (used by the test harness, which isolates the registry under TMPDIR).
   if [ "${WORKBRANCH_ALLOW_TEMP_REGISTRY:-0}" != "1" ] && registry_path_is_temp "$root"; then
-    printf 'Skipping companion registry for temporary path: %s\n' "$root" >&2
+    REGISTRY_ADD_ROOT_SKIPPED=1
+    printf '[*] Skipping companion registry for temporary path: %s\n' "$root" >&2
     return 0
   fi
   file=$(registry_path)

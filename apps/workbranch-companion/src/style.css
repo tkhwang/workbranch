@@ -3,7 +3,7 @@
 	background: #0a0e16;
 	font-family:
 		-apple-system, "SF Pro Text", "Segoe UI", system-ui, "Helvetica Neue",
-		Arial, sans-serif;
+		arial, sans-serif;
 	-webkit-font-smoothing: antialiased;
 	text-rendering: optimizelegibility;
 }
@@ -21,7 +21,7 @@ body {
 main {
 	--ui-font-family:
 		-apple-system, "SF Pro Text", "Segoe UI", system-ui, "Helvetica Neue",
-		Arial, sans-serif;
+		arial, sans-serif;
 	--app-font-family:
 		ui-monospace, "SFMono-Regular", "Menlo", "Monaco", "Consolas",
 		"Liberation Mono", monospace;

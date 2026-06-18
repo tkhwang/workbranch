@@ -212,6 +212,33 @@ INPUT
   assert_contains "$(cat "$TMP_ROOT/work/fullstack/.workbranch.config")" "BRANCH_PREFIX feature"
 }
 
+test_interactive_init_temp_project_reports_registry_skip_without_registered_success() {
+  TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
+  mkdir -p "$TMP_ROOT/remotes" "$TMP_ROOT/seeds" "$TMP_ROOT/work"
+  frontend_remote=$(make_repo frontend)
+  xdg="$TMP_ROOT/xdg"
+  input=$(cat <<INPUT
+
+.
+fullstack
+_base
+frontend
+$frontend_remote
+master
+
+n
+Y
+n
+
+
+INPUT
+)
+  out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success env -u WORKBRANCH_ALLOW_TEMP_REGISTRY XDG_CONFIG_HOME="$xdg" "$WORKBRANCH" init)
+  assert_contains "$out" "[*] Skipping companion registry for temporary path:"
+  assert_not_contains "$out" "Registered with companion:"
+  assert_not_exists "$xdg/workbranch-companion/projects.md"
+}
+
 test_interactive_init_can_cancel_before_creating_project() {
   TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
   mkdir -p "$TMP_ROOT/remotes" "$TMP_ROOT/seeds" "$TMP_ROOT/work"

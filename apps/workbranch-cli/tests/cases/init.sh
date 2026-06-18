@@ -212,6 +212,16 @@ test_init_registers_companion_project_markdown() {
   assert_contains "$(cat "$registry")" "# workbranch companion projects"
 }
 
+test_init_temp_project_reports_registry_skip_without_registered_success() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  xdg="$TMP_ROOT/xdg"
+  out=$(cd "$project" && run_expect_success env -u WORKBRANCH_ALLOW_TEMP_REGISTRY XDG_CONFIG_HOME="$xdg" "$WORKBRANCH" init)
+  assert_contains "$out" "[*] Skipping companion registry for temporary path:"
+  assert_not_contains "$out" "Registered with companion:"
+  assert_not_exists "$xdg/workbranch-companion/projects.md"
+}
+
 
 test_registry_serializes_concurrent_add_remove() {
   TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
@@ -321,7 +331,7 @@ test_registry_skips_temp_root_without_optin() {
   helper=$(registry_add_helper_path)
   out=$(env -u WORKBRANCH_ALLOW_TEMP_REGISTRY XDG_CONFIG_HOME="$xdg" "$helper" "$APP_ROOT" "$root" 2>&1) \
     || fail "registry add helper failed: $out"
-  assert_contains "$out" "Skipping companion registry for temporary path"
+  assert_contains "$out" "[*] Skipping companion registry for temporary path"
   assert_not_exists "$xdg/workbranch-companion/projects.md"
 }
 
@@ -337,4 +347,28 @@ test_registry_adds_temp_root_with_optin() {
   registry="$xdg/workbranch-companion/projects.md"
   assert_file "$registry"
   assert_contains "$(cat "$registry")" "- $root_real"
+}
+
+test_registry_tmpdir_root_does_not_treat_all_absolute_paths_as_temp() {
+  TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
+  helper="$TMP_ROOT/registry-temp-check-helper.sh"
+  cat > "$helper" <<'SCRIPT'
+#!/usr/bin/env bash
+set -eu
+APP_ROOT=$1
+path=$2
+die() { printf '%s\n' "[-] Error: $*" >&2; exit 1; }
+. "$APP_ROOT/src/workbranch/lib/registry.sh"
+if registry_path_is_temp "$path"; then
+  printf '%s\n' "temp"
+else
+  printf '%s\n' "not-temp"
+fi
+SCRIPT
+  chmod +x "$helper"
+
+  app_root_real=$(cd "$APP_ROOT" && pwd -P)
+  out=$(env TMPDIR=/ "$helper" "$APP_ROOT" "$app_root_real") \
+    || fail "registry temp check helper failed: $out"
+  [ "$out" = "not-temp" ] || fail "TMPDIR=/ must not treat every absolute path as temporary: $out"
 }
