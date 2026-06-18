@@ -31,13 +31,14 @@ function parseArgs(argv) {
 }
 
 function syncCargoLockMarker(cargoLock) {
-	const packageEntry = /(^\[\[package\]\]\nname = "workbranch-companion"\nversion = "([^"]+)")(?: # x-release-please-version)?/m;
+	const packageEntry =
+		/(^\[\[package\]\]\r?\nname = "workbranch-companion"\r?\nversion = "([^"]+)")(?: # x-release-please-version)?/m;
 	if (!packageEntry.test(cargoLock)) {
 		throw new Error(
 			"Cargo.lock must include the workbranch-companion package entry",
 		);
 	}
-	return cargoLock.replace(packageEntry, '$1 # x-release-please-version');
+	return cargoLock.replace(packageEntry, "$1 # x-release-please-version");
 }
 
 function main() {

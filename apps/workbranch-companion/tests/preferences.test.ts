@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import { describe, expect, it } from "vitest";
 import {
 	COMPANION_FONT_OPTIONS,
@@ -106,7 +107,8 @@ describe("companion preferences", () => {
 
 		// Then the newer write waits and lands after the older write
 		expect(writes).toEqual(["font"]);
-		releaseFirstWrite?.();
+		assert.ok(releaseFirstWrite, "releaseFirstWrite must be initialized");
+		releaseFirstWrite();
 		await saveQueue;
 		expect(writes).toEqual(["font", "theme"]);
 	});
