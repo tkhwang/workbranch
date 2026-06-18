@@ -3,5 +3,11 @@
   "identifier": "default",
   "description": "Default capability for the Workbranch Companion window.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "autostart:allow-enable",
+    "autostart:allow-disable",
+    "autostart:allow-is-enabled",
+    "store:default"
+  ]
 }

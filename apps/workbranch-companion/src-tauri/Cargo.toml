@@ -20,6 +20,7 @@ tauri = { version = "2.9.5", features = ["tray-icon", "image-png"] }
 tauri-plugin-positioner = { version = "2", features = ["tray-icon"] }
 thiserror = "2"
 notify = "8"
+tauri-plugin-store = "2"
 
 [lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
@@ -33,3 +34,6 @@ panic = "deny"
 todo = "deny"
 unimplemented = "deny"
 undocumented_unsafe_blocks = "deny"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-autostart = "2"
