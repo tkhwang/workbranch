@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.3.0](https://github.com/tkhwang/workbranch/compare/v2.2.0...v2.3.0) (2026-06-18)
+
+
+### Features
+
+* **design:** update companion design for terminal HUD ([ff92672](https://github.com/tkhwang/workbranch/commit/ff9267211889f2621e20a63157b310a0d49b1f77))
+* **design:** update companion design for terminal HUD ([cf82685](https://github.com/tkhwang/workbranch/commit/cf82685c92398438df13053e5b6a91cc9335324b))
+* **release:** add release marker sync script ([00c8565](https://github.com/tkhwang/workbranch/commit/00c856557a05d833a62b339d0ad4a744dd03c156))
+
+
+### Bug Fixes
+
+* update sync-release-markers to support CRLF line endings and improve test robustness ([d6e4d40](https://github.com/tkhwang/workbranch/commit/d6e4d407c79f5be87d7c1e8be20adb4b7c760ff2))
+
 ## [2.2.0](https://github.com/tkhwang/workbranch/compare/v2.1.1...v2.2.0) (2026-06-17)
 
 
