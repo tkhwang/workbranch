@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.3.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.2.0...workbranch-companion-v2.3.0) (2026-06-18)
+
+
+### Features
+
+* **design:** refine hud design and skip temp registry paths ([824e01c](https://github.com/tkhwang/workbranch/commit/824e01c6f876ddad6f7277e4f264243ba1b3ab3f))
+* **design:** refine hud design and skip temp registry paths ([f4e9ec4](https://github.com/tkhwang/workbranch/commit/f4e9ec4ecf30e77e39b2927db8d085347ebbff63))
+
+
+### Bug Fixes
+
+* **registry:** improve temp path handling and messaging ([c3ec6ac](https://github.com/tkhwang/workbranch/commit/c3ec6acb96925ba1c39a3e846b4e1d3419d306ec))
+
 ## [2.2.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.1.0...workbranch-companion-v2.2.0) (2026-06-18)
 
 
