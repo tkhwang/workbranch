@@ -1,11 +1,20 @@
 type Props = {
 	readonly onRefresh: () => void;
 	readonly onQuit: () => void;
+	readonly status: string;
 };
 
-export function AppToolbar({ onRefresh, onQuit }: Props) {
+export function AppToolbar({ onRefresh, onQuit, status }: Props) {
 	return (
 		<div className="toolbar" aria-label="Companion controls" role="toolbar">
+			<span
+				className="toolbar-status"
+				aria-live="polite"
+				role="status"
+				title={status}
+			>
+				{status}
+			</span>
 			<button
 				type="button"
 				className="toolbar-button refresh-button"

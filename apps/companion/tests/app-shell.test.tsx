@@ -48,7 +48,7 @@ describe("App shell settings wiring", () => {
 		}
 	});
 
-	it("renders terminal preference data attributes, icon refresh, bottom view nav, and live status footer", () => {
+	it("renders terminal preference data attributes, icon refresh, top status, and bottom view nav", () => {
 		// Given the companion app shell at its initial render
 		// When static markup is rendered
 		const html = renderToStaticMarkup(<App />);
@@ -58,6 +58,9 @@ describe("App shell settings wiring", () => {
 		expect(html).toContain('data-font="system-mono"');
 		expect(html).toContain('aria-label="Refresh tasks"');
 		expect(html).toContain('aria-label="Quit Companion"');
+		expect(html).toContain('class="toolbar-status"');
+		expect(html).toContain(">Ready</span>");
+		expect(html).not.toContain("<footer");
 		expect(html).not.toContain(">Refresh</button>");
 		expect(html).not.toContain(">Quit</button>");
 		expect(html).toContain('class="toolbar-icon"');
@@ -100,16 +103,55 @@ describe("App shell settings wiring", () => {
 		);
 	});
 
-	it("lays out task launch actions as equal full-width thirds", () => {
+	it("keeps the current step strip visually flat instead of card-like", () => {
+		// Given the task detail stylesheet
+		// When the current-step CSS contract is inspected
+		const css = readCssContract("src/style.css");
+
+		// Then the current step reads as a low-profile status strip, not a nested card
+		expect(css).toMatch(
+			/\.current-step-strip\s*\{[^}]*background:\s*var\(--surface-2\)/s,
+		);
+		expect(css).toMatch(
+			/\.current-step-strip\s*\{[^}]*box-shadow:\s*inset 1px 0 0 var\(--accent\)/s,
+		);
+		expect(css).not.toMatch(
+			/\.current-step-strip\s*\{[^}]*var\(--shadow-card\)/s,
+		);
+		expect(css).not.toMatch(
+			/\.current-step-strip\s*\{[^}]*var\(--current-step-bg\)/s,
+		);
+	});
+
+	it("lays out task launch actions as a compact inline command bar", () => {
 		// Given the task action stylesheet
 		// When the action bar CSS contract is inspected
 		const css = readCssContract("src/style.css");
 
-		// Then IDE, Terminal, and Finder divide the row evenly
+		// Then IDE, Terminal, and Finder stay compact instead of becoming large cards
+		expect(css).toMatch(/\.task-actions\s*\{[^}]*display:\s*flex/s);
+		expect(css).toMatch(/\.task-actions\s*\{[^}]*align-items:\s*center/s);
+		expect(css).toMatch(/\.task-action\s*\{[^}]*display:\s*inline-flex/s);
+		expect(css).not.toMatch(/\.task-actions\s*\{[^}]*grid-template-columns/s);
+		expect(css).not.toMatch(/\.task-action\s*\{[^}]*width:\s*100%/s);
+	});
+
+	it("keeps the bottom view menu in normal flow instead of covering task content", () => {
+		// Given the companion shell stylesheet
+		// When the bottom navigation CSS contract is inspected
+		const css = readCssContract("src/style.css");
+
+		// Then the command bar is part of the popover layout, not a fixed overlay
+		expect(css).toMatch(/main\s*\{[^}]*padding:\s*12px/s);
+		expect(css).not.toMatch(/main\s*\{[^}]*padding:[^;}]*78px/s);
+		expect(css).toMatch(/\.view-nav\s*\{[^}]*position:\s*static/s);
 		expect(css).toMatch(
-			/\.task-actions\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/s,
+			/\.view-nav\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/s,
 		);
-		expect(css).toMatch(/\.task-action\s*\{[^}]*width:\s*100%/s);
+		expect(css).toMatch(/\.view-nav-button\s*\{[^}]*min-width:\s*0/s);
+		expect(css).toMatch(/\.view-nav-button\s*\{[^}]*justify-self:\s*stretch/s);
+		expect(css).not.toMatch(/\.view-nav-button\s*\{[^}]*width:\s*100%/s);
+		expect(css).not.toMatch(/\.view-nav\s*\{[^}]*position:\s*fixed/s);
 	});
 
 	it("defines the eight famous dark and light theme token selectors", () => {

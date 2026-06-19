@@ -209,7 +209,11 @@ export function App() {
 		<main data-font={preferences.font} data-theme={activeTheme}>
 			<header>
 				<AppSummary summary={model.summary} />
-				<AppToolbar onRefresh={() => void refresh()} onQuit={handleQuit} />
+				<AppToolbar
+					onRefresh={() => void refresh()}
+					onQuit={handleQuit}
+					status={status}
+				/>
 			</header>
 			{currentView === "main" ? (
 				<section className="view-panel" aria-label="Main View">
@@ -251,9 +255,6 @@ export function App() {
 					{error.root}: {error.message}
 				</p>
 			))}
-			<footer aria-live="polite" role="status">
-				{status}
-			</footer>
 			<ViewNav currentView={currentView} onViewChange={setCurrentView} />
 		</main>
 	);

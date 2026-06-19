@@ -47,6 +47,7 @@ summary:focus-visible {
 	align-items: center;
 	display: inline-flex;
 	gap: 6px;
+	min-width: 0;
 }
 
 .toolbar-button {
@@ -54,6 +55,19 @@ summary:focus-visible {
 	font-size: 11px;
 	min-height: 30px;
 	padding: 5px 8px;
+}
+
+.toolbar-status {
+	border: 1px solid var(--line);
+	border-radius: 999px;
+	color: var(--faint);
+	font-size: 10px;
+	line-height: 1;
+	max-width: 98px;
+	overflow: hidden;
+	padding: 5px 7px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .toolbar-divider {
@@ -121,16 +135,14 @@ summary:focus-visible {
 	background: var(--surface-1);
 	border: 1px solid var(--line-strong);
 	border-radius: 16px;
-	bottom: 10px;
 	box-shadow: var(--shadow-pop);
 	display: grid;
 	gap: 4px;
-	grid-template-columns: repeat(3, 1fr);
-	left: 12px;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	margin-top: 8px;
 	padding: 5px;
-	position: fixed;
-	right: 12px;
-	z-index: 5;
+	position: static;
+	width: 100%;
 }
 
 @supports (background: color-mix(in srgb, black, white)) {
@@ -149,8 +161,10 @@ summary:focus-visible {
 	font-size: 10px;
 	gap: 7px;
 	justify-content: center;
+	justify-self: stretch;
 	line-height: 1;
 	min-height: 40px;
+	min-width: 0;
 	padding: 6px 8px;
 }
 
@@ -166,6 +180,13 @@ summary:focus-visible {
 }
 
 .view-nav-icon {
+	flex: 0 0 auto;
 	height: 18px;
 	width: 18px;
+}
+
+.view-nav-button span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }

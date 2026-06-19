@@ -2,7 +2,7 @@
 
 ## Source of truth
 - Status: Active
-- Last refreshed: 2026-06-18
+- Last refreshed: 2026-06-20
 - Primary product surfaces: Workbranch Companion macOS menu bar popover.
 - Evidence reviewed:
   - `docs/plans/0032-companion-tauri-react-rewrite.md`
@@ -50,7 +50,7 @@
   3. Main view: project group header, task name/status/progress/notification, repo branch/dirty state, active plan/current step, actions.
   4. Activity view: future report placeholder only in this slice.
   5. Setting view: launch-at-login, font, and theme controls.
-  6. Persistent live status footer and bottom view navigation.
+  6. Compact live status chip in the top toolbar and bottom view navigation.
 
 ## Design principles
 - Principle 1: Status is a launcher signal, not a paragraph. Use compact dots, counts, and labels.
@@ -71,7 +71,7 @@
 - New/changed components:
   - global inventory/status summary,
   - project group header,
-  - top toolbar with icon-only refresh control,
+  - top toolbar with live status chip and icon-only refresh control,
   - bottom view navigation for Main, Activity, and Setting,
   - Setting view preferences panel,
   - Activity report placeholder view,
@@ -90,7 +90,7 @@
 - Target standard: keyboard-operable popover controls and readable contrast.
 - Keyboard/focus behavior: buttons and `summary` expose clear focus rings.
 - Contrast/readability: status text and current step must pass practical dark-mode contrast; disabled action may be muted but legible.
-- Screen-reader semantics: preserve button `aria-label`s; bottom view buttons expose destination labels and `aria-current`; settings controls use associated labels, switch state text, and a live status footer.
+- Screen-reader semantics: preserve button `aria-label`s; bottom view buttons expose destination labels and `aria-current`; settings controls use associated labels, switch state text, and the toolbar status chip exposes `role="status"` with polite live updates.
 - Reduced motion and sensory considerations: disable transform transitions under `prefers-reduced-motion: reduce`.
 
 ## Responsive behavior
@@ -99,10 +99,10 @@
 - Touch/hover differences: hover is enhancement only; core state is visible without hover.
 
 ## Interaction states
-- Loading: footer/status line reports refresh status.
+- Loading: toolbar status chip reports refresh status.
 - Empty: concise empty message with setup hint.
 - Error: root-scoped error row with red accent.
-- Success: status footer says `Updated` / `Action complete`.
+- Success: toolbar status chip says `Updated` / `Action complete`.
 - Disabled: disabled action has muted text and no press transform.
 - Offline/slow network: not applicable; CLI/local filesystem driven.
 

@@ -75,5 +75,5 @@ main {
 	color: var(--text);
 	font-family: var(--app-font-family);
 	min-height: 100vh;
-	padding: 12px 12px 78px;
+	padding: 12px;
 }
