@@ -52,6 +52,10 @@ export async function appendActivityEvents(
 	await invoke("append_activity_events", { events });
 }
 
+export async function quitCompanion(): Promise<void> {
+	await invoke("quit_app");
+}
+
 export async function runAction(
 	command: CompanionCommand,
 	cwd: string,

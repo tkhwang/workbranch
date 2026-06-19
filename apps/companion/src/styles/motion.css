@@ -1,0 +1,11 @@
+@media (prefers-reduced-motion: reduce) {
+	.task-action,
+	.task {
+		transition: none;
+	}
+
+	.task-action:active:not(:disabled),
+	.task:hover {
+		transform: none;
+	}
+}

@@ -1,4 +1,32 @@
 import { load } from "@tauri-apps/plugin-store";
+import {
+	COMPANION_THEME_MODE_OPTIONS,
+	COMPANION_THEME_OPTIONS,
+	type CompanionResolvedThemeMode,
+	type CompanionTheme,
+	type CompanionThemeFamily,
+	type CompanionThemeMode,
+	isCompanionThemeFamily,
+	isCompanionThemeMode,
+	isLegacyCompanionTheme,
+	resolvedThemeValue,
+	themeFamilyFromLegacyTheme,
+	themeModeFromLegacyTheme,
+} from "./themePreferences";
+
+export type {
+	CompanionResolvedThemeMode,
+	CompanionTheme,
+	CompanionThemeFamily,
+	CompanionThemeMode,
+	CompanionThemeModeOption,
+	CompanionThemeOption,
+} from "./themePreferences";
+export {
+	COMPANION_THEME_MODE_OPTIONS,
+	COMPANION_THEME_OPTIONS,
+	resolvedThemeValue,
+};
 
 export const COMPANION_PREFERENCES_STORE_FILE = "companion-preferences.json";
 
@@ -10,30 +38,18 @@ const COMPANION_FONT_VALUES = [
 	"jetbrains-mono",
 ] as const;
 
-const COMPANION_THEME_VALUES = [
-	"terminal-dark",
-	"amber-crt",
-	"green-mono",
-	"high-contrast",
-] as const;
-
 export type CompanionFont = (typeof COMPANION_FONT_VALUES)[number];
-export type CompanionTheme = (typeof COMPANION_THEME_VALUES)[number];
 
 export type CompanionPreferences = {
 	readonly font: CompanionFont;
-	readonly theme: CompanionTheme;
+	readonly themeFamily: CompanionThemeFamily;
+	readonly themeMode: CompanionThemeMode;
 };
 
 export type CompanionFontOption = {
 	readonly value: CompanionFont;
 	readonly label: string;
 	readonly cssFamily: string;
-};
-
-export type CompanionThemeOption = {
-	readonly value: CompanionTheme;
-	readonly label: string;
 };
 
 export type PreferenceSanitizationResult = {
@@ -43,7 +59,8 @@ export type PreferenceSanitizationResult = {
 
 export type PreferenceStoreEntries = {
 	readonly font: CompanionFont;
-	readonly theme: CompanionTheme;
+	readonly themeFamily: CompanionThemeFamily;
+	readonly themeMode: CompanionThemeMode;
 };
 
 export type CompanionPreferenceStore = {
@@ -54,7 +71,8 @@ export type CompanionPreferenceStore = {
 
 export const DEFAULT_COMPANION_PREFERENCES: CompanionPreferences = {
 	font: "system-mono",
-	theme: "terminal-dark",
+	themeFamily: "dracula",
+	themeMode: "system",
 };
 
 export const COMPANION_FONT_OPTIONS: readonly CompanionFontOption[] = [
@@ -88,13 +106,6 @@ export const COMPANION_FONT_OPTIONS: readonly CompanionFontOption[] = [
 	},
 ];
 
-export const COMPANION_THEME_OPTIONS: readonly CompanionThemeOption[] = [
-	{ value: "terminal-dark", label: "Terminal Dark" },
-	{ value: "amber-crt", label: "Amber CRT" },
-	{ value: "green-mono", label: "Green Mono" },
-	{ value: "high-contrast", label: "High Contrast" },
-];
-
 export function isCompanionFont(value: unknown): value is CompanionFont {
 	switch (value) {
 		case "system-mono":
@@ -108,31 +119,34 @@ export function isCompanionFont(value: unknown): value is CompanionFont {
 	}
 }
 
-export function isCompanionTheme(value: unknown): value is CompanionTheme {
-	switch (value) {
-		case "terminal-dark":
-		case "amber-crt":
-		case "green-mono":
-		case "high-contrast":
-			return true;
-		default:
-			return false;
-	}
-}
-
 export function sanitizeCompanionPreferences(input: {
 	readonly font?: unknown;
+	readonly themeFamily?: unknown;
+	readonly themeMode?: unknown;
 	readonly theme?: unknown;
 }): PreferenceSanitizationResult {
 	const font = isCompanionFont(input.font)
 		? input.font
 		: DEFAULT_COMPANION_PREFERENCES.font;
-	const theme = isCompanionTheme(input.theme)
+	const legacyTheme = isLegacyCompanionTheme(input.theme)
 		? input.theme
-		: DEFAULT_COMPANION_PREFERENCES.theme;
+		: undefined;
+	const themeFamily = isCompanionThemeFamily(input.themeFamily)
+		? input.themeFamily
+		: legacyTheme
+			? themeFamilyFromLegacyTheme(legacyTheme)
+			: DEFAULT_COMPANION_PREFERENCES.themeFamily;
+	const themeMode = isCompanionThemeMode(input.themeMode)
+		? input.themeMode
+		: legacyTheme
+			? themeModeFromLegacyTheme(legacyTheme)
+			: DEFAULT_COMPANION_PREFERENCES.themeMode;
 	return {
-		preferences: { font, theme },
-		sanitized: font !== input.font || theme !== input.theme,
+		preferences: { font, themeFamily, themeMode },
+		sanitized:
+			font !== input.font ||
+			themeFamily !== input.themeFamily ||
+			themeMode !== input.themeMode,
 	};
 }
 
@@ -140,7 +154,11 @@ export function shouldRestoreFailedPreferenceUpdate(
 	current: CompanionPreferences,
 	attempted: CompanionPreferences,
 ): boolean {
-	return current.font === attempted.font && current.theme === attempted.theme;
+	return (
+		current.font === attempted.font &&
+		current.themeFamily === attempted.themeFamily &&
+		current.themeMode === attempted.themeMode
+	);
 }
 
 export type PreferenceSaveOperation = () => Promise<void>;
@@ -157,7 +175,8 @@ export function preferencesToStoreEntries(
 ): PreferenceStoreEntries {
 	return {
 		font: preferences.font,
-		theme: preferences.theme,
+		themeFamily: preferences.themeFamily,
+		themeMode: preferences.themeMode,
 	};
 }
 
@@ -173,6 +192,8 @@ export async function readCompanionPreferences(
 ): Promise<PreferenceSanitizationResult> {
 	return sanitizeCompanionPreferences({
 		font: await store.get<unknown>("font"),
+		themeFamily: await store.get<unknown>("themeFamily"),
+		themeMode: await store.get<unknown>("themeMode"),
 		theme: await store.get<unknown>("theme"),
 	});
 }
@@ -183,6 +204,16 @@ export async function writeCompanionPreferences(
 ): Promise<void> {
 	const entries = preferencesToStoreEntries(preferences);
 	await store.set("font", entries.font);
-	await store.set("theme", entries.theme);
+	await store.set("themeFamily", entries.themeFamily);
+	await store.set("themeMode", entries.themeMode);
 	await store.save();
+}
+
+export function resolvedCompanionTheme(
+	preferences: CompanionPreferences,
+	systemMode: CompanionResolvedThemeMode,
+): CompanionTheme {
+	const mode =
+		preferences.themeMode === "system" ? systemMode : preferences.themeMode;
+	return resolvedThemeValue(preferences.themeFamily, mode);
 }

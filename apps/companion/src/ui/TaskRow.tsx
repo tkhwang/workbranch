@@ -4,12 +4,12 @@ import type { Step, Task } from "../domain/model";
 import { activePlan, taskProgress, taskStatus } from "../domain/model";
 
 const STATUS_META = {
-	todo: { icon: "·", label: "Todo" },
-	planning: { icon: "○", label: "Planning" },
-	"in-progress": { icon: "●", label: "In progress" },
-	review: { icon: "◐", label: "Review" },
-	blocked: { icon: "!", label: "Blocked" },
-	done: { icon: "✓", label: "Done" },
+	todo: { label: "Todo" },
+	planning: { label: "Planning" },
+	"in-progress": { label: "In progress" },
+	review: { label: "Review" },
+	blocked: { label: "Blocked" },
+	done: { label: "Done" },
 } as const;
 
 const TASK_ACTION_KINDS = ["ide", "terminal", "finder"] as const;
@@ -91,7 +91,7 @@ function TaskSummary({ task, status, progress }: TaskSummaryProps) {
 				role="img"
 				title={meta.label}
 			>
-				{meta.icon}
+				<span className="task-status-dot" />
 			</span>
 			<span className="task-name" title={task.name}>
 				{task.name}

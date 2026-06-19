@@ -175,9 +175,9 @@ configure_terminal_prompt() {
 configure_preferred_language_prompt() {
   allow_eof=${1:-no}
   info "Preferred language"
-  current=$(preferred_language_label)
   print_language_presets
-  if ! value=$(prompt_read "[*] Preferred language for generated task guidance [$current]: "); then
+  current_choice=$(preferred_language_choice_label)
+  if ! value=$(prompt_read "[*] Preferred language for generated task guidance (choose 1 or 2) [$current_choice]: "); then
     [ "$allow_eof" = "yes" ] && return 2
     die "input aborted"
   fi
@@ -276,7 +276,11 @@ configure_repo_setup_prompt() {
   name=$1
   idx=$(repo_index_by_name "$name") || die "unknown repo: $name"
   current=$(repo_setup_at "$idx")
-  value=$(prompt_read "[*] Repo setup command for $name [$current]: ") || die "input aborted"
+  if [ -n "$current" ]; then
+    value=$(prompt_read "[*] Repo setup command for $name [$current]: ") || die "input aborted"
+  else
+    value=$(prompt_read "[*] Repo setup command for $name [pnpm install] (example, Enter to skip): ") || die "input aborted"
+  fi
   case "$value" in
     "") ;;
     --clear) clear_repo_setup "$name" ;;

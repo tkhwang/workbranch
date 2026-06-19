@@ -59,12 +59,12 @@
 - Tradeoffs: density is preferred over spaciousness, but tap/click targets remain at least 32px high where practical.
 
 ## Visual language
-- Color: terminal-like theme presets (`terminal-dark`, `amber-crt`, `green-mono`, `high-contrast`) with complete token sets for surfaces, lines, text, accents, status colors, and shell/component backgrounds.
+- Color: famous terminal/editor theme presets are selected through a `Light | Dark | System` mode control plus four visible family buttons (`dracula`, `nord`, `solarized`, `gruvbox`) for the resolved mode; each family has complete dark/light token sets for surfaces, lines, text, accents, status colors, and shell/component backgrounds. Theme cards show representative color chips rather than a blended gradient bar so each theme's character is legible at a glance.
 - Typography: dual-axis. UI chrome (task/project names, headings, button and nav labels, settings controls) uses a system sans stack for hierarchy and readability; developer data (repo/branch/path, counts, plan label) stays monospace. The user-selectable font preference controls the monospace data stack.
 - Spacing/layout rhythm: compact terminal/preferences rhythm, 8px grid, row-first grouping, prompt-like separators, subtle grid or border lines, no large cards.
 - Shape/radius/elevation: one fixed radius scale (`6px` controls, `10px` rows, `14px` shell); depth from clearly stepped tonal surfaces, soft elevation shadows on cards, and hairline borders; cards lift on hover. Avoid heavy gradients and glossy neon glow.
 - Motion: 120ms press/reveal feedback only; respect reduced motion.
-- Imagery/iconography: text glyphs and status dots only; no decorative illustration.
+- Imagery/iconography: status state uses quiet color dots with accessible labels; avoid status checkmark glyphs in task headers. Checklist rows may keep their task-list marks. No decorative illustration.
 
 ## Components
 - Existing components to reuse: `TaskRow`, action buttons, native `details/summary` disclosure.
@@ -77,14 +77,14 @@
   - Activity report placeholder view,
   - switch row for launch-at-login,
   - font select row,
-  - theme select row with optional non-interactive preview chips,
+  - theme mode segmented control (`Light`, `Dark`, `System`) with one four-button family grid and four representative palette chips per card for the resolved mode,
   - launcher-like task summary line,
   - current-step strip,
   - repo chips,
   - action bar limited to IDE, Terminal, and Finder,
   - nested step tree.
 - Variants and states: todo, planning, in-progress, review, blocked, done, notification present, dirty repo.
-- Token/component ownership: `style.css` owns CSS custom properties and component classes.
+- Token/component ownership: `style.css` is the CSS import manifest; `src/styles/base.css`, `themes.css`, `chrome.css`, `task-details.css`, `status-groups.css`, `settings.css`, and `motion.css` own CSS custom properties and component classes by surface.
 
 ## Accessibility
 - Target standard: keyboard-operable popover controls and readable contrast.
@@ -125,4 +125,4 @@
 ## Direction revision
 - 2026-06-17: Primary reference changed from Linear to Raycast after implementation review. Keep Linear only as a secondary cue for compact status hierarchy; the dominant feel should be a Raycast-like menu command/status popover, not a SaaS issue-list dashboard.
 - 2026-06-18: Primary direction changed from Raycast-like chrome to a terminal/CLI developer HUD for companion settings, fonts, and theme presets. Treat the 2026-06-17 Raycast direction as superseded for shell color, typography, and settings components; keep only the compact status hierarchy lessons. Later on 2026-06-18, navigation changed to view-level bottom tabs: Main, Activity report placeholder, and Setting, while the top-right header keeps refresh as an icon-only control.
-- 2026-06-18 (refresh): Direction refined from a mono-only terminal HUD to a **modern developer HUD — terminal core, modern shell**. The strict mono-only typography and hairline-only depth produced a flat, low-contrast, drab popover. Corrections: (1) dual-axis typography — system sans for names/headings/controls, monospace kept for developer data; (2) clearly stepped tonal surfaces plus soft card elevation with hover lift, replacing near-invisible translucent cards; (3) accent (cyan in terminal-dark) stays the single signal color but appears on more touchpoints (project rail, current-step left rail, active states). This supersedes the mono-only typography line and the hairline-only depth line above. Identity, density, status-as-launcher, and the four theme presets are unchanged.
+- 2026-06-18 (refresh): Direction refined from a mono-only terminal HUD to a **modern developer HUD — terminal core, modern shell**. The strict mono-only typography and hairline-only depth produced a flat, low-contrast, drab popover. Corrections: (1) dual-axis typography — system sans for names/headings/controls, monospace kept for developer data; (2) clearly stepped tonal surfaces plus soft card elevation with hover lift, replacing near-invisible translucent cards; (3) accent (cyan in terminal-dark) stays the single signal color but appears on more touchpoints (project rail, current-step left rail, active states). This supersedes the mono-only typography line and the hairline-only depth line above. Identity, density, status-as-launcher, and the theme preset direction now expands to four famous families with dark/light variants.

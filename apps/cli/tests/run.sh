@@ -190,6 +190,7 @@ main() {
   run_test test_plan_archive_slug_collision_suffix_and_no_plan_error
   run_test test_remove_deletes_workbranch_state_with_archives_before_leftover_prompt
   run_test test_land_archive_prompt_yes_archives_and_no_keeps_brief
+  run_test test_land_archive_prompt_eof_keeps_brief
   run_test test_finalize_archive_prompt_records_finalize
   run_test test_pull_archive_prompt_requires_all_filtered_repos_merged
   run_test test_pull_archive_prompt_skips_trivial_ancestor_without_task_commits

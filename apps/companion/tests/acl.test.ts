@@ -148,6 +148,9 @@ describe("ACL", () => {
 			"alpha-new",
 			"alpha-old",
 		]);
+		expect(
+			model.groups.flatMap((group) => group.rows).map((row) => row.expanded),
+		).toEqual([true, true, true]);
 	});
 });
 

@@ -39,8 +39,8 @@ test_land_archive_prompt_yes_archives_and_no_keeps_brief() {
   commit_task_repo_file "$project/login/frontend" land.txt "land frontend"
   commit_task_repo_file "$project/login/backend" land.txt "land backend"
 
-  out=$(printf 'y\n' | WORKBRANCH_TEST_ARCHIVE_TIMESTAMP=20260616-130000 run_expect_success env WORKBRANCH_ALLOW_NON_TTY_PROMPT=1 "$WORKBRANCH" land login)
-  assert_contains "$out" "Mark plan \"Land Plan\" done and archive? [y/N]"
+  out=$(printf '\n' | WORKBRANCH_TEST_ARCHIVE_TIMESTAMP=20260616-130000 run_expect_success env WORKBRANCH_ALLOW_NON_TTY_PROMPT=1 "$WORKBRANCH" land login)
+  assert_contains "$out" "$(printf '\n[*] Mark plan \"Land Plan\" done and archive? [Y/n]')"
   assert_contains "$out" "Archived plan:"
   archive_file=$(archive_trigger_file_for "$project/login")
   assert_file "$archive_file"
@@ -55,9 +55,26 @@ test_land_archive_prompt_yes_archives_and_no_keeps_brief() {
   commit_task_repo_file "$project/keep/frontend" keep-land.txt "keep land frontend"
   commit_task_repo_file "$project/keep/backend" keep-land.txt "keep land backend"
   out=$(printf 'n\n' | run_expect_success env WORKBRANCH_ALLOW_NON_TTY_PROMPT=1 "$WORKBRANCH" land keep)
-  assert_contains "$out" "Mark plan \"Keep Land Plan\" done and archive? [y/N]"
+  assert_contains "$out" "$(printf '\n[*] Mark plan \"Keep Land Plan\" done and archive? [Y/n]')"
   assert_contains "$(cat "$project/keep/TASK-WORKBRANCH.md")" "# Keep Land Plan"
   assert_not_exists "$project/keep/.workbranch/plans/done"
+}
+
+test_land_archive_prompt_eof_keeps_brief() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add eof >/dev/null
+  write_trigger_brief "$project/eof" "EOF Land Plan"
+  commit_task_repo_file "$project/eof/frontend" eof-land.txt "eof land frontend"
+  commit_task_repo_file "$project/eof/backend" eof-land.txt "eof land backend"
+
+  out=$(WORKBRANCH_TEST_ARCHIVE_TIMESTAMP=20260616-130500 run_expect_success env WORKBRANCH_ALLOW_NON_TTY_PROMPT=1 "$WORKBRANCH" land eof </dev/null)
+  assert_contains "$out" "$(printf '\n[*] Mark plan \"EOF Land Plan\" done and archive? [Y/n]')"
+  assert_not_contains "$out" "Archived plan:"
+  assert_contains "$(cat "$project/eof/TASK-WORKBRANCH.md")" "# EOF Land Plan"
+  assert_not_exists "$project/eof/.workbranch/plans/done"
 }
 
 test_finalize_archive_prompt_records_finalize() {
@@ -72,7 +89,7 @@ test_finalize_archive_prompt_records_finalize() {
 
   out=$(printf 'y\n' | WORKBRANCH_TEST_ARCHIVE_TIMESTAMP=20260616-131000 run_expect_success env WORKBRANCH_ALLOW_NON_TTY_PROMPT=1 "$WORKBRANCH" finalize feat-login)
   assert_contains "$out" "Landing task"
-  assert_contains "$out" "Mark plan \"Finalize Plan\" done and archive? [y/N]"
+  assert_contains "$out" "$(printf '\n[*] Mark plan \"Finalize Plan\" done and archive? [Y/n]')"
   archive_file=$(archive_trigger_file_for "$project/feat-login")
   assert_file "$archive_file"
   assert_contains "$(cat "$archive_file")" "completed_via: finalize"
@@ -90,7 +107,7 @@ test_pull_archive_prompt_requires_all_filtered_repos_merged() {
   git -C "$project/login/frontend" push origin feature/login:master >/dev/null 2>&1
 
   out=$(printf 'y\n' | WORKBRANCH_TEST_ARCHIVE_TIMESTAMP=20260616-132000 run_expect_success env WORKBRANCH_ALLOW_NON_TTY_PROMPT=1 "$WORKBRANCH" pull)
-  assert_not_contains "$out" "Mark plan \"Pull Filter Plan\" done and archive? [y/N]"
+  assert_not_contains "$out" "Mark plan \"Pull Filter Plan\" done and archive?"
   assert_contains "$(cat "$project/login/TASK-WORKBRANCH.md")" "# Pull Filter Plan"
   assert_not_exists "$project/login/.workbranch/plans/done"
 
@@ -101,7 +118,7 @@ test_pull_archive_prompt_requires_all_filtered_repos_merged() {
   git -C "$project/filtered/frontend" push origin feature/filtered:master >/dev/null 2>&1
 
   out=$(printf 'y\n' | WORKBRANCH_TEST_ARCHIVE_TIMESTAMP=20260616-132000 run_expect_success env WORKBRANCH_ALLOW_NON_TTY_PROMPT=1 "$WORKBRANCH" pull --repo frontend)
-  assert_contains "$out" "Mark plan \"Pull Filtered Repo Plan\" done and archive? [y/N]"
+  assert_contains "$out" "$(printf '\n[*] Mark plan \"Pull Filtered Repo Plan\" done and archive? [Y/n]')"
   archive_file=$(archive_trigger_file_for "$project/filtered")
   assert_file "$archive_file"
   assert_contains "$(cat "$archive_file")" "completed_via: pull"
@@ -118,7 +135,7 @@ test_pull_archive_prompt_skips_trivial_ancestor_without_task_commits() {
   commit_to_remote_master frontend upstream-only
 
   out=$(printf 'y\n' | run_expect_success env WORKBRANCH_ALLOW_NON_TTY_PROMPT=1 "$WORKBRANCH" pull --repo frontend)
-  assert_not_contains "$out" "Mark plan \"Empty Branch Plan\" done and archive? [y/N]"
+  assert_not_contains "$out" "Mark plan \"Empty Branch Plan\" done and archive?"
   assert_contains "$(cat "$project/empty/TASK-WORKBRANCH.md")" "# Empty Branch Plan"
   assert_not_exists "$project/empty/.workbranch/plans/done"
 }

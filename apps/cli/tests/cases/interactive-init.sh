@@ -46,8 +46,8 @@ INPUT
   assert_not_contains "$out" "Task branch examples: master + login -> feature/login, feature/cpq + task1 -> feature/cpq-task1"
   assert_contains "$out" "[*] Base repo branch [main]:"
   assert_contains "$out" "[*] Base repo branch [master]:"
-  assert_contains "$out" "[*] Repo setup command for frontend []:"
-  assert_contains "$out" "[*] Repo setup command for backend []:"
+  assert_contains "$out" "[*] Repo setup command for frontend [pnpm install] (example, Enter to skip):"
+  assert_contains "$out" "[*] Repo setup command for backend [pnpm install] (example, Enter to skip):"
   assert_not_contains "$out" "[*] Task branch defaults:"
   assert_not_contains "$out" "[base repo] main        -> task1 -> [task repo] feature/task1"
   assert_not_contains "$out" "[base repo] feature/XXX -> task1 -> [task repo] feature/XXX-task1"
@@ -73,15 +73,15 @@ INPUT
   assert_contains "$out" "[*] Project"
   assert_contains "$out" "[*] Repo #1"
   assert_contains "$out" "[*] Repo #2"
-  assert_contains "$out" "[*] Preferred language for generated task guidance [English]:"
+  assert_contains "$out" "[*] Preferred language for generated task guidance (choose 1 or 2) [1: English]:"
   assert_contains "$out" "1) English"
   assert_contains "$out" "2) 한글"
   case "$out" in
-    *"[*] Repo #1"*"[*] Preferred language for generated task guidance [English]:"*"[*] IDE command:"*) ;;
+    *"[*] Repo #1"*"[*] Preferred language for generated task guidance (choose 1 or 2) [1: English]:"*"[*] IDE command:"*) ;;
     *) fail "expected language prompt before IDE prompt after repo setup; got: $out" ;;
   esac
   case "$out" in
-    *"[+] Initialized"*"[*] Add your first task now? [Y/n]:"*"[*] Preferred language for generated task guidance [English]:"*"[*] IDE command:"*"[*] Terminal command:"*) ;;
+    *"[+] Initialized"*"[*] Add your first task now? [Y/n]:"*"[*] Preferred language for generated task guidance (choose 1 or 2) [1: English]:"*"[*] IDE command:"*"[*] Terminal command:"*) ;;
     *) fail "expected init order: base clone, add first task prompt, language preference, then tool config; got: $out" ;;
   esac
   assert_not_contains "$out" "[*] Task setup command"
@@ -424,11 +424,11 @@ INPUT
 )
   out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" init)
   project="$TMP_ROOT/work/fullstack"
-  assert_contains "$out" "[*] Preferred language for generated task guidance [English]:"
+  assert_contains "$out" "[*] Preferred language for generated task guidance (choose 1 or 2) [1: English]:"
   assert_contains "$out" "1) English"
   assert_contains "$out" "2) 한글"
   case "$out" in
-    *"[*] Preferred language for generated task guidance [English]:"*"[*] IDE command:"*) ;;
+    *"[*] Preferred language for generated task guidance (choose 1 or 2) [1: English]:"*"[*] IDE command:"*) ;;
     *) fail "expected language prompt before tool config; got: $out" ;;
   esac
   assert_contains "$(cat "$project/.workbranch.config")" "PREFERRED_LANGUAGE ko"

@@ -151,7 +151,7 @@ status: done
 
 | 트리거 | 위치 | 판정 | 동작 |
 |---|---|---|---|
-| `land` | `execute_land_task` 성공 직후 | 현재 Plan 존재 | `[*] Mark plan "<title>" done and archive? [y/N]` → y면 `archive_current_plan`(`completed_via: land`) |
+| `land` | `execute_land_task` 성공 직후 | 현재 Plan 존재 | 앞에 빈 줄을 두고 `[*] Mark plan "<title>" done and archive? [Y/n]` → Enter/y면 `archive_current_plan`(`completed_via: land`) |
 | `finalize` | `cmd_finalize` 끝(land 성공 후) | 위와 동일 | 위와 동일(`completed_via: finalize`) |
 | `pull` | `run_pull` 후(신규 스캔) | repo filter 대상 repo 전체에서 task 브랜치가 pull 후 base의 ancestor & pull 전 의미있는 task 커밋 존재 | task별 프롬프트 → y면 archive(`completed_via: pull`) |
 | `push`/모호 | — | — | 아무 동작 안 함 |
