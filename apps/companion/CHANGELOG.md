@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.4.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.3.1...workbranch-companion-v2.4.0) (2026-06-19)
+
+
+### Features
+
+* **app:** add quit_app command and remove tray menu ([282eb42](https://github.com/tkhwang/workbranch/commit/282eb42059b7425f0c9e149b7e7bab1becb2e311))
+* **design:** refine visual language and component details ([282eb42](https://github.com/tkhwang/workbranch/commit/282eb42059b7425f0c9e149b7e7bab1becb2e311))
+* **ui:** update UI ([15f9990](https://github.com/tkhwang/workbranch/commit/15f9990948bb54dacd835da1e07b1051393baf8b))
+
+
+### Bug Fixes
+
+* **cli:** handle eof on archive prompt ([ef8f484](https://github.com/tkhwang/workbranch/commit/ef8f484522366b2b07d0d9c2e3ad9b368838c17d))
+* **companion:** prevent click gate consumption on middle click ([ef8f484](https://github.com/tkhwang/workbranch/commit/ef8f484522366b2b07d0d9c2e3ad9b368838c17d))
+* **companion:** update task expansion and font family ([de82c21](https://github.com/tkhwang/workbranch/commit/de82c217f8cb5af49a6d00e2d911ad2d8396d3bd))
+
 ## [2.3.1](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.3.0...workbranch-companion-v2.3.1) (2026-06-19)
 
 
