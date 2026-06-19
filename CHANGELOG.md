@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.1](https://github.com/tkhwang/workbranch/compare/v2.4.0...v2.4.1) (2026-06-19)
+
+
+### Bug Fixes
+
+* **companion:** update paths and release markers ([2c01e8d](https://github.com/tkhwang/workbranch/commit/2c01e8d5d10ee4e2fe91267f2cf45c51173a1233))
+
 ## [2.4.0](https://github.com/tkhwang/workbranch/compare/v2.3.0...v2.4.0) (2026-06-18)
 
 
