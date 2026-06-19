@@ -86,8 +86,7 @@ mod tests {
 
     #[test]
     fn local_workbranch_bin_uses_renamed_cli_app_dir() {
-        let expected =
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../cli/bin/workbranch");
+        let expected = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../cli/bin/workbranch");
 
         assert_eq!(local_workbranch_bin(), expected);
     }

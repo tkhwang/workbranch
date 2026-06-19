@@ -1,8 +1,6 @@
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::image::Image;
-use tauri::menu::{Menu, MenuItem};
-
 use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
 use tauri::{App, AppHandle, Manager, WindowEvent};
 use tauri_plugin_positioner::{Position, WindowExt};
@@ -28,25 +26,18 @@ pub(crate) fn install(app: &mut App) -> tauri::Result<()> {
         });
     }
 
-    let show = MenuItem::with_id(app, "show", "Show Companion", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show, &quit])?;
     let icon = Image::from_bytes(TRAY_TEMPLATE_ICON)?;
     let click_gate = Arc::new(Mutex::new(TrayClickGate::default()));
     TrayIconBuilder::with_id("workbranch-companion")
         .icon(icon)
         .icon_as_template(true)
-        .menu(&menu)
         .show_menu_on_left_click(false)
-        .on_menu_event(|app, event| match event.id().as_ref() {
-            "show" => show_main_window(app),
-            "quit" => app.exit(0),
-            _ => {}
-        })
         .on_tray_icon_event(move |tray, event| {
             tauri_plugin_positioner::on_tray_event(tray.app_handle(), &event);
-            if should_toggle_from_tray_event(&click_gate, &event) {
-                toggle_main_window(tray.app_handle());
+            match click_action_from_tray_event(&click_gate, &event) {
+                Some(ClickAction::Toggle) => toggle_main_window(tray.app_handle()),
+                Some(ClickAction::Show) => show_main_window(tray.app_handle()),
+                None => {}
             }
         })
         .build(app)?;
@@ -74,21 +65,33 @@ impl TrayClickGate {
     }
 }
 
-fn should_toggle_from_tray_event(gate: &Mutex<TrayClickGate>, event: &TrayIconEvent) -> bool {
-    if !matches!(
-        event,
-        TrayIconEvent::Click {
-            button: MouseButton::Left,
-            ..
-        }
-    ) {
-        return false;
-    }
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ClickAction {
+    Toggle,
+    Show,
+}
 
-    if let Ok(mut gate) = gate.lock() {
-        gate.accept(Instant::now())
+fn click_action_for_button(button: MouseButton) -> Option<ClickAction> {
+    match button {
+        MouseButton::Left => Some(ClickAction::Toggle),
+        MouseButton::Right => Some(ClickAction::Show),
+        MouseButton::Middle => None,
+    }
+}
+
+fn click_action_from_tray_event(
+    gate: &Mutex<TrayClickGate>,
+    event: &TrayIconEvent,
+) -> Option<ClickAction> {
+    let TrayIconEvent::Click { button, .. } = event else {
+        return None;
+    };
+
+    let mut gate = gate.lock().ok()?;
+    if gate.accept(Instant::now()) {
+        click_action_for_button(*button)
     } else {
-        false
+        None
     }
 }
 
@@ -113,8 +116,9 @@ fn show_main_window(app: &AppHandle) {
 
 #[cfg(test)]
 mod tests {
-    use super::{CLICK_PAIR_SUPPRESSION, TrayClickGate};
+    use super::{CLICK_PAIR_SUPPRESSION, ClickAction, TrayClickGate, click_action_for_button};
     use std::time::{Duration, Instant};
+    use tauri::tray::MouseButton;
 
     #[test]
     fn accept_suppresses_paired_click_phase_when_inside_window() {
@@ -134,5 +138,13 @@ mod tests {
 
         assert!(gate.accept(first_click));
         assert!(gate.accept(next_click));
+    }
+
+    #[test]
+    fn right_click_shows_main_window_without_menu_action() {
+        assert_eq!(
+            click_action_for_button(MouseButton::Right),
+            Some(ClickAction::Show)
+        );
     }
 }

@@ -139,6 +139,11 @@ async fn workbranch_run(
 }
 
 #[tauri::command]
+fn quit_app(app: AppHandle) {
+    app.exit(0);
+}
+
+#[tauri::command]
 async fn watch_roots(
     app: AppHandle,
     roots: Vec<String>,
@@ -255,6 +260,7 @@ pub fn run() {
             workbranch_run,
             append_activity_events,
             watch_roots,
+            quit_app,
         ]);
     if let Err(error) = builder.run(tauri::generate_context!()) {
         eprintln!("error while running tauri application: {error}");

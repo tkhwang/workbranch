@@ -1,22 +1,26 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createActivityRefresh } from "./application/activity";
+import { resolvedCompanionTheme } from "./application/preferences";
 import {
 	buildMenuModel,
 	type MenuModel,
 	type MenuSummary,
 } from "./application/state";
+import { useSystemThemeMode } from "./application/systemThemeMode";
 import { useCompanionSettings } from "./application/useCompanionSettings";
 import type { GlobalState, Task } from "./domain/model";
 import {
 	appendActivityEvents,
 	type CompanionCommand,
 	onRootChanged,
+	quitCompanion,
 	refreshStatus,
 	runAction,
 	watchRoots,
 } from "./infrastructure/tauriClient";
 import { startWorkspaceMonitor } from "./infrastructure/workspaceMonitor";
+import { AppToolbar } from "./ui/AppToolbar";
 import { ProjectGroup } from "./ui/ProjectGroup";
 import { SettingsPanel } from "./ui/SettingsPanel";
 import type { TaskActionKind } from "./ui/TaskRow";
@@ -95,6 +99,7 @@ export function App() {
 	const [state, setState] = useState<GlobalState>(EMPTY_STATE);
 	const [status, setStatus] = useState("Ready");
 	const [currentView, setCurrentView] = useState<CompanionView>("main");
+	const systemThemeMode = useSystemThemeMode();
 	const model: MenuModel = buildMenuModel(state);
 	const tauriRuntimeAvailable = isTauri();
 	const refreshWithActivity = useMemo(
@@ -122,6 +127,7 @@ export function App() {
 		updateLaunchAtLogin,
 		updatePreferences,
 	} = useCompanionSettings({ onError: showError, onStatus: setStatus });
+	const activeTheme = resolvedCompanionTheme(preferences, systemThemeMode);
 
 	const applyState = useCallback((next: GlobalState) => {
 		setState(next);
@@ -139,6 +145,14 @@ export function App() {
 			showError(error);
 		}
 	}, [applyState, refreshWithActivity, showError, tauriRuntimeAvailable]);
+
+	const handleQuit = useCallback(() => {
+		if (!tauriRuntimeAvailable) {
+			setStatus("Tauri runtime unavailable");
+			return;
+		}
+		void quitCompanion().catch(showError);
+	}, [showError, tauriRuntimeAvailable]);
 
 	const handleTaskAction = useCallback(
 		async (root: string, task: Task, kind: TaskActionKind) => {
@@ -192,28 +206,10 @@ export function App() {
 	}, [applyState, refreshWithActivity, showError, tauriRuntimeAvailable]);
 
 	return (
-		<main data-font={preferences.font} data-theme={preferences.theme}>
+		<main data-font={preferences.font} data-theme={activeTheme}>
 			<header>
 				<AppSummary summary={model.summary} />
-				<div className="toolbar" aria-label="Companion controls" role="toolbar">
-					<button
-						type="button"
-						className="toolbar-button refresh-button"
-						onClick={() => void refresh()}
-						aria-label="Refresh tasks"
-					>
-						<svg
-							aria-hidden="true"
-							className="toolbar-icon"
-							viewBox="0 0 24 24"
-						>
-							<path d="M20 6.5v5h-5" />
-							<path d="M4 17.5v-5h5" />
-							<path d="M18.2 9A7 7 0 0 0 6.6 6.4L4 8.8" />
-							<path d="M5.8 15a7 7 0 0 0 11.6 2.6l2.6-2.4" />
-						</svg>
-					</button>
-				</div>
+				<AppToolbar onRefresh={() => void refresh()} onQuit={handleQuit} />
 			</header>
 			{currentView === "main" ? (
 				<section className="view-panel" aria-label="Main View">
@@ -243,6 +239,7 @@ export function App() {
 			{currentView === "settings" ? (
 				<SettingsPanel
 					preferences={preferences}
+					systemThemeMode={systemThemeMode}
 					launchAtLogin={launchAtLogin}
 					launchAtLoginLoading={launchAtLoginLoading}
 					onLaunchAtLoginChange={(enabled) => void updateLaunchAtLogin(enabled)}

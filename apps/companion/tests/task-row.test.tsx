@@ -118,6 +118,21 @@ const linearFixtureTask: Task = {
 	],
 };
 
+const doneFixtureTask: Task = {
+	...linearFixtureTask,
+	plans: [
+		{
+			title: "Companion UI refresh",
+			index: 0,
+			status: "done",
+			progressDone: 4,
+			progressTotal: 4,
+			currentItem: "Done",
+			steps: [],
+		},
+	],
+};
+
 describe("TaskRow", () => {
 	it("renders nested checklist children for generated task briefs", () => {
 		const html = renderToStaticMarkup(
@@ -153,6 +168,20 @@ describe("TaskRow", () => {
 		expect(html).toContain("repo-chip repo-dirty");
 		expect(html).toContain("workbranch");
 		expect(html).toContain("feat/update-0617");
+	});
+	it("renders task status as a quiet dot without a check glyph", () => {
+		const html = renderToStaticMarkup(
+			<TaskRow
+				root="/tmp/workbranch"
+				task={doneFixtureTask}
+				expanded={true}
+				onAction={() => {}}
+			/>,
+		);
+
+		expect(html).toContain('aria-label="Done"');
+		expect(html).toContain('class="task-status-dot"');
+		expect(html).not.toContain('class="task-status-rail">✓</span>');
 	});
 	it("exposes only IDE, Terminal, and Finder actions", () => {
 		const html = renderToStaticMarkup(

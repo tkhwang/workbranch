@@ -6,24 +6,30 @@ import {
 	DEFAULT_COMPANION_PREFERENCES,
 	enqueuePreferenceSave,
 	preferencesToStoreEntries,
+	resolvedCompanionTheme,
 	sanitizeCompanionPreferences,
 	shouldRestoreFailedPreferenceUpdate,
 } from "../src/application/preferences";
 
 describe("companion preferences", () => {
-	it("defaults to terminal-dark and system-mono", () => {
+	it("defaults to Dracula with system mode and system-mono", () => {
 		// Given no stored preference values
 		// When the default preference contract is read
-		// Then the terminal HUD defaults are used
+		// Then the Dracula HUD follows the OS theme until the user chooses a mode
 		expect(DEFAULT_COMPANION_PREFERENCES).toEqual({
 			font: "system-mono",
-			theme: "terminal-dark",
+			themeFamily: "dracula",
+			themeMode: "system",
 		});
 	});
 
-	it("sanitizes invalid stored font and theme values to defaults", () => {
+	it("sanitizes invalid stored font, theme family, and theme mode values to defaults", () => {
 		// Given corrupted persisted preference values
-		const stored = { font: "comic-sans", theme: "rainbow" };
+		const stored = {
+			font: "comic-sans",
+			themeFamily: "rainbow",
+			themeMode: "sepia",
+		};
 
 		// When preferences are sanitized at the store boundary
 		const result = sanitizeCompanionPreferences(stored);
@@ -31,6 +37,24 @@ describe("companion preferences", () => {
 		// Then defaults are applied and sanitization is reported
 		expect(result).toEqual({
 			preferences: DEFAULT_COMPANION_PREFERENCES,
+			sanitized: true,
+		});
+	});
+
+	it("migrates a legacy concrete theme value into family and mode preferences", () => {
+		// Given a previous settings file stored one concrete dark/light theme value
+		const stored = { font: "menlo", theme: "nord-light" };
+
+		// When preferences are sanitized at the store boundary
+		const result = sanitizeCompanionPreferences(stored);
+
+		// Then the legacy value is preserved as the new family and mode pair
+		expect(result).toEqual({
+			preferences: {
+				font: "menlo",
+				themeFamily: "nord",
+				themeMode: "light",
+			},
 			sanitized: true,
 		});
 	});
@@ -53,22 +77,60 @@ describe("companion preferences", () => {
 		).toBe(true);
 	});
 
-	it("exposes the four resolved theme presets", () => {
+	it("exposes four famous theme families in dark and light variants", () => {
 		// Given the theme option list used by the settings panel
 		// When option values are read
-		// Then the fixed preset contract is preserved
+		// Then each famous family has both dark and light variants
 		expect(COMPANION_THEME_OPTIONS.map((option) => option.value)).toEqual([
-			"terminal-dark",
-			"amber-crt",
-			"green-mono",
-			"high-contrast",
+			"dracula-dark",
+			"nord-dark",
+			"solarized-dark",
+			"gruvbox-dark",
+			"dracula-light",
+			"nord-light",
+			"solarized-light",
+			"gruvbox-light",
 		]);
+		expect(
+			COMPANION_THEME_OPTIONS.filter((option) => option.mode === "dark"),
+		).toHaveLength(4);
+		expect(
+			COMPANION_THEME_OPTIONS.filter((option) => option.mode === "light"),
+		).toHaveLength(4);
+	});
+
+	it("resolves system theme mode using the current OS color scheme", () => {
+		// Given preferences in explicit and system modes
+		const explicitLight = {
+			font: "system-mono",
+			themeFamily: "gruvbox",
+			themeMode: "light",
+		} as const;
+		const systemNord = {
+			font: "system-mono",
+			themeFamily: "nord",
+			themeMode: "system",
+		} as const;
+
+		// When concrete data-theme values are resolved
+		// Then system mode follows the supplied system mode while explicit mode wins
+		expect(resolvedCompanionTheme(explicitLight, "dark")).toBe("gruvbox-light");
+		expect(resolvedCompanionTheme(systemNord, "light")).toBe("nord-light");
+		expect(resolvedCompanionTheme(systemNord, "dark")).toBe("nord-dark");
 	});
 
 	it("restores a failed optimistic preference update only when no newer update won", () => {
 		// Given one failed optimistic update and a later successful update
-		const failedAttempt = { font: "menlo", theme: "terminal-dark" } as const;
-		const newerCurrent = { font: "menlo", theme: "green-mono" } as const;
+		const failedAttempt = {
+			font: "menlo",
+			themeFamily: "dracula",
+			themeMode: "system",
+		} as const;
+		const newerCurrent = {
+			font: "menlo",
+			themeFamily: "nord",
+			themeMode: "light",
+		} as const;
 
 		// When deciding whether the failed request may roll back local state
 		const staleRollbackAllowed = shouldRestoreFailedPreferenceUpdate(
@@ -113,16 +175,21 @@ describe("companion preferences", () => {
 		expect(writes).toEqual(["font", "theme"]);
 	});
 
-	it("serializes only font and theme store keys", () => {
+	it("serializes only font, theme family, and theme mode store keys", () => {
 		// Given a sanitized preference pair
 		// When the pair is converted for persistence
 		const entries = preferencesToStoreEntries({
 			font: "menlo",
-			theme: "green-mono",
+			themeFamily: "nord",
+			themeMode: "light",
 		});
 
 		// Then launch-at-login and other app state are excluded from the store contract
-		expect(entries).toEqual({ font: "menlo", theme: "green-mono" });
-		expect(Object.keys(entries)).toEqual(["font", "theme"]);
+		expect(entries).toEqual({
+			font: "menlo",
+			themeFamily: "nord",
+			themeMode: "light",
+		});
+		expect(Object.keys(entries)).toEqual(["font", "themeFamily", "themeMode"]);
 	});
 });

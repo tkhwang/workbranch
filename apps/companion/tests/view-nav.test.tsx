@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { Children, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -27,6 +29,14 @@ function collectButtons(node: ReactNode): readonly ButtonProps[] {
 	return buttons;
 }
 
+function readCssContract(path: string): string {
+	const css = readFileSync(path, "utf8");
+	const importedCss = Array.from(css.matchAll(/@import "(.+)";/g))
+		.map((match) => readCssContract(join(dirname(path), match[1] ?? "")))
+		.join("\n");
+	return `${css}\n${importedCss}`;
+}
+
 describe("ViewNav", () => {
 	it("renders a mobile-style view menu with the current view marked", () => {
 		// Given the settings view is active
@@ -44,6 +54,18 @@ describe("ViewNav", () => {
 		expect(html).toContain("Main");
 		expect(html).toContain("Activity");
 		expect(html).toContain("Setting");
+	});
+
+	it("renders bottom menu items as icon-leading text with spacing", () => {
+		// Given the companion stylesheet for the bottom view navigation
+		// When the nav button layout contract is inspected
+		const css = readCssContract("src/style.css");
+
+		// Then each menu item keeps the icon before the text with visible spacing
+		expect(css).toMatch(
+			/\.view-nav-button\s*\{[^}]*display:\s*inline-flex[^}]*gap:\s*7px/s,
+		);
+		expect(css).toMatch(/\.view-nav-button\s*\{[^}]*min-height:\s*40px/s);
 	});
 
 	it("delegates clicks as view changes", () => {

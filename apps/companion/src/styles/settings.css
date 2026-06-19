@@ -1,0 +1,266 @@
+.settings-panel {
+	background: var(--surface-1);
+	border: 1px solid var(--line);
+	border-radius: var(--radius-row);
+	box-shadow: var(--shadow-card);
+	display: grid;
+	gap: 10px;
+	margin-bottom: 12px;
+	padding: 10px;
+}
+
+.settings-panel-header {
+	align-items: start;
+	display: flex;
+	justify-content: space-between;
+	gap: 10px;
+}
+
+.settings-panel h2 {
+	color: var(--text);
+	font-size: 13px;
+	font-weight: 700;
+}
+
+.settings-panel p,
+.settings-hint {
+	color: var(--faint);
+	font-size: 11px;
+}
+
+.settings-section {
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	margin: 0;
+	padding: 9px;
+}
+
+.settings-section legend {
+	color: var(--accent);
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	padding: 0 4px;
+	text-transform: uppercase;
+}
+
+.settings-row {
+	align-items: center;
+	display: flex;
+	gap: 10px;
+	justify-content: space-between;
+}
+
+.settings-row label {
+	color: var(--text);
+	font-size: 12px;
+}
+
+.settings-row input[type="checkbox"] {
+	accent-color: var(--accent);
+	height: 18px;
+	width: 18px;
+}
+
+.settings-row select {
+	min-width: 156px;
+}
+
+.settings-row-select {
+	position: relative;
+}
+
+.settings-row-select select {
+	margin-left: auto;
+	padding-right: 28px;
+}
+
+.settings-row-select::after {
+	color: var(--faint);
+	content: "⌄";
+	font-size: 11px;
+	pointer-events: none;
+	position: absolute;
+	right: 10px;
+	top: 50%;
+	transform: translateY(-50%);
+}
+
+.font-preview {
+	background: var(--surface-2);
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	color: var(--text);
+	display: grid;
+	font-size: 12px;
+	gap: 6px;
+	line-height: 1.45;
+	margin-top: 8px;
+	padding: 9px;
+}
+
+.font-preview code {
+	color: var(--accent-strong);
+	font: inherit;
+}
+
+.font-preview-label {
+	color: var(--faint);
+	font-size: 10px;
+}
+
+.theme-mode-toggle {
+	background: var(--surface-2);
+	border: 1px solid var(--line);
+	border-radius: 9px;
+	display: grid;
+	gap: 4px;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	margin: 4px 0 9px;
+	padding: 4px;
+}
+
+.theme-mode-button {
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: 7px;
+	color: var(--muted);
+	font-size: 11px;
+	font-weight: 700;
+	min-height: 30px;
+	padding: 6px;
+}
+
+.theme-mode-button:hover:not(:disabled) {
+	background: var(--button-bg-hover);
+	color: var(--text);
+}
+
+.theme-mode-button[data-active="true"] {
+	background: var(--accent-soft);
+	border-color: var(--accent);
+	color: var(--text);
+}
+
+.theme-button-grid {
+	display: grid;
+	gap: 7px;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.theme-button {
+	align-items: center;
+	background: var(--surface-2);
+	border: 1px solid var(--line);
+	border-radius: 9px;
+	color: var(--muted);
+	display: grid;
+	gap: 7px;
+	justify-items: stretch;
+	min-height: 54px;
+	padding: 7px;
+	text-align: left;
+}
+
+.theme-button:hover:not(:disabled) {
+	background: var(--button-bg-hover);
+	border-color: var(--line-strong);
+}
+
+.theme-button[data-active="true"] {
+	background: var(--accent-soft);
+	border-color: var(--accent);
+	color: var(--text);
+}
+
+.theme-swatch {
+	display: grid;
+	gap: 5px;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	width: 100%;
+}
+
+.theme-swatch-color {
+	background: var(--theme-swatch-surface);
+	border: 1px solid var(--line-strong);
+	border-radius: 999px;
+	display: block;
+	height: 15px;
+	min-width: 0;
+}
+
+.theme-swatch-color:nth-child(2) {
+	background: var(--theme-swatch-accent);
+}
+
+.theme-swatch-color:nth-child(3) {
+	background: var(--theme-swatch-secondary);
+}
+
+.theme-swatch-color:nth-child(4) {
+	background: var(--theme-swatch-success);
+}
+
+.theme-button-label {
+	font-size: 11px;
+	font-weight: 700;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.theme-swatch-dracula-dark {
+	--theme-swatch-surface: #282a36;
+	--theme-swatch-accent: #bd93f9;
+	--theme-swatch-secondary: #ff79c6;
+	--theme-swatch-success: #50fa7b;
+}
+
+.theme-swatch-nord-dark {
+	--theme-swatch-surface: #2e3440;
+	--theme-swatch-accent: #5e81ac;
+	--theme-swatch-secondary: #88c0d0;
+	--theme-swatch-success: #a3be8c;
+}
+
+.theme-swatch-solarized-dark {
+	--theme-swatch-surface: #002b36;
+	--theme-swatch-accent: #268bd2;
+	--theme-swatch-secondary: #b58900;
+	--theme-swatch-success: #859900;
+}
+
+.theme-swatch-gruvbox-dark {
+	--theme-swatch-surface: #282828;
+	--theme-swatch-accent: #fabd2f;
+	--theme-swatch-secondary: #fe8019;
+	--theme-swatch-success: #b8bb26;
+}
+
+.theme-swatch-dracula-light {
+	--theme-swatch-surface: #f8f8f2;
+	--theme-swatch-accent: #bd93f9;
+	--theme-swatch-secondary: #ff79c6;
+	--theme-swatch-success: #50fa7b;
+}
+
+.theme-swatch-nord-light {
+	--theme-swatch-surface: #eceff4;
+	--theme-swatch-accent: #5e81ac;
+	--theme-swatch-secondary: #88c0d0;
+	--theme-swatch-success: #a3be8c;
+}
+
+.theme-swatch-solarized-light {
+	--theme-swatch-surface: #fdf6e3;
+	--theme-swatch-accent: #268bd2;
+	--theme-swatch-secondary: #b58900;
+	--theme-swatch-success: #859900;
+}
+
+.theme-swatch-gruvbox-light {
+	--theme-swatch-surface: #fbf1c7;
+	--theme-swatch-accent: #af3a03;
+	--theme-swatch-secondary: #b57614;
+	--theme-swatch-success: #79740e;
+}

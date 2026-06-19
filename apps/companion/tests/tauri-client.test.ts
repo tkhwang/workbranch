@@ -12,6 +12,7 @@ import {
 	appendActivityEvents,
 	CompanionActionError,
 	ensureRunSucceeded,
+	quitCompanion,
 	runAction,
 } from "../src/infrastructure/tauriClient";
 
@@ -64,6 +65,20 @@ describe("ensureRunSucceeded", () => {
 				stderr: "configured IDE command not found: code",
 			}),
 		).toThrow(CompanionActionError);
+	});
+});
+
+describe("quitCompanion", () => {
+	beforeEach(() => {
+		tauri.invoke.mockReset();
+	});
+
+	it("invokes the Tauri quit command", async () => {
+		tauri.invoke.mockResolvedValue(undefined);
+
+		await quitCompanion();
+
+		expect(tauri.invoke).toHaveBeenCalledWith("quit_app");
 	});
 });
 

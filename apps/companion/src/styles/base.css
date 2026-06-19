@@ -1,0 +1,79 @@
+:root {
+	color: #f4f6ff;
+	background: #0a0e16;
+	font-family:
+		-apple-system, "SF Pro Text", "Segoe UI", system-ui, "Helvetica Neue",
+		arial, sans-serif;
+	-webkit-font-smoothing: antialiased;
+	text-rendering: optimizelegibility;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	min-width: 360px;
+	background: #0a0e16;
+}
+
+main {
+	--ui-font-family:
+		-apple-system, "SF Pro Text", "Segoe UI", system-ui, "Helvetica Neue",
+		arial, sans-serif;
+	--app-font-family:
+		ui-monospace, "SFMono-Regular", "Menlo", "Monaco", "Consolas",
+		"Liberation Mono", monospace;
+	--surface-0: #0a0e16;
+	--surface-1: #121824;
+	--surface-2: #18202e;
+	--surface-3: #232d3f;
+	--line: rgba(150, 180, 215, 0.1);
+	--line-strong: rgba(150, 180, 215, 0.2);
+	--text: #eef4fc;
+	--muted: #aab8c9;
+	--faint: #6f8195;
+	--accent: #5cd6ff;
+	--accent-strong: #84e3ff;
+	--accent-soft: rgba(92, 214, 255, 0.16);
+	--blocked: #ff6b7a;
+	--blocked-soft: rgba(255, 107, 122, 0.16);
+	--review: #b7a7ff;
+	--review-soft: rgba(183, 167, 255, 0.16);
+	--done: #65d18a;
+	--done-soft: rgba(101, 209, 138, 0.16);
+	--notify: #f4c35b;
+	--notify-soft: rgba(244, 195, 91, 0.16);
+	--shell-bg:
+		radial-gradient(120% 80px at 50% 0, rgba(92, 214, 255, 0.08), transparent),
+		var(--surface-0);
+	--shell-topline: linear-gradient(
+		90deg,
+		transparent,
+		var(--accent),
+		transparent
+	);
+	--task-bg: var(--surface-2);
+	--task-bg-hover: var(--surface-3);
+	--button-bg: rgba(150, 180, 215, 0.07);
+	--button-bg-hover: rgba(150, 180, 215, 0.13);
+	--current-step-bg:
+		linear-gradient(135deg, var(--accent-soft), transparent 70%),
+		var(--surface-3);
+	--active-rail-bg: var(--accent-soft);
+	--shadow-card:
+		0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 20px -10px rgba(0, 0, 0, 0.6);
+	--shadow-card-hover:
+		0 2px 4px rgba(0, 0, 0, 0.45), 0 14px 28px -10px rgba(0, 0, 0, 0.65);
+	--shadow-pop: 0 14px 36px rgba(0, 0, 0, 0.5);
+	--radius-row: 11px;
+	--radius-shell: 14px;
+
+	position: relative;
+	background: var(--shell-bg);
+	color: var(--text);
+	font-family: var(--app-font-family);
+	min-height: 100vh;
+	padding: 12px 12px 78px;
+}
