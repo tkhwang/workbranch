@@ -157,6 +157,8 @@ docs/plans/0032..0037-*.md
 - Task 1~2: `git mv apps/workbranch-cli apps/cli`, `git mv apps/workbranch-companion apps/companion` 적용. `git status`에서 두 앱 디렉터리가 rename으로 추적된다.
 - Task 3~10: live 설정/스크립트/CI/문서 경로를 `apps/cli`·`apps/companion`으로 동기화했다. 외부 식별자(`workbranch`, `@workbranch/companion`, `workbranch-companion`, `WorkbranchCompanion.app`)는 유지했다.
 - Task 11: `apps/cli/scripts/build-workbranch.sh`로 `apps/cli/bin/workbranch`와 루트 `bin/workbranch`를 재생성했고, `pnpm install`로 `pnpm-lock.yaml`을 재생성했다.
+- Review fix: `apps/companion/src-tauri/Cargo.lock`의 `workbranch-companion` version line에 `# x-release-please-version` marker를 복구했고, `pnpm --filter @workbranch/companion tauri build` 이후에도 marker가 유지되도록 `apps/companion/package.json`에 `posttauri: pnpm run sync:release-markers`를 추가했다.
+- Review fix: `apps/companion/src-tauri/src/workbranch_bin.rs`의 local CLI fallback을 rename 후 경로 `../../cli/bin/workbranch`로 수정했고, 같은 경로를 고정하는 unit test를 추가했다. CI 실패 재현 seam인 `cargo test --manifest-path apps/companion/src-tauri/Cargo.toml`은 17 tests passed.
 - 검증 evidence:
   - old-path live check: `rg "apps/workbranch-cli|apps/workbranch-companion" ... | grep -v "docs/plans/003[2-8]"` → 0건.
   - syntax/release config: `/bin/bash -n bin/workbranch apps/cli/bin/workbranch install.sh apps/cli/install.sh apps/cli/tests/run.sh apps/cli/scripts/build-workbranch.sh`, release-please JSON assertion, `git diff --check` 통과.
