@@ -8,10 +8,10 @@ from pathlib import Path
 cfg = json.loads(Path('release-please-config.json').read_text())
 manifest = json.loads(Path('.release-please-manifest.json').read_text())
 root = cfg['packages']['.']
-companion = cfg['packages']['apps/workbranch-companion']
+companion = cfg['packages']['apps/companion']
 exclude_paths = set(root.get('exclude-paths', []))
 required_recursive_excludes = {
-    'apps/workbranch-companion/**',
+    'apps/companion/**',
     'packages/contract/**',
     'docs/**',
     '.github/**',
@@ -21,7 +21,7 @@ if missing:
     raise SystemExit(f"root package must recursively exclude non-CLI release paths: {missing}")
 
 extra_files = {item['path'] for item in root.get('extra-files', [])}
-if 'apps/workbranch-cli/bin/workbranch' not in extra_files:
+if 'apps/cli/bin/workbranch' not in extra_files:
     raise SystemExit('root package must update moved CLI artifact')
 if 'bin/workbranch' not in extra_files:
     raise SystemExit('root package must update raw-install compatibility artifact')
@@ -30,7 +30,7 @@ if cfg.get('separate-pull-requests') is not True:
     raise SystemExit('release-please must preserve independent package PRs')
 if 'companion' in cfg['packages'] or 'companion' in manifest:
     raise SystemExit('legacy companion release package key must be migrated')
-if 'apps/workbranch-companion' not in manifest:
+if 'apps/companion' not in manifest:
     raise SystemExit('manifest must carry companion version under moved app path')
 companion_extra_files = companion.get('extra-files', [])
 expected_companion_extra_files = [
@@ -43,7 +43,7 @@ if companion_extra_files != expected_companion_extra_files:
     raise SystemExit(f'companion extra-files mismatch: {companion_extra_files}')
 
 sample_companion_only_files = [
-    'apps/workbranch-companion/src/App.tsx',
+    'apps/companion/src/App.tsx',
     'packages/contract/src/index.ts',
     'docs/plans/0027-companion-launch-at-login.md',
     'DESIGN.md',
@@ -71,8 +71,8 @@ formula = Path('packaging/homebrew/workbranch.rb').read_text()
 workflow = Path('.github/workflows/homebrew-bump.yml').read_text()
 
 expected_formula_lines = [
-    'system "apps/workbranch-cli/scripts/build-workbranch.sh"',
-    'bin.install "apps/workbranch-cli/bin/workbranch"',
+    'system "apps/cli/scripts/build-workbranch.sh"',
+    'bin.install "apps/cli/bin/workbranch"',
 ]
 missing_formula_lines = [line for line in expected_formula_lines if line not in formula]
 if missing_formula_lines:
@@ -111,12 +111,12 @@ import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-manifest_version = json.loads(Path('.release-please-manifest.json').read_text())['apps/workbranch-companion']
-package_version = json.loads(Path('apps/workbranch-companion/package.json').read_text())['version']
-tauri_version = json.loads(Path('apps/workbranch-companion/src-tauri/tauri.conf.json').read_text())['version']
-cargo_toml = Path('apps/workbranch-companion/src-tauri/Cargo.toml').read_text()
+manifest_version = json.loads(Path('.release-please-manifest.json').read_text())['apps/companion']
+package_version = json.loads(Path('apps/companion/package.json').read_text())['version']
+tauri_version = json.loads(Path('apps/companion/src-tauri/tauri.conf.json').read_text())['version']
+cargo_toml = Path('apps/companion/src-tauri/Cargo.toml').read_text()
 cargo_toml_version = re.search(r'^version = "([^"]+)"$', cargo_toml, flags=re.MULTILINE).group(1)
-cargo_lock = Path('apps/workbranch-companion/src-tauri/Cargo.lock').read_text()
+cargo_lock = Path('apps/companion/src-tauri/Cargo.lock').read_text()
 cargo_lock_match = re.search(
     r'(?m)^name = "workbranch-companion"\nversion = "([^"]+)"(?:\s+# x-release-please-version)?$',
     cargo_lock,
@@ -136,7 +136,7 @@ with TemporaryDirectory() as tmpdir:
     temp_lock.write_text(markerless_lock)
     subprocess.run([
         'node',
-        'apps/workbranch-companion/scripts/sync-release-markers.mjs',
+        'apps/companion/scripts/sync-release-markers.mjs',
         '--file',
         str(temp_lock),
     ], check=True)

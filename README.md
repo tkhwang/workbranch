@@ -202,7 +202,7 @@ Combined flow shortcuts:
 
 ## Native menu bar companion
 
-`apps/workbranch-companion/` contains the Tauri v2 + React macOS menu bar app, `WorkbranchCompanion.app`. It consumes `workbranch list --global --json` through a typed Tauri command boundary, maps the CLI JSON contract through the `packages/contract` Published Language, and keeps the same presentation-first scope as the legacy companion: task status/progress, Plan/Step visibility, notifications, memo edits, Finder/IDE/terminal launch actions, copy path, refresh/quit, and local activity reports. Task lifecycle and Git mutation commands such as `add`, `done`, `land`, and `push` remain CLI-only.
+`apps/companion/` contains the Tauri v2 + React macOS menu bar app, `WorkbranchCompanion.app`. It consumes `workbranch list --global --json` through a typed Tauri command boundary, maps the CLI JSON contract through the `packages/contract` Published Language, and keeps the same presentation-first scope as the legacy companion: task status/progress, Plan/Step visibility, notifications, memo edits, Finder/IDE/terminal launch actions, copy path, refresh/quit, and local activity reports. Task lifecycle and Git mutation commands such as `add`, `done`, `land`, and `push` remain CLI-only.
 
 Activity history is stored in `~/.local/state/workbranch/activity.jsonl` and is preserved even if the related repo/task workspace is later removed. Configure roots in `~/.config/workbranch-companion/projects.md`.
 
@@ -221,7 +221,7 @@ Build it locally:
 pnpm install
 pnpm --filter @workbranch/companion test
 pnpm --filter @workbranch/companion tauri build
-open "apps/workbranch-companion/src-tauri/target/release/bundle/macos/WorkbranchCompanion.app"
+open "apps/companion/src-tauri/target/release/bundle/macos/WorkbranchCompanion.app"
 ```
 
 ## More docs

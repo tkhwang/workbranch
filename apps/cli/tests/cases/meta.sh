@@ -9,7 +9,7 @@ test_generated_workbranch_is_up_to_date() {
   fi
   if ! cmp "$generated" "$WORKBRANCH" >/dev/null; then
     rm -rf "$tmp_root"
-    fail "apps/workbranch-cli/bin/workbranch is stale; run apps/workbranch-cli/scripts/build-workbranch.sh"
+    fail "apps/cli/bin/workbranch is stale; run apps/cli/scripts/build-workbranch.sh"
   fi
   rm -rf "$tmp_root"
 }

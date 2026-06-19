@@ -20,7 +20,7 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'workbranch-companion-v') }}
     env:
       TAG_NAME: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}
-      APP_BUNDLE_PATH: apps/workbranch-companion/src-tauri/target/universal-apple-darwin/release/bundle/macos/WorkbranchCompanion.app
+      APP_BUNDLE_PATH: apps/companion/src-tauri/target/universal-apple-darwin/release/bundle/macos/WorkbranchCompanion.app
 
     steps:
       - name: Validate tag

@@ -24,20 +24,20 @@ jobs:
           sudo apt-get install -y shellcheck
 
       - name: Syntax check
-        run: /bin/bash -n bin/workbranch install.sh apps/workbranch-cli/install.sh apps/workbranch-cli/bin/workbranch apps/workbranch-cli/tests/run.sh apps/workbranch-cli/scripts/build-workbranch.sh
+        run: /bin/bash -n bin/workbranch install.sh apps/cli/install.sh apps/cli/bin/workbranch apps/cli/tests/run.sh apps/cli/scripts/build-workbranch.sh
 
       - name: Run integration tests
-        run: apps/workbranch-cli/tests/run.sh
+        run: apps/cli/tests/run.sh
 
       - name: Run platform contract smoke tests
         run: |
-          WORKBRANCH_TEST_PLATFORM=macos ./apps/workbranch-cli/bin/workbranch help >/dev/null
-          WORKBRANCH_TEST_PLATFORM=linux ./apps/workbranch-cli/bin/workbranch help >/dev/null
-          WORKBRANCH_TEST_PLATFORM=wsl ./apps/workbranch-cli/bin/workbranch version >/dev/null
-          WORKBRANCH_TEST_PLATFORM=other ./apps/workbranch-cli/bin/workbranch list 2>&1 | grep 'unsupported platform: other'
-          WORKBRANCH_TEST_PLATFORM=linux ./apps/workbranch-cli/bin/workbranch finder task1 2>&1 | grep 'workbranch finder is only supported on macOS'
-          WORKBRANCH_TEST_PLATFORM=wsl ./apps/workbranch-cli/bin/workbranch config ide 2>&1 | grep 'workbranch config ide is only supported on macOS'
+          WORKBRANCH_TEST_PLATFORM=macos ./apps/cli/bin/workbranch help >/dev/null
+          WORKBRANCH_TEST_PLATFORM=linux ./apps/cli/bin/workbranch help >/dev/null
+          WORKBRANCH_TEST_PLATFORM=wsl ./apps/cli/bin/workbranch version >/dev/null
+          WORKBRANCH_TEST_PLATFORM=other ./apps/cli/bin/workbranch list 2>&1 | grep 'unsupported platform: other'
+          WORKBRANCH_TEST_PLATFORM=linux ./apps/cli/bin/workbranch finder task1 2>&1 | grep 'workbranch finder is only supported on macOS'
+          WORKBRANCH_TEST_PLATFORM=wsl ./apps/cli/bin/workbranch config ide 2>&1 | grep 'workbranch config ide is only supported on macOS'
 
       - name: ShellCheck sources
         run: |
-          find apps/workbranch-cli/src/workbranch apps/workbranch-cli/scripts -type f -name '*.sh' -print0 | xargs -0 shellcheck -s bash -S warning -e SC2034 install.sh apps/workbranch-cli/install.sh
+          find apps/cli/src/workbranch apps/cli/scripts -type f -name '*.sh' -print0 | xargs -0 shellcheck -s bash -S warning -e SC2034 install.sh apps/cli/install.sh

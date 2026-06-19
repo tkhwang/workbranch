@@ -13,12 +13,12 @@ pnpm install
 pnpm --filter @workbranch/companion lint
 pnpm --filter @workbranch/companion typecheck
 pnpm --filter @workbranch/companion test
-cargo test --manifest-path apps/workbranch-companion/src-tauri/Cargo.toml
+cargo test --manifest-path apps/companion/src-tauri/Cargo.toml
 pnpm --filter @workbranch/companion tauri build
 ```
 
 The macOS bundle is emitted at:
 
 ```text
-apps/workbranch-companion/src-tauri/target/release/bundle/macos/WorkbranchCompanion.app
+apps/companion/src-tauri/target/release/bundle/macos/WorkbranchCompanion.app
 ```
