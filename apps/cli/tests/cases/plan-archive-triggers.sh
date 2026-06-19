@@ -60,6 +60,23 @@ test_land_archive_prompt_yes_archives_and_no_keeps_brief() {
   assert_not_exists "$project/keep/.workbranch/plans/done"
 }
 
+test_land_archive_prompt_eof_keeps_brief() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add eof >/dev/null
+  write_trigger_brief "$project/eof" "EOF Land Plan"
+  commit_task_repo_file "$project/eof/frontend" eof-land.txt "eof land frontend"
+  commit_task_repo_file "$project/eof/backend" eof-land.txt "eof land backend"
+
+  out=$(WORKBRANCH_TEST_ARCHIVE_TIMESTAMP=20260616-130500 run_expect_success env WORKBRANCH_ALLOW_NON_TTY_PROMPT=1 "$WORKBRANCH" land eof </dev/null)
+  assert_contains "$out" "$(printf '\n[*] Mark plan \"EOF Land Plan\" done and archive? [Y/n]')"
+  assert_not_contains "$out" "Archived plan:"
+  assert_contains "$(cat "$project/eof/TASK-WORKBRANCH.md")" "# EOF Land Plan"
+  assert_not_exists "$project/eof/.workbranch/plans/done"
+}
+
 test_finalize_archive_prompt_records_finalize() {
   new_fixture
   project="$FIXTURE_PROJECT"

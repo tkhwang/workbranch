@@ -6,9 +6,9 @@ import {
 	type CompanionTheme,
 	type CompanionThemeFamily,
 	type CompanionThemeMode,
-	isCompanionTheme,
 	isCompanionThemeFamily,
 	isCompanionThemeMode,
+	isLegacyCompanionTheme,
 	resolvedThemeValue,
 	themeFamilyFromLegacyTheme,
 	themeModeFromLegacyTheme,
@@ -128,7 +128,9 @@ export function sanitizeCompanionPreferences(input: {
 	const font = isCompanionFont(input.font)
 		? input.font
 		: DEFAULT_COMPANION_PREFERENCES.font;
-	const legacyTheme = isCompanionTheme(input.theme) ? input.theme : undefined;
+	const legacyTheme = isLegacyCompanionTheme(input.theme)
+		? input.theme
+		: undefined;
 	const themeFamily = isCompanionThemeFamily(input.themeFamily)
 		? input.themeFamily
 		: legacyTheme

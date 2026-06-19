@@ -86,10 +86,11 @@ fn click_action_from_tray_event(
     let TrayIconEvent::Click { button, .. } = event else {
         return None;
     };
+    let action = click_action_for_button(*button)?;
 
     let mut gate = gate.lock().ok()?;
     if gate.accept(Instant::now()) {
-        click_action_for_button(*button)
+        Some(action)
     } else {
         None
     }
@@ -116,9 +117,24 @@ fn show_main_window(app: &AppHandle) {
 
 #[cfg(test)]
 mod tests {
-    use super::{CLICK_PAIR_SUPPRESSION, ClickAction, TrayClickGate, click_action_for_button};
+    use super::{
+        CLICK_PAIR_SUPPRESSION, ClickAction, TrayClickGate, click_action_for_button,
+        click_action_from_tray_event,
+    };
+    use std::sync::Mutex;
     use std::time::{Duration, Instant};
-    use tauri::tray::MouseButton;
+    use tauri::tray::{MouseButton, MouseButtonState, TrayIconEvent, TrayIconId};
+    use tauri::{PhysicalPosition, Rect};
+
+    fn click_event(button: MouseButton) -> TrayIconEvent {
+        TrayIconEvent::Click {
+            id: TrayIconId::new("workbranch-companion"),
+            position: PhysicalPosition::default(),
+            rect: Rect::default(),
+            button,
+            button_state: MouseButtonState::Down,
+        }
+    }
 
     #[test]
     fn accept_suppresses_paired_click_phase_when_inside_window() {
@@ -144,6 +160,19 @@ mod tests {
     fn right_click_shows_main_window_without_menu_action() {
         assert_eq!(
             click_action_for_button(MouseButton::Right),
+            Some(ClickAction::Show)
+        );
+    }
+
+    #[test]
+    fn middle_click_does_not_consume_click_gate() {
+        let gate = Mutex::new(TrayClickGate::default());
+        let middle_click = click_event(MouseButton::Middle);
+        let right_click = click_event(MouseButton::Right);
+
+        assert_eq!(click_action_from_tray_event(&gate, &middle_click), None);
+        assert_eq!(
+            click_action_from_tray_event(&gate, &right_click),
             Some(ClickAction::Show)
         );
     }

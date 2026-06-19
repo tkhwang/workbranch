@@ -1963,7 +1963,7 @@ archive_prompt_current_plan() {
   title=${TASK_PLAN_TITLES[$plan_index]}
   if [ -t 0 ] || [ "${WORKBRANCH_ALLOW_NON_TTY_PROMPT:-}" = "1" ]; then
     answer=$(prompt_read "
-[*] Mark plan \"$title\" done and archive? [Y/n]: ") || answer=""
+[*] Mark plan \"$title\" done and archive? [Y/n]: ") || return 0
     case "$answer" in
       ""|y|Y|yes|YES|Yes)
         archive_current_plan "$task" "$completed_via"

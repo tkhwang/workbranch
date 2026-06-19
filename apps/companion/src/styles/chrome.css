@@ -91,7 +91,6 @@ summary:focus-visible {
 .toolbar-icon,
 .view-nav-icon {
 	fill: none;
-
 	stroke: currentcolor;
 	stroke-linecap: round;
 	stroke-linejoin: round;

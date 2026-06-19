@@ -9,6 +9,13 @@ const COMPANION_THEME_VALUES = [
 	"gruvbox-light",
 ] as const;
 
+const PREVIOUS_COMPANION_THEME_VALUES = [
+	"terminal-dark",
+	"amber-crt",
+	"green-mono",
+	"high-contrast",
+] as const;
+
 const COMPANION_THEME_FAMILY_VALUES = [
 	"dracula",
 	"nord",
@@ -21,6 +28,8 @@ const COMPANION_THEME_MODE_VALUES = ["light", "dark", "system"] as const;
 const COMPANION_RESOLVED_THEME_MODE_VALUES = ["light", "dark"] as const;
 
 export type CompanionTheme = (typeof COMPANION_THEME_VALUES)[number];
+type PreviousCompanionTheme = (typeof PREVIOUS_COMPANION_THEME_VALUES)[number];
+type LegacyCompanionTheme = CompanionTheme | PreviousCompanionTheme;
 export type CompanionThemeFamily =
 	(typeof COMPANION_THEME_FAMILY_VALUES)[number];
 export type CompanionThemeMode = (typeof COMPANION_THEME_MODE_VALUES)[number];
@@ -144,6 +153,26 @@ export function isCompanionTheme(value: unknown): value is CompanionTheme {
 	}
 }
 
+function isPreviousCompanionTheme(
+	value: unknown,
+): value is PreviousCompanionTheme {
+	switch (value) {
+		case "terminal-dark":
+		case "amber-crt":
+		case "green-mono":
+		case "high-contrast":
+			return true;
+		default:
+			return false;
+	}
+}
+
+export function isLegacyCompanionTheme(
+	value: unknown,
+): value is LegacyCompanionTheme {
+	return isCompanionTheme(value) || isPreviousCompanionTheme(value);
+}
+
 export function isCompanionThemeFamily(
 	value: unknown,
 ): value is CompanionThemeFamily {
@@ -172,9 +201,17 @@ export function isCompanionThemeMode(
 }
 
 export function themeFamilyFromLegacyTheme(
-	theme: CompanionTheme,
+	theme: LegacyCompanionTheme,
 ): CompanionThemeFamily {
 	switch (theme) {
+		case "terminal-dark":
+			return "nord";
+		case "amber-crt":
+			return "gruvbox";
+		case "green-mono":
+			return "solarized";
+		case "high-contrast":
+			return "dracula";
 		case "dracula-dark":
 		case "dracula-light":
 			return "dracula";
@@ -191,9 +228,13 @@ export function themeFamilyFromLegacyTheme(
 }
 
 export function themeModeFromLegacyTheme(
-	theme: CompanionTheme,
+	theme: LegacyCompanionTheme,
 ): CompanionResolvedThemeMode {
 	switch (theme) {
+		case "terminal-dark":
+		case "amber-crt":
+		case "green-mono":
+		case "high-contrast":
 		case "dracula-dark":
 		case "nord-dark":
 		case "solarized-dark":

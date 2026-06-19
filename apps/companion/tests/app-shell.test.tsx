@@ -1,18 +1,53 @@
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { App } from "../src/App";
 
-function readCssContract(path: string): string {
-	const css = readFileSync(path, "utf8");
+function readCssContract(path: string, visited = new Set<string>()): string {
+	const absolutePath = resolve(path);
+	if (visited.has(absolutePath)) {
+		return "";
+	}
+	visited.add(absolutePath);
+	const css = readFileSync(absolutePath, "utf8");
 	const importedCss = Array.from(css.matchAll(/@import "(.+)";/g))
-		.map((match) => readCssContract(join(dirname(path), match[1] ?? "")))
+		.map((match) => {
+			const importPath = match[1];
+			if (importPath === undefined) {
+				return "";
+			}
+			return readCssContract(
+				resolve(dirname(absolutePath), importPath),
+				visited,
+			);
+		})
 		.join("\n");
 	return `${css}\n${importedCss}`;
 }
 
 describe("App shell settings wiring", () => {
+	it("skips already-read CSS imports to avoid import cycles", () => {
+		// Given two CSS files import each other
+		const directory = mkdtempSync(join(tmpdir(), "workbranch-css-cycle-"));
+		const rootCss = join(directory, "root.css");
+		const childCss = join(directory, "child.css");
+		writeFileSync(rootCss, '@import "./child.css";\n.root { color: red; }\n');
+		writeFileSync(childCss, '@import "./root.css";\n.child { color: blue; }\n');
+
+		try {
+			// When the CSS contract reader follows imports
+			const css = readCssContract(rootCss);
+
+			// Then each file is read once and the recursive cycle is skipped
+			expect(css.match(/\.root/g)).toHaveLength(1);
+			expect(css.match(/\.child/g)).toHaveLength(1);
+		} finally {
+			rmSync(directory, { recursive: true, force: true });
+		}
+	});
+
 	it("renders terminal preference data attributes, icon refresh, bottom view nav, and live status footer", () => {
 		// Given the companion app shell at its initial render
 		// When static markup is rendered

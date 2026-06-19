@@ -59,6 +59,46 @@ describe("companion preferences", () => {
 		});
 	});
 
+	it("migrates previous theme enum values before falling back to defaults", () => {
+		// Given settings files stored the original companion theme enum values
+		const migrations = [
+			{
+				theme: "terminal-dark",
+				themeFamily: "nord",
+			},
+			{
+				theme: "amber-crt",
+				themeFamily: "gruvbox",
+			},
+			{
+				theme: "green-mono",
+				themeFamily: "solarized",
+			},
+			{
+				theme: "high-contrast",
+				themeFamily: "dracula",
+			},
+		] as const;
+
+		for (const migration of migrations) {
+			// When preferences are sanitized at the store boundary
+			const result = sanitizeCompanionPreferences({
+				font: "monaco",
+				theme: migration.theme,
+			});
+
+			// Then the user's prior theme choice is preserved as a dark family choice
+			expect(result).toEqual({
+				preferences: {
+					font: "monaco",
+					themeFamily: migration.themeFamily,
+					themeMode: "dark",
+				},
+				sanitized: true,
+			});
+		}
+	});
+
 	it("exposes only fixed-width font choices", () => {
 		// Given the font option list used by the settings panel
 		// When option CSS stacks are inspected
