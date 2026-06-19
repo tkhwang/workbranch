@@ -10,8 +10,8 @@ Icon?
 ._*
 
 # Tauri app icons are source assets, not macOS Icon? metadata.
-!apps/workbranch-companion/src-tauri/icons/
-!apps/workbranch-companion/src-tauri/icons/**
+!apps/companion/src-tauri/icons/
+!apps/companion/src-tauri/icons/**
 
 # Editor / IDE
 .vscode/
@@ -50,4 +50,4 @@ node_modules/
 
 # Tauri / Rust build artifacts
 target/
-apps/workbranch-companion/src-tauri/target/
+apps/companion/src-tauri/target/

@@ -3,7 +3,7 @@ name: Companion CI
 on:
   pull_request:
     paths:
-      - "apps/workbranch-companion/**"
+      - "apps/companion/**"
       - ".github/workflows/companion-ci.yml"
       - "packages/contract/**"
       - "package.json"
@@ -13,7 +13,7 @@ on:
     branches:
       - main
     paths:
-      - "apps/workbranch-companion/**"
+      - "apps/companion/**"
       - ".github/workflows/companion-ci.yml"
       - "packages/contract/**"
       - "package.json"
@@ -46,7 +46,7 @@ jobs:
         run: pnpm --filter @workbranch/companion test
 
       - name: Core test runner
-        run: cargo test --manifest-path apps/workbranch-companion/src-tauri/Cargo.toml
+        run: cargo test --manifest-path apps/companion/src-tauri/Cargo.toml
 
       - name: App bundle smoke
         run: pnpm --filter @workbranch/companion tauri build

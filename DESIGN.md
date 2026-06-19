@@ -8,9 +8,9 @@
   - `docs/plans/0032-companion-tauri-react-rewrite.md`
   - `docs/plans/0033-companion-responsiveness-nonblocking-commands-and-watch-scope.md`
   - `docs/plans/0037-companion-settings-cli-theme.md`
-  - `apps/workbranch-companion/src/App.tsx`
-  - `apps/workbranch-companion/src/ui/TaskRow.tsx`
-  - `apps/workbranch-companion/src/style.css`
+  - `apps/companion/src/App.tsx`
+  - `apps/companion/src/ui/TaskRow.tsx`
+  - `apps/companion/src/style.css`
 
 ## Brand
 - Personality: fast, focused, terminal-native, command-line HUD.

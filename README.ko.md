@@ -202,7 +202,7 @@ Combined flow shortcut:
 
 ## Native menu bar companion
 
-`apps/workbranch-companion/`에는 Tauri v2 + React 기반 macOS menu bar app인 `WorkbranchCompanion.app`이 있습니다. 이 앱은 typed Tauri command 경계로 `workbranch list --global --json`을 호출하고, `packages/contract` Published Language를 통해 CLI JSON contract를 번역합니다. 범위는 기존 companion과 같은 presentation-first 운영 기능입니다: task status/progress, Plan/Step 표시, notification, memo edit, Finder/IDE/terminal launch, copy path, refresh/quit, local activity report. `add`, `done`, `land`, `push` 같은 task lifecycle/Git mutation은 계속 CLI 전용입니다.
+`apps/companion/`에는 Tauri v2 + React 기반 macOS menu bar app인 `WorkbranchCompanion.app`이 있습니다. 이 앱은 typed Tauri command 경계로 `workbranch list --global --json`을 호출하고, `packages/contract` Published Language를 통해 CLI JSON contract를 번역합니다. 범위는 기존 companion과 같은 presentation-first 운영 기능입니다: task status/progress, Plan/Step 표시, notification, memo edit, Finder/IDE/terminal launch, copy path, refresh/quit, local activity report. `add`, `done`, `land`, `push` 같은 task lifecycle/Git mutation은 계속 CLI 전용입니다.
 
 Activity history는 `~/.local/state/workbranch/activity.jsonl`에 저장되고, 관련 repo/task workspace가 나중에 제거되어도 보존됩니다. Root 설정은 `~/.config/workbranch-companion/projects.md`에서 합니다.
 
@@ -221,7 +221,7 @@ Local build:
 pnpm install
 pnpm --filter @workbranch/companion test
 pnpm --filter @workbranch/companion tauri build
-open "apps/workbranch-companion/src-tauri/target/release/bundle/macos/WorkbranchCompanion.app"
+open "apps/companion/src-tauri/target/release/bundle/macos/WorkbranchCompanion.app"
 ```
 
 ## More docs

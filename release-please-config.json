@@ -9,7 +9,7 @@
       "component": "workbranch",
       "include-component-in-tag": false,
       "exclude-paths": [
-        "apps/workbranch-companion/**",
+        "apps/companion/**",
         "packages/contract/**",
         ".github/**",
         "docs/**",
@@ -22,7 +22,7 @@
       "extra-files": [
         {
           "type": "generic",
-          "path": "apps/workbranch-cli/bin/workbranch"
+          "path": "apps/cli/bin/workbranch"
         },
         {
           "type": "generic",
@@ -30,7 +30,7 @@
         }
       ]
     },
-    "apps/workbranch-companion": {
+    "apps/companion": {
       "package-name": "workbranch-companion",
       "component": "workbranch-companion",
       "release-type": "simple",

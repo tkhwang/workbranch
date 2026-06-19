@@ -15,7 +15,7 @@ import Ajv2020 from "ajv/dist/2020.js";
 
 const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const repoRoot = resolve(packageRoot, "../..");
-const workbranchBin = join(repoRoot, "apps/workbranch-cli/bin/workbranch");
+const workbranchBin = join(repoRoot, "apps/cli/bin/workbranch");
 
 function readJson(relativePath) {
 	return JSON.parse(readFileSync(join(packageRoot, relativePath), "utf8"));

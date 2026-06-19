@@ -15,7 +15,8 @@
     "tauri": "tauri",
     "pretauri": "pnpm run sync:release-markers",
     "sync:release-markers": "node scripts/sync-release-markers.mjs",
-    "check:release-markers": "node scripts/sync-release-markers.mjs --check"
+    "check:release-markers": "node scripts/sync-release-markers.mjs --check",
+    "posttauri": "pnpm run sync:release-markers"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.9.0",

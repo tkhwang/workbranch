@@ -52,9 +52,7 @@ fn locate_workbranch(configured: Option<&str>) -> Result<PathBuf, CompanionError
     if let Some(home) = std::env::var_os("HOME") {
         candidates.push(PathBuf::from(home).join(".local/bin/workbranch"));
     }
-    candidates.push(
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../workbranch-cli/bin/workbranch"),
-    );
+    candidates.push(local_workbranch_bin());
 
     for candidate in &candidates {
         if candidate.is_file() {
@@ -69,6 +67,10 @@ fn locate_workbranch(configured: Option<&str>) -> Result<PathBuf, CompanionError
     ))
 }
 
+fn local_workbranch_bin() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../cli/bin/workbranch")
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -80,6 +82,14 @@ mod tests {
     fn locate_workbranch_finds_local_cli_when_available() {
         let found = locate_workbranch(None);
         assert!(found.is_ok(), "expected local workbranch binary: {found:?}");
+    }
+
+    #[test]
+    fn local_workbranch_bin_uses_renamed_cli_app_dir() {
+        let expected =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../cli/bin/workbranch");
+
+        assert_eq!(local_workbranch_bin(), expected);
     }
 
     #[test]

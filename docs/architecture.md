@@ -1,17 +1,17 @@
 # Workbranch architecture
 
-`workbranch` is a pnpm-workspace monorepo. Deployable apps live under `apps/*`: the Bash CLI supplier app is authored under `apps/workbranch-cli/src/workbranch/**`, the Tauri/React companion consumer app lives under `apps/workbranch-companion/**`, and the shared JSON contract snapshot lives under `packages/contract/**`. The CLI is still distributed as one generated executable at root `bin/workbranch` for raw install compatibility, with the canonical generated app artifact at `apps/workbranch-cli/bin/workbranch`.
+`workbranch` is a pnpm-workspace monorepo. Deployable apps live under `apps/*`: the Bash CLI supplier app is authored under `apps/cli/src/workbranch/**`, the Tauri/React companion consumer app lives under `apps/companion/**`, and the shared JSON contract snapshot lives under `packages/contract/**`. The CLI is still distributed as one generated executable at root `bin/workbranch` for raw install compatibility, with the canonical generated app artifact at `apps/cli/bin/workbranch`.
 
 ## Edit/build rule
 
-- Edit `apps/workbranch-cli/src/workbranch/**`.
-- Run `apps/workbranch-cli/scripts/build-workbranch.sh`.
-- Commit source changes plus both generated artifacts: `apps/workbranch-cli/bin/workbranch` and root compatibility `bin/workbranch`.
+- Edit `apps/cli/src/workbranch/**`.
+- Run `apps/cli/scripts/build-workbranch.sh`.
+- Commit source changes plus both generated artifacts: `apps/cli/bin/workbranch` and root compatibility `bin/workbranch`.
 - Do not hand-edit `bin/workbranch`.
 
 ## Command boundary
 
-Each user command should have one `apps/workbranch-cli/src/workbranch/commands/<command>.sh` file.
+Each user command should have one `apps/cli/src/workbranch/commands/<command>.sh` file.
 
 A command file owns orchestration:
 
@@ -21,11 +21,11 @@ A command file owns orchestration:
 4. call `workbranch_git_*` functions for documented Git operations
 5. print concise user-facing status
 
-`apps/workbranch-cli/src/workbranch/git-ops.sh` owns the exact mutating Git commands mirrored by `docs/git-operations.md`.
+`apps/cli/src/workbranch/git-ops.sh` owns the exact mutating Git commands mirrored by `docs/git-operations.md`.
 
-`apps/workbranch-cli/src/workbranch/lib/preflight.sh` owns safety checks and aggregate preflight failure reporting.
+`apps/cli/src/workbranch/lib/preflight.sh` owns safety checks and aggregate preflight failure reporting.
 
-`apps/workbranch-cli/src/workbranch/lib/tool-launcher.sh` owns editor/terminal presets, task path resolution, and configured tool execution. `apps/workbranch-cli/src/workbranch/commands/path.sh` owns the stdout-only path command. `apps/workbranch-cli/src/workbranch/commands/tool-launcher.sh` owns `editor` and `terminal` orchestration. These commands are not Git operations and do not modify repositories.
+`apps/cli/src/workbranch/lib/tool-launcher.sh` owns editor/terminal presets, task path resolution, and configured tool execution. `apps/cli/src/workbranch/commands/path.sh` owns the stdout-only path command. `apps/cli/src/workbranch/commands/tool-launcher.sh` owns `editor` and `terminal` orchestration. These commands are not Git operations and do not modify repositories.
 
 
 ## Task root boundary
@@ -43,7 +43,7 @@ The activity log is append-only history. It is not removed by `workbranch prune`
 
 ## Distribution boundary
 
-All install channels use the generated CLI artifact. `apps/workbranch-cli/bin/workbranch` is canonical for the CLI app and root `bin/workbranch` is kept as the raw-install compatibility artifact:
+All install channels use the generated CLI artifact. `apps/cli/bin/workbranch` is canonical for the CLI app and root `bin/workbranch` is kept as the raw-install compatibility artifact:
 
 - direct curl/wget downloads via root `install.sh`
 - root `install.sh` checkout installs

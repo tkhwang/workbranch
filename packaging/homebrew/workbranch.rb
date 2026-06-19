@@ -6,8 +6,8 @@ class Workbranch < Formula
   license "MIT"
 
   def install
-    system "apps/workbranch-cli/scripts/build-workbranch.sh"
-    bin.install "apps/workbranch-cli/bin/workbranch"
+    system "apps/cli/scripts/build-workbranch.sh"
+    bin.install "apps/cli/bin/workbranch"
   end
 
   test do
