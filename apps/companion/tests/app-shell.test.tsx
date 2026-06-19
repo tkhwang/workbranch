@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { App } from "../src/App";
@@ -20,5 +21,18 @@ describe("App shell settings wiring", () => {
 		expect(html).toContain('aria-label="Open Settings"');
 		expect(html).toContain('role="status"');
 		expect(html).toContain('aria-live="polite"');
+	});
+
+	it("uses the configured fixed-width font as the app shell font family", () => {
+		// Given the companion stylesheet and font preference data attributes
+		// When the CSS contract is inspected
+		const css = readFileSync("src/style.css", "utf8");
+
+		// Then the app shell font follows the selected monospace setting
+		expect(css).toMatch(
+			/main\s*\{[^}]*font-family:\s*var\(--app-font-family\)/s,
+		);
+		expect(css).toContain('main[data-font="menlo"]');
+		expect(css).toContain('--app-font-family: "Menlo"');
 	});
 });

@@ -42,7 +42,7 @@ export function buildMenuModel(state: GlobalState): MenuModel {
 					project: project.name,
 					root: project.root,
 					task,
-					expanded: task.notiCount > 0 || taskStatus(task) === "blocked",
+					expanded: true,
 				}))
 				.sort((left, right) => right.task.updatedAt - left.task.updatedAt),
 		}))
