@@ -42,7 +42,7 @@
 - Key contexts of use: quick menu bar glance while coding, before switching tasks, during AI-agent execution.
 
 ## Information architecture
-- Primary navigation: bottom mobile-style view bar with three destinations: Main, Activity, Setting.
+- Primary navigation: sticky floating bottom view bar with three destinations: Main, Activity, Setting.
 - Core screens: Main task list, Activity report placeholder, Setting preferences view.
 - Content hierarchy:
   1. Global inventory + status rollup and icon-only refresh.
@@ -72,7 +72,7 @@
   - global inventory/status summary,
   - project group header,
   - top toolbar with live status chip and icon-only refresh control,
-  - bottom view navigation for Main, Activity, and Setting,
+  - sticky floating bottom view navigation for Main, Activity, and Setting,
   - Setting view preferences panel,
   - Activity report placeholder view,
   - switch row for launch-at-login,
@@ -91,6 +91,7 @@
 - Keyboard/focus behavior: buttons and `summary` expose clear focus rings.
 - Contrast/readability: status text and current step must pass practical dark-mode contrast; disabled action may be muted but legible.
 - Screen-reader semantics: preserve button `aria-label`s; bottom view buttons expose destination labels and `aria-current`; settings controls use associated labels, switch state text, and the toolbar status chip exposes `role="status"` with polite live updates.
+- Long actionable toolbar status messages, including preference reset notices and command stderr, must remain fully visible without hover-only disclosure.
 - Reduced motion and sensory considerations: disable transform transitions under `prefers-reduced-motion: reduce`.
 
 ## Responsive behavior

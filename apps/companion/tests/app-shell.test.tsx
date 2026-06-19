@@ -72,6 +72,25 @@ describe("App shell settings wiring", () => {
 		expect(html).toContain('aria-live="polite"');
 	});
 
+	it("shows full toolbar status messages instead of relying on hover-only title text", () => {
+		// Given the companion toolbar stylesheet
+		// When the status chip CSS contract is inspected
+		const css = readCssContract("src/style.css");
+
+		// Then long actionable status text remains visible for keyboard and touch users
+		expect(css).toMatch(/header\s*\{[^}]*flex-wrap:\s*wrap/s);
+		expect(css).toMatch(/\.toolbar\s*\{[^}]*flex:\s*1 1 180px/s);
+		expect(css).toMatch(/\.toolbar\s*\{[^}]*justify-content:\s*flex-end/s);
+		expect(css).toMatch(/\.toolbar-status\s*\{[^}]*overflow:\s*visible/s);
+		expect(css).toMatch(/\.toolbar-status\s*\{[^}]*white-space:\s*normal/s);
+		expect(css).toMatch(/\.toolbar-status\s*\{[^}]*overflow-wrap:\s*anywhere/s);
+		expect(css).not.toMatch(/\.toolbar-status\s*\{[^}]*max-width:\s*98px/s);
+		expect(css).not.toMatch(
+			/\.toolbar-status\s*\{[^}]*text-overflow:\s*ellipsis/s,
+		);
+		expect(css).not.toMatch(/\.toolbar-status\s*\{[^}]*white-space:\s*nowrap/s);
+	});
+
 	it("uses the configured fixed-width font as the app shell font family", () => {
 		// Given the companion stylesheet and font preference data attributes
 		// When the CSS contract is inspected
@@ -128,23 +147,30 @@ describe("App shell settings wiring", () => {
 		// When the action bar CSS contract is inspected
 		const css = readCssContract("src/style.css");
 
-		// Then IDE, Terminal, and Finder stay compact instead of becoming large cards
+		// Then IDE, Terminal, and Finder stay compact without clipping focus rings
 		expect(css).toMatch(/\.task-actions\s*\{[^}]*display:\s*flex/s);
 		expect(css).toMatch(/\.task-actions\s*\{[^}]*align-items:\s*center/s);
+		expect(css).toMatch(/\.task-actions\s*\{[^}]*overflow:\s*visible/s);
 		expect(css).toMatch(/\.task-action\s*\{[^}]*display:\s*inline-flex/s);
 		expect(css).not.toMatch(/\.task-actions\s*\{[^}]*grid-template-columns/s);
 		expect(css).not.toMatch(/\.task-action\s*\{[^}]*width:\s*100%/s);
 	});
 
-	it("keeps the bottom view menu in normal flow instead of covering task content", () => {
+	it("keeps the bottom view menu floating without covering task content", () => {
 		// Given the companion shell stylesheet
 		// When the bottom navigation CSS contract is inspected
 		const css = readCssContract("src/style.css");
 
-		// Then the command bar is part of the popover layout, not a fixed overlay
+		// Then the command bar stays visible as a sticky floating affordance
 		expect(css).toMatch(/main\s*\{[^}]*padding:\s*12px/s);
+		expect(css).toMatch(/main\s*\{[^}]*display:\s*flex/s);
+		expect(css).toMatch(/main\s*\{[^}]*flex-direction:\s*column/s);
+		expect(css).toMatch(/\.view-panel\s*\{[^}]*flex:\s*1 1 auto/s);
+		expect(css).toMatch(/\.view-panel\s*\{[^}]*padding-bottom:\s*52px/s);
 		expect(css).not.toMatch(/main\s*\{[^}]*padding:[^;}]*78px/s);
-		expect(css).toMatch(/\.view-nav\s*\{[^}]*position:\s*static/s);
+		expect(css).toMatch(/\.view-nav\s*\{[^}]*bottom:\s*10px/s);
+		expect(css).toMatch(/\.view-nav\s*\{[^}]*position:\s*sticky/s);
+		expect(css).toMatch(/\.view-nav\s*\{[^}]*z-index:\s*3/s);
 		expect(css).toMatch(
 			/\.view-nav\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/s,
 		);
@@ -152,6 +178,7 @@ describe("App shell settings wiring", () => {
 		expect(css).toMatch(/\.view-nav-button\s*\{[^}]*justify-self:\s*stretch/s);
 		expect(css).not.toMatch(/\.view-nav-button\s*\{[^}]*width:\s*100%/s);
 		expect(css).not.toMatch(/\.view-nav\s*\{[^}]*position:\s*fixed/s);
+		expect(css).not.toMatch(/\.view-nav\s*\{[^}]*position:\s*static/s);
 	});
 
 	it("defines the eight famous dark and light theme token selectors", () => {
