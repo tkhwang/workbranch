@@ -127,9 +127,10 @@ archive_prompt_current_plan() {
   plan_index=$(task_active_plan_index_loaded) || return 0
   title=${TASK_PLAN_TITLES[$plan_index]}
   if [ -t 0 ] || [ "${WORKBRANCH_ALLOW_NON_TTY_PROMPT:-}" = "1" ]; then
-    answer=$(prompt_read "[*] Mark plan \"$title\" done and archive? [y/N]: ") || answer=""
+    answer=$(prompt_read "
+[*] Mark plan \"$title\" done and archive? [Y/n]: ") || answer=""
     case "$answer" in
-      y|Y|yes|YES|Yes)
+      ""|y|Y|yes|YES|Yes)
         archive_current_plan "$task" "$completed_via"
         ;;
     esac

@@ -442,12 +442,12 @@ test_config_preserves_task_setup_while_prompting_repo_setup() {
   assert_contains "$out" "[*] Terminal command:"
   assert_contains "$out" "[*] Choose terminal [keep]:"
   assert_contains "$out" "[*] Base repo branch for frontend [master]:"
-  assert_contains "$out" "[*] Repo setup command for frontend []:"
+  assert_contains "$out" "[*] Repo setup command for frontend [pnpm install] (example, Enter to skip):"
   assert_contains "$out" "[*] Base repo branch for backend [master]:"
-  assert_contains "$out" "[*] Repo setup command for backend []:"
+  assert_contains "$out" "[*] Repo setup command for backend [pnpm install] (example, Enter to skip):"
   assert_not_contains "$out" "Task setup command"
-  assert_contains "$out" "$(printf '%s \n\n%s' "[*] Repo setup command for frontend []:" "[*] Base repo branch for backend [master]:")"
-  assert_contains "$out" "$(printf '%s \n\n%s' "[*] Repo setup command for backend []:" "[+] Config updated:")"
+  assert_contains "$out" "$(printf '%s \n\n%s' "[*] Repo setup command for frontend [pnpm install] (example, Enter to skip):" "[*] Base repo branch for backend [master]:")"
+  assert_contains "$out" "$(printf '%s \n\n%s' "[*] Repo setup command for backend [pnpm install] (example, Enter to skip):" "[+] Config updated:")"
   case "$out" in
     *"Base repo branch for frontend"*"Repo setup command for frontend"*"Base repo branch for backend"*"Repo setup command for backend"*) ;;
     *) fail "expected config to ask branch and setup per repo only; got: $out" ;;
