@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.1](https://github.com/tkhwang/workbranch/compare/v2.5.0...v2.5.1) (2026-06-20)
+
+
+### Bug Fixes
+
+* **ui:** improve accessibility of toolbar and navigation ([7064efb](https://github.com/tkhwang/workbranch/commit/7064efb168a8d45be6d5c4b33ccda98dae6d3242))
+
 ## [2.5.0](https://github.com/tkhwang/workbranch/compare/v2.4.1...v2.5.0) (2026-06-19)
 
 
