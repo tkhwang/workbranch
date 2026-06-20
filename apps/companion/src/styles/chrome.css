@@ -1,6 +1,7 @@
 header {
-	align-items: center;
+	align-items: flex-start;
 	display: flex;
+	flex-wrap: wrap;
 	gap: 10px;
 	justify-content: space-between;
 	margin-bottom: 10px;
@@ -46,7 +47,11 @@ summary:focus-visible {
 .toolbar {
 	align-items: center;
 	display: inline-flex;
+	flex: 1 1 180px;
+	flex-wrap: wrap;
 	gap: 6px;
+	justify-content: flex-end;
+	min-width: 0;
 }
 
 .toolbar-button {
@@ -56,6 +61,23 @@ summary:focus-visible {
 	padding: 5px 8px;
 }
 
+.toolbar-status {
+	border: 1px solid var(--line);
+	border-radius: 999px;
+	color: var(--faint);
+	flex: 0 1 min(100%, 42ch);
+	font-size: 10px;
+	line-height: 1.25;
+	max-width: min(100%, 42ch);
+	min-width: 0;
+	overflow: visible;
+	overflow-wrap: anywhere;
+	padding: 5px 7px;
+	text-align: right;
+	text-overflow: clip;
+	white-space: normal;
+}
+
 .toolbar-divider {
 	background: var(--line-strong);
 	height: 18px;
@@ -63,7 +85,9 @@ summary:focus-visible {
 }
 
 .view-panel {
+	flex: 1 1 auto;
 	margin-bottom: 12px;
+	padding-bottom: 52px;
 }
 
 .activity-view {
@@ -125,12 +149,12 @@ summary:focus-visible {
 	box-shadow: var(--shadow-pop);
 	display: grid;
 	gap: 4px;
-	grid-template-columns: repeat(3, 1fr);
-	left: 12px;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	margin-top: 8px;
 	padding: 5px;
-	position: fixed;
-	right: 12px;
-	z-index: 5;
+	position: sticky;
+	width: 100%;
+	z-index: 3;
 }
 
 @supports (background: color-mix(in srgb, black, white)) {
@@ -149,8 +173,10 @@ summary:focus-visible {
 	font-size: 10px;
 	gap: 7px;
 	justify-content: center;
+	justify-self: stretch;
 	line-height: 1;
 	min-height: 40px;
+	min-width: 0;
 	padding: 6px 8px;
 }
 
@@ -166,6 +192,13 @@ summary:focus-visible {
 }
 
 .view-nav-icon {
+	flex: 0 0 auto;
 	height: 18px;
 	width: 18px;
+}
+
+.view-nav-button span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }

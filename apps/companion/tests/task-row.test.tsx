@@ -196,6 +196,8 @@ describe("TaskRow", () => {
 		expect(html).toContain('aria-label="open generated-task in IDE"');
 		expect(html).toContain('aria-label="open generated-task in terminal"');
 		expect(html).toContain('aria-label="open generated-task in Finder"');
+		expect(html).toContain('class="task-action-icon"');
+		expect(html).toContain('class="task-action-separator"');
 		expect(html).not.toContain("edit memo for generated-task");
 		expect(html).not.toContain("clear memo for generated-task");
 		expect(html).not.toContain("clear notifications for generated-task");

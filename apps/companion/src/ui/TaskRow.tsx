@@ -2,6 +2,7 @@ import { Fragment } from "react";
 import { currentItem } from "../application/state";
 import type { Step, Task } from "../domain/model";
 import { activePlan, taskProgress, taskStatus } from "../domain/model";
+import { TaskActionIcon } from "./TaskActionIcon";
 
 const STATUS_META = {
 	todo: { label: "Todo" },
@@ -179,17 +180,24 @@ export function TaskRow({ root, task, expanded, onAction }: Props) {
 					</ul>
 				) : null}
 				<div className="task-actions">
-					{actions.map((action) => (
-						<button
-							aria-label={action.ariaLabel}
-							className="task-action"
-							disabled={action.disabled}
-							key={action.kind}
-							onClick={() => onAction(root, task, action.kind)}
-							type="button"
-						>
-							{action.label}
-						</button>
+					{actions.map((action, index) => (
+						<Fragment key={action.kind}>
+							{index > 0 ? (
+								<span className="task-action-separator" aria-hidden="true">
+									·
+								</span>
+							) : null}
+							<button
+								aria-label={action.ariaLabel}
+								className="task-action"
+								disabled={action.disabled}
+								onClick={() => onAction(root, task, action.kind)}
+								type="button"
+							>
+								<TaskActionIcon kind={action.kind} />
+								<span>{action.label}</span>
+							</button>
+						</Fragment>
 					))}
 				</div>
 			</div>
