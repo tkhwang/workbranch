@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.2](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.4.1...workbranch-companion-v2.4.2) (2026-06-21)
+
+
+### Bug Fixes
+
+* **styles:** add color-mix support for button backgrounds ([957e73a](https://github.com/tkhwang/workbranch/commit/957e73a6c7f0ce63ec5c000c075a87b8fe9e438b))
+
 ## [2.4.1](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.4.0...workbranch-companion-v2.4.1) (2026-06-20)
 
 
