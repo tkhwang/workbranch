@@ -104,6 +104,26 @@ describe("App shell settings wiring", () => {
 		expect(css).toContain('--app-font-family: "Menlo"');
 	});
 
+	it("keeps static button background fallbacks outside color-mix supports", () => {
+		// Given the companion stylesheet is built for chrome105 and safari13 WebViews
+		// When the button background token contract is inspected
+		const css = readCssContract("src/style.css");
+		const [cssBeforeColorMixSupports = ""] = css.split(
+			"@supports (background: color-mix(in srgb, black, white))",
+		);
+
+		// Then unsupported color-mix tokens cannot invalidate default button backgrounds
+		expect(css).toMatch(
+			/main\s*\{[^}]*--button-bg:\s*rgba\(150,\s*180,\s*215,\s*0\.07\);[^}]*--button-bg-hover:\s*rgba\(150,\s*180,\s*215,\s*0\.13\);/s,
+		);
+		expect(css).toMatch(
+			/@supports\s*\(background:\s*color-mix\(in srgb,\s*black,\s*white\)\)\s*\{\s*main\s*\{[^}]*--button-bg:\s*color-mix\(in srgb,\s*var\(--text\) 6%,\s*transparent\);[^}]*--button-bg-hover:\s*color-mix\(in srgb,\s*var\(--text\) 12%,\s*transparent\);/s,
+		);
+		expect(cssBeforeColorMixSupports).not.toMatch(
+			/--button-bg:\s*color-mix\(in srgb,\s*var\(--text\)/,
+		);
+	});
+
 	it("right-aligns the settings font select without letting the chevron take layout space", () => {
 		// Given the settings stylesheet
 		// When the font select row CSS contract is inspected

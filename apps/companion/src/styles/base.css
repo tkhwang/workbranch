@@ -60,15 +60,16 @@ main {
 	);
 	--task-bg: var(--surface-2);
 	--task-bg-hover: var(--surface-3);
-	--button-bg: color-mix(in srgb, var(--text) 6%, transparent);
-	--button-bg-hover: color-mix(in srgb, var(--text) 12%, transparent);
+	--button-bg: rgba(150, 180, 215, 0.07);
+	--button-bg-hover: rgba(150, 180, 215, 0.13);
 	--current-step-bg:
 		linear-gradient(135deg, var(--accent-soft), transparent 70%),
 		var(--surface-3);
 	--active-rail-bg: var(--accent-soft);
 	--shadow-soft: rgba(0, 0, 0, 0.4);
 	--shadow-strong: rgba(0, 0, 0, 0.6);
-	--shadow-card: 0 1px 2px var(--shadow-soft), 0 8px 20px -10px var(--shadow-strong);
+	--shadow-card:
+		0 1px 2px var(--shadow-soft), 0 8px 20px -10px var(--shadow-strong);
 	--shadow-card-hover:
 		0 2px 4px var(--shadow-soft), 0 14px 28px -10px var(--shadow-strong);
 	--shadow-pop: 0 14px 36px var(--shadow-strong);
@@ -83,4 +84,11 @@ main {
 	font-family: var(--app-font-family);
 	min-height: 100vh;
 	padding: 12px;
+}
+
+@supports (background: color-mix(in srgb, black, white)) {
+	main {
+		--button-bg: color-mix(in srgb, var(--text) 6%, transparent);
+		--button-bg-hover: color-mix(in srgb, var(--text) 12%, transparent);
+	}
 }
