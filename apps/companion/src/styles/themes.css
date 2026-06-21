@@ -230,6 +230,11 @@ main[data-theme="gruvbox-light"] {
 		var(--surface-3);
 }
 
+main[data-theme$="-light"] {
+	--shadow-soft: rgba(30, 35, 50, 0.1);
+	--shadow-strong: rgba(30, 35, 50, 0.16);
+}
+
 main[data-font="sf-mono"] {
 	--app-font-family:
 		"SFMono-Regular", ui-monospace, "Menlo", "Monaco", "Consolas", monospace;
