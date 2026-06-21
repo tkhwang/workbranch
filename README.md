@@ -11,6 +11,8 @@ Manage Git worktree task spaces without memorizing `git worktree` commands.
 
 `workbranch` creates one task folder per feature, works with one repo or many repos, and keeps branch refresh commands short and safe.
 
+> 🖥️ **Prefer a GUI?** [WorkbranchCompanion](#native-menu-bar-companion) is a native macOS menu bar app that shows task status, progress, and notifications at a glance.
+
 ![workbranch demo](./docs/figs/workbranch-demo.gif)
 
 ## Install
