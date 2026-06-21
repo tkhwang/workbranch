@@ -141,9 +141,8 @@ summary::-webkit-details-marker {
 .current-step {
 	color: var(--text);
 	font-size: 12px;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	overflow-wrap: anywhere;
+	white-space: normal;
 }
 
 .repo-chips {
