@@ -37,7 +37,11 @@ expected_companion_extra_files = [
     {'type': 'json', 'path': 'src-tauri/tauri.conf.json', 'jsonpath': '$.version'},
     {'type': 'json', 'path': 'package.json', 'jsonpath': '$.version'},
     {'type': 'toml', 'path': 'src-tauri/Cargo.toml', 'jsonpath': '$.package.version'},
-    {'type': 'generic', 'path': 'src-tauri/Cargo.lock'},
+    {
+        'type': 'toml',
+        'path': 'src-tauri/Cargo.lock',
+        'jsonpath': '$.package[?(@.name.value=="workbranch-companion")].version',
+    },
 ]
 if companion_extra_files != expected_companion_extra_files:
     raise SystemExit(f'companion extra-files mismatch: {companion_extra_files}')
@@ -107,41 +111,38 @@ test_companion_release_versions_stay_in_sync() {
   python3 - <<'PY'
 import json
 import re
-import subprocess
 from pathlib import Path
-from tempfile import TemporaryDirectory
 
 manifest_version = json.loads(Path('.release-please-manifest.json').read_text())['apps/companion']
-package_version = json.loads(Path('apps/companion/package.json').read_text())['version']
+package_json = json.loads(Path('apps/companion/package.json').read_text())
+package_version = package_json['version']
+root_package_json = json.loads(Path('package.json').read_text())
 tauri_version = json.loads(Path('apps/companion/src-tauri/tauri.conf.json').read_text())['version']
 cargo_toml = Path('apps/companion/src-tauri/Cargo.toml').read_text()
 cargo_toml_version = re.search(r'^version = "([^"]+)"$', cargo_toml, flags=re.MULTILINE).group(1)
 cargo_lock = Path('apps/companion/src-tauri/Cargo.lock').read_text()
 cargo_lock_match = re.search(
-    r'(?m)^name = "workbranch-companion"\nversion = "([^"]+)"(?:\s+# x-release-please-version)?$',
+    r'(?m)^name = "workbranch-companion"\r?\nversion = "([^"]+)"$',
     cargo_lock,
 )
 if cargo_lock_match is None:
     raise SystemExit('Cargo.lock must include the workbranch-companion package entry')
-if 'name = "workbranch-companion"\nversion = "' + cargo_lock_match.group(1) + '" # x-release-please-version' not in cargo_lock:
-    raise SystemExit('[-] Error: Cargo.lock workbranch-companion version must carry x-release-please-version marker')
 cargo_lock_version = cargo_lock_match.group(1)
 
-with TemporaryDirectory() as tmpdir:
-    markerless_lock = cargo_lock.replace(
-        'name = "workbranch-companion"\nversion = "' + cargo_lock_match.group(1) + '" # x-release-please-version',
-        'name = "workbranch-companion"\nversion = "' + cargo_lock_match.group(1) + '"',
-    )
-    temp_lock = Path(tmpdir) / 'Cargo.lock'
-    temp_lock.write_text(markerless_lock)
-    subprocess.run([
-        'node',
-        'apps/companion/scripts/sync-release-markers.mjs',
-        '--file',
-        str(temp_lock),
-    ], check=True)
-    if 'name = "workbranch-companion"\nversion = "' + cargo_lock_match.group(1) + '" # x-release-please-version' not in temp_lock.read_text():
-        raise SystemExit('[-] Error: companion release marker sync script did not restore Cargo.lock marker')
+if 'x-release-please-version' in cargo_lock:
+    raise SystemExit('Cargo.lock must stay markerless; release-please updates it through TOML JSONPath')
+
+all_scripts = {
+    f'companion:{name}': command for name, command in package_json.get('scripts', {}).items()
+} | {
+    f'root:{name}': command for name, command in root_package_json.get('scripts', {}).items()
+}
+marker_scripts = sorted(
+    name for name, command in all_scripts.items()
+    if 'release-markers' in name or 'release-markers' in command
+)
+if marker_scripts:
+    raise SystemExit(f'package scripts must not manage Cargo.lock release markers: {marker_scripts}')
 
 
 versions = {

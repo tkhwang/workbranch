@@ -13,8 +13,6 @@
     "companion:build": "pnpm --filter @workbranch/companion tauri build",
     "companion:dev": "pnpm --filter @workbranch/companion tauri dev",
     "companion:run": "open \"apps/companion/src-tauri/target/release/bundle/macos/WorkbranchCompanion.app\"",
-    "companion:test": "pnpm --filter @workbranch/companion test",
-    "companion:sync-release-markers": "pnpm --filter @workbranch/companion sync:release-markers",
-    "companion:check-release-markers": "pnpm --filter @workbranch/companion check:release-markers"
+    "companion:test": "pnpm --filter @workbranch/companion test"
   }
 }

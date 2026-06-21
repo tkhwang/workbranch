@@ -56,7 +56,7 @@ export function useCompanionSettings({
 				setPreferenceStore(store);
 				setPreferences(result.preferences);
 				if (result.sanitized) {
-					onStatus("Preferences reset to supported defaults");
+					onStatus("Preferences migrated to supported settings");
 					const save = enqueuePreferenceSave(
 						preferenceSaveQueue.current,
 						async () => {

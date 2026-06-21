@@ -209,20 +209,6 @@
 	white-space: nowrap;
 }
 
-.theme-swatch-dracula-dark {
-	--theme-swatch-surface: #282a36;
-	--theme-swatch-accent: #bd93f9;
-	--theme-swatch-secondary: #ff79c6;
-	--theme-swatch-success: #50fa7b;
-}
-
-.theme-swatch-nord-dark {
-	--theme-swatch-surface: #2e3440;
-	--theme-swatch-accent: #5e81ac;
-	--theme-swatch-secondary: #88c0d0;
-	--theme-swatch-success: #a3be8c;
-}
-
 .theme-swatch-solarized-dark {
 	--theme-swatch-surface: #002b36;
 	--theme-swatch-accent: #268bd2;
@@ -230,25 +216,25 @@
 	--theme-swatch-success: #859900;
 }
 
-.theme-swatch-gruvbox-dark {
-	--theme-swatch-surface: #282828;
-	--theme-swatch-accent: #fabd2f;
-	--theme-swatch-secondary: #fe8019;
-	--theme-swatch-success: #b8bb26;
-}
-
-.theme-swatch-dracula-light {
-	--theme-swatch-surface: #f8f8f2;
+.theme-swatch-dracula-dark {
+	--theme-swatch-surface: #282a36;
 	--theme-swatch-accent: #bd93f9;
-	--theme-swatch-secondary: #ff79c6;
+	--theme-swatch-secondary: #6272a4;
 	--theme-swatch-success: #50fa7b;
 }
 
-.theme-swatch-nord-light {
-	--theme-swatch-surface: #eceff4;
-	--theme-swatch-accent: #5e81ac;
-	--theme-swatch-secondary: #88c0d0;
-	--theme-swatch-success: #a3be8c;
+.theme-swatch-catppuccin-dark {
+	--theme-swatch-surface: #1e1e2e;
+	--theme-swatch-accent: #cba6f7;
+	--theme-swatch-secondary: #f5c2e7;
+	--theme-swatch-success: #a6e3a1;
+}
+
+.theme-swatch-github-dark {
+	--theme-swatch-surface: #0d1117;
+	--theme-swatch-accent: #2f81f7;
+	--theme-swatch-secondary: #a371f7;
+	--theme-swatch-success: #3fb950;
 }
 
 .theme-swatch-solarized-light {
@@ -258,9 +244,23 @@
 	--theme-swatch-success: #859900;
 }
 
-.theme-swatch-gruvbox-light {
-	--theme-swatch-surface: #fbf1c7;
-	--theme-swatch-accent: #af3a03;
-	--theme-swatch-secondary: #b57614;
-	--theme-swatch-success: #79740e;
+.theme-swatch-dracula-light {
+	--theme-swatch-surface: #f8f8f2;
+	--theme-swatch-accent: #7c3fbf;
+	--theme-swatch-secondary: #6272a4;
+	--theme-swatch-success: #168a3a;
+}
+
+.theme-swatch-catppuccin-light {
+	--theme-swatch-surface: #eff1f5;
+	--theme-swatch-accent: #8839ef;
+	--theme-swatch-secondary: #ea76cb;
+	--theme-swatch-success: #40a02b;
+}
+
+.theme-swatch-github-light {
+	--theme-swatch-surface: #ffffff;
+	--theme-swatch-accent: #0969da;
+	--theme-swatch-secondary: #8250df;
+	--theme-swatch-success: #1a7f37;
 }

@@ -60,7 +60,14 @@ const nestedChecklistTask: Task = {
 							text: "Implement change",
 							checked: false,
 							depth: 1,
-							children: [],
+							children: [
+								{
+									text: "Wire depth-specific marker",
+									checked: false,
+									depth: 2,
+									children: [],
+								},
+							],
 						},
 						{
 							text: "Run verification",
@@ -133,33 +140,38 @@ const doneFixtureTask: Task = {
 	],
 };
 
+function renderTaskRow(task: Task): string {
+	return renderToStaticMarkup(
+		<TaskRow
+			root="/tmp/workbranch"
+			task={task}
+			expanded={true}
+			onAction={() => {}}
+		/>,
+	);
+}
+
 describe("TaskRow", () => {
 	it("renders nested checklist children for generated task briefs", () => {
-		const html = renderToStaticMarkup(
-			<TaskRow
-				root="/tmp/workbranch"
-				task={nestedChecklistTask}
-				expanded={true}
-				onAction={() => {}}
-			/>,
-		);
+		const html = renderTaskRow(nestedChecklistTask);
 
 		expect(html).toContain("Generated Plan");
 		expect(html).toContain("Implement change");
 		expect(html).toContain("Run verification");
-		expect(html.indexOf("☐ Generated Plan")).toBeLessThan(
-			html.indexOf("☐ Implement change"),
+		expect(html).toContain("Wire depth-specific marker");
+		expect(html).toContain('class="step-item step-item-todo step-depth-0"');
+		expect(html).toContain('class="step-item step-item-todo step-depth-1"');
+		expect(html).toContain('class="step-item step-item-todo step-depth-2"');
+		expect(html).toContain('class="step-marker step-marker-todo"');
+		expect(html).toContain('class="step-text"');
+		expect(html.indexOf("Generated Plan")).toBeLessThan(
+			html.indexOf("Implement change"),
 		);
+		expect(html).not.toContain("☐ Generated Plan");
+		expect(html).not.toContain("☐ Implement change");
 	});
 	it("renders a Raycast-style task summary with current step and repo state", () => {
-		const html = renderToStaticMarkup(
-			<TaskRow
-				root="/tmp/workbranch"
-				task={linearFixtureTask}
-				expanded={true}
-				onAction={() => {}}
-			/>,
-		);
+		const html = renderTaskRow(linearFixtureTask);
 
 		expect(html).toContain("task-status-rail");
 		expect(html).toContain("Companion UI refresh");
@@ -170,28 +182,14 @@ describe("TaskRow", () => {
 		expect(html).toContain("feat/update-0617");
 	});
 	it("renders task status as a quiet dot without a check glyph", () => {
-		const html = renderToStaticMarkup(
-			<TaskRow
-				root="/tmp/workbranch"
-				task={doneFixtureTask}
-				expanded={true}
-				onAction={() => {}}
-			/>,
-		);
+		const html = renderTaskRow(doneFixtureTask);
 
 		expect(html).toContain('aria-label="Done"');
 		expect(html).toContain('class="task-status-dot"');
 		expect(html).not.toContain('class="task-status-rail">✓</span>');
 	});
 	it("exposes only IDE, Terminal, and Finder actions", () => {
-		const html = renderToStaticMarkup(
-			<TaskRow
-				root="/tmp/workbranch"
-				task={nestedChecklistTask}
-				expanded={true}
-				onAction={() => {}}
-			/>,
-		);
+		const html = renderTaskRow(nestedChecklistTask);
 
 		expect(html).toContain('aria-label="open generated-task in IDE"');
 		expect(html).toContain('aria-label="open generated-task in terminal"');
@@ -206,6 +204,54 @@ describe("TaskRow", () => {
 			taskActionsFor(nestedChecklistTask).map((action) => action.label),
 		).toEqual(["IDE", "Terminal", "Finder"]);
 	});
+	it("renders launch actions in the detail header before checklist steps", () => {
+		// Given a task with repo chips and checklist steps
+		const html = renderTaskRow(linearFixtureTask);
+
+		// When the expanded detail markup is rendered
+		const actionIndex = html.indexOf('class="task-actions"');
+		const stepsIndex = html.indexOf('class="steps"');
+
+		// Then launch actions stay in the top detail header before long steps
+		expect(html).toContain('class="task-detail-header"');
+		expect(actionIndex).toBeGreaterThan(-1);
+		expect(stepsIndex).toBeGreaterThan(-1);
+		expect(actionIndex).toBeLessThan(stepsIndex);
+	});
+
+	it("renders checklist status as visual markers outside the step text", () => {
+		// Given a task with completed and pending checklist rows
+		const html = renderTaskRow(linearFixtureTask);
+
+		// When the expanded checklist is rendered
+		// Then checked/pending state is a marker, not a loose text glyph prefix
+		expect(html).toContain('class="step-item step-item-done step-depth-0"');
+		expect(html).toContain('class="step-marker step-marker-done"');
+		expect(html).toContain('aria-label="completed step"');
+		expect(html).toContain('class="step-item step-item-todo step-depth-1"');
+		expect(html).toContain('class="step-marker step-marker-todo"');
+		expect(html).toContain('aria-label="pending step"');
+		expect(html).not.toContain("✓ Companion UI refresh");
+		expect(html).not.toContain("☐ Review screenshot");
+	});
+
+	it("marks checklist hierarchy with stronger classes for higher levels", () => {
+		// Given nested plan, step, and sub-step checklist rows
+		const html = renderTaskRow(nestedChecklistTask);
+
+		// When the expanded checklist is rendered
+		// Then each depth gets a separate visual marker class, capped at sub-step level
+		expect(html).toContain('class="step-item step-item-todo step-depth-0"');
+		expect(html).toContain('class="step-item step-item-todo step-depth-1"');
+		expect(html).toContain('class="step-item step-item-todo step-depth-2"');
+		expect(html.indexOf("step-depth-0")).toBeLessThan(
+			html.indexOf("step-depth-1"),
+		);
+		expect(html.indexOf("step-depth-1")).toBeLessThan(
+			html.indexOf("step-depth-2"),
+		);
+	});
+
 	it("passes the project root, task, and action kind when a row action is clicked", () => {
 		const calls: ActionCall[] = [];
 		const element = TaskRow({

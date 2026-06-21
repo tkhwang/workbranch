@@ -12,13 +12,13 @@ import {
 } from "../src/application/preferences";
 
 describe("companion preferences", () => {
-	it("defaults to Dracula with system mode and system-mono", () => {
+	it("defaults to Solarized with system mode and system-mono", () => {
 		// Given no stored preference values
 		// When the default preference contract is read
-		// Then the Dracula HUD follows the OS theme until the user chooses a mode
+		// Then the Solarized HUD follows the OS theme until the user chooses a mode
 		expect(DEFAULT_COMPANION_PREFERENCES).toEqual({
 			font: "system-mono",
-			themeFamily: "dracula",
+			themeFamily: "solarized",
 			themeMode: "system",
 		});
 	});
@@ -52,7 +52,7 @@ describe("companion preferences", () => {
 		expect(result).toEqual({
 			preferences: {
 				font: "menlo",
-				themeFamily: "nord",
+				themeFamily: "solarized",
 				themeMode: "light",
 			},
 			sanitized: true,
@@ -64,11 +64,11 @@ describe("companion preferences", () => {
 		const migrations = [
 			{
 				theme: "terminal-dark",
-				themeFamily: "nord",
+				themeFamily: "github",
 			},
 			{
 				theme: "amber-crt",
-				themeFamily: "gruvbox",
+				themeFamily: "dracula",
 			},
 			{
 				theme: "green-mono",
@@ -76,7 +76,7 @@ describe("companion preferences", () => {
 			},
 			{
 				theme: "high-contrast",
-				themeFamily: "dracula",
+				themeFamily: "github",
 			},
 		] as const;
 
@@ -97,6 +97,39 @@ describe("companion preferences", () => {
 				sanitized: true,
 			});
 		}
+	});
+
+	it("migrates removed stored theme families before falling back to defaults", () => {
+		// Given stored family values from removed themes
+		const gruvboxResult = sanitizeCompanionPreferences({
+			font: "sf-mono",
+			themeFamily: "gruvbox",
+			themeMode: "dark",
+		});
+		const nordResult = sanitizeCompanionPreferences({
+			font: "sf-mono",
+			themeFamily: "nord",
+			themeMode: "light",
+		});
+
+		// When preferences are sanitized at the store boundary
+		// Then removed families migrate to nearest surviving families and preserve mode
+		expect(gruvboxResult).toEqual({
+			preferences: {
+				font: "sf-mono",
+				themeFamily: "dracula",
+				themeMode: "dark",
+			},
+			sanitized: true,
+		});
+		expect(nordResult).toEqual({
+			preferences: {
+				font: "sf-mono",
+				themeFamily: "solarized",
+				themeMode: "light",
+			},
+			sanitized: true,
+		});
 	});
 
 	it("exposes only fixed-width font choices", () => {
@@ -122,15 +155,24 @@ describe("companion preferences", () => {
 		// When option values are read
 		// Then each famous family has both dark and light variants
 		expect(COMPANION_THEME_OPTIONS.map((option) => option.value)).toEqual([
-			"dracula-dark",
-			"nord-dark",
 			"solarized-dark",
-			"gruvbox-dark",
-			"dracula-light",
-			"nord-light",
+			"dracula-dark",
+			"catppuccin-dark",
+			"github-dark",
 			"solarized-light",
-			"gruvbox-light",
+			"dracula-light",
+			"catppuccin-light",
+			"github-light",
 		]);
+		expect(COMPANION_THEME_OPTIONS.map((option) => option.family)).toContain(
+			"dracula",
+		);
+		expect(
+			COMPANION_THEME_OPTIONS.map((option) => option.family),
+		).not.toContain("gruvbox");
+		expect(
+			COMPANION_THEME_OPTIONS.map((option) => option.family),
+		).not.toContain("nord");
 		expect(
 			COMPANION_THEME_OPTIONS.filter((option) => option.mode === "dark"),
 		).toHaveLength(4);
@@ -143,32 +185,32 @@ describe("companion preferences", () => {
 		// Given preferences in explicit and system modes
 		const explicitLight = {
 			font: "system-mono",
-			themeFamily: "gruvbox",
+			themeFamily: "dracula",
 			themeMode: "light",
 		} as const;
-		const systemNord = {
+		const systemGitHub = {
 			font: "system-mono",
-			themeFamily: "nord",
+			themeFamily: "github",
 			themeMode: "system",
 		} as const;
 
 		// When concrete data-theme values are resolved
 		// Then system mode follows the supplied system mode while explicit mode wins
-		expect(resolvedCompanionTheme(explicitLight, "dark")).toBe("gruvbox-light");
-		expect(resolvedCompanionTheme(systemNord, "light")).toBe("nord-light");
-		expect(resolvedCompanionTheme(systemNord, "dark")).toBe("nord-dark");
+		expect(resolvedCompanionTheme(explicitLight, "dark")).toBe("dracula-light");
+		expect(resolvedCompanionTheme(systemGitHub, "light")).toBe("github-light");
+		expect(resolvedCompanionTheme(systemGitHub, "dark")).toBe("github-dark");
 	});
 
 	it("restores a failed optimistic preference update only when no newer update won", () => {
 		// Given one failed optimistic update and a later successful update
 		const failedAttempt = {
 			font: "menlo",
-			themeFamily: "dracula",
+			themeFamily: "catppuccin",
 			themeMode: "system",
 		} as const;
 		const newerCurrent = {
 			font: "menlo",
-			themeFamily: "nord",
+			themeFamily: "github",
 			themeMode: "light",
 		} as const;
 
@@ -220,14 +262,14 @@ describe("companion preferences", () => {
 		// When the pair is converted for persistence
 		const entries = preferencesToStoreEntries({
 			font: "menlo",
-			themeFamily: "nord",
+			themeFamily: "github",
 			themeMode: "light",
 		});
 
 		// Then launch-at-login and other app state are excluded from the store contract
 		expect(entries).toEqual({
 			font: "menlo",
-			themeFamily: "nord",
+			themeFamily: "github",
 			themeMode: "light",
 		});
 		expect(Object.keys(entries)).toEqual(["font", "themeFamily", "themeMode"]);

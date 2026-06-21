@@ -65,10 +65,20 @@ export function taskActionsFor(task: Task): readonly TaskRowAction[] {
 function StepItems({ steps, keyPrefix }: StepItemsProps) {
 	return steps.map((step, index) => {
 		const key = `${keyPrefix}.${index}`;
+		const markerState = step.checked ? "done" : "todo";
+		const markerDepth = Math.min(step.depth, 2);
 		return (
 			<Fragment key={key}>
-				<li style={{ paddingLeft: `${step.depth * 14}px` }}>
-					{step.checked ? "✓" : "☐"} {step.text}
+				<li
+					className={`step-item step-item-${markerState} step-depth-${markerDepth}`}
+					style={{ paddingLeft: `${step.depth * 14}px` }}
+				>
+					<span
+						aria-label={step.checked ? "completed step" : "pending step"}
+						className={`step-marker step-marker-${markerState}`}
+						role="img"
+					/>
+					<span className="step-text">{step.text}</span>
 				</li>
 				<StepItems steps={step.children} keyPrefix={key} />
 			</Fragment>
@@ -163,14 +173,36 @@ export function TaskRow({ root, task, expanded, onAction }: Props) {
 	const progress = taskProgress(task);
 	const now = currentItem(task);
 	const plan = activePlan(task);
-	const actions = taskActionsFor(task);
 	return (
 		<details className={`task task-${status}`} open={expanded}>
 			<summary>
 				<TaskSummary task={task} status={status} progress={progress} />
 			</summary>
 			<div className="task-detail">
-				<RepoChips repos={task.repos} />
+				<div className="task-detail-header">
+					<RepoChips repos={task.repos} />
+					<div className="task-actions">
+						{taskActionsFor(task).map((action, index) => (
+							<Fragment key={action.kind}>
+								{index > 0 ? (
+									<span className="task-action-separator" aria-hidden="true">
+										·
+									</span>
+								) : null}
+								<button
+									aria-label={action.ariaLabel}
+									className="task-action"
+									disabled={action.disabled}
+									onClick={() => onAction(root, task, action.kind)}
+									type="button"
+								>
+									<TaskActionIcon kind={action.kind} />
+									<span>{action.label}</span>
+								</button>
+							</Fragment>
+						))}
+					</div>
+				</div>
 				{plan && now ? (
 					<CurrentStep planTitle={plan.title} currentItem={now} />
 				) : null}
@@ -179,27 +211,6 @@ export function TaskRow({ root, task, expanded, onAction }: Props) {
 						<StepItems steps={plan.steps} keyPrefix="plan" />
 					</ul>
 				) : null}
-				<div className="task-actions">
-					{actions.map((action, index) => (
-						<Fragment key={action.kind}>
-							{index > 0 ? (
-								<span className="task-action-separator" aria-hidden="true">
-									·
-								</span>
-							) : null}
-							<button
-								aria-label={action.ariaLabel}
-								className="task-action"
-								disabled={action.disabled}
-								onClick={() => onAction(root, task, action.kind)}
-								type="button"
-							>
-								<TaskActionIcon kind={action.kind} />
-								<span>{action.label}</span>
-							</button>
-						</Fragment>
-					))}
-				</div>
 			</div>
 		</details>
 	);
