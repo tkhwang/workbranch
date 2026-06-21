@@ -71,7 +71,7 @@ export type CompanionPreferenceStore = {
 
 export const DEFAULT_COMPANION_PREFERENCES: CompanionPreferences = {
 	font: "system-mono",
-	themeFamily: "dracula",
+	themeFamily: "solarized",
 	themeMode: "system",
 };
 
@@ -119,6 +119,19 @@ export function isCompanionFont(value: unknown): value is CompanionFont {
 	}
 }
 
+function migrateRemovedThemeFamily(
+	value: unknown,
+): CompanionThemeFamily | undefined {
+	switch (value) {
+		case "gruvbox":
+			return "dracula";
+		case "nord":
+			return "solarized";
+		default:
+			return undefined;
+	}
+}
+
 export function sanitizeCompanionPreferences(input: {
 	readonly font?: unknown;
 	readonly themeFamily?: unknown;
@@ -131,11 +144,14 @@ export function sanitizeCompanionPreferences(input: {
 	const legacyTheme = isLegacyCompanionTheme(input.theme)
 		? input.theme
 		: undefined;
+	const removedThemeFamily = migrateRemovedThemeFamily(input.themeFamily);
 	const themeFamily = isCompanionThemeFamily(input.themeFamily)
 		? input.themeFamily
-		: legacyTheme
-			? themeFamilyFromLegacyTheme(legacyTheme)
-			: DEFAULT_COMPANION_PREFERENCES.themeFamily;
+		: removedThemeFamily
+			? removedThemeFamily
+			: legacyTheme
+				? themeFamilyFromLegacyTheme(legacyTheme)
+				: DEFAULT_COMPANION_PREFERENCES.themeFamily;
 	const themeMode = isCompanionThemeMode(input.themeMode)
 		? input.themeMode
 		: legacyTheme

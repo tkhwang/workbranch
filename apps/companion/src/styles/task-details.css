@@ -118,6 +118,14 @@ summary::-webkit-details-marker {
 	padding: 8px 10px 9px;
 }
 
+.task-detail-header {
+	align-items: flex-start;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	justify-content: space-between;
+}
+
 .current-step-strip {
 	background: var(--surface-2);
 	border: 1px solid var(--line);
@@ -150,8 +158,13 @@ summary::-webkit-details-marker {
 	flex-wrap: wrap;
 	gap: 6px;
 	list-style: none;
-	margin-top: 8px;
+	margin: 0;
 	padding: 0;
+}
+
+.task-detail-header .repo-chips {
+	flex: 1 1 auto;
+	min-width: 0;
 }
 
 .repo-chip {
@@ -199,8 +212,79 @@ summary::-webkit-details-marker {
 	padding: 0 0 0 8px;
 }
 
-.steps li {
+.step-item {
+	align-items: start;
+	display: grid;
+	gap: 6px;
+	grid-template-columns: 12px minmax(0, 1fr);
 	padding: 2px 0;
+}
+
+.step-marker {
+	border-radius: 999px;
+	box-sizing: border-box;
+	display: inline-block;
+	margin-top: 5px;
+}
+
+.step-depth-0 .step-marker {
+	border-radius: 2px;
+	height: 8px;
+	margin-top: 5px;
+	width: 8px;
+}
+
+.step-depth-1 .step-marker {
+	border-radius: 999px;
+	height: 7px;
+	width: 7px;
+}
+
+.step-depth-2 .step-marker {
+	height: 5px;
+	margin-left: 1px;
+	margin-top: 6px;
+	width: 5px;
+}
+
+.step-marker-done {
+	background: var(--faint);
+	box-shadow: 0 0 0 2px var(--line);
+}
+
+.step-depth-0.step-item-done .step-marker {
+	background: var(--faint);
+	box-shadow: 0 0 0 2px var(--line);
+}
+
+.step-depth-1.step-item-done .step-marker {
+	box-shadow: 0 0 0 2px var(--line);
+}
+
+.step-depth-2.step-item-done .step-marker {
+	box-shadow: 0 0 0 1px var(--line);
+}
+
+.step-marker-todo {
+	background: var(--surface-2);
+	border: 1px solid var(--line-strong);
+}
+
+.step-depth-0.step-item-todo .step-marker {
+	border-color: var(--line-strong);
+	box-shadow: 0 0 0 2px var(--line);
+}
+
+.step-text {
+	overflow-wrap: anywhere;
+}
+
+.step-item-done .step-text {
+	color: var(--muted);
+}
+
+.step-item-todo .step-text {
+	color: var(--text);
 }
 
 .error {

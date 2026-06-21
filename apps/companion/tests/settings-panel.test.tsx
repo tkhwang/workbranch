@@ -55,7 +55,7 @@ function collectByType<TProps>(
 
 const preferences: CompanionPreferences = {
 	font: "system-mono",
-	themeFamily: "dracula",
+	themeFamily: "solarized",
 	themeMode: "system",
 };
 
@@ -95,10 +95,10 @@ describe("SettingsPanel", () => {
 		expect(html).toContain("Launch at login");
 		expect(html).toContain("System Mono");
 		expect(html).toContain("JetBrains Mono");
-		expect(html).toContain("Dracula");
-		expect(html).toContain("Nord");
+		expect(html).toContain("Catppuccin");
+		expect(html).toContain("GitHub");
 		expect(html).toContain("Solarized");
-		expect(html).toContain("Gruvbox");
+		expect(html).toContain("Dracula");
 		expect(html).toContain("Light");
 		expect(html).toContain("Dark");
 		expect(html).toContain("System");
@@ -111,7 +111,7 @@ describe("SettingsPanel", () => {
 		const html = renderSettingsPanel({
 			currentPreferences: {
 				font: "menlo",
-				themeFamily: "dracula",
+				themeFamily: "solarized",
 				themeMode: "system",
 			},
 		});
@@ -125,11 +125,11 @@ describe("SettingsPanel", () => {
 	});
 
 	it("renders only four large theme buttons for the selected dark or light mode", () => {
-		// Given the Nord Light theme is selected
+		// Given the GitHub Light theme is selected
 		const html = renderSettingsPanel({
 			currentPreferences: {
 				font: "system-mono",
-				themeFamily: "nord",
+				themeFamily: "github",
 				themeMode: "light",
 			},
 		});
@@ -139,11 +139,12 @@ describe("SettingsPanel", () => {
 		expect(html).toContain('class="theme-button-grid"');
 		expect(html).toContain('class="theme-button"');
 		expect(html).toContain("theme-swatch theme-swatch-dracula-light");
-		expect(html).toContain("theme-swatch theme-swatch-nord-light");
-		expect(html).not.toContain("theme-swatch theme-swatch-dracula-dark");
-		expect(html).not.toContain("theme-swatch theme-swatch-nord-dark");
+		expect(html).toContain("theme-swatch theme-swatch-catppuccin-light");
+		expect(html).toContain("theme-swatch theme-swatch-github-light");
+		expect(html).not.toContain("theme-swatch theme-swatch-catppuccin-dark");
+		expect(html).not.toContain("theme-swatch theme-swatch-github-dark");
 		expect(html).toContain('aria-pressed="true"');
-		expect(html).toContain("Current theme: Nord Light");
+		expect(html).toContain("Current theme: GitHub Light");
 		expect(html).not.toContain('<select id="companion-theme"');
 	});
 
@@ -152,7 +153,7 @@ describe("SettingsPanel", () => {
 		const html = renderSettingsPanel({
 			currentPreferences: {
 				font: "system-mono",
-				themeFamily: "nord",
+				themeFamily: "github",
 				themeMode: "light",
 			},
 		});
@@ -161,7 +162,7 @@ describe("SettingsPanel", () => {
 		// Then each theme card exposes four representative color chips
 		expect(html.match(/class="theme-swatch-color"/g)).toHaveLength(16);
 		expect(html).toContain(
-			'class="theme-swatch theme-swatch-dracula-light"><span class="theme-swatch-color"',
+			'class="theme-swatch theme-swatch-catppuccin-light"><span class="theme-swatch-color"',
 		);
 	});
 
@@ -176,8 +177,10 @@ describe("SettingsPanel", () => {
 		// Then only light theme family buttons are shown under system mode
 		expect(html).toContain("System (Light now)");
 		expect(html).toContain("theme-swatch theme-swatch-dracula-light");
+		expect(html).toContain("theme-swatch theme-swatch-catppuccin-light");
 		expect(html).not.toContain("theme-swatch theme-swatch-dracula-dark");
-		expect(html).toContain("Current theme: Dracula Light");
+		expect(html).not.toContain("theme-swatch theme-swatch-catppuccin-dark");
+		expect(html).toContain("Current theme: Solarized Light");
 	});
 
 	it("delegates launch, font, and theme updates to app-shell callbacks", () => {
@@ -208,7 +211,7 @@ describe("SettingsPanel", () => {
 			(button) => button["aria-label"] === "Use Light theme mode",
 		);
 		const themeButton = buttons.find(
-			(button) => button["aria-label"] === "Use Nord theme",
+			(button) => button["aria-label"] === "Use GitHub theme",
 		);
 		launchToggle?.onChange?.({ currentTarget: { checked: true } });
 		fontSelect?.onChange?.({
@@ -220,9 +223,9 @@ describe("SettingsPanel", () => {
 		// Then the app shell receives every change without the panel swallowing failures
 		expect(launchCalls).toEqual([true]);
 		expect(preferenceCalls).toEqual([
-			{ font: "menlo", themeFamily: "dracula", themeMode: "system" },
-			{ font: "system-mono", themeFamily: "dracula", themeMode: "light" },
-			{ font: "system-mono", themeFamily: "nord", themeMode: "system" },
+			{ font: "menlo", themeFamily: "solarized", themeMode: "system" },
+			{ font: "system-mono", themeFamily: "solarized", themeMode: "light" },
+			{ font: "system-mono", themeFamily: "github", themeMode: "system" },
 		]);
 	});
 });

@@ -54,7 +54,7 @@ describe("App shell settings wiring", () => {
 		const html = renderToStaticMarkup(<App />);
 
 		// Then the settings-capable shell contract is present before effects run
-		expect(html).toContain('data-theme="dracula-dark"');
+		expect(html).toContain('data-theme="solarized-dark"');
 		expect(html).toContain('data-font="system-mono"');
 		expect(html).toContain('aria-label="Refresh tasks"');
 		expect(html).toContain('aria-label="Quit Companion"');
@@ -162,18 +162,55 @@ describe("App shell settings wiring", () => {
 		);
 	});
 
-	it("lays out task launch actions as a compact inline command bar", () => {
+	it("lays out task launch actions as a full-width thirds command bar", () => {
 		// Given the task action stylesheet
 		// When the action bar CSS contract is inspected
 		const css = readCssContract("src/style.css");
 
-		// Then IDE, Terminal, and Finder stay compact without clipping focus rings
+		// Then IDE, Terminal, and Finder each occupy one third of the row.
 		expect(css).toMatch(/\.task-actions\s*\{[^}]*display:\s*flex/s);
-		expect(css).toMatch(/\.task-actions\s*\{[^}]*align-items:\s*center/s);
+		expect(css).toMatch(/\.task-actions\s*\{[^}]*flex:\s*1 1 100%/s);
+		expect(css).toMatch(/\.task-actions\s*\{[^}]*width:\s*100%/s);
 		expect(css).toMatch(/\.task-actions\s*\{[^}]*overflow:\s*visible/s);
 		expect(css).toMatch(/\.task-action\s*\{[^}]*display:\s*inline-flex/s);
+		expect(css).toMatch(/\.task-action\s*\{[^}]*flex:\s*1 1 0/s);
+		expect(css).toMatch(/\.task-action\s*\{[^}]*min-width:\s*0/s);
+		expect(css).toMatch(/\.task-action-separator\s*\{[^}]*display:\s*none/s);
 		expect(css).not.toMatch(/\.task-actions\s*\{[^}]*grid-template-columns/s);
-		expect(css).not.toMatch(/\.task-action\s*\{[^}]*width:\s*100%/s);
+	});
+
+	it("renders checklist status markers as aligned dots instead of text glyphs", () => {
+		// Given the task detail stylesheet
+		// When checklist marker CSS is inspected
+		const css = readCssContract("src/style.css");
+
+		// Then marker layout separates status from readable step text
+		expect(css).toMatch(/\.step-item\s*\{[^}]*display:\s*grid/s);
+		expect(css).toMatch(
+			/\.step-item\s*\{[^}]*grid-template-columns:\s*12px minmax\(0, 1fr\)/s,
+		);
+		expect(css).toMatch(/\.step-marker\s*\{[^}]*border-radius:\s*999px/s);
+		expect(css).toMatch(
+			/\.step-depth-0\s+\.step-marker\s*\{[^}]*border-radius:\s*2px[^}]*height:\s*8px[^}]*width:\s*8px/s,
+		);
+		expect(css).toMatch(
+			/\.step-depth-1\s+\.step-marker\s*\{[^}]*border-radius:\s*999px[^}]*height:\s*7px[^}]*width:\s*7px/s,
+		);
+		expect(css).toMatch(
+			/\.step-depth-2\s+\.step-marker\s*\{[^}]*height:\s*5px[^}]*width:\s*5px/s,
+		);
+		expect(css).toMatch(
+			/\.step-marker-done\s*\{[^}]*background:\s*var\(--faint\)/s,
+		);
+		expect(css).toMatch(
+			/\.step-depth-0\.step-item-done\s+\.step-marker\s*\{[^}]*background:\s*var\(--faint\)[^}]*box-shadow:\s*0 0 0 2px var\(--line\)/s,
+		);
+		expect(css).not.toMatch(
+			/\.step-marker-done\s*\{[^}]*background:\s*var\(--done\)/s,
+		);
+		expect(css).toMatch(
+			/\.step-marker-todo\s*\{[^}]*border:\s*1px solid var\(--line-strong\)/s,
+		);
 	});
 
 	it("keeps the bottom view menu floating without covering task content", () => {
@@ -208,19 +245,28 @@ describe("App shell settings wiring", () => {
 
 		// Then each dark/light family has app tokens and representative swatch chips
 		for (const theme of [
-			"dracula-dark",
-			"nord-dark",
 			"solarized-dark",
-			"gruvbox-dark",
-			"dracula-light",
-			"nord-light",
+			"dracula-dark",
+			"catppuccin-dark",
+			"github-dark",
 			"solarized-light",
-			"gruvbox-light",
+			"dracula-light",
+			"catppuccin-light",
+			"github-light",
 		]) {
 			expect(css).toContain(`main[data-theme="${theme}"]`);
 			expect(css).toContain(`.theme-swatch-${theme}`);
 		}
 		expect(css).toContain("--theme-swatch-accent");
+		expect(css).toContain("#002b36");
+		expect(css).toContain("#282a36");
+		expect(css).toContain("#6272a4");
+		expect(css).toContain("#1e1e2e");
+		expect(css).toContain("#0d1117");
+		expect(css).not.toContain('main[data-theme="nord-dark"]');
+		expect(css).not.toContain('main[data-theme="gruvbox-dark"]');
+		expect(css).not.toContain(".theme-swatch-gruvbox-dark");
+		expect(css).not.toContain(".theme-swatch-nord-dark");
 		expect(css).not.toMatch(/\.theme-swatch-[^{]+\{[^}]*linear-gradient/s);
 	});
 });
