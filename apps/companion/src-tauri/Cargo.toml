@@ -1,6 +1,6 @@
 [package]
 name = "workbranch-companion"
-version = "2.4.2"
+version = "2.5.0"
 description = "Workbranch menu bar companion"
 edition = "2024"
 rust-version = "1.95"
