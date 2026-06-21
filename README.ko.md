@@ -11,6 +11,8 @@
 
 `workbranch`는 feature마다 하나의 task 폴더를 만들고, single repo와 multi-repo 프로젝트 모두에서 짧고 안전한 branch refresh 명령을 제공합니다.
 
+> 🖥️ **GUI를 선호하나요?** [WorkbranchCompanion](#native-menu-bar-companion)은 task 상태, 진행률, 알림을 메뉴바에서 한눈에 보여주는 macOS 네이티브 메뉴바 앱입니다.
+
 ![workbranch demo](./docs/figs/workbranch-demo.gif)
 
 ## Install
