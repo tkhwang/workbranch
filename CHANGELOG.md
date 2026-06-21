@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.6.0](https://github.com/tkhwang/workbranch/compare/v2.5.2...v2.6.0) (2026-06-21)
+
+
+### Features
+
+* **design:** update companion design document ([fd45f6a](https://github.com/tkhwang/workbranch/commit/fd45f6adfe73577eb7c75875dbaf8521ee1e21f1))
+* **design:** update companion design document ([5526cc8](https://github.com/tkhwang/workbranch/commit/5526cc856d1f9863d1d9cf9f154e704ebd2d4005))
+
+
+### Bug Fixes
+
+* **release:** remove release-please markers from cargo.lock ([89414a8](https://github.com/tkhwang/workbranch/commit/89414a8ab844e69a53f1aa3efefc06017ca4020e))
+
 ## [2.5.2](https://github.com/tkhwang/workbranch/compare/v2.5.1...v2.5.2) (2026-06-21)
 
 
