@@ -22,7 +22,7 @@ import {
 import { startWorkspaceMonitor } from "./infrastructure/workspaceMonitor";
 import { AppToolbar } from "./ui/AppToolbar";
 import { ProjectGroup } from "./ui/ProjectGroup";
-import { SettingsPanel } from "./ui/SettingsPanel";
+import { SettingsView } from "./ui/SettingsView";
 import type { TaskActionKind } from "./ui/TaskRow";
 import { type CompanionView, ViewNav } from "./ui/ViewNav";
 
@@ -241,7 +241,7 @@ export function App() {
 				</section>
 			) : null}
 			{currentView === "settings" ? (
-				<SettingsPanel
+				<SettingsView
 					preferences={preferences}
 					systemThemeMode={systemThemeMode}
 					launchAtLogin={launchAtLogin}

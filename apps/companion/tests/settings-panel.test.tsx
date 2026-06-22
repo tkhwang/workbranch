@@ -55,7 +55,7 @@ function collectByType<TProps>(
 
 const preferences: CompanionPreferences = {
 	font: "system-mono",
-	themeFamily: "solarized",
+	themeFamily: "companion",
 	themeMode: "system",
 };
 
@@ -79,7 +79,7 @@ function renderSettingsPanel({
 }
 
 describe("SettingsPanel", () => {
-	it("renders labeled fieldsets for startup, font, and theme controls", () => {
+	it("renders labeled fieldsets for startup, font, and mode controls", () => {
 		// Given current companion preferences and launch-at-login status
 		// When the settings panel is rendered
 		const html = renderSettingsPanel();
@@ -92,17 +92,14 @@ describe("SettingsPanel", () => {
 		expect(html).toContain("<legend>Theme</legend>");
 		expect(html).toContain('for="launch-at-login"');
 		expect(html).toContain('for="companion-font"');
-		expect(html).toContain("Launch at login");
+		expect(html).toContain("Open at Login");
 		expect(html).toContain("System Mono");
 		expect(html).toContain("JetBrains Mono");
-		expect(html).toContain("Catppuccin");
-		expect(html).toContain("GitHub");
-		expect(html).toContain("Solarized");
-		expect(html).toContain("Dracula");
 		expect(html).toContain("Light");
 		expect(html).toContain("Dark");
 		expect(html).toContain("System");
 		expect(html).toContain("System (Dark now)");
+		expect(html).toContain("Palette: Catppuccin Dark / White Light");
 		expect(html).not.toContain('id="companion-theme"');
 	});
 
@@ -111,7 +108,7 @@ describe("SettingsPanel", () => {
 		const html = renderSettingsPanel({
 			currentPreferences: {
 				font: "menlo",
-				themeFamily: "solarized",
+				themeFamily: "companion",
 				themeMode: "system",
 			},
 		});
@@ -124,49 +121,28 @@ describe("SettingsPanel", () => {
 		expect(html).toContain("1234567890");
 	});
 
-	it("renders only four large theme buttons for the selected dark or light mode", () => {
-		// Given the GitHub Light theme is selected
+	it("renders only the theme mode toggle without color family cards", () => {
+		// Given explicit light mode is selected
 		const html = renderSettingsPanel({
 			currentPreferences: {
 				font: "system-mono",
-				themeFamily: "github",
+				themeFamily: "companion",
 				themeMode: "light",
 			},
 		});
 
 		// When settings are rendered
-		// Then theme choices are large button cards only for the resolved light mode
-		expect(html).toContain('class="theme-button-grid"');
-		expect(html).toContain('class="theme-button"');
-		expect(html).toContain("theme-swatch theme-swatch-dracula-light");
-		expect(html).toContain("theme-swatch theme-swatch-catppuccin-light");
-		expect(html).toContain("theme-swatch theme-swatch-github-light");
-		expect(html).not.toContain("theme-swatch theme-swatch-catppuccin-dark");
-		expect(html).not.toContain("theme-swatch theme-swatch-github-dark");
-		expect(html).toContain('aria-pressed="true"');
-		expect(html).toContain("Current theme: GitHub Light");
-		expect(html).not.toContain('<select id="companion-theme"');
+		// Then the color-family grid and swatches are absent
+		expect(html).toContain("Light mode");
+		expect(html).toContain("Palette: Catppuccin Dark / White Light");
+		expect(html).not.toContain('class="theme-button-grid"');
+		expect(html).not.toContain('class="theme-button"');
+		expect(html).not.toContain("theme-swatch");
+		expect(html).not.toContain("Use GitHub theme");
+		expect(html).not.toContain("Current theme:");
 	});
 
-	it("renders representative color chips instead of a single gradient bar", () => {
-		// Given light mode theme choices are visible
-		const html = renderSettingsPanel({
-			currentPreferences: {
-				font: "system-mono",
-				themeFamily: "github",
-				themeMode: "light",
-			},
-		});
-
-		// When the four theme cards are rendered
-		// Then each theme card exposes four representative color chips
-		expect(html.match(/class="theme-swatch-color"/g)).toHaveLength(16);
-		expect(html).toContain(
-			'class="theme-swatch theme-swatch-catppuccin-light"><span class="theme-swatch-color"',
-		);
-	});
-
-	it("renders system mode using the current system dark or light theme", () => {
+	it("renders system mode using the current system dark or light mode", () => {
 		// Given system mode is selected while the OS is currently light
 		const html = renderSettingsPanel({
 			currentPreferences: preferences,
@@ -174,16 +150,12 @@ describe("SettingsPanel", () => {
 		});
 
 		// When settings are rendered
-		// Then only light theme family buttons are shown under system mode
+		// Then mode state is visible without exposing color-family choices
 		expect(html).toContain("System (Light now)");
-		expect(html).toContain("theme-swatch theme-swatch-dracula-light");
-		expect(html).toContain("theme-swatch theme-swatch-catppuccin-light");
-		expect(html).not.toContain("theme-swatch theme-swatch-dracula-dark");
-		expect(html).not.toContain("theme-swatch theme-swatch-catppuccin-dark");
-		expect(html).toContain("Current theme: Solarized Light");
+		expect(html).not.toContain("theme-swatch");
 	});
 
-	it("delegates launch, font, and theme updates to app-shell callbacks", () => {
+	it("delegates launch, font, and mode updates to app-shell callbacks", () => {
 		// Given a rendered settings panel with callback spies
 		const launchCalls: boolean[] = [];
 		const preferenceCalls: CompanionPreferences[] = [];
@@ -210,22 +182,17 @@ describe("SettingsPanel", () => {
 		const modeButton = buttons.find(
 			(button) => button["aria-label"] === "Use Light theme mode",
 		);
-		const themeButton = buttons.find(
-			(button) => button["aria-label"] === "Use GitHub theme",
-		);
 		launchToggle?.onChange?.({ currentTarget: { checked: true } });
 		fontSelect?.onChange?.({
 			currentTarget: { value: "menlo" satisfies CompanionFont },
 		});
 		modeButton?.onClick?.();
-		themeButton?.onClick?.();
 
 		// Then the app shell receives every change without the panel swallowing failures
 		expect(launchCalls).toEqual([true]);
 		expect(preferenceCalls).toEqual([
-			{ font: "menlo", themeFamily: "solarized", themeMode: "system" },
-			{ font: "system-mono", themeFamily: "solarized", themeMode: "light" },
-			{ font: "system-mono", themeFamily: "github", themeMode: "system" },
+			{ font: "menlo", themeFamily: "companion", themeMode: "system" },
+			{ font: "system-mono", themeFamily: "companion", themeMode: "light" },
 		]);
 	});
 });

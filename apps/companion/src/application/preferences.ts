@@ -71,7 +71,7 @@ export type CompanionPreferenceStore = {
 
 export const DEFAULT_COMPANION_PREFERENCES: CompanionPreferences = {
 	font: "system-mono",
-	themeFamily: "solarized",
+	themeFamily: "companion",
 	themeMode: "system",
 };
 
@@ -123,10 +123,14 @@ function migrateRemovedThemeFamily(
 	value: unknown,
 ): CompanionThemeFamily | undefined {
 	switch (value) {
+		case "breakfast":
+		case "solarized":
+		case "dracula":
+		case "catppuccin":
+		case "github":
 		case "gruvbox":
-			return "dracula";
 		case "nord":
-			return "solarized";
+			return "companion";
 		default:
 			return undefined;
 	}

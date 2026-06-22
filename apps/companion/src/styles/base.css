@@ -1,6 +1,6 @@
 :root {
-	color: #f4f6ff;
-	background: #0a0e16;
+	color: #faf6ef;
+	background: #15110d;
 	font-family:
 		-apple-system, "SF Pro Text", "Segoe UI", system-ui, "Helvetica Neue",
 		arial, sans-serif;
@@ -15,11 +15,11 @@
 body {
 	margin: 0;
 	min-width: 360px;
-	background: #0a0e16;
+	background: #15110d;
 }
 
 body:has(main[data-theme$="-light"]) {
-	background: #e7eaf0;
+	background: #ffffff;
 }
 
 main {
@@ -29,28 +29,33 @@ main {
 	--app-font-family:
 		ui-monospace, "SFMono-Regular", "Menlo", "Monaco", "Consolas",
 		"Liberation Mono", monospace;
-	--surface-0: #0a0e16;
-	--surface-1: #121824;
-	--surface-2: #18202e;
-	--surface-3: #232d3f;
-	--line: rgba(150, 180, 215, 0.1);
-	--line-strong: rgba(150, 180, 215, 0.2);
-	--text: #eef4fc;
-	--muted: #aab8c9;
-	--faint: #6f8195;
-	--accent: #5cd6ff;
-	--accent-strong: #84e3ff;
-	--accent-soft: rgba(92, 214, 255, 0.16);
-	--blocked: #ff6b7a;
-	--blocked-soft: rgba(255, 107, 122, 0.16);
-	--review: #b7a7ff;
-	--review-soft: rgba(183, 167, 255, 0.16);
-	--done: #65d18a;
-	--done-soft: rgba(101, 209, 138, 0.16);
-	--notify: #f4c35b;
-	--notify-soft: rgba(244, 195, 91, 0.16);
+	--surface-0: #15110d;
+	--surface-1: #201913;
+	--surface-2: #2a2118;
+	--surface-3: #3a2b1e;
+	--line: rgba(255, 215, 154, 0.12);
+	--line-strong: rgba(255, 215, 154, 0.26);
+	--text: #faf6ef;
+	--muted: #b4aca2;
+	--faint: #8a837a;
+	--accent: #f59e0b;
+	--accent-strong: #ffd79a;
+	--accent-soft: rgba(245, 158, 11, 0.18);
+	--blocked: #e5484d;
+	--blocked-soft: rgba(229, 72, 77, 0.16);
+	--review: #c9c2ff;
+	--review-soft: rgba(201, 194, 255, 0.16);
+	--done: #1ca86a;
+	--done-soft: rgba(28, 168, 106, 0.16);
+	--notify: #ffc24b;
+	--notify-soft: rgba(255, 194, 75, 0.17);
 	--shell-bg:
-		radial-gradient(120% 80px at 50% 0, rgba(92, 214, 255, 0.08), transparent),
+		radial-gradient(120% 120px at 50% 0, rgba(245, 158, 11, 0.13), transparent),
+		radial-gradient(
+			90% 160px at 100% 12%,
+			rgba(255, 138, 30, 0.08),
+			transparent
+		),
 		var(--surface-0);
 	--shell-topline: linear-gradient(
 		90deg,
@@ -60,14 +65,14 @@ main {
 	);
 	--task-bg: var(--surface-2);
 	--task-bg-hover: var(--surface-3);
-	--button-bg: rgba(150, 180, 215, 0.07);
-	--button-bg-hover: rgba(150, 180, 215, 0.13);
+	--button-bg: rgba(255, 215, 154, 0.07);
+	--button-bg-hover: rgba(255, 215, 154, 0.13);
 	--current-step-bg:
 		linear-gradient(135deg, var(--accent-soft), transparent 70%),
 		var(--surface-3);
 	--active-rail-bg: var(--accent-soft);
-	--shadow-soft: rgba(0, 0, 0, 0.4);
-	--shadow-strong: rgba(0, 0, 0, 0.6);
+	--shadow-soft: rgba(0, 0, 0, 0.32);
+	--shadow-strong: rgba(0, 0, 0, 0.52);
 	--shadow-card:
 		0 1px 2px var(--shadow-soft), 0 8px 20px -10px var(--shadow-strong);
 	--shadow-card-hover:
@@ -77,6 +82,8 @@ main {
 	--radius-shell: 14px;
 
 	position: relative;
+	max-width: 100%;
+	width: 100vw;
 	background: var(--shell-bg);
 	color: var(--text);
 	display: flex;

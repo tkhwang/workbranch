@@ -8,7 +8,7 @@ export function AppToolbar({ onRefresh, onQuit, status }: Props) {
 	return (
 		<div className="toolbar" aria-label="Companion controls" role="toolbar">
 			<span
-				className="toolbar-status"
+				className="toolbar-status-sr"
 				aria-live="polite"
 				role="status"
 				title={status}

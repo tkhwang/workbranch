@@ -5,9 +5,7 @@ import type {
 import {
 	COMPANION_FONT_OPTIONS,
 	COMPANION_THEME_MODE_OPTIONS,
-	COMPANION_THEME_OPTIONS,
 	isCompanionFont,
-	resolvedCompanionTheme,
 } from "../application/preferences";
 
 type Props = {
@@ -18,13 +16,6 @@ type Props = {
 	readonly onLaunchAtLoginChange: (enabled: boolean) => void;
 	readonly onPreferencesChange: (preferences: CompanionPreferences) => void;
 };
-
-const THEME_SWATCH_CHIPS = [
-	"surface",
-	"accent",
-	"secondary",
-	"success",
-] as const;
 
 export function SettingsPanel({
 	preferences,
@@ -39,18 +30,6 @@ export function SettingsPanel({
 	);
 	const fontFamily = fontOption?.cssFamily ?? preferences.font;
 	const fontName = fontOption?.label ?? preferences.font;
-	const activeTheme = resolvedCompanionTheme(preferences, systemThemeMode);
-	const themeOption = COMPANION_THEME_OPTIONS.find(
-		(candidate) => candidate.value === activeTheme,
-	);
-	const themeName = themeOption?.label ?? activeTheme;
-	const resolvedThemeMode =
-		preferences.themeMode === "system"
-			? systemThemeMode
-			: preferences.themeMode;
-	const visibleThemeOptions = COMPANION_THEME_OPTIONS.filter(
-		(option) => option.mode === resolvedThemeMode,
-	);
 	const modeHint =
 		preferences.themeMode === "system"
 			? `System (${systemThemeMode === "dark" ? "Dark" : "Light"} now)`
@@ -67,7 +46,7 @@ export function SettingsPanel({
 			<fieldset className="settings-section">
 				<legend>Startup</legend>
 				<div className="settings-row">
-					<label htmlFor="launch-at-login">Launch at login</label>
+					<label htmlFor="launch-at-login">Open at Login</label>
 					<input
 						checked={launchAtLogin}
 						disabled={launchAtLoginLoading}
@@ -82,8 +61,8 @@ export function SettingsPanel({
 					{launchAtLoginLoading
 						? "Checking login item state"
 						: launchAtLogin
-							? "Launches automatically when you sign in"
-							: "Launches only when opened manually"}
+							? "Opens automatically when you sign in"
+							: "Opens only when opened manually"}
 				</p>
 			</fieldset>
 			<fieldset className="settings-section">
@@ -129,6 +108,7 @@ export function SettingsPanel({
 								onClick={() =>
 									onPreferencesChange({
 										...preferences,
+										themeFamily: "companion",
 										themeMode: option.value,
 									})
 								}
@@ -139,39 +119,8 @@ export function SettingsPanel({
 						);
 					})}
 				</div>
-				<div className="theme-button-grid">
-					{visibleThemeOptions.map((option) => {
-						const selected = option.family === preferences.themeFamily;
-						return (
-							<button
-								aria-label={`Use ${option.familyLabel} theme`}
-								aria-pressed={selected}
-								className="theme-button"
-								data-active={selected ? "true" : "false"}
-								key={option.family}
-								onClick={() =>
-									onPreferencesChange({
-										...preferences,
-										themeFamily: option.family,
-									})
-								}
-								type="button"
-							>
-								<span
-									aria-hidden="true"
-									className={`theme-swatch theme-swatch-${option.value}`}
-								>
-									{THEME_SWATCH_CHIPS.map((chip) => (
-										<span className="theme-swatch-color" key={chip} />
-									))}
-								</span>
-								<span className="theme-button-label">{option.familyLabel}</span>
-							</button>
-						);
-					})}
-				</div>
 				<p className="settings-hint">
-					{modeHint} · Current theme: {themeName}
+					{modeHint} · Palette: Catppuccin Dark / White Light
 				</p>
 			</fieldset>
 		</section>
