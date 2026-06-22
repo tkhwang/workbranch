@@ -125,7 +125,7 @@ describe("App shell settings wiring", () => {
 		expect(css).toMatch(/\.toolbar\s*\{[^}]*justify-content:\s*flex-end/s);
 		expect(css).toMatch(/\.toolbar-status-sr\s*\{[^}]*position:\s*absolute/s);
 		expect(css).toMatch(
-			/\.toolbar-status-sr\s*\{[^}]*clip:\s*rect\(0 0 0 0\)/s,
+			/\.toolbar-status-sr\s*\{[^}]*clip-path:\s*inset\(50%\)/s,
 		);
 		expect(css).toMatch(/\.toolbar-status-sr\s*\{[^}]*white-space:\s*nowrap/s);
 		expect(css).not.toMatch(/\.toolbar-status\s*\{/s);
