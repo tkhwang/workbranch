@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.7.0](https://github.com/tkhwang/workbranch/compare/v2.6.0...v2.7.0) (2026-06-22)
+
+
+### Features
+
+* **design:** simplify color theme settings ([8ce657e](https://github.com/tkhwang/workbranch/commit/8ce657eb864acfe9be04f7909d749191baab2f6b))
+* **design:** simplify color theme settings ([20b83a1](https://github.com/tkhwang/workbranch/commit/20b83a1f3e8b126f6b2de8e49093a702b7b3b0d4))
+* **ui:** display visible error alerts for operations ([2680b54](https://github.com/tkhwang/workbranch/commit/2680b54492f134827ced7576c315aad2c3b80876))
+
 ## [2.6.0](https://github.com/tkhwang/workbranch/compare/v2.5.2...v2.6.0) (2026-06-21)
 
 
