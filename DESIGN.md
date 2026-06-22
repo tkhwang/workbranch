@@ -101,7 +101,7 @@
 ## Interaction states
 - Loading: screen-reader live status reports refresh state without adding a visible top-line chip.
 - Empty: concise empty message with setup hint.
-- Error: root-scoped error row with red accent.
+- Error: root-scoped error row with red accent; operation failures such as refresh/action/preference errors also render a visible alert row while routine Ready/Updated statuses stay screen-reader-only.
 - Success: routine `Updated` / `Action complete` messages are not shown as a visible top-line chip; they remain available to assistive tech.
 - Disabled: disabled action has muted text and no press transform.
 - Offline/slow network: not applicable; CLI/local filesystem driven.

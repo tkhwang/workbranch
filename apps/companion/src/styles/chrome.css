@@ -79,6 +79,17 @@ summary:focus-visible {
 	width: 1px;
 }
 
+.app-error {
+	background: var(--blocked-soft);
+	border: 1px solid var(--blocked);
+	border-radius: 8px;
+	color: var(--blocked);
+	font-size: 12px;
+	font-weight: 600;
+	margin-bottom: 10px;
+	padding: 8px 10px;
+}
+
 .view-panel {
 	flex: 1 1 auto;
 	margin-bottom: 12px;

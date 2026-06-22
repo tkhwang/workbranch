@@ -4,6 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { App } from "../src/App";
+import { StatusAlert } from "../src/ui/StatusAlert";
 
 function readCssContract(path: string, visited = new Set<string>()): string {
 	const absolutePath = resolve(path);
@@ -71,6 +72,46 @@ describe("App shell settings wiring", () => {
 		expect(html).toContain('aria-label="Open Settings"');
 		expect(html).toContain('role="status"');
 		expect(html).toContain('aria-live="polite"');
+		expect(html).not.toContain('class="app-error"');
+		expect(html).not.toContain('role="alert"');
+	});
+
+	it("renders operation failures as a visible alert instead of only screen-reader status", () => {
+		// Given a failed companion operation status
+		// When the visible status alert is rendered
+		const html = renderToStaticMarkup(
+			<StatusAlert message="refresh failed: command stderr" />,
+		);
+
+		// Then sighted users get an alert row with the failure text
+		expect(html).toContain('class="app-error"');
+		expect(html).toContain('role="alert"');
+		expect(html).toContain("refresh failed: command stderr");
+	});
+
+	it("omits the visible status alert for routine status updates", () => {
+		// Given no visible error is active
+		// When the status alert is rendered
+		const html = renderToStaticMarkup(<StatusAlert message={undefined} />);
+
+		// Then routine Ready/Updated text can stay in the screen-reader-only toolbar
+		expect(html).toBe("");
+	});
+
+	it("styles visible operation errors without restoring the routine toolbar chip", () => {
+		// Given the companion toolbar stylesheet
+		// When status CSS is inspected
+		const css = readCssContract("src/style.css");
+
+		// Then only operation failures have a visible status surface
+		expect(css).toMatch(
+			/\.app-error\s*\{[^}]*background:\s*var\(--blocked-soft\)/s,
+		);
+		expect(css).toMatch(
+			/\.app-error\s*\{[^}]*border:\s*1px solid var\(--blocked\)/s,
+		);
+		expect(css).toMatch(/\.app-error\s*\{[^}]*color:\s*var\(--blocked\)/s);
+		expect(css).not.toMatch(/\.toolbar-status\s*\{/s);
 	});
 
 	it("keeps toolbar status available to assistive tech without a visible top-line chip", () => {
