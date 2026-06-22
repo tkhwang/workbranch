@@ -2,11 +2,7 @@ import { isTauri } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createActivityRefresh } from "./application/activity";
 import { resolvedCompanionTheme } from "./application/preferences";
-import {
-	buildMenuModel,
-	type MenuModel,
-	type MenuSummary,
-} from "./application/state";
+import { buildMenuModel, type MenuModel } from "./application/state";
 import { useSystemThemeMode } from "./application/systemThemeMode";
 import { useCompanionSettings } from "./application/useCompanionSettings";
 import type { GlobalState, Task } from "./domain/model";
@@ -20,13 +16,16 @@ import {
 	watchRoots,
 } from "./infrastructure/tauriClient";
 import { startWorkspaceMonitor } from "./infrastructure/workspaceMonitor";
+import { AppSummary } from "./ui/AppSummary";
 import { AppToolbar } from "./ui/AppToolbar";
 import { ProjectGroup } from "./ui/ProjectGroup";
-import { SettingsPanel } from "./ui/SettingsPanel";
+import { SettingsView } from "./ui/SettingsView";
+import { StatusAlert } from "./ui/StatusAlert";
 import type { TaskActionKind } from "./ui/TaskRow";
 import { type CompanionView, ViewNav } from "./ui/ViewNav";
 
 const EMPTY_STATE: GlobalState = { projects: [], errors: [] };
+const TAURI_RUNTIME_UNAVAILABLE = "Tauri runtime unavailable";
 
 function currentEpochSeconds(): number {
 	return Math.floor(Date.now() / 1000);
@@ -46,58 +45,10 @@ function commandForTaskAction(
 	}
 }
 
-function plural(count: number, word: string): string {
-	return count === 1 ? word : `${word}s`;
-}
-
-function AppSummary({ summary }: { readonly summary: MenuSummary }) {
-	const { projectCount, taskCount, active, blocked, notifications } = summary;
-	return (
-		<div className="app-summary">
-			<span className="app-inventory">
-				{taskCount === 0
-					? "No tasks"
-					: `${projectCount} ${plural(projectCount, "project")} · ${taskCount} ${plural(taskCount, "task")}`}
-			</span>
-			<span className="app-badges">
-				{active > 0 ? (
-					<span
-						className="badge badge-active"
-						title={`${active} in progress`}
-						aria-label={`${active} in progress`}
-						role="img"
-					>
-						RUN {active}
-					</span>
-				) : null}
-				{blocked > 0 ? (
-					<span
-						className="badge badge-blocked"
-						title={`${blocked} blocked`}
-						aria-label={`${blocked} blocked`}
-						role="img"
-					>
-						BLK {blocked}
-					</span>
-				) : null}
-				{notifications > 0 ? (
-					<span
-						className="badge badge-noti"
-						title={`${notifications} notifications`}
-						aria-label={`${notifications} notifications`}
-						role="img"
-					>
-						NOTI {notifications}
-					</span>
-				) : null}
-			</span>
-		</div>
-	);
-}
-
 export function App() {
 	const [state, setState] = useState<GlobalState>(EMPTY_STATE);
 	const [status, setStatus] = useState("Ready");
+	const [visibleError, setVisibleError] = useState<string>();
 	const [currentView, setCurrentView] = useState<CompanionView>("main");
 	const systemThemeMode = useSystemThemeMode();
 	const model: MenuModel = buildMenuModel(state);
@@ -112,12 +63,19 @@ export function App() {
 		[],
 	);
 
+	const showStatus = useCallback((message: string) => {
+		setStatus(message);
+		setVisibleError(
+			message === TAURI_RUNTIME_UNAVAILABLE
+				? TAURI_RUNTIME_UNAVAILABLE
+				: undefined,
+		);
+	}, []);
+
 	const showError = useCallback((error: unknown) => {
-		if (error instanceof Error) {
-			setStatus(error.message);
-		} else {
-			setStatus(String(error));
-		}
+		const message = error instanceof Error ? error.message : String(error);
+		setStatus(message);
+		setVisibleError(message);
 	}, []);
 
 	const {
@@ -126,17 +84,20 @@ export function App() {
 		launchAtLoginLoading,
 		updateLaunchAtLogin,
 		updatePreferences,
-	} = useCompanionSettings({ onError: showError, onStatus: setStatus });
+	} = useCompanionSettings({ onError: showError, onStatus: showStatus });
 	const activeTheme = resolvedCompanionTheme(preferences, systemThemeMode);
 
-	const applyState = useCallback((next: GlobalState) => {
-		setState(next);
-		setStatus("Updated");
-	}, []);
+	const applyState = useCallback(
+		(next: GlobalState) => {
+			setState(next);
+			showStatus("Updated");
+		},
+		[showStatus],
+	);
 
 	const refresh = useCallback(async () => {
 		if (!tauriRuntimeAvailable) {
-			setStatus("Tauri runtime unavailable");
+			showStatus(TAURI_RUNTIME_UNAVAILABLE);
 			return;
 		}
 		try {
@@ -144,32 +105,44 @@ export function App() {
 		} catch (error) {
 			showError(error);
 		}
-	}, [applyState, refreshWithActivity, showError, tauriRuntimeAvailable]);
+	}, [
+		applyState,
+		refreshWithActivity,
+		showError,
+		showStatus,
+		tauriRuntimeAvailable,
+	]);
 
 	const handleQuit = useCallback(() => {
 		if (!tauriRuntimeAvailable) {
-			setStatus("Tauri runtime unavailable");
+			showStatus(TAURI_RUNTIME_UNAVAILABLE);
 			return;
 		}
 		void quitCompanion().catch(showError);
-	}, [showError, tauriRuntimeAvailable]);
+	}, [showError, showStatus, tauriRuntimeAvailable]);
 
 	const handleTaskAction = useCallback(
 		async (root: string, task: Task, kind: TaskActionKind) => {
 			if (!tauriRuntimeAvailable) {
-				setStatus("Tauri runtime unavailable");
+				showStatus(TAURI_RUNTIME_UNAVAILABLE);
 				return;
 			}
 			const command = commandForTaskAction(task, kind);
 			try {
 				await runAction(command, root);
 				applyState(await refreshWithActivity());
-				setStatus("Action complete");
+				showStatus("Action complete");
 			} catch (error) {
 				showError(error);
 			}
 		},
-		[applyState, refreshWithActivity, showError, tauriRuntimeAvailable],
+		[
+			applyState,
+			refreshWithActivity,
+			showError,
+			showStatus,
+			tauriRuntimeAvailable,
+		],
 	);
 
 	useEffect(() => {
@@ -215,6 +188,7 @@ export function App() {
 					status={status}
 				/>
 			</header>
+			<StatusAlert message={visibleError} />
 			{currentView === "main" ? (
 				<section className="view-panel" aria-label="Main View">
 					{model.groups.length === 0 ? (
@@ -241,7 +215,7 @@ export function App() {
 				</section>
 			) : null}
 			{currentView === "settings" ? (
-				<SettingsPanel
+				<SettingsView
 					preferences={preferences}
 					systemThemeMode={systemThemeMode}
 					launchAtLogin={launchAtLogin}

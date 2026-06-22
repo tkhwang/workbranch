@@ -4,6 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { App } from "../src/App";
+import { StatusAlert } from "../src/ui/StatusAlert";
 
 function readCssContract(path: string, visited = new Set<string>()): string {
 	const absolutePath = resolve(path);
@@ -48,17 +49,18 @@ describe("App shell settings wiring", () => {
 		}
 	});
 
-	it("renders terminal preference data attributes, icon refresh, top status, and bottom view nav", () => {
+	it("renders terminal preference data attributes, icon controls, screen-reader status, and bottom view nav", () => {
 		// Given the companion app shell at its initial render
 		// When static markup is rendered
 		const html = renderToStaticMarkup(<App />);
 
 		// Then the settings-capable shell contract is present before effects run
-		expect(html).toContain('data-theme="solarized-dark"');
+		expect(html).toContain('data-theme="catppuccin-dark"');
 		expect(html).toContain('data-font="system-mono"');
 		expect(html).toContain('aria-label="Refresh tasks"');
 		expect(html).toContain('aria-label="Quit Companion"');
-		expect(html).toContain('class="toolbar-status"');
+		expect(html).toContain('class="toolbar-status-sr"');
+		expect(html).not.toContain('class="toolbar-status"');
 		expect(html).toContain(">Ready</span>");
 		expect(html).not.toContain("<footer");
 		expect(html).not.toContain(">Refresh</button>");
@@ -70,25 +72,63 @@ describe("App shell settings wiring", () => {
 		expect(html).toContain('aria-label="Open Settings"');
 		expect(html).toContain('role="status"');
 		expect(html).toContain('aria-live="polite"');
+		expect(html).not.toContain('class="app-error"');
+		expect(html).not.toContain('role="alert"');
 	});
 
-	it("shows full toolbar status messages instead of relying on hover-only title text", () => {
+	it("renders operation failures as a visible alert instead of only screen-reader status", () => {
+		// Given a failed companion operation status
+		// When the visible status alert is rendered
+		const html = renderToStaticMarkup(
+			<StatusAlert message="refresh failed: command stderr" />,
+		);
+
+		// Then sighted users get an alert row with the failure text
+		expect(html).toContain('class="app-error"');
+		expect(html).toContain('role="alert"');
+		expect(html).toContain("refresh failed: command stderr");
+	});
+
+	it("omits the visible status alert for routine status updates", () => {
+		// Given no visible error is active
+		// When the status alert is rendered
+		const html = renderToStaticMarkup(<StatusAlert message={undefined} />);
+
+		// Then routine Ready/Updated text can stay in the screen-reader-only toolbar
+		expect(html).toBe("");
+	});
+
+	it("styles visible operation errors without restoring the routine toolbar chip", () => {
+		// Given the companion toolbar stylesheet
+		// When status CSS is inspected
+		const css = readCssContract("src/style.css");
+
+		// Then only operation failures have a visible status surface
+		expect(css).toMatch(
+			/\.app-error\s*\{[^}]*background:\s*var\(--blocked-soft\)/s,
+		);
+		expect(css).toMatch(
+			/\.app-error\s*\{[^}]*border:\s*1px solid var\(--blocked\)/s,
+		);
+		expect(css).toMatch(/\.app-error\s*\{[^}]*color:\s*var\(--blocked\)/s);
+		expect(css).not.toMatch(/\.toolbar-status\s*\{/s);
+	});
+
+	it("keeps toolbar status available to assistive tech without a visible top-line chip", () => {
 		// Given the companion toolbar stylesheet
 		// When the status chip CSS contract is inspected
 		const css = readCssContract("src/style.css");
 
-		// Then long actionable status text remains visible for keyboard and touch users
+		// Then status updates remain announced while the visible top line stays focused on controls
 		expect(css).toMatch(/header\s*\{[^}]*flex-wrap:\s*wrap/s);
 		expect(css).toMatch(/\.toolbar\s*\{[^}]*flex:\s*1 1 180px/s);
 		expect(css).toMatch(/\.toolbar\s*\{[^}]*justify-content:\s*flex-end/s);
-		expect(css).toMatch(/\.toolbar-status\s*\{[^}]*overflow:\s*visible/s);
-		expect(css).toMatch(/\.toolbar-status\s*\{[^}]*white-space:\s*normal/s);
-		expect(css).toMatch(/\.toolbar-status\s*\{[^}]*overflow-wrap:\s*anywhere/s);
-		expect(css).not.toMatch(/\.toolbar-status\s*\{[^}]*max-width:\s*98px/s);
-		expect(css).not.toMatch(
-			/\.toolbar-status\s*\{[^}]*text-overflow:\s*ellipsis/s,
+		expect(css).toMatch(/\.toolbar-status-sr\s*\{[^}]*position:\s*absolute/s);
+		expect(css).toMatch(
+			/\.toolbar-status-sr\s*\{[^}]*clip-path:\s*inset\(50%\)/s,
 		);
-		expect(css).not.toMatch(/\.toolbar-status\s*\{[^}]*white-space:\s*nowrap/s);
+		expect(css).toMatch(/\.toolbar-status-sr\s*\{[^}]*white-space:\s*nowrap/s);
+		expect(css).not.toMatch(/\.toolbar-status\s*\{/s);
 	});
 
 	it("uses the configured fixed-width font as the app shell font family", () => {
@@ -114,7 +154,7 @@ describe("App shell settings wiring", () => {
 
 		// Then unsupported color-mix tokens cannot invalidate default button backgrounds
 		expect(css).toMatch(
-			/main\s*\{[^}]*--button-bg:\s*rgba\(150,\s*180,\s*215,\s*0\.07\);[^}]*--button-bg-hover:\s*rgba\(150,\s*180,\s*215,\s*0\.13\);/s,
+			/main\s*\{[^}]*--button-bg:\s*rgba\(255,\s*215,\s*154,\s*0\.07\);[^}]*--button-bg-hover:\s*rgba\(255,\s*215,\s*154,\s*0\.13\);/s,
 		);
 		expect(css).toMatch(
 			/@supports\s*\(background:\s*color-mix\(in srgb,\s*black,\s*white\)\)\s*\{\s*main\s*\{[^}]*--button-bg:\s*color-mix\(in srgb,\s*var\(--text\) 6%,\s*transparent\);[^}]*--button-bg-hover:\s*color-mix\(in srgb,\s*var\(--text\) 12%,\s*transparent\);/s,
@@ -213,6 +253,19 @@ describe("App shell settings wiring", () => {
 		);
 	});
 
+	it("renders settings inside the flexible view panel so bottom nav stays at the shell bottom", () => {
+		// Given the app shell source owns view-level layout wrappers
+		// When the settings branch is inspected
+		const source = readFileSync("src/ui/SettingsView.tsx", "utf8");
+
+		// Then SettingsView uses the same flexing view-panel contract as Main and Activity
+		expect(source).toContain('className="settings-view view-panel"');
+		expect(source).toContain('aria-label="Settings View"');
+		expect(source).toMatch(
+			/className="settings-view view-panel"[\s\S]*<SettingsPanel[\s\S]*<\/section>/,
+		);
+	});
+
 	it("keeps the bottom view menu floating without covering task content", () => {
 		// Given the companion shell stylesheet
 		// When the bottom navigation CSS contract is inspected
@@ -220,6 +273,8 @@ describe("App shell settings wiring", () => {
 
 		// Then the command bar stays visible as a sticky floating affordance
 		expect(css).toMatch(/main\s*\{[^}]*padding:\s*12px/s);
+		expect(css).toMatch(/main\s*\{[^}]*max-width:\s*100%/s);
+		expect(css).toMatch(/main\s*\{[^}]*width:\s*100vw/s);
 		expect(css).toMatch(/main\s*\{[^}]*display:\s*flex/s);
 		expect(css).toMatch(/main\s*\{[^}]*flex-direction:\s*column/s);
 		expect(css).toMatch(/\.view-panel\s*\{[^}]*flex:\s*1 1 auto/s);
@@ -238,35 +293,33 @@ describe("App shell settings wiring", () => {
 		expect(css).not.toMatch(/\.view-nav\s*\{[^}]*position:\s*static/s);
 	});
 
-	it("defines the eight famous dark and light theme token selectors", () => {
+	it("defines only the curated dark and light theme token selectors", () => {
 		// Given the companion stylesheet
 		// When theme selector contracts are inspected
 		const css = readCssContract("src/style.css");
 
-		// Then each dark/light family has app tokens and representative swatch chips
-		for (const theme of [
+		// Then the app exposes one dark and one light palette with no swatch-card CSS
+		expect(css).toContain('main[data-theme="catppuccin-dark"]');
+		expect(css).toContain('main[data-theme="breakfast-light"]');
+		expect(css).toContain("#1e1e2e");
+		expect(css).toContain("#cba6f7");
+		expect(css).toContain("#ffffff");
+		expect(css).toContain("#7c3aed");
+		for (const removedTheme of [
+			"breakfast-dark",
 			"solarized-dark",
 			"dracula-dark",
-			"catppuccin-dark",
 			"github-dark",
 			"solarized-light",
 			"dracula-light",
 			"catppuccin-light",
 			"github-light",
+			"nord-dark",
+			"gruvbox-dark",
 		]) {
-			expect(css).toContain(`main[data-theme="${theme}"]`);
-			expect(css).toContain(`.theme-swatch-${theme}`);
+			expect(css).not.toContain(`main[data-theme="${removedTheme}"]`);
 		}
-		expect(css).toContain("--theme-swatch-accent");
-		expect(css).toContain("#002b36");
-		expect(css).toContain("#282a36");
-		expect(css).toContain("#6272a4");
-		expect(css).toContain("#1e1e2e");
-		expect(css).toContain("#0d1117");
-		expect(css).not.toContain('main[data-theme="nord-dark"]');
-		expect(css).not.toContain('main[data-theme="gruvbox-dark"]');
-		expect(css).not.toContain(".theme-swatch-gruvbox-dark");
-		expect(css).not.toContain(".theme-swatch-nord-dark");
-		expect(css).not.toMatch(/\.theme-swatch-[^{]+\{[^}]*linear-gradient/s);
+		expect(css).not.toContain(".theme-swatch-");
+		expect(css).not.toContain("--theme-swatch-accent");
 	});
 });

@@ -51,7 +51,7 @@
   3. Main view: project group header, task name/status/progress/notification, repo branch/dirty state, active plan/current step, actions.
   4. Activity view: future report stub only in this slice.
   5. Setting view: launch-at-login, font, and theme controls.
-  6. Compact live status chip in the top toolbar and bottom view navigation.
+  6. Screen-reader live status in the top toolbar and bottom view navigation; routine `Updated`/`Ready` text stays out of the visible top line.
 
 ## Design principles
 - Principle 1: Status is a launcher signal, not a paragraph. Use compact dots, counts, and labels.
@@ -60,7 +60,7 @@
 - Tradeoffs: density is preferred over spaciousness, but tap/click targets remain at least 32px high where practical.
 
 ## Visual language
-- Color: famous terminal/editor theme presets are selected through a `Light | Dark | System` mode control plus four visible family buttons (`solarized`, `dracula`, `catppuccin`, `github`) for the resolved mode; each family has complete dark/light token sets for surfaces, lines, text, accents, status colors, and shell/component backgrounds. Theme cards show representative color chips rather than a blended gradient bar so each theme's character is legible at a glance. Removed Gruvbox/Nord settings migrate to Dracula/Solarized respectively, preserving mode.
+- Color: Settings exposes one curated companion palette rather than parallel color families. Dark mode resolves to Catppuccin-inspired surfaces (`#1e1e2e`, `#181825`) with lavender/pink accents (`#cba6f7`, `#f5c2e7`) because it is the preferred dark look. Light mode is white/neutral rather than yellow: near-white surfaces (`#ffffff`, `#fbfcff`, `#f4f6fb`) with dark slate text (`#242633`) and a subtle lavender accent (`#7c3aed`). The visible setting is only `Light | Dark | System`; legacy theme families and concrete theme values collapse to this Companion palette while preserving mode.
 - Typography: dual-axis. UI chrome (task/project names, headings, button and nav labels, settings controls) uses a system sans stack for hierarchy and readability; developer data (repo/branch/path, counts, plan label) stays monospace. The user-selectable font preference controls the monospace data stack.
 - Spacing/layout rhythm: compact terminal/preferences rhythm, 8px grid, row-first grouping, prompt-like separators, subtle grid or border lines, no large cards.
 - Shape/radius/elevation: one fixed radius scale (`6px` controls, `10px` rows, `14px` shell); depth from clearly stepped tonal surfaces, soft elevation shadows on cards, and hairline borders; cards lift on hover. Avoid heavy gradients and glossy neon glow.
@@ -72,13 +72,13 @@
 - New/changed components:
   - global inventory/status summary,
   - project group header,
-  - top toolbar with live status chip and icon-only refresh control,
+  - top toolbar with icon-only refresh/quit controls and screen-reader-only live status,
   - sticky floating bottom view navigation for Main, Activity, and Setting,
   - Setting view preferences panel,
   - Activity report stub view,
   - switch row for launch-at-login,
   - font select row,
-  - theme mode segmented control (`Light`, `Dark`, `System`) with one four-button family grid and four representative palette chips per card for the resolved mode,
+  - theme mode segmented control (`Light`, `Dark`, `System`) with no visible color-family grid,
   - launcher-like task summary line,
   - current-step strip,
   - detail header row containing repo chips and a full-width IDE/Terminal/Finder action bar split into equal thirds above current step and checklist content,
@@ -90,8 +90,7 @@
 - Target standard: keyboard-operable popover controls and readable contrast.
 - Keyboard/focus behavior: buttons and `summary` expose clear focus rings.
 - Contrast/readability: status text and current step must pass practical dark-mode contrast; disabled action may be muted but legible.
-- Screen-reader semantics: preserve button `aria-label`s; bottom view buttons expose destination labels and `aria-current`; settings controls use associated labels, switch state text, and the toolbar status chip exposes `role="status"` with polite live updates.
-- Long actionable toolbar status messages, including preference migration/reset notices and command stderr, must remain fully visible without hover-only disclosure.
+- Screen-reader semantics: preserve button `aria-label`s; bottom view buttons expose destination labels and `aria-current`; settings controls use associated labels, switch state text, and the toolbar keeps a screen-reader-only `role="status"` region with polite live updates.
 - Reduced motion and sensory considerations: disable transform transitions under `prefers-reduced-motion: reduce`.
 
 ## Responsive behavior
@@ -100,10 +99,10 @@
 - Touch/hover differences: hover is enhancement only; core state is visible without hover.
 
 ## Interaction states
-- Loading: toolbar status chip reports refresh status.
+- Loading: screen-reader live status reports refresh state without adding a visible top-line chip.
 - Empty: concise empty message with setup hint.
-- Error: root-scoped error row with red accent.
-- Success: toolbar status chip says `Updated` / `Action complete`.
+- Error: root-scoped error row with red accent; operation failures such as refresh/action/preference errors also render a visible alert row while routine Ready/Updated statuses stay screen-reader-only.
+- Success: routine `Updated` / `Action complete` messages are not shown as a visible top-line chip; they remain available to assistive tech.
 - Disabled: disabled action has muted text and no press transform.
 - Offline/slow network: not applicable; CLI/local filesystem driven.
 
@@ -129,3 +128,9 @@
 - 2026-06-18 (refresh): Direction refined from a mono-only terminal HUD to a **modern developer HUD — terminal core, modern shell**. The strict mono-only typography and hairline-only depth produced a flat, low-contrast, drab popover. Corrections: (1) dual-axis typography — system sans for names/headings/controls, monospace kept for developer data; (2) clearly stepped tonal surfaces plus soft card elevation with hover lift, replacing near-invisible translucent cards; (3) accent (cyan in terminal-dark) stays the single signal color but appears on more touchpoints (project rail, current-step left rail, active states). This supersedes the mono-only typography line and the hairline-only depth line above. Identity, density, status-as-launcher, and the theme preset direction now expands to four famous families with dark/light variants.
 - 2026-06-21: Task detail launch controls move from the bottom of expanded checklist content into the top detail header next to repo chips, wrapping above steps on narrow widths. Theme lineup was initially narrowed to Solarized, Gruvbox, Catppuccin, and GitHub with removed Dracula/Nord migrations.
 - 2026-06-21 (follow-up): Launch controls now occupy a full-width action row in equal thirds. Dark theme lineup replaces Gruvbox with Dracula, so the active families are Solarized, Dracula, Catppuccin, and GitHub; old `gruvbox` settings migrate to `dracula`, while `nord` still migrates to `solarized`. Checklist status moved from loose `✓`/`☐` text prefixes to an aligned marker column so row text scans cleanly; follow-up tuning makes depth 0 a smaller, lighter square marker, keeps depth 1 circular, and lowers completed markers to neutral muted tones instead of bright green.
+- 2026-06-22: Added Breakfast as the default companion theme family after reviewing tokens4breakfast.app. The palette shifts the first-run menu bar popover from cool terminal blue toward warm parchment/espresso/amber while keeping compact developer-HUD density and preserving existing terminal/editor theme choices. Legacy `amber-crt` and removed `gruvbox` settings now migrate to Breakfast as the nearest warm theme.
+- 2026-06-22 (settings simplification): Collapsed the visible color theme family picker into a single Companion palette with only `Light | Dark | System` controls. Dark mode now resolves to Catppuccin as the preferred dark look; light mode keeps the same calm direction but shifts from yellow Breakfast parchment to a whiter neutral surface palette. Existing stored theme families migrate to Companion while preserving mode.
+
+- 2026-06-22 (toolbar): Removed the visible top toolbar status chip after review; the top line now keeps task inventory plus icon controls only. A screen-reader-only polite live region preserves status announcements without showing routine `Updated` text in the popover chrome.
+
+- 2026-06-23: Light mode shifted from yellow/warm Breakfast parchment to a whiter neutral palette with subtle lavender accents after visual review.

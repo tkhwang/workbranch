@@ -154,9 +154,7 @@ export function useCompanionSettings({
 				}
 				const current = await isEnabled();
 				setLaunchAtLogin(current);
-				onStatus(
-					current ? "Launch at login enabled" : "Launch at login disabled",
-				);
+				onStatus(current ? "Open at Login enabled" : "Open at Login disabled");
 			} catch (error) {
 				onError(error);
 			} finally {

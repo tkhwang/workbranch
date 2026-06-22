@@ -12,13 +12,13 @@ import {
 } from "../src/application/preferences";
 
 describe("companion preferences", () => {
-	it("defaults to Solarized with system mode and system-mono", () => {
+	it("defaults to the Companion palette with system mode and system-mono", () => {
 		// Given no stored preference values
 		// When the default preference contract is read
-		// Then the Solarized HUD follows the OS theme until the user chooses a mode
+		// Then the HUD follows the OS theme with one curated palette
 		expect(DEFAULT_COMPANION_PREFERENCES).toEqual({
 			font: "system-mono",
-			themeFamily: "solarized",
+			themeFamily: "companion",
 			themeMode: "system",
 		});
 	});
@@ -41,18 +41,18 @@ describe("companion preferences", () => {
 		});
 	});
 
-	it("migrates a legacy concrete theme value into family and mode preferences", () => {
+	it("migrates a legacy concrete theme value into Companion family and mode preferences", () => {
 		// Given a previous settings file stored one concrete dark/light theme value
 		const stored = { font: "menlo", theme: "nord-light" };
 
 		// When preferences are sanitized at the store boundary
 		const result = sanitizeCompanionPreferences(stored);
 
-		// Then the legacy value is preserved as the new family and mode pair
+		// Then the legacy color family collapses to Companion while preserving mode
 		expect(result).toEqual({
 			preferences: {
 				font: "menlo",
-				themeFamily: "solarized",
+				themeFamily: "companion",
 				themeMode: "light",
 			},
 			sanitized: true,
@@ -60,38 +60,26 @@ describe("companion preferences", () => {
 	});
 
 	it("migrates previous theme enum values before falling back to defaults", () => {
-		// Given settings files stored the original companion theme enum values
+		// Given settings files stored earlier companion theme enum values
 		const migrations = [
-			{
-				theme: "terminal-dark",
-				themeFamily: "github",
-			},
-			{
-				theme: "amber-crt",
-				themeFamily: "dracula",
-			},
-			{
-				theme: "green-mono",
-				themeFamily: "solarized",
-			},
-			{
-				theme: "high-contrast",
-				themeFamily: "github",
-			},
+			"terminal-dark",
+			"amber-crt",
+			"green-mono",
+			"high-contrast",
 		] as const;
 
-		for (const migration of migrations) {
+		for (const theme of migrations) {
 			// When preferences are sanitized at the store boundary
 			const result = sanitizeCompanionPreferences({
 				font: "monaco",
-				theme: migration.theme,
+				theme,
 			});
 
-			// Then the user's prior theme choice is preserved as a dark family choice
+			// Then previous dark choices converge to the Companion dark palette
 			expect(result).toEqual({
 				preferences: {
 					font: "monaco",
-					themeFamily: migration.themeFamily,
+					themeFamily: "companion",
 					themeMode: "dark",
 				},
 				sanitized: true,
@@ -113,11 +101,11 @@ describe("companion preferences", () => {
 		});
 
 		// When preferences are sanitized at the store boundary
-		// Then removed families migrate to nearest surviving families and preserve mode
+		// Then removed families collapse to Companion and preserve mode
 		expect(gruvboxResult).toEqual({
 			preferences: {
 				font: "sf-mono",
-				themeFamily: "dracula",
+				themeFamily: "companion",
 				themeMode: "dark",
 			},
 			sanitized: true,
@@ -125,7 +113,7 @@ describe("companion preferences", () => {
 		expect(nordResult).toEqual({
 			preferences: {
 				font: "sf-mono",
-				themeFamily: "solarized",
+				themeFamily: "companion",
 				themeMode: "light",
 			},
 			sanitized: true,
@@ -150,67 +138,64 @@ describe("companion preferences", () => {
 		).toBe(true);
 	});
 
-	it("exposes four famous theme families in dark and light variants", () => {
-		// Given the theme option list used by the settings panel
+	it("exposes only Catppuccin Dark and White Light theme variants", () => {
+		// Given the active theme option list
 		// When option values are read
-		// Then each famous family has both dark and light variants
-		expect(COMPANION_THEME_OPTIONS.map((option) => option.value)).toEqual([
-			"solarized-dark",
-			"dracula-dark",
-			"catppuccin-dark",
-			"github-dark",
-			"solarized-light",
-			"dracula-light",
-			"catppuccin-light",
-			"github-light",
+		// Then Settings has one curated dark/light palette instead of multiple families
+		expect(COMPANION_THEME_OPTIONS).toEqual([
+			{
+				value: "catppuccin-dark",
+				family: "companion",
+				familyLabel: "Companion",
+				label: "Catppuccin Dark",
+				mode: "dark",
+			},
+			{
+				value: "breakfast-light",
+				family: "companion",
+				familyLabel: "Companion",
+				label: "White Light",
+				mode: "light",
+			},
 		]);
-		expect(COMPANION_THEME_OPTIONS.map((option) => option.family)).toContain(
-			"dracula",
-		);
-		expect(
-			COMPANION_THEME_OPTIONS.map((option) => option.family),
-		).not.toContain("gruvbox");
-		expect(
-			COMPANION_THEME_OPTIONS.map((option) => option.family),
-		).not.toContain("nord");
-		expect(
-			COMPANION_THEME_OPTIONS.filter((option) => option.mode === "dark"),
-		).toHaveLength(4);
-		expect(
-			COMPANION_THEME_OPTIONS.filter((option) => option.mode === "light"),
-		).toHaveLength(4);
 	});
 
 	it("resolves system theme mode using the current OS color scheme", () => {
 		// Given preferences in explicit and system modes
 		const explicitLight = {
 			font: "system-mono",
-			themeFamily: "dracula",
+			themeFamily: "companion",
 			themeMode: "light",
 		} as const;
-		const systemGitHub = {
+		const systemCompanion = {
 			font: "system-mono",
-			themeFamily: "github",
+			themeFamily: "companion",
 			themeMode: "system",
 		} as const;
 
 		// When concrete data-theme values are resolved
 		// Then system mode follows the supplied system mode while explicit mode wins
-		expect(resolvedCompanionTheme(explicitLight, "dark")).toBe("dracula-light");
-		expect(resolvedCompanionTheme(systemGitHub, "light")).toBe("github-light");
-		expect(resolvedCompanionTheme(systemGitHub, "dark")).toBe("github-dark");
+		expect(resolvedCompanionTheme(explicitLight, "dark")).toBe(
+			"breakfast-light",
+		);
+		expect(resolvedCompanionTheme(systemCompanion, "light")).toBe(
+			"breakfast-light",
+		);
+		expect(resolvedCompanionTheme(systemCompanion, "dark")).toBe(
+			"catppuccin-dark",
+		);
 	});
 
 	it("restores a failed optimistic preference update only when no newer update won", () => {
 		// Given one failed optimistic update and a later successful update
 		const failedAttempt = {
 			font: "menlo",
-			themeFamily: "catppuccin",
+			themeFamily: "companion",
 			themeMode: "system",
 		} as const;
 		const newerCurrent = {
 			font: "menlo",
-			themeFamily: "github",
+			themeFamily: "companion",
 			themeMode: "light",
 		} as const;
 
@@ -262,14 +247,14 @@ describe("companion preferences", () => {
 		// When the pair is converted for persistence
 		const entries = preferencesToStoreEntries({
 			font: "menlo",
-			themeFamily: "github",
+			themeFamily: "companion",
 			themeMode: "light",
 		});
 
 		// Then launch-at-login and other app state are excluded from the store contract
 		expect(entries).toEqual({
 			font: "menlo",
-			themeFamily: "github",
+			themeFamily: "companion",
 			themeMode: "light",
 		});
 		expect(Object.keys(entries)).toEqual(["font", "themeFamily", "themeMode"]);

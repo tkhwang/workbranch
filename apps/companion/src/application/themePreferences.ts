@@ -1,13 +1,4 @@
-const COMPANION_THEME_VALUES = [
-	"solarized-dark",
-	"dracula-dark",
-	"catppuccin-dark",
-	"github-dark",
-	"solarized-light",
-	"dracula-light",
-	"catppuccin-light",
-	"github-light",
-] as const;
+const COMPANION_THEME_VALUES = ["catppuccin-dark", "breakfast-light"] as const;
 
 const PREVIOUS_COMPANION_THEME_VALUES = [
 	"terminal-dark",
@@ -18,16 +9,19 @@ const PREVIOUS_COMPANION_THEME_VALUES = [
 	"gruvbox-light",
 	"nord-dark",
 	"nord-light",
+	"breakfast-dark",
+	"solarized-dark",
+	"dracula-dark",
+	"github-dark",
+	"solarized-light",
+	"dracula-light",
+	"catppuccin-light",
+	"github-light",
 ] as const;
 
-const COMPANION_THEME_FAMILY_VALUES = [
-	"solarized",
-	"dracula",
-	"catppuccin",
-	"github",
-] as const;
-
+const COMPANION_THEME_FAMILY_VALUES = ["companion"] as const;
 const COMPANION_THEME_MODE_VALUES = ["light", "dark", "system"] as const;
+const RESOLVED_THEME_MODE_VALUES = ["dark", "light"] as const;
 
 export type CompanionTheme = (typeof COMPANION_THEME_VALUES)[number];
 type PreviousCompanionTheme = (typeof PREVIOUS_COMPANION_THEME_VALUES)[number];
@@ -35,7 +29,8 @@ type LegacyCompanionTheme = CompanionTheme | PreviousCompanionTheme;
 export type CompanionThemeFamily =
 	(typeof COMPANION_THEME_FAMILY_VALUES)[number];
 export type CompanionThemeMode = (typeof COMPANION_THEME_MODE_VALUES)[number];
-export type CompanionResolvedThemeMode = "light" | "dark";
+export type CompanionResolvedThemeMode =
+	(typeof RESOLVED_THEME_MODE_VALUES)[number];
 
 export type CompanionThemeOption = {
 	readonly value: CompanionTheme;
@@ -50,83 +45,57 @@ export type CompanionThemeModeOption = {
 	readonly label: string;
 };
 
-const THEME_BY_FAMILY_AND_MODE: Record<
-	CompanionThemeFamily,
-	Record<CompanionResolvedThemeMode, CompanionTheme>
+const COMPANION_THEME_SET = new Set<unknown>(COMPANION_THEME_VALUES);
+const PREVIOUS_COMPANION_THEME_SET = new Set<unknown>(
+	PREVIOUS_COMPANION_THEME_VALUES,
+);
+const COMPANION_THEME_FAMILY_SET = new Set<unknown>(
+	COMPANION_THEME_FAMILY_VALUES,
+);
+const COMPANION_THEME_MODE_SET = new Set<unknown>(COMPANION_THEME_MODE_VALUES);
+
+const THEME_BY_MODE: Record<CompanionResolvedThemeMode, CompanionTheme> = {
+	dark: "catppuccin-dark",
+	light: "breakfast-light",
+};
+
+const THEME_MODE_BY_LEGACY_THEME: Record<
+	LegacyCompanionTheme,
+	CompanionResolvedThemeMode
 > = {
-	solarized: {
-		dark: "solarized-dark",
-		light: "solarized-light",
-	},
-	dracula: {
-		dark: "dracula-dark",
-		light: "dracula-light",
-	},
-	catppuccin: {
-		dark: "catppuccin-dark",
-		light: "catppuccin-light",
-	},
-	github: {
-		dark: "github-dark",
-		light: "github-light",
-	},
+	"terminal-dark": "dark",
+	"amber-crt": "dark",
+	"green-mono": "dark",
+	"high-contrast": "dark",
+	"gruvbox-dark": "dark",
+	"gruvbox-light": "light",
+	"nord-dark": "dark",
+	"nord-light": "light",
+	"breakfast-dark": "dark",
+	"breakfast-light": "light",
+	"solarized-dark": "dark",
+	"solarized-light": "light",
+	"dracula-dark": "dark",
+	"dracula-light": "light",
+	"catppuccin-dark": "dark",
+	"catppuccin-light": "light",
+	"github-dark": "dark",
+	"github-light": "light",
 };
 
 export const COMPANION_THEME_OPTIONS: readonly CompanionThemeOption[] = [
 	{
-		value: "solarized-dark",
-		family: "solarized",
-		familyLabel: "Solarized",
-		label: "Solarized Dark",
-		mode: "dark",
-	},
-	{
-		value: "dracula-dark",
-		family: "dracula",
-		familyLabel: "Dracula",
-		label: "Dracula Dark",
-		mode: "dark",
-	},
-	{
 		value: "catppuccin-dark",
-		family: "catppuccin",
-		familyLabel: "Catppuccin",
+		family: "companion",
+		familyLabel: "Companion",
 		label: "Catppuccin Dark",
 		mode: "dark",
 	},
 	{
-		value: "github-dark",
-		family: "github",
-		familyLabel: "GitHub",
-		label: "GitHub Dark",
-		mode: "dark",
-	},
-	{
-		value: "solarized-light",
-		family: "solarized",
-		familyLabel: "Solarized",
-		label: "Solarized Light",
-		mode: "light",
-	},
-	{
-		value: "dracula-light",
-		family: "dracula",
-		familyLabel: "Dracula",
-		label: "Dracula Light",
-		mode: "light",
-	},
-	{
-		value: "catppuccin-light",
-		family: "catppuccin",
-		familyLabel: "Catppuccin",
-		label: "Catppuccin Light",
-		mode: "light",
-	},
-	{
-		value: "github-light",
-		family: "github",
-		familyLabel: "GitHub",
-		label: "GitHub Light",
+		value: "breakfast-light",
+		family: "companion",
+		familyLabel: "Companion",
+		label: "White Light",
 		mode: "light",
 	},
 ];
@@ -139,37 +108,13 @@ export const COMPANION_THEME_MODE_OPTIONS: readonly CompanionThemeModeOption[] =
 	];
 
 export function isCompanionTheme(value: unknown): value is CompanionTheme {
-	switch (value) {
-		case "solarized-dark":
-		case "dracula-dark":
-		case "catppuccin-dark":
-		case "github-dark":
-		case "solarized-light":
-		case "dracula-light":
-		case "catppuccin-light":
-		case "github-light":
-			return true;
-		default:
-			return false;
-	}
+	return COMPANION_THEME_SET.has(value);
 }
 
 function isPreviousCompanionTheme(
 	value: unknown,
 ): value is PreviousCompanionTheme {
-	switch (value) {
-		case "terminal-dark":
-		case "amber-crt":
-		case "green-mono":
-		case "high-contrast":
-		case "gruvbox-dark":
-		case "gruvbox-light":
-		case "nord-dark":
-		case "nord-light":
-			return true;
-		default:
-			return false;
-	}
+	return PREVIOUS_COMPANION_THEME_SET.has(value);
 }
 
 export function isLegacyCompanionTheme(
@@ -181,87 +126,30 @@ export function isLegacyCompanionTheme(
 export function isCompanionThemeFamily(
 	value: unknown,
 ): value is CompanionThemeFamily {
-	switch (value) {
-		case "solarized":
-		case "dracula":
-		case "catppuccin":
-		case "github":
-			return true;
-		default:
-			return false;
-	}
+	return COMPANION_THEME_FAMILY_SET.has(value);
 }
 
 export function isCompanionThemeMode(
 	value: unknown,
 ): value is CompanionThemeMode {
-	switch (value) {
-		case "light":
-		case "dark":
-		case "system":
-			return true;
-		default:
-			return false;
-	}
+	return COMPANION_THEME_MODE_SET.has(value);
 }
 
 export function themeFamilyFromLegacyTheme(
-	theme: LegacyCompanionTheme,
+	_theme: LegacyCompanionTheme,
 ): CompanionThemeFamily {
-	switch (theme) {
-		case "terminal-dark":
-		case "high-contrast":
-			return "github";
-		case "amber-crt":
-		case "gruvbox-dark":
-		case "gruvbox-light":
-		case "dracula-dark":
-		case "dracula-light":
-			return "dracula";
-		case "green-mono":
-		case "nord-dark":
-		case "nord-light":
-			return "solarized";
-		case "solarized-dark":
-		case "solarized-light":
-			return "solarized";
-		case "catppuccin-dark":
-		case "catppuccin-light":
-			return "catppuccin";
-		case "github-dark":
-		case "github-light":
-			return "github";
-	}
+	return "companion";
 }
 
 export function themeModeFromLegacyTheme(
 	theme: LegacyCompanionTheme,
 ): CompanionResolvedThemeMode {
-	switch (theme) {
-		case "terminal-dark":
-		case "amber-crt":
-		case "green-mono":
-		case "high-contrast":
-		case "gruvbox-dark":
-		case "nord-dark":
-		case "solarized-dark":
-		case "dracula-dark":
-		case "catppuccin-dark":
-		case "github-dark":
-			return "dark";
-		case "gruvbox-light":
-		case "nord-light":
-		case "solarized-light":
-		case "dracula-light":
-		case "catppuccin-light":
-		case "github-light":
-			return "light";
-	}
+	return THEME_MODE_BY_LEGACY_THEME[theme];
 }
 
 export function resolvedThemeValue(
-	family: CompanionThemeFamily,
+	_family: CompanionThemeFamily,
 	mode: CompanionResolvedThemeMode,
 ): CompanionTheme {
-	return THEME_BY_FAMILY_AND_MODE[family][mode];
+	return THEME_BY_MODE[mode];
 }
