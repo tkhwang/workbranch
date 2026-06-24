@@ -25,4 +25,4 @@ mono-repo에서는 checkout 하나가 이미 agent에게 하나의 project surfa
 
 ## Task root 규약
 
-Agent session은 기본적으로 `<task>`에서 실행합니다. 그래야 agent가 `AGENTS.md`, `TASK-WORKBRANCH.md`, task 아래 모든 repo를 볼 수 있습니다. Task root 자체는 git으로 관리되지 않습니다. 코드 변경과 Git 명령은 `<task>/<repo>` 안에서 수행하세요. `.omx/`, `.omc/` 같은 runtime state는 git 미관리 task-root 잔여물로 취급되며 `workbranch remove <task>`가 삭제 전에 목록으로 보여줍니다.
+Agent session은 기본적으로 `<task>`에서 실행합니다. 그래야 agent가 `AGENTS.md`, `TASK-WORKBRANCH.md`, task 아래 모든 repo를 볼 수 있습니다. Task root 자체는 git으로 관리되지 않습니다. 코드 변경과 Git 명령은 `<task>/<repo>` 안에서 수행하세요. Repo를 수정하기 전에는 해당 repo 안의 `AGENTS.md`, `CLAUDE.md`, `.claude/` 같은 repo-local agent 지침을 찾아 읽고 따르세요. `.omx/`, `.omc/` 같은 runtime state는 git 미관리 task-root 잔여물로 취급되며 `workbranch remove <task>`가 삭제 전에 목록으로 보여줍니다.

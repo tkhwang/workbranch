@@ -88,6 +88,7 @@ test_add_creates_task_brief_and_agent_guidance() {
   assert_contains "$guidance" "The task root is not a Git repository; it is a workbranch metadata/agent workspace."
   assert_contains "$guidance" 'The actual Git repositories live under `<task>/<repo>`.'
   assert_contains "$guidance" 'Make code changes and run Git commands inside the repo folders; keep progress in `TASK-WORKBRANCH.md` at the task root.'
+  assert_contains "$guidance" 'Before editing a repo, read and follow repo-local agent instructions such as `<task>/<repo>/AGENTS.md`, `<task>/<repo>/CLAUDE.md`, or `<task>/<repo>/.claude/` when present.'
   assert_not_exists "$project/login/frontend/.gitignore"
   assert_not_exists "$project/login/backend/.gitignore"
   return 0

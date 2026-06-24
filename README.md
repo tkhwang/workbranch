@@ -93,7 +93,7 @@ See [AI agent workflows](docs/ai-agents.md) for the multi-repo benefits.
 
 ## Working on a task
 
-Now work inside the task workspace. The task root (`<task>`) is a non-git workbranch metadata/agent workspace; the actual Git repos live under `<task>/<repo>`.
+Now work inside the task workspace. The task root (`<task>`) is a non-git workbranch metadata/agent workspace; the actual Git repos live under `<task>/<repo>`. Before editing a repo, read and follow repo-local agent instructions such as `<task>/<repo>/AGENTS.md`, `<task>/<repo>/CLAUDE.md`, or `<task>/<repo>/.claude/` when present.
 
 ```bash
 # macOS: open code repos in the IDE, and the task root in the terminal
@@ -195,7 +195,7 @@ Combined flow shortcuts:
 `workbranch add <task>` creates task-root state outside the repo worktrees:
 
 - `<task>/TASK-WORKBRANCH.md` is the human/agent-editable current Plan brief. The generated template starts with `# <plan>` as the Plan H1, followed by a Plan-local `status: todo|planning|in-progress|review|blocked|done` line and Markdown checklist Steps. `plan:` and `## Plan:` are no longer part of the supported brief format. `workbranch done <task>` marks the current Plan done, moves it to `.workbranch/plans/done/<timestamp>-<slug>.md`, and leaves the brief ready for the next Plan. Successful `land`/`finalize` and safe merged-task detection after `pull` ask before doing the same archive action. `workbranch memo <task> [text]` reads or overwrites the brief, and `workbranch memo <task> --clear` removes it. Inside a task workspace, `workbranch memo` may omit `<task>` for reading only.
-- `<task>/AGENTS.md` tells AI agents running from either `<task>` or `<task>/<repo>` to keep the task brief current, including when starting/resuming, changing the active step, before/after verification, when blocked, and before the final response.
+- `<task>/AGENTS.md` tells AI agents running from either `<task>` or `<task>/<repo>` to keep the task brief current, including when starting/resuming, changing the active step, before/after verification, when blocked, and before the final response. It also reminds agents to load repo-local instructions before editing a repo.
 - `<task>/.workbranch/notifications.jsonl` is an append-only local inbox. `workbranch noti add/list/clear` manages it, and `workbranch list --json` exposes `notiCount`, `plans`, `planTitle`, `status`, `progressDone`, `progressTotal`, `currentItem`, and `updatedAt` for companion apps.
 
 `workbranch remove <task>` deletes known workbranch task state after successful workspace removal: `TASK-WORKBRANCH.md`, generated `AGENTS.md`, `.workbranch/`, and `.workbranch.task`. Everything else left in the task root, including agent runtime folders such as `.omx/` and `.omc/`, is not git-managed. Normal remove lists those leftovers and asks once whether to delete the entire task root. `workbranch remove <task> --force` removes the task root without prompting after the normal safety preflights pass.

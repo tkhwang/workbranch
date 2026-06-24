@@ -25,4 +25,4 @@ In a mono-repo, one checkout already gives the agent a single project surface. I
 
 ## Task root convention
 
-Run agent sessions from `<task>` by default so the agent can see `AGENTS.md`, `TASK-WORKBRANCH.md`, and every repo under the task. The task root itself is not git-managed; make code changes and run Git commands inside `<task>/<repo>`. Runtime state such as `.omx/` or `.omc/` is treated as non-git task-root leftover and is listed by `workbranch remove <task>` before deletion.
+Run agent sessions from `<task>` by default so the agent can see `AGENTS.md`, `TASK-WORKBRANCH.md`, and every repo under the task. The task root itself is not git-managed; make code changes and run Git commands inside `<task>/<repo>`. Before editing a repo, read and follow repo-local agent instructions such as `<task>/<repo>/AGENTS.md`, `<task>/<repo>/CLAUDE.md`, or `<task>/<repo>/.claude/` when present. Runtime state such as `.omx/` or `.omc/` is treated as non-git task-root leftover and is listed by `workbranch remove <task>` before deletion.
