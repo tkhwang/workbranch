@@ -93,7 +93,7 @@ multi-repo에서의 장점은 [AI agent workflow](docs/ai-agents.ko.md)를 참�
 
 ## 작업 흐름
 
-이제 task workspace에서 작업하세요. task root(`<task>`)는 git으로 관리되지 않는 workbranch metadata/agent 작업 공간이고, 실제 Git repo는 `<task>/<repo>` 아래에 있습니다.
+이제 task workspace에서 작업하세요. task root(`<task>`)는 git으로 관리되지 않는 workbranch metadata/agent 작업 공간이고, 실제 Git repo는 `<task>/<repo>` 아래에 있습니다. Repo를 수정하기 전에는 해당 repo 안의 `AGENTS.md`, `CLAUDE.md`, `.claude/` 같은 repo-local agent 지침을 찾아 읽고 따르세요.
 
 ```bash
 # macOS: IDE는 code repo를 열고, terminal은 task root를 엽니다
@@ -195,7 +195,7 @@ Combined flow shortcut:
 `workbranch add <task>`는 repo worktree 밖의 task root에 workbranch-managed state를 생성합니다.
 
 - `<task>/TASK-WORKBRANCH.md`는 사람/AI agent가 함께 갱신하는 현재 Plan brief입니다. 생성 템플릿은 `# <plan>` H1을 Plan 이름으로 쓰고, 바로 아래 Plan-local `status: todo|planning|in-progress|review|blocked|done` 줄과 Markdown checklist Step을 둡니다. `plan:`과 `## Plan:`은 더 이상 지원 brief 형식이 아닙니다. `workbranch done <task>`는 현재 Plan을 done 처리한 뒤 `.workbranch/plans/done/<timestamp>-<slug>.md`로 이동하고 brief를 다음 Plan용으로 비웁니다. `land`/`finalize` 성공 후와 `pull` 뒤 안전하게 merged task를 감지했을 때도 확인 프롬프트 후 같은 archive 동작을 수행합니다. `workbranch memo <task> [text]`로 읽거나 덮어쓰고, `workbranch memo <task> --clear`로 삭제합니다. Task workspace 안에서는 읽기일 때만 `workbranch memo`처럼 `<task>`를 생략할 수 있습니다.
-- `<task>/AGENTS.md`는 `<task>` 또는 `<task>/<repo>`에서 실행되는 AI agent가 같은 task brief를 갱신하도록 안내합니다. 갱신 시점은 시작/재개, active step 변경, 검증 전후, blocked, final response 직전입니다.
+- `<task>/AGENTS.md`는 `<task>` 또는 `<task>/<repo>`에서 실행되는 AI agent가 같은 task brief를 갱신하도록 안내합니다. 갱신 시점은 시작/재개, active step 변경, 검증 전후, blocked, final response 직전입니다. 또한 repo 수정 전에 repo-local 지침을 읽도록 안내합니다.
 - `<task>/.workbranch/notifications.jsonl`은 append-only local inbox입니다. `workbranch noti add/list/clear`가 관리하고, `workbranch list --json`은 companion app용 `notiCount`, `plans`, `planTitle`, `status`, `progressDone`, `progressTotal`, `currentItem`, `updatedAt`을 노출합니다.
 
 `workbranch remove <task>`는 workspace 제거가 성공한 뒤 known workbranch task state(`TASK-WORKBRANCH.md`, generated `AGENTS.md`, `.workbranch/`, `.workbranch.task`)를 삭제합니다. 그 외 task root에 남은 항목은 `.omx/`, `.omc/` 같은 agent runtime folder를 포함해 git으로 관리되지 않는 잔여물입니다. Normal remove는 이 목록을 보여주고 task root 전체를 삭제할지 한 번 묻습니다. `workbranch remove <task> --force`는 일반 safety preflight 통과 후 묻지 않고 task root를 제거합니다.
