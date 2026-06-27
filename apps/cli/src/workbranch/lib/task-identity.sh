@@ -52,6 +52,23 @@ validate_task_detail_name() {
   git check-ref-format --branch "$branch_ref" >/dev/null 2>&1 || die "invalid task detail name '$value': produces invalid branch '$branch_ref'"
 }
 
+parent_branch_to_folder_slug() {
+  local parent slug
+  parent=$1
+  slug=${parent//\//-}
+  validate_safe_name "parent branch folder slug" "$slug"
+  printf '%s' "$slug"
+}
+
+validate_parent_base_task_name() {
+  local value parent branch_ref
+  value=$1
+  parent=$2
+  validate_safe_name "task name" "$value"
+  branch_ref="$parent-$value"
+  git check-ref-format --branch "$branch_ref" >/dev/null 2>&1 || die "invalid task name '$value': produces invalid branch '$branch_ref'"
+}
+
 validate_task_folder_name() {
   local value type detail
   value=$(normalize_task_argument "$1")
@@ -76,6 +93,15 @@ task_folder_from_identity() {
   validate_task_type "$type"
   validate_task_detail_name "$detail" "$type"
   printf '%s-%s' "$type" "$detail"
+}
+
+task_folder_from_parent_base() {
+  local parent name slug
+  parent=$1
+  name=$2
+  validate_parent_base_task_name "$name" "$parent"
+  slug=$(parent_branch_to_folder_slug "$parent")
+  printf '%s-%s' "$slug" "$name"
 }
 
 task_branch_from_identity() {

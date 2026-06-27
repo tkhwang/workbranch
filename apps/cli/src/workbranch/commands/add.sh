@@ -21,8 +21,20 @@ prompt_task_branches_for_add() {
 }
 
 prompt_task_identity_for_add() {
-  local default_detail type detail task
+  local default_detail type detail task parent_base
   default_detail=${1:-}
+  if parent_base=$(all_repos_share_parent_feature_base); then
+    if [ -n "$default_detail" ]; then
+      detail=$(prompt_with_default "Task name" "$default_detail")
+    else
+      detail=$(prompt_required "Task name")
+    fi
+    validate_parent_base_task_name "$detail" "$parent_base"
+    task=$(task_folder_from_parent_base "$parent_base" "$detail")
+    printf '%s[*]%s Task folder: %s\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" "$task" >&2
+    printf '%s' "$task"
+    return 0
+  fi
   printf '%s[*]%s Task type examples: feat, fix, chore, docs, refactor, test, perf, ci, build, revert\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" >&2
   type=$(prompt_with_default "Task type" "feat")
   validate_task_type "$type"
@@ -38,7 +50,7 @@ prompt_task_identity_for_add() {
 }
 
 resolve_task_for_add() {
-  local candidate
+  local candidate parent_base parent_slug
   if [ ${#ARGS[@]} -eq 0 ]; then
     prompt_task_identity_for_add
     return 0
@@ -52,6 +64,15 @@ resolve_task_for_add() {
   fi
 
   if [ -t 0 ]; then
+    if parent_base=$(all_repos_share_parent_feature_base); then
+      parent_slug=$(parent_branch_to_folder_slug "$parent_base")
+      case "$candidate" in
+        "$parent_slug"-*)
+          printf '%s' "$candidate"
+          return 0
+          ;;
+      esac
+    fi
     prompt_task_identity_for_add "$candidate"
   else
     printf '%s' "$candidate"

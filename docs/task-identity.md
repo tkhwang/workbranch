@@ -2,7 +2,9 @@
 
 [README](../README.md) | [한국어](task-identity.ko.md)
 
-New task creation asks for two values:
+Task creation uses the prompt shape that matches the configured base branches.
+
+On `main`/`master`-style bases, `workbranch add` asks for the conventional task identity:
 
 | Prompt           | Example | Used for             |
 | ---------------- | ------- | -------------------- |
@@ -12,13 +14,19 @@ New task creation asks for two values:
 `workbranch` derives:
 
 - task folder: `feat-login`
-- per-repo default Git branch:
-  - base `main` or `master` -> `feat/login`
-  - base `feature/cpq` -> `feature/cpq-login`
+- per-repo default Git branch: `feat/login`
 
-Folder names and branch names stay separate because folders must be path-safe while Git branches normally use `/`. `workbranch` uses `-` as the folder-safe type/detail separator, so `feat-login` is the task-folder form of `feat/login`. Repo-specific branch prompts still let you override the default per repo.
+When every repo shares one identical parent feature base, such as `feature/cpq`, the conventional task type would not appear in the branch. In that case `workbranch add` asks only for the task name and mirrors the resulting branch into the folder name by replacing `/` with `-`:
 
-Interactive `workbranch add <detail>` enters the same creation flow, using `<detail>` as the default Task detail name. For example, `workbranch add login` asks for Task type, shows `login` as the editable detail default, and recommends the folder `feat-login`; each repo then suggests a branch from its configured base branch. `workbranch add feat-login` remains a direct shorthand for the conventional task key. Non-interactive scripts can still pass task keys without the conventional `type-` prefix; those legacy explicit keys keep branch-prefix defaults for compatibility.
+- task name: `login`
+- task folder: `feature-cpq-login`
+- per-repo default Git branch: `feature/cpq-login`
+
+Interactive `workbranch add <name>` follows the same base-aware prompt flow with `<name>` as the editable default. On `main`/`master` bases it asks for `Task type` and `Task detail name [<name>]`; on a shared parent feature base it asks only for `Task name [<name>]`.
+
+`workbranch add feat-login` remains a direct shorthand for the conventional task key. On a parent feature base, that explicit shorthand keeps folder `feat-login` for compatibility while defaulting the branch to `feature/cpq-login`. Explicit parent-slug keys such as `workbranch add feature-cpq-login` are accepted and resolve back to `feature/cpq-login`. Non-interactive scripts can still pass task keys without the conventional `type-` prefix; those legacy explicit keys keep branch-prefix defaults for compatibility.
+
+Folder names and branch names stay separate surfaces because folders must be path-safe while Git branches normally use `/`. Repo-specific branch prompts still let you override the default per repo.
 
 By default, `workbranch add` creates task branches from the current HEAD of your local `_base/<repo>` worktrees. It does not pull remote base branches automatically. To start from the latest remote base, run:
 

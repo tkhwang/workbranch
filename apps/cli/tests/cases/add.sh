@@ -119,6 +119,77 @@ CONFIG
   assert_contains "$(cat "$project/feat-task1/.workbranch.task")" "REPO_BRANCH backend feature/cpq-task1"
 }
 
+test_add_parent_slug_task_folder_maps_to_parent_prefixed_branch() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  commit_to_remote_branch frontend feature/cpq parent-frontend
+  cat > "$project/.workbranch.config" <<CONFIG
+PROJECT_NAME fullstack
+MAIN_WORKTREES_DIR _base
+BRANCH_PREFIX feature
+
+REPO frontend $TMP_ROOT/remotes/frontend.git feature/cpq
+CONFIG
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+
+  out=$(printf '\n' | "$WORKBRANCH" add feature-cpq-task1 2>&1)
+  status=$?
+
+  [ "$status" -eq 0 ] || fail "add with parent-slug task folder failed: $out"
+  assert_contains "$out" "  task repo branch [feature/cpq-task1]"
+  assert_contains "$out" "  task repo folder: feature-cpq-task1/frontend"
+  assert_not_contains "$out" "feature/cpq-feature-cpq-task1"
+  assert_branch "$project/feature-cpq-task1/frontend" "feature/cpq-task1"
+  assert_contains "$(cat "$project/feature-cpq-task1/.workbranch.task")" "REPO_BRANCH frontend feature/cpq-task1"
+}
+
+with_project_identity_libs() {
+  (
+    . "$REPO_ROOT/apps/cli/src/workbranch/lib/output.sh"
+    . "$REPO_ROOT/apps/cli/src/workbranch/lib/validation.sh"
+    . "$REPO_ROOT/apps/cli/src/workbranch/lib/config.sh"
+    . "$REPO_ROOT/apps/cli/src/workbranch/lib/task-identity.sh"
+    . "$REPO_ROOT/apps/cli/src/workbranch/lib/project.sh"
+    "$@"
+  )
+}
+
+assert_shared_parent_feature_base() {
+  expected=$1
+  shift
+  REPO_NAMES=()
+  REPO_BASE_BRANCHES=()
+  BRANCH_PREFIX=feature
+  for base in "$@"; do
+    REPO_NAMES[${#REPO_NAMES[@]}]="repo${#REPO_NAMES[@]}"
+    REPO_BASE_BRANCHES[${#REPO_BASE_BRANCHES[@]}]=$base
+  done
+  got=$(all_repos_share_parent_feature_base) || fail "expected shared parent feature base for: $*"
+  [ "$got" = "$expected" ] || fail "expected shared parent feature base $expected, got $got"
+}
+
+assert_no_shared_parent_feature_base() {
+  REPO_NAMES=()
+  REPO_BASE_BRANCHES=()
+  BRANCH_PREFIX=feature
+  for base in "$@"; do
+    REPO_NAMES[${#REPO_NAMES[@]}]="repo${#REPO_NAMES[@]}"
+    REPO_BASE_BRANCHES[${#REPO_BASE_BRANCHES[@]}]=$base
+  done
+  if got=$(all_repos_share_parent_feature_base); then
+    fail "expected no shared parent feature base for '$*', got $got"
+  fi
+}
+
+test_all_repos_share_parent_feature_base_detects_only_identical_parent_bases() {
+  with_project_identity_libs assert_shared_parent_feature_base feature/cpq feature/cpq || return 1
+  with_project_identity_libs assert_shared_parent_feature_base feature/cpq feature/cpq feature/cpq || return 1
+  with_project_identity_libs assert_no_shared_parent_feature_base feature/cpq main || return 1
+  with_project_identity_libs assert_no_shared_parent_feature_base feature/cpq feature/xyz || return 1
+  with_project_identity_libs assert_no_shared_parent_feature_base main || return 1
+}
+
 test_add_prompts_for_task_type_and_detail_without_task_argument() {
   new_fixture
   project="$FIXTURE_PROJECT"
@@ -136,6 +207,138 @@ test_add_prompts_for_task_type_and_detail_without_task_argument() {
   assert_not_contains "$out" "Default task branch:"
   assert_branch "$project/feat-branch-name/frontend" "feat/branch-name"
   assert_branch "$project/feat-branch-name/backend" "feat/branch-name"
+}
+
+test_add_prompts_for_task_name_only_on_shared_parent_feature_base() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  commit_to_remote_branch frontend feature/cpq parent-frontend
+  cat > "$project/.workbranch.config" <<CONFIG
+PROJECT_NAME fullstack
+MAIN_WORKTREES_DIR _base
+BRANCH_PREFIX feature
+
+REPO frontend $TMP_ROOT/remotes/frontend.git feature/cpq
+CONFIG
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+
+  out=$(printf 'task1\n\n' | "$WORKBRANCH" add 2>&1)
+  status=$?
+
+  [ "$status" -eq 0 ] || fail "name-only add on shared parent feature base failed: $out"
+  assert_contains "$out" "Task name"
+  assert_not_contains "$out" "Task type"
+  assert_not_contains "$out" "Task detail name"
+  assert_contains "$out" "Task folder: feature-cpq-task1"
+  assert_contains "$out" "  task repo branch [feature/cpq-task1]"
+  assert_contains "$out" "  task repo folder: feature-cpq-task1/frontend"
+  assert_branch "$project/feature-cpq-task1/frontend" "feature/cpq-task1"
+}
+
+test_add_bare_tty_name_prefills_task_name_on_shared_parent_feature_base() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  commit_to_remote_branch frontend feature/cpq parent-frontend
+  cat > "$project/.workbranch.config" <<CONFIG
+PROJECT_NAME fullstack
+MAIN_WORKTREES_DIR _base
+BRANCH_PREFIX feature
+
+REPO frontend $TMP_ROOT/remotes/frontend.git feature/cpq
+CONFIG
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+
+  out=$(printf '\n\n' | run_with_pty sh -c 'cd "$1" && shift && exec "$@"' sh "$project" "$WORKBRANCH" add task1 2>&1)
+  status=$?
+
+  [ "$status" -eq 0 ] || fail "TTY bare-name add on shared parent feature base failed: $out"
+  assert_contains "$out" "Task name [task1]"
+  assert_not_contains "$out" "Task type"
+  assert_not_contains "$out" "Task detail name"
+  assert_contains "$out" "Task folder: feature-cpq-task1"
+  assert_contains "$out" "  task repo branch [feature/cpq-task1]"
+  assert_branch "$project/feature-cpq-task1/frontend" "feature/cpq-task1"
+  assert_not_exists "$project/task1"
+}
+
+test_add_mixed_bases_keep_conventional_task_identity_prompt() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  commit_to_remote_branch frontend feature/cpq parent-frontend
+  cat > "$project/.workbranch.config" <<CONFIG
+PROJECT_NAME fullstack
+MAIN_WORKTREES_DIR _base
+BRANCH_PREFIX feature
+
+REPO frontend $TMP_ROOT/remotes/frontend.git feature/cpq
+REPO backend $TMP_ROOT/remotes/backend.git master
+CONFIG
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+
+  out=$(printf 'feat\ntask1\n\n\n' | "$WORKBRANCH" add 2>&1)
+  status=$?
+
+  [ "$status" -eq 0 ] || fail "mixed-base interactive add failed: $out"
+  assert_contains "$out" "Task type [feat]"
+  assert_contains "$out" "Task detail name"
+  assert_contains "$out" "Task folder: feat-task1"
+  assert_contains "$out" "  task repo branch [feature/cpq-task1]"
+  assert_contains "$out" "  task repo branch [feat/task1]"
+  assert_branch "$project/feat-task1/frontend" "feature/cpq-task1"
+  assert_branch "$project/feat-task1/backend" "feat/task1"
+}
+
+test_add_noninteractive_bare_name_keeps_legacy_folder_on_parent_feature_base() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  commit_to_remote_branch frontend feature/cpq parent-frontend
+  cat > "$project/.workbranch.config" <<CONFIG
+PROJECT_NAME fullstack
+MAIN_WORKTREES_DIR _base
+BRANCH_PREFIX feature
+
+REPO frontend $TMP_ROOT/remotes/frontend.git feature/cpq
+CONFIG
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+
+  out=$(printf '\n' | "$WORKBRANCH" add task1 2>&1)
+  status=$?
+
+  [ "$status" -eq 0 ] || fail "non-interactive bare-name add on parent feature base failed: $out"
+  assert_not_contains "$out" "Task name"
+  assert_not_contains "$out" "Task type"
+  assert_contains "$out" "  task repo branch [feature/cpq-task1]"
+  assert_contains "$out" "  task repo folder: task1/frontend"
+  assert_branch "$project/task1/frontend" "feature/cpq-task1"
+  assert_not_exists "$project/feature-cpq-task1"
+}
+
+test_add_parent_feature_base_with_unsafe_folder_slug_keeps_legacy_default() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  commit_to_remote_branch frontend 'feature/cpq+exp' parent-frontend
+  cat > "$project/.workbranch.config" <<CONFIG
+PROJECT_NAME fullstack
+MAIN_WORKTREES_DIR _base
+BRANCH_PREFIX feature
+
+REPO frontend $TMP_ROOT/remotes/frontend.git feature/cpq+exp
+CONFIG
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+
+  out=$(printf '\n' | "$WORKBRANCH" add task1 2>&1)
+  status=$?
+
+  [ "$status" -eq 0 ] || fail "add with folder-unsafe parent base failed: $out"
+  assert_not_contains "$out" "parent branch folder slug"
+  assert_contains "$out" "  task repo branch [feature/cpq+exp-task1]"
+  assert_contains "$out" "  task repo folder: task1/frontend"
+  assert_branch "$project/task1/frontend" "feature/cpq+exp-task1"
 }
 
 test_add_task_argument_prefills_interactive_task_detail() {
