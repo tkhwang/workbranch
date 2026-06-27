@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.8.0](https://github.com/tkhwang/workbranch/compare/v2.7.0...v2.8.0) (2026-06-27)
+
+
+### Features
+
+* **add:** support parent feature branch base ([1d99c80](https://github.com/tkhwang/workbranch/commit/1d99c80be7312ce0a08cf5fe564ccec7f00ca392))
+* **add:** support parent feature branch base ([ef090d6](https://github.com/tkhwang/workbranch/commit/ef090d6ee67abe9deb783fdc6be3ee1b8705f181))
+
 ## [2.7.0](https://github.com/tkhwang/workbranch/compare/v2.6.0...v2.7.0) (2026-06-22)
 
 
