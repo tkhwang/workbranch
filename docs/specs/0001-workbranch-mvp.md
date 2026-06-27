@@ -80,7 +80,7 @@ The recommended task identity is `type-detail` for the task folder. Each repo de
 
 ```text
 task type feat / detail login + base master      -> task folder feat-login -> default branch feat/login
-task type feat / detail task1 + base feature/cpq -> task folder feat-task1 -> default branch feature/cpq-task1
+interactive task name task1 + shared base feature/cpq -> task folder feature-cpq-task1 -> default branch feature/cpq-task1
 interactive add login         + base master      -> task folder feat-login -> default branch feat/login
 non-interactive task login    -> task folder login      -> legacy default branch feature/login
 base repo branch feature/cpq  + non-interactive task1   -> legacy default branch feature/cpq-task1
@@ -89,8 +89,8 @@ task folder feat-login        + override tk/login       -> chosen branch tk/logi
 
 Rule:
 
-- `workbranch add` with no positional task asks for task type and detail name, then derives task folder `<type>-<detail>`.
-- Interactive `workbranch add <detail>` enters that same task identity flow, using `<detail>` as the editable default for Task detail name.
+- `workbranch add` with no positional task asks for task type and detail name on `main`/`master`-style bases, then derives task folder `<type>-<detail>`. When every repo shares the same parent feature base, it asks only for task name and derives the folder by replacing `/` in the resulting branch with `-`.
+- Interactive `workbranch add <detail>` enters the same base-aware task identity flow, using `<detail>` as the editable default: Task detail name on `main`/`master`-style bases, or Task name on a shared parent feature base.
 - `workbranch add <task>` that starts with a known type followed by `-` is accepted as a direct conventional task key; the detail is everything after the first `-`.
 - For conventional task keys, repos on `main`/`master`-style bases default to `<type>/<detail>`. Repos on parent feature bases such as `feature/cpq` or `feat/cpq` default to `<base-branch>-<detail>`.
 - Non-interactive `workbranch add <task>` values without the conventional `type-` prefix keep the legacy default rule for script compatibility: parent feature base branches become `<base-branch>-<task>`, otherwise the default is `<BRANCH_PREFIX>/<task>` with `feature` as the compatibility fallback.

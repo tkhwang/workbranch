@@ -70,6 +70,8 @@ workbranch add login # (branch) feat/login
                      # (folder) feat-login/<repo>
 ```
 
+These quick-start examples assume a `main`/`master` base. If every repo is based on the same parent feature branch, such as `feature/cpq`, `workbranch add login` asks only for the task name and creates folder `feature-cpq-login/<repo>` with branch `feature/cpq-login`.
+
 ## What it creates
 
 For every task, `workbranch` creates linked worktrees under one shared task directory:

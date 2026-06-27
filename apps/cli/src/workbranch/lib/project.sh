@@ -69,11 +69,46 @@ base_branch_looks_like_parent_task_branch() {
   esac
 }
 
+all_repos_share_parent_feature_base() {
+  local count i base_branch common_base parent_slug
+  count=$(repo_count)
+  [ "$count" -gt 0 ] || return 1
+  i=0
+  common_base=""
+  while [ $i -lt "$count" ]; do
+    base_branch=$(repo_base_branch_at "$i")
+    base_branch_looks_like_parent_task_branch "$base_branch" || return 1
+    parent_slug=${base_branch//\//-}
+    is_safe_name "$parent_slug" || return 1
+    if [ -z "$common_base" ]; then
+      common_base=$base_branch
+    elif [ "$base_branch" != "$common_base" ]; then
+      return 1
+    fi
+    i=$((i + 1))
+  done
+  printf '%s' "$common_base"
+}
+
 default_repo_task_branch_at() {
-  local index task base_branch identity_branch task_detail
+  local index task base_branch identity_branch task_detail parent_slug parent_task_name
   index=$1
   task=$2
   base_branch=$(repo_base_branch_at "$index")
+  if base_branch_looks_like_parent_task_branch "$base_branch"; then
+    parent_slug=${base_branch//\//-}
+    if is_safe_name "$parent_slug"; then
+      case "$task" in
+        "$parent_slug"-*)
+          parent_task_name=${task#"$parent_slug"-}
+          if [ -n "$parent_task_name" ]; then
+            base_prefixed_branch_for_task "$base_branch" "$parent_task_name"
+            return 0
+          fi
+          ;;
+      esac
+    fi
+  fi
   if identity_branch=$(task_branch_from_folder_identity "$task"); then
     if base_branch_looks_like_parent_task_branch "$base_branch"; then
       task_detail=$(task_identity_detail_from_folder "$task")

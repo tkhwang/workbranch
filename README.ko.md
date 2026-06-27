@@ -70,6 +70,8 @@ workbranch add login # (branch) feat/login
                      # (folder) feat-login/<repo>
 ```
 
+이 quick-start 예시는 `main`/`master` base 기준입니다. 모든 repo가 `feature/cpq` 같은 동일 parent feature branch를 base로 쓰면 `workbranch add login`은 task name만 묻고 folder `feature-cpq-login/<repo>`, branch `feature/cpq-login`을 만듭니다.
+
 ## 생성되는 구조
 
 각 task마다 하나의 공유 task 디렉토리 아래에 linked worktree가 만들어집니다.
