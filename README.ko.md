@@ -11,9 +11,32 @@
 
 `workbranch`는 feature마다 하나의 task 폴더를 만들고, single repo와 multi-repo 프로젝트 모두에서 짧고 안전한 branch refresh 명령을 제공합니다.
 
-> 🖥️ **GUI를 선호하나요?** [WorkbranchCompanion](#native-menu-bar-companion)은 task 상태, 진행률, 알림을 메뉴바에서 한눈에 보여주는 macOS 네이티브 메뉴바 앱입니다.
+CLI는 workspace를 만들고 Git 흐름을 실행합니다. Companion은 macOS menu bar에서 task 상태, Plan 진행률, 알림을 보여줍니다. 둘 다 같은 `workbranch` project 상태를 읽으므로 CLI로 작업하고 Companion으로 한눈에 확인하는 방식으로 쓰면 됩니다.
 
 ![workbranch demo](./docs/figs/workbranch-demo.gif)
+
+## 한눈에 보기
+
+| 필요할 때                              | 사용                 | 역할                         | 설치                                                   |
+| -------------------------------------- | -------------------- | ---------------------------- | ------------------------------------------------------ |
+| task workspace 생성, 최신화, land/push | `workbranch` CLI     | 실제 Git/worktree 작업 실행  | `brew install tkhwang/tap/workbranch`                  |
+| task 상태, Plan 진행률, 알림 확인      | Workbranch Companion | CLI 상태를 menu bar에서 표시 | `brew install --cask tkhwang/tap/workbranch-companion` |
+
+## 빠른 시작
+
+```bash
+brew install tkhwang/tap/workbranch
+workbranch init                 # project와 repo 등록, 첫 task 생성 가능
+workbranch add login            # 필요할 때 새 task 생성
+cd feat-login                   # task root: AI agent 실행 위치
+workbranch status               # 모든 repo 상태 확인
+```
+
+macOS에서 Companion도 함께 쓰려면:
+
+```bash
+brew install --cask tkhwang/tap/workbranch-companion
+```
 
 ## Install
 
@@ -38,21 +61,7 @@ curl -fsSL https://raw.githubusercontent.com/tkhwang/workbranch/main/install.sh 
 
 Homebrew는 published release를 설치하고, curl installer는 `main`을 따라갑니다.
 
-## Repo top에서 build/run
-
-Monorepo root script로 두 deployable app을 모두 build/run할 수 있습니다.
-
-```bash
-pnpm install
-pnpm cli:build
-pnpm cli:run -- version
-pnpm companion:build
-pnpm companion:run
-```
-
-명시적 app alias도 제공합니다: `pnpm apps:cli:build`, `pnpm apps:cli:run -- <args>`, `pnpm apps:companion:build`, `pnpm apps:companion:run`.
-
-## Quick start
+## 처음 project 만들기
 
 `workbranch init`이 설정을 안내하고, 첫 task까지 바로 만들 수 있습니다.
 
@@ -72,7 +81,7 @@ workbranch add login # (branch) feat/login
 
 이 quick-start 예시는 `main`/`master` base 기준입니다. 모든 repo가 `feature/cpq` 같은 동일 parent feature branch를 base로 쓰면 `workbranch add login`은 task name만 묻고 folder `feature-cpq-login/<repo>`, branch `feature/cpq-login`을 만듭니다.
 
-## 생성되는 구조
+## CLI가 만드는 구조
 
 각 task마다 하나의 공유 task 디렉토리 아래에 linked worktree가 만들어집니다.
 
@@ -92,6 +101,8 @@ my-app-workspace
 agent가 작업을 시작하기 전에 `workbranch refresh <task>` 한 번이면 task 안의 모든 repo가 최신 base로 맞춰집니다 — repo마다 따로 pull하거나 rebase할 필요가 없습니다.
 
 multi-repo에서의 장점은 [AI agent workflow](docs/ai-agents.ko.md)를 참고하세요.
+
+Companion은 이 구조를 `workbranch list --global --json`으로 읽어서 task별 Plan, 진행률, 알림을 보여줍니다. task 생성, 최신화, land/push 같은 Git 변경은 계속 CLI에서 실행합니다.
 
 ## 작업 흐름
 
@@ -168,18 +179,18 @@ workbranch push                  # local feat/login -> origin/feat/login
 
 ## 주요 명령어
 
-| Command                    | 용도                                                    |
-| -------------------------- | ------------------------------------------------------- |
-| `workbranch init`          | config 기준으로 base worktree 생성 또는 clone           |
-| `workbranch add [<task>]`  | task workspace 생성                                     |
-| `workbranch list [--json]` | repo와 task workspace 목록 확인; `--json`은 machine-readable 출력 |
-| `workbranch memo [task]`   | `TASK-WORKBRANCH.md` task brief 확인/작성/삭제          |
-| `workbranch noti ...`       | task notification 추가/목록/삭제                        |
-| `workbranch status`        | base remote diff, task diff, dirty state 확인           |
-| `workbranch update [task]` | local base 기준으로 task의 모든 repo update (pull 없음) |
-| `workbranch land <task>`   | task 작업을 local base branch로 fast-forward 반영       |
-| `workbranch done <task>`   | 현재 Plan을 done 처리하고 archive로 이동                |
-| `workbranch push [task]`   | base 또는 task branch push                              |
+| Command                     | 용도                                                                        |
+| --------------------------- | --------------------------------------------------------------------------- |
+| `workbranch init`           | config 기준으로 base worktree 생성 또는 clone                               |
+| `workbranch add [<task>]`   | task workspace 생성                                                         |
+| `workbranch list [--json]`  | repo와 task workspace 목록 확인; `--json`은 machine-readable 출력           |
+| `workbranch memo [task]`    | `TASK-WORKBRANCH.md` task brief 확인/작성/삭제                              |
+| `workbranch noti ...`       | task notification 추가/목록/삭제                                            |
+| `workbranch status`         | base remote diff, task diff, dirty state 확인                               |
+| `workbranch update [task]`  | local base 기준으로 task의 모든 repo update (pull 없음)                     |
+| `workbranch land <task>`    | task 작업을 local base branch로 fast-forward 반영                           |
+| `workbranch done <task>`    | 현재 Plan을 done 처리하고 archive로 이동                                    |
+| `workbranch push [task]`    | base 또는 task branch push                                                  |
 | `workbranch doctor [--fix]` | project health 진단; safe fix는 stale worktree prune과 brief H1 repair 포함 |
 
 Combined flow shortcut:
@@ -192,46 +203,23 @@ Combined flow shortcut:
 
 ![img](./docs/figs/workbranch-git-flow.png)
 
-## Task brief & notifications
+## Companion으로 보기
 
-`workbranch add <task>`는 repo worktree 밖의 task root에 workbranch-managed state를 생성합니다.
+Workbranch Companion은 CLI가 만든 project/task 상태를 macOS menu bar에서 보여주는 앱입니다.
 
-- `<task>/TASK-WORKBRANCH.md`는 사람/AI agent가 함께 갱신하는 현재 Plan brief입니다. 생성 템플릿은 `# <plan>` H1을 Plan 이름으로 쓰고, 바로 아래 Plan-local `status: todo|planning|in-progress|review|blocked|done` 줄과 Markdown checklist Step을 둡니다. `plan:`과 `## Plan:`은 더 이상 지원 brief 형식이 아닙니다. `workbranch done <task>`는 현재 Plan을 done 처리한 뒤 `.workbranch/plans/done/<timestamp>-<slug>.md`로 이동하고 brief를 다음 Plan용으로 비웁니다. `land`/`finalize` 성공 후와 `pull` 뒤 안전하게 merged task를 감지했을 때도 확인 프롬프트 후 같은 archive 동작을 수행합니다. `workbranch memo <task> [text]`로 읽거나 덮어쓰고, `workbranch memo <task> --clear`로 삭제합니다. Task workspace 안에서는 읽기일 때만 `workbranch memo`처럼 `<task>`를 생략할 수 있습니다.
-- `<task>/AGENTS.md`는 `<task>` 또는 `<task>/<repo>`에서 실행되는 AI agent가 같은 task brief를 갱신하도록 안내합니다. 갱신 시점은 시작/재개, active step 변경, 검증 전후, blocked, final response 직전입니다. 또한 repo 수정 전에 repo-local 지침을 읽도록 안내합니다.
-- `<task>/.workbranch/notifications.jsonl`은 append-only local inbox입니다. `workbranch noti add/list/clear`가 관리하고, `workbranch list --json`은 companion app용 `notiCount`, `plans`, `planTitle`, `status`, `progressDone`, `progressTotal`, `currentItem`, `updatedAt`을 노출합니다.
+- Companion: `status`, Plan/Step 진행률, notification, memo, Finder/IDE/terminal 열기처럼 작업 상태를 확인하고 이동하는 화면
+- 공통 상태: task root의 `TASK-WORKBRANCH.md`, `.workbranch/notifications.jsonl`, 그리고 `workbranch list --global --json` 출력
 
-`workbranch remove <task>`는 workspace 제거가 성공한 뒤 known workbranch task state(`TASK-WORKBRANCH.md`, generated `AGENTS.md`, `.workbranch/`, `.workbranch.task`)를 삭제합니다. 그 외 task root에 남은 항목은 `.omx/`, `.omc/` 같은 agent runtime folder를 포함해 git으로 관리되지 않는 잔여물입니다. Normal remove는 이 목록을 보여주고 task root 전체를 삭제할지 한 번 묻습니다. `workbranch remove <task> --force`는 일반 safety preflight 통과 후 묻지 않고 task root를 제거합니다.
-
-`workbranch doctor`는 task brief format도 확인합니다. `status:` 또는 checklist item이 있는데 `# <plan>` H1이 없는 brief는 zero Plan으로 parse되어 CLI HUD와 companion app에서 보이지 않으므로 issue로 보고합니다. `workbranch doctor --fix`는 brief 본문을 rewrite하지 않고 맨 앞에 `# <task>` heading 한 줄만 추가할 수 있습니다. Backup은 만들지 않으며, 되돌리려면 삽입된 첫 줄을 삭제하면 됩니다. Checklist item이 계속 `##` note section 아래에 남아 있으면 intended Plan을 `# ` heading으로 승격하라는 manual follow-up을 보고하고, 그 조치가 끝날 때까지 non-zero로 종료합니다.
-
-## Native menu bar companion
-
-`apps/companion/`에는 Tauri v2 + React 기반 macOS menu bar app인 `WorkbranchCompanion.app`이 있습니다. 이 앱은 typed Tauri command 경계로 `workbranch list --global --json`을 호출하고, `packages/contract` Published Language를 통해 CLI JSON contract를 번역합니다. 범위는 기존 companion과 같은 presentation-first 운영 기능입니다: task status/progress, Plan/Step 표시, notification, memo edit, Finder/IDE/terminal launch, copy path, refresh/quit, local activity report. `add`, `done`, `land`, `push` 같은 task lifecycle/Git mutation은 계속 CLI 전용입니다.
-
-Activity history는 `~/.local/state/workbranch/activity.jsonl`에 저장되고, 관련 repo/task workspace가 나중에 제거되어도 보존됩니다. Root 설정은 `~/.config/workbranch-companion/projects.md`에서 합니다.
-
-Published release 설치:
+설치:
 
 ```bash
-brew tap tkhwang/tap
 brew install --cask tkhwang/tap/workbranch-companion
-```
-
-Published companion release는 Developer ID 인증서로 서명되고 notarization을 거치므로, Gatekeeper quarantine 우회 flag가 필요하지 않습니다.
-
-Local build:
-
-```bash
-pnpm install
-pnpm --filter @workbranch/companion test
-pnpm --filter @workbranch/companion tauri build
-open "apps/companion/src-tauri/target/release/bundle/macos/WorkbranchCompanion.app"
 ```
 
 ## More docs
 
 - [Task identity와 branch 이름](docs/task-identity.ko.md)
-- [Usage details](docs/usage.ko.md)
+- [사용 상세](docs/usage.ko.md)
 - [AI agent workflow](docs/ai-agents.ko.md)
 - [Architecture](docs/architecture.md)
 - [Git operations](docs/git-operations.md)
