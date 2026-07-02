@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.9.0](https://github.com/tkhwang/workbranch/compare/v2.8.0...v2.9.0) (2026-07-02)
+
+
+### Features
+
+* **config:** improve repo setup prompt ([d74a3c7](https://github.com/tkhwang/workbranch/commit/d74a3c78eef9db2c19491ddd4ab4310b9c3c97b5))
+* **config:** improve repo setup prompt ([f09d215](https://github.com/tkhwang/workbranch/commit/f09d2151ea3aacef7895328418ed8abf59fcb391))
+
 ## [2.8.0](https://github.com/tkhwang/workbranch/compare/v2.7.0...v2.8.0) (2026-06-27)
 
 
