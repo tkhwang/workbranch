@@ -442,12 +442,16 @@ test_config_preserves_task_setup_while_prompting_repo_setup() {
   assert_contains "$out" "[*] Terminal command:"
   assert_contains "$out" "[*] Choose terminal [keep]:"
   assert_contains "$out" "[*] Base repo branch for frontend [master]:"
-  assert_contains "$out" "[*] Repo setup command for frontend [pnpm install] (example, Enter to skip):"
+  assert_contains "$out" "[*] Choose repo setup for frontend [1]:"
   assert_contains "$out" "[*] Base repo branch for backend [master]:"
-  assert_contains "$out" "[*] Repo setup command for backend [pnpm install] (example, Enter to skip):"
+  assert_contains "$out" "[*] Choose repo setup for backend [1]:"
   assert_not_contains "$out" "Task setup command"
-  assert_contains "$out" "$(printf '%s \n\n%s' "[*] Repo setup command for frontend [pnpm install] (example, Enter to skip):" "[*] Base repo branch for backend [master]:")"
-  assert_contains "$out" "$(printf '%s \n\n%s' "[*] Repo setup command for backend [pnpm install] (example, Enter to skip):" "[+] Config updated:")"
+  assert_contains "$out" "1) pnpm install (typical example)"
+  assert_contains "$out" "2) Clear (no setup command)"
+  case "$out" in
+    *"Choose repo setup for frontend"*"Base repo branch for backend"*"Choose repo setup for backend"*"[+] Config updated:"*) ;;
+    *) fail "expected repo setup prompts to interleave with base branch prompts; got: $out" ;;
+  esac
   case "$out" in
     *"Base repo branch for frontend"*"Repo setup command for frontend"*"Base repo branch for backend"*"Repo setup command for backend"*) ;;
     *) fail "expected config to ask branch and setup per repo only; got: $out" ;;

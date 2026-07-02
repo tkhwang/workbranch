@@ -46,8 +46,11 @@ INPUT
   assert_not_contains "$out" "Task branch examples: master + login -> feature/login, feature/cpq + task1 -> feature/cpq-task1"
   assert_contains "$out" "[*] Base repo branch [main]:"
   assert_contains "$out" "[*] Base repo branch [master]:"
-  assert_contains "$out" "[*] Repo setup command for frontend [pnpm install] (example, Enter to skip):"
-  assert_contains "$out" "[*] Repo setup command for backend [pnpm install] (example, Enter to skip):"
+  assert_contains "$out" "[*] Repo setup command for frontend:"
+  assert_contains "$out" "1) pnpm install (typical example)"
+  assert_contains "$out" "2) Clear (no setup command)"
+  assert_contains "$out" "[*] Choose repo setup for frontend [1]:"
+  assert_contains "$out" "[*] Choose repo setup for backend [1]:"
   assert_not_contains "$out" "[*] Task branch defaults:"
   assert_not_contains "$out" "[base repo] main        -> task1 -> [task repo] feature/task1"
   assert_not_contains "$out" "[base repo] feature/XXX -> task1 -> [task repo] feature/XXX-task1"
@@ -114,12 +117,12 @@ _base
 frontend
 $frontend_remote
 master
-
+2
 Y
 backend
 $backend_remote
 
-
+2
 n
 Y
 
