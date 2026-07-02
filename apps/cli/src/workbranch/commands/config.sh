@@ -278,14 +278,23 @@ configure_repo_setup_prompt() {
   current=$(repo_setup_at "$idx")
   if [ -n "$current" ]; then
     value=$(prompt_read "[*] Repo setup command for $name [$current]: ") || die "input aborted"
+    case "$value" in
+      "") ;;
+      --clear) clear_repo_setup "$name" ;;
+      *) set_repo_setup "$name" "$value" ;;
+    esac
   else
-    value=$(prompt_read "[*] Repo setup command for $name [pnpm install] (example, Enter to skip): ") || die "input aborted"
+    info "Repo setup command for $name:"
+    printf '    1) pnpm install (typical example)\n' >&2
+    printf '    2) Clear (no setup command)\n' >&2
+    printf '    or type a custom command\n' >&2
+    value=$(prompt_read "[*] Choose repo setup for $name [1]: ") || die "input aborted"
+    case "$value" in
+      ""|1) set_repo_setup "$name" "pnpm install" ;;
+      2|--clear) clear_repo_setup "$name" ;;
+      *) set_repo_setup "$name" "$value" ;;
+    esac
   fi
-  case "$value" in
-    "") ;;
-    --clear) clear_repo_setup "$name" ;;
-    *) set_repo_setup "$name" "$value" ;;
-  esac
 }
 
 base_worktrees_exist_in_dir() {
