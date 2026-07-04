@@ -206,15 +206,20 @@ function firstAvailableLane(
 	return undefined;
 }
 
+function laneEnd(session: CalendarSession, minimumLaneSeconds: number): number {
+	return Math.max(session.end, session.start + minimumLaneSeconds);
+}
+
 function assignClusterLanes(
 	cluster: readonly CalendarSession[],
+	minimumLaneSeconds: number,
 ): readonly LaneSession[] {
 	const laneEnds: number[] = [];
 	const assigned: LaneSession[] = [];
 	for (const session of cluster) {
 		const reusableLane = firstAvailableLane(laneEnds, session.start);
 		const lane = reusableLane ?? laneEnds.length;
-		laneEnds[lane] = session.end;
+		laneEnds[lane] = laneEnd(session, minimumLaneSeconds);
 		assigned.push({
 			...session,
 			lane,
@@ -231,12 +236,14 @@ function assignClusterLanes(
 function flushCluster(
 	lanes: LaneSession[],
 	cluster: readonly CalendarSession[],
+	minimumLaneSeconds: number,
 ): void {
-	lanes.push(...assignClusterLanes(cluster));
+	lanes.push(...assignClusterLanes(cluster, minimumLaneSeconds));
 }
 
 export function assignLanes(
 	sessions: readonly CalendarSession[],
+	minimumLaneSeconds = 0,
 ): readonly LaneSession[] {
 	const sorted = [...sessions].sort(
 		(left, right) => left.start - right.start || left.end - right.end,
@@ -246,14 +253,14 @@ export function assignLanes(
 	let clusterEnd = Number.NEGATIVE_INFINITY;
 	for (const session of sorted) {
 		if (cluster.length > 0 && session.start >= clusterEnd) {
-			flushCluster(lanes, cluster);
+			flushCluster(lanes, cluster, minimumLaneSeconds);
 			cluster = [];
 			clusterEnd = Number.NEGATIVE_INFINITY;
 		}
 		cluster.push(session);
-		clusterEnd = Math.max(clusterEnd, session.end);
+		clusterEnd = Math.max(clusterEnd, laneEnd(session, minimumLaneSeconds));
 	}
-	flushCluster(lanes, cluster);
+	flushCluster(lanes, cluster, minimumLaneSeconds);
 	return lanes;
 }
 

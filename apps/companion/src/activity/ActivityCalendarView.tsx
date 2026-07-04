@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { IDLE_GAP_SECONDS } from "../application/activity";
 import {
@@ -45,6 +45,7 @@ type CalendarTimelineProps = {
 
 const SECONDS_PER_HOUR = 60 * 60;
 const PALETTE_SIZE = 6;
+const MIN_DISPLAY_LANE_SECONDS = 90 * 60;
 
 function modeDays(mode: CalendarMode): number {
 	switch (mode) {
@@ -183,29 +184,12 @@ function timeRange(session: CalendarSession): string {
 	return `${formatTime(session.start)}–${formatTime(session.end)}`;
 }
 
-function lastPlanTitle(session: CalendarSession): string | undefined {
-	return session.planTitles[session.planTitles.length - 1];
-}
-
-function maybeRenderPlanTitle(session: CalendarSession): ReactNode {
-	const title = lastPlanTitle(session);
-	return title === undefined ? null : (
-		<span className="cal-block-plan">{title}</span>
-	);
-}
-
 function sessionDensity(session: CalendarSession): "compact" | "regular" {
 	return session.end - session.start < 30 * 60 ? "compact" : "regular";
 }
 
 function sessionWidth(session: LaneSession): "narrow" | "wide" {
 	return session.laneCount > 1 ? "narrow" : "wide";
-}
-
-function shouldShowPlanTitle(session: LaneSession): boolean {
-	return (
-		sessionDensity(session) === "regular" && sessionWidth(session) === "wide"
-	);
 }
 
 function daySessions(
@@ -216,6 +200,12 @@ function daySessions(
 	return sessions.filter(
 		(session) => session.end > dayStart && session.start < dayEnd,
 	);
+}
+
+export function assignDisplayLanes(
+	sessions: readonly CalendarSession[],
+): readonly LaneSession[] {
+	return assignLanes(sessions, MIN_DISPLAY_LANE_SECONDS);
 }
 
 export function CalendarTimeline({
@@ -276,12 +266,7 @@ export function CalendarTimeline({
 							>
 								<span className="cal-block-task">{session.task}</span>
 								{mode === "day" ? (
-									<>
-										<span className="cal-block-time">{timeRange(session)}</span>
-										{shouldShowPlanTitle(session)
-											? maybeRenderPlanTitle(session)
-											: null}
-									</>
+									<span className="cal-block-time">{timeRange(session)}</span>
 								) : null}
 							</button>
 						))}
@@ -354,7 +339,7 @@ export function ActivityCalendarView({
 		selectedProject === undefined
 			? events
 			: events.filter((event) => event.project === selectedProject);
-	const calendarSessions = assignLanes(
+	const calendarSessions = assignDisplayLanes(
 		clipToRange(sessionsFromEvents(filteredEvents), anchorEpoch, rangeEnd),
 	);
 	const selectedSession = calendarSessions.find(

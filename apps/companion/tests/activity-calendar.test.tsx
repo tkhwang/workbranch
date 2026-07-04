@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
+	assignDisplayLanes,
 	CALENDAR_MODES,
 	CalendarTimeline,
 } from "../src/activity/ActivityCalendarView";
@@ -155,6 +156,20 @@ describe("assignLanes", () => {
 			lanes.every((session) => session.lane === 0 && session.laneCount === 1),
 		).toBe(true);
 	});
+
+	it("separates close sessions when a display minimum would overlap", () => {
+		const sessions = sessionsFromEvents([
+			event(BASE, "a"),
+			event(BASE + 15 * 60, "b"),
+		]);
+
+		const lanes = assignLanes(sessions, 30 * 60);
+
+		expect(new Set(lanes.map((session) => session.lane))).toEqual(
+			new Set([0, 1]),
+		);
+		expect(lanes.every((session) => session.laneCount === 2)).toBe(true);
+	});
 });
 
 describe("clipToRange / hourRange / date helpers", () => {
@@ -231,16 +246,16 @@ describe("CalendarTimeline", () => {
 				mode="day"
 				selectedKey={undefined}
 				onSelect={() => {}}
-				sessions={laneSessions([DAY + 10 * 3600])}
+				sessions={laneSessions([DAY + 10 * 3600, DAY + 10 * 3600 + 25 * 60])}
 			/>,
 		);
 
 		expect(html).toContain("feat-x");
 		expect(html).toContain("9 AM");
-		expect(html).toContain("09:55–10:05");
+		expect(html).toContain("09:55–10:25");
 	});
 
-	it("keeps compact day sessions readable by omitting the plan row", () => {
+	it("keeps compact day sessions readable as task and time only", () => {
 		const html = renderToStaticMarkup(
 			<CalendarTimeline
 				days={[DAY]}
@@ -268,7 +283,7 @@ describe("CalendarTimeline", () => {
 		expect(html).not.toContain("Companion Activity calendar timeline");
 	});
 
-	it("keeps overlapping day lanes readable by hiding plan text in narrow lanes", () => {
+	it("keeps overlapping day lanes readable by hiding activity text in narrow lanes", () => {
 		const html = renderToStaticMarkup(
 			<CalendarTimeline
 				days={[DAY]}
@@ -303,6 +318,44 @@ describe("CalendarTimeline", () => {
 		expect(html).toContain("feature-cpq-task3");
 		expect(html).not.toContain("SCED configure roundtrip");
 		expect(html).not.toContain("RFQ list item count plan");
+		expect(html).toContain("13:55–14:05");
+		expect(html).toContain("13:56–14:06");
+	});
+
+	it("renders compact narrow overlaps as task and time only", () => {
+		const html = renderToStaticMarkup(
+			<CalendarTimeline
+				days={[DAY]}
+				mode="day"
+				selectedKey={undefined}
+				onSelect={() => {}}
+				sessions={assignLanes(
+					sessionsFromEvents([
+						{
+							observedAt: DAY + 8 * 3600 + 5 * 60,
+							root: "/r",
+							project: "workbranch",
+							task: "feat-calendar-workflow",
+							status: "in-progress",
+						},
+						{
+							observedAt: DAY + 8 * 3600 + 6 * 60,
+							root: "/r",
+							project: "workbranch",
+							task: "feat-calendar-followup",
+							status: "in-progress",
+						},
+					]),
+				)}
+			/>,
+		);
+
+		expect(html.match(/data-density="compact"/g)?.length).toBe(2);
+		expect(html.match(/data-width="narrow"/g)?.length).toBe(2);
+		expect(html).toContain("feat-calendar-workflow");
+		expect(html).toContain("feat-calendar-followup");
+		expect(html).toContain("08:00–08:10");
+		expect(html).toContain("08:01–08:11");
 	});
 
 	it("sets a taller minimum height for one-day compact readability", () => {
@@ -314,6 +367,21 @@ describe("CalendarTimeline", () => {
 		expect(css).toMatch(
 			/\.cal-timeline\[data-mode="day"\] \.cal-session\[data-density="compact"\][^}]*\.cal-timeline\[data-mode="day"\] \.cal-session\[data-width="narrow"\]\s*\{[^}]*align-content:\s*center/s,
 		);
+	});
+
+	it("separates visually overlapping compact blocks before rendering", () => {
+		const lanes = assignDisplayLanes(
+			sessionsFromEvents([
+				event(DAY + 8 * 3600 + 5 * 60, "feat-calendar-workflow"),
+				event(DAY + 8 * 3600 + 20 * 60, "feat-calendar-followup"),
+			]),
+		);
+
+		expect(lanes).toHaveLength(2);
+		expect(new Set(lanes.map((session) => session.lane))).toEqual(
+			new Set([0, 1]),
+		);
+		expect(lanes.every((session) => session.laneCount === 2)).toBe(true);
 	});
 
 	it("renders three day columns in three-day mode", () => {
