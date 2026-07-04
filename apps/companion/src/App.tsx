@@ -1,5 +1,6 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ActivityCalendarView } from "./activity/ActivityCalendarView";
 import { createActivityRefresh } from "./application/activity";
 import { resolvedCompanionTheme } from "./application/preferences";
 import { buildMenuModel, type MenuModel } from "./application/state";
@@ -11,6 +12,7 @@ import {
 	type CompanionCommand,
 	onRootChanged,
 	quitCompanion,
+	readActivityEvents,
 	refreshStatus,
 	runAction,
 	watchRoots,
@@ -208,10 +210,12 @@ export function App() {
 			{currentView === "activity" ? (
 				<section
 					className="activity-view view-panel"
-					aria-label="Activity report"
+					aria-label="Activity calendar"
 				>
-					<h2>Activity report</h2>
-					<p>Activity reporting will land in a future companion slice.</p>
+					<ActivityCalendarView
+						loadEvents={readActivityEvents}
+						today={() => new Date()}
+					/>
 				</section>
 			) : null}
 			{currentView === "settings" ? (

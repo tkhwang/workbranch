@@ -1,5 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import {
+	type CalendarEventInput,
+	calendarEventFromUnknown,
+} from "../activity/calendar";
 import type { ActivityEvent } from "../application/activity";
 import type { GlobalState } from "../domain/model";
 import { mapGlobalDocumentToState } from "./acl";
@@ -54,6 +58,19 @@ export async function appendActivityEvents(
 
 export async function quitCompanion(): Promise<void> {
 	await invoke("quit_app");
+}
+
+export async function readActivityEvents(
+	fromEpoch: number,
+	toEpoch: number,
+): Promise<readonly CalendarEventInput[]> {
+	const raw = await invoke<readonly unknown[]>("read_activity_events", {
+		fromEpoch,
+		toEpoch,
+	});
+	return raw
+		.map(calendarEventFromUnknown)
+		.filter((event): event is CalendarEventInput => event !== undefined);
 }
 
 export async function runAction(

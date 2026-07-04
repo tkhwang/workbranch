@@ -11,16 +11,16 @@
 
 `workbranch`는 feature마다 하나의 task 폴더를 만들고, single repo와 multi-repo 프로젝트 모두에서 짧고 안전한 branch refresh 명령을 제공합니다.
 
-CLI는 workspace를 만들고 Git 흐름을 실행합니다. Companion은 macOS menu bar에서 task 상태, Plan 진행률, 알림을 보여줍니다. 둘 다 같은 `workbranch` project 상태를 읽으므로 CLI로 작업하고 Companion으로 한눈에 확인하는 방식으로 쓰면 됩니다.
+CLI는 workspace를 만들고 Git 흐름을 실행합니다. Companion은 macOS menu bar에서 task 상태, Plan 진행률, activity timeline, 알림을 보여줍니다. 둘 다 같은 `workbranch` project 상태를 읽으므로 CLI로 작업하고 Companion으로 한눈에 확인하는 방식으로 쓰면 됩니다.
 
 ![workbranch demo](./docs/figs/workbranch-demo.gif)
 
 ## 한눈에 보기
 
-| 필요할 때                              | 사용                 | 역할                         | 설치                                                   |
-| -------------------------------------- | -------------------- | ---------------------------- | ------------------------------------------------------ |
-| task workspace 생성, 최신화, land/push | `workbranch` CLI     | 실제 Git/worktree 작업 실행  | `brew install tkhwang/tap/workbranch`                  |
-| task 상태, Plan 진행률, 알림 확인      | Workbranch Companion | CLI 상태를 menu bar에서 표시 | `brew install --cask tkhwang/tap/workbranch-companion` |
+| 필요할 때                                      | 사용                 | 역할                         | 설치                                                   |
+| ---------------------------------------------- | -------------------- | ---------------------------- | ------------------------------------------------------ |
+| task workspace 생성, 최신화, land/push         | `workbranch` CLI     | 실제 Git/worktree 작업 실행  | `brew install tkhwang/tap/workbranch`                  |
+| task 상태, Plan 진행률, activity timeline, 알림 확인 | Workbranch Companion | CLI 상태를 menu bar에서 표시 | `brew install --cask tkhwang/tap/workbranch-companion` |
 
 ## 빠른 시작
 
@@ -102,7 +102,7 @@ agent가 작업을 시작하기 전에 `workbranch refresh <task>` 한 번이면
 
 multi-repo에서의 장점은 [AI agent workflow](docs/ai-agents.ko.md)를 참고하세요.
 
-Companion은 이 구조를 `workbranch list --global --json`으로 읽어서 task별 Plan, 진행률, 알림을 보여줍니다. task 생성, 최신화, land/push 같은 Git 변경은 계속 CLI에서 실행합니다.
+Companion은 이 구조를 `workbranch list --global --json`으로 읽어서 task별 Plan, 진행률, 알림, activity timeline을 보여줍니다. task 생성, 최신화, land/push 같은 Git 변경은 계속 CLI에서 실행합니다.
 
 ## 작업 흐름
 
@@ -207,7 +207,7 @@ Combined flow shortcut:
 
 Workbranch Companion은 CLI가 만든 project/task 상태를 macOS menu bar에서 보여주는 앱입니다.
 
-- Companion: `status`, Plan/Step 진행률, notification, memo, Finder/IDE/terminal 열기처럼 작업 상태를 확인하고 이동하는 화면
+- Companion: `status`, Plan/Step 진행률, activity calendar timeline, notification, memo, Finder/IDE/terminal 열기처럼 작업 상태를 확인하고 이동하는 화면
 - 공통 상태: task root의 `TASK-WORKBRANCH.md`, `.workbranch/notifications.jsonl`, 그리고 `workbranch list --global --json` 출력
 
 설치:

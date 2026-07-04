@@ -11,7 +11,7 @@ Manage Git worktree task spaces without memorizing `git worktree` commands.
 
 `workbranch` creates one task folder per feature, works with one repo or many repos, and keeps branch refresh commands short and safe.
 
-The CLI creates workspaces and runs the Git flow. Companion shows task status, Plan progress, and notifications from the macOS menu bar. They read the same `workbranch` project state, so you can work from the CLI and check everything at a glance in Companion.
+The CLI creates workspaces and runs the Git flow. Companion shows task status, Plan progress, activity timelines, and notifications from the macOS menu bar. They read the same `workbranch` project state, so you can work from the CLI and check everything at a glance in Companion.
 
 ![workbranch demo](./docs/figs/workbranch-demo.gif)
 
@@ -20,7 +20,7 @@ The CLI creates workspaces and runs the Git flow. Companion shows task status, P
 | When you need to | Use | Role | Install |
 | ---------------- | --- | ---- | ------- |
 | Create, refresh, land, or push task workspaces | `workbranch` CLI | Runs the actual Git/worktree workflow | `brew install tkhwang/tap/workbranch` |
-| Check task status, Plan progress, and notifications | Workbranch Companion | Shows CLI state from the menu bar | `brew install --cask tkhwang/tap/workbranch-companion` |
+| Check task status, Plan progress, activity timelines, and notifications | Workbranch Companion | Shows CLI state from the menu bar | `brew install --cask tkhwang/tap/workbranch-companion` |
 
 ## Quick start
 
@@ -102,7 +102,7 @@ Before an agent starts, `workbranch refresh <task>` brings every repo in the tas
 
 See [AI agent workflows](docs/ai-agents.md) for the multi-repo benefits.
 
-Companion reads this structure through `workbranch list --global --json` and shows each task's Plan, progress, and notifications. Task creation, refresh, land, and push remain CLI actions.
+Companion reads this structure through `workbranch list --global --json` and shows each task's Plan, progress, notifications, and activity timeline. Task creation, refresh, land, and push remain CLI actions.
 
 ## Working on a task
 
@@ -207,7 +207,7 @@ Combined flow shortcuts:
 
 Workbranch Companion is a macOS menu bar app that shows the project/task state created by the CLI.
 
-- Companion: check and navigate task status, Plan/Step progress, notifications, memo, Finder/IDE/terminal launch actions
+- Companion: check and navigate task status, Plan/Step progress, activity calendar timelines, notifications, memo, Finder/IDE/terminal launch actions
 - Shared state: the task root's `TASK-WORKBRANCH.md`, `.workbranch/notifications.jsonl`, and `workbranch list --global --json` output
 
 Install:

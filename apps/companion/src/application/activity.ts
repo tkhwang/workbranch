@@ -36,8 +36,8 @@ export type ActivityRefreshDeps = {
 	readonly now: () => number;
 };
 
-const IDLE_GAP_SECONDS = 25 * 60;
-const LEAD_PAD_SECONDS = 5 * 60;
+export const IDLE_GAP_SECONDS = 25 * 60;
+export const LEAD_PAD_SECONDS = 5 * 60;
 
 function eventKey(event: ActivityEvent): string {
 	return [
