@@ -82,31 +82,37 @@
 
 .cal-chip[data-color="0"],
 .cal-session[data-color="0"] {
+	--cal-bg: rgba(203, 166, 247, 0.18);
 	--cal-color: var(--cal-1);
 }
 
 .cal-chip[data-color="1"],
 .cal-session[data-color="1"] {
+	--cal-bg: rgba(137, 180, 250, 0.18);
 	--cal-color: var(--cal-2);
 }
 
 .cal-chip[data-color="2"],
 .cal-session[data-color="2"] {
+	--cal-bg: rgba(166, 227, 161, 0.18);
 	--cal-color: var(--cal-3);
 }
 
 .cal-chip[data-color="3"],
 .cal-session[data-color="3"] {
+	--cal-bg: rgba(249, 226, 175, 0.18);
 	--cal-color: var(--cal-4);
 }
 
 .cal-chip[data-color="4"],
 .cal-session[data-color="4"] {
+	--cal-bg: rgba(245, 194, 231, 0.18);
 	--cal-color: var(--cal-5);
 }
 
 .cal-chip[data-color="5"],
 .cal-session[data-color="5"] {
+	--cal-bg: rgba(148, 226, 213, 0.18);
 	--cal-color: var(--cal-6);
 }
 
@@ -177,16 +183,10 @@
 }
 
 .cal-session {
-	background: color-mix(
-		in srgb,
-		var(--cal-color, var(--accent)) 18%,
-		transparent
-	);
-	border-color: color-mix(
-		in srgb,
-		var(--cal-color, var(--accent)) 62%,
-		var(--line)
-	);
+	--cal-bg: var(--accent-soft);
+
+	background: var(--cal-bg);
+	border-color: var(--cal-color, var(--accent));
 	border-left: 3px solid var(--cal-color, var(--accent));
 	border-radius: 7px;
 	box-shadow: none;
@@ -214,12 +214,31 @@
 
 .cal-session:hover:not(:disabled),
 .cal-session[data-selected="true"] {
-	background: color-mix(
-		in srgb,
-		var(--cal-color, var(--accent)) 26%,
-		transparent
-	);
-	border-color: var(--cal-color, var(--accent));
+	background: var(--cal-bg);
+}
+
+@supports (background: color-mix(in srgb, black, white)) {
+	.cal-session {
+		background: color-mix(
+			in srgb,
+			var(--cal-color, var(--accent)) 18%,
+			transparent
+		);
+		border-color: color-mix(
+			in srgb,
+			var(--cal-color, var(--accent)) 62%,
+			var(--line)
+		);
+	}
+
+	.cal-session:hover:not(:disabled),
+	.cal-session[data-selected="true"] {
+		background: color-mix(
+			in srgb,
+			var(--cal-color, var(--accent)) 26%,
+			transparent
+		);
+	}
 }
 
 .cal-block-task,

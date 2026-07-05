@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { App } from "../src/App";
+import { App, nextActivityReloadToken } from "../src/App";
 import { StatusAlert } from "../src/ui/StatusAlert";
 
 function readCssContract(path: string, visited = new Set<string>()): string {
@@ -29,6 +29,11 @@ function readCssContract(path: string, visited = new Set<string>()): string {
 }
 
 describe("App shell settings wiring", () => {
+	it("advances the activity reload token after successful app refreshes", () => {
+		expect(nextActivityReloadToken(0)).toBe(1);
+		expect(nextActivityReloadToken(41)).toBe(42);
+	});
+
 	it("skips already-read CSS imports to avoid import cycles", () => {
 		// Given two CSS files import each other
 		const directory = mkdtempSync(join(tmpdir(), "workbranch-css-cycle-"));

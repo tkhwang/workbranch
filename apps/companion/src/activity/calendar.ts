@@ -28,7 +28,6 @@ export type LaneSession = CalendarSession & {
 
 export const MIN_SESSION_SECONDS = 5 * 60;
 
-const SECONDS_PER_DAY = 24 * 60 * 60;
 const SECONDS_PER_HOUR = 60 * 60;
 const DEFAULT_START_HOUR = 9;
 const DEFAULT_END_HOUR = 19;
@@ -268,18 +267,20 @@ function clampHour(hour: number): number {
 	return Math.max(0, Math.min(24, hour));
 }
 
-export function hourRange(
-	sessions: readonly CalendarSession[],
-	dayStart: number,
-): HourRange {
+function containingDayStart(epoch: number): number {
+	return startOfDayEpoch(new Date(epoch * 1000));
+}
+
+export function hourRange(sessions: readonly CalendarSession[]): HourRange {
 	let startHour = DEFAULT_START_HOUR;
 	let endHour = DEFAULT_END_HOUR;
 	for (const session of sessions) {
+		const sessionDayStart = containingDayStart(session.start);
 		const sessionStartHour = Math.floor(
-			(session.start - dayStart) / SECONDS_PER_HOUR,
+			(session.start - sessionDayStart) / SECONDS_PER_HOUR,
 		);
 		const sessionEndHour = Math.ceil(
-			(session.end - dayStart) / SECONDS_PER_HOUR,
+			(session.end - sessionDayStart) / SECONDS_PER_HOUR,
 		);
 		startHour = Math.min(startHour, sessionStartHour);
 		endHour = Math.max(endHour, sessionEndHour);
@@ -301,7 +302,9 @@ export function startOfDayEpoch(anchor: Date): number {
 }
 
 export function addDays(epoch: number, days: number): number {
-	return epoch + days * SECONDS_PER_DAY;
+	const date = new Date(epoch * 1000);
+	date.setDate(date.getDate() + days);
+	return Math.floor(date.getTime() / 1000);
 }
 
 export function projectColorIndex(

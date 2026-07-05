@@ -108,12 +108,13 @@ pub(crate) fn read_activity_events_in_range(
 
     let mut events = Vec::new();
     for line in BufReader::new(file).lines() {
-        let line = line?;
+        let Ok(line) = line else {
+            continue;
+        };
         let Ok(value) = serde_json::from_str::<serde_json::Value>(&line) else {
             continue;
         };
-        let Some(observed_at) = value.get("observedAt").and_then(serde_json::Value::as_u64)
-        else {
+        let Some(observed_at) = value.get("observedAt").and_then(serde_json::Value::as_u64) else {
             continue;
         };
         if observed_at >= from_epoch && observed_at <= to_epoch {
@@ -131,18 +132,13 @@ mod tests {
 
     fn tempdir_like() -> Result<PathBuf, Box<dyn std::error::Error>> {
         let suffix = NEXT_TEMP_DIR.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!(
-            "wb-activity-test-{}-{suffix}",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("wb-activity-test-{}-{suffix}", std::process::id()));
         fs::create_dir_all(&path)?;
         Ok(path)
     }
 
-    fn write_lines(
-        dir: &Path,
-        lines: &[&str],
-    ) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    fn write_lines(dir: &Path, lines: &[&str]) -> Result<PathBuf, Box<dyn std::error::Error>> {
         let path = dir.join("activity.jsonl");
         let mut file = std::fs::File::create(&path)?;
         for line in lines {
@@ -172,8 +168,8 @@ mod tests {
     }
 
     #[test]
-    fn skips_unparseable_and_legacy_lines_without_observed_at(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn skips_unparseable_and_legacy_lines_without_observed_at()
+    -> Result<(), Box<dyn std::error::Error>> {
         let dir = tempdir_like()?;
         let path = write_lines(
             &dir,
@@ -188,6 +184,24 @@ mod tests {
 
         assert_eq!(events.len(), 1);
         assert_eq!(events[0]["observedAt"], 100);
+        Ok(())
+    }
+
+    #[test]
+    fn skips_invalid_utf8_lines_and_continues() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempdir_like()?;
+        let path = dir.join("activity.jsonl");
+        let mut file = std::fs::File::create(&path)?;
+        file.write_all(br#"{"v":1,"observedAt":100,"project":"a","task":"t"}"#)?;
+        file.write_all(b"\n\xff\xfe\n")?;
+        file.write_all(br#"{"v":1,"observedAt":200,"project":"a","task":"t"}"#)?;
+        file.write_all(b"\n")?;
+
+        let events = read_activity_events_in_range(&path, 0, 1_000)?;
+
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0]["observedAt"], 100);
+        assert_eq!(events[1]["observedAt"], 200);
         Ok(())
     }
 

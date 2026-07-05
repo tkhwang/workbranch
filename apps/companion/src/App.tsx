@@ -47,8 +47,13 @@ function commandForTaskAction(
 	}
 }
 
+export function nextActivityReloadToken(current: number): number {
+	return current + 1;
+}
+
 export function App() {
 	const [state, setState] = useState<GlobalState>(EMPTY_STATE);
+	const [activityReloadToken, setActivityReloadToken] = useState(0);
 	const [status, setStatus] = useState("Ready");
 	const [visibleError, setVisibleError] = useState<string>();
 	const [currentView, setCurrentView] = useState<CompanionView>("main");
@@ -92,6 +97,7 @@ export function App() {
 	const applyState = useCallback(
 		(next: GlobalState) => {
 			setState(next);
+			setActivityReloadToken(nextActivityReloadToken);
 			showStatus("Updated");
 		},
 		[showStatus],
@@ -214,6 +220,7 @@ export function App() {
 				>
 					<ActivityCalendarView
 						loadEvents={readActivityEvents}
+						reloadToken={activityReloadToken}
 						today={() => new Date()}
 					/>
 				</section>

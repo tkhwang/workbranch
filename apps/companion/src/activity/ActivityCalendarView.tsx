@@ -32,7 +32,13 @@ type ActivityCalendarViewProps = {
 		fromEpoch: number,
 		toEpoch: number,
 	) => Promise<readonly CalendarEventInput[]>;
+	readonly reloadToken: number;
 	readonly today: () => Date;
+};
+
+type ActivityLoadRange = {
+	readonly from: number;
+	readonly to: number;
 };
 
 type CalendarTimelineProps = {
@@ -137,7 +143,7 @@ function CalendarModeIcon({ mode }: { readonly mode: CalendarMode }) {
 
 function timelineHours(startHour: number, endHour: number): readonly number[] {
 	const hours: number[] = [];
-	for (let hour = startHour; hour <= endHour; hour += 1) {
+	for (let hour = startHour; hour < endHour; hour += 1) {
 		hours.push(hour);
 	}
 	return hours;
@@ -208,6 +214,16 @@ export function assignDisplayLanes(
 	return assignLanes(sessions, MIN_DISPLAY_LANE_SECONDS);
 }
 
+export function activityLoadRange(
+	anchorEpoch: number,
+	rangeEnd: number,
+): ActivityLoadRange {
+	return {
+		from: anchorEpoch - IDLE_GAP_SECONDS,
+		to: rangeEnd + IDLE_GAP_SECONDS,
+	};
+}
+
 export function CalendarTimeline({
 	days,
 	sessions,
@@ -215,7 +231,7 @@ export function CalendarTimeline({
 	selectedKey,
 	onSelect,
 }: CalendarTimelineProps) {
-	const range = hourRange(sessions, days[0] ?? startOfDayEpoch(new Date()));
+	const range = hourRange(sessions);
 	const hours = timelineHours(range.startHour, range.endHour);
 	return (
 		<div className="cal-timeline" data-mode={mode}>
@@ -283,8 +299,21 @@ function projectNames(
 	return [...new Set(events.map((event) => event.project))].sort();
 }
 
+export function validateProjectFilter(
+	events: readonly CalendarEventInput[],
+	selectedProject: string | undefined,
+): string | undefined {
+	if (selectedProject === undefined) {
+		return undefined;
+	}
+	return events.some((event) => event.project === selectedProject)
+		? selectedProject
+		: undefined;
+}
+
 export function ActivityCalendarView({
 	loadEvents,
+	reloadToken,
 	today,
 }: ActivityCalendarViewProps) {
 	const [mode, setMode] = useState<CalendarMode>("day");
@@ -304,15 +333,25 @@ export function ActivityCalendarView({
 		[anchorEpoch, mode],
 	);
 	const rangeEnd = addDays(anchorEpoch, modeDays(mode));
+	const loadRange = useMemo(
+		() => ({
+			...activityLoadRange(anchorEpoch, rangeEnd),
+			reloadToken,
+		}),
+		[anchorEpoch, rangeEnd, reloadToken],
+	);
 
 	useEffect(() => {
 		let cancelled = false;
 		setLoading(true);
 		setError(undefined);
-		void loadEvents(anchorEpoch - IDLE_GAP_SECONDS, rangeEnd)
+		void loadEvents(loadRange.from, loadRange.to)
 			.then((nextEvents) => {
 				if (!cancelled) {
 					setEvents(nextEvents);
+					setSelectedProject((currentProject) =>
+						validateProjectFilter(nextEvents, currentProject),
+					);
 					setSelectedKey(undefined);
 				}
 			})
@@ -332,7 +371,7 @@ export function ActivityCalendarView({
 		return () => {
 			cancelled = true;
 		};
-	}, [anchorEpoch, loadEvents, rangeEnd]);
+	}, [loadEvents, loadRange]);
 
 	const projects = projectNames(events);
 	const filteredEvents =

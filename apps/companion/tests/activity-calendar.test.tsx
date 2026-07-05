@@ -2,9 +2,11 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
+	activityLoadRange,
 	assignDisplayLanes,
 	CALENDAR_MODES,
 	CalendarTimeline,
+	validateProjectFilter,
 } from "../src/activity/ActivityCalendarView";
 import {
 	addDays,
@@ -16,6 +18,7 @@ import {
 	sessionsFromEvents,
 	startOfDayEpoch,
 } from "../src/activity/calendar";
+import { IDLE_GAP_SECONDS } from "../src/application/activity";
 
 describe("calendarEventFromUnknown", () => {
 	it("accepts a modern event and keeps optional plan fields", () => {
@@ -77,6 +80,20 @@ function event(observedAt: number, task = "feat-x", planTitle?: string) {
 		status: "in-progress",
 		...(planTitle === undefined ? {} : { planTitle }),
 	};
+}
+
+function withTimeZone<Result>(timeZone: string, run: () => Result): Result {
+	const previousTimeZone = process.env.TZ;
+	process.env.TZ = timeZone;
+	try {
+		return run();
+	} finally {
+		if (previousTimeZone === undefined) {
+			delete process.env.TZ;
+		} else {
+			process.env.TZ = previousTimeZone;
+		}
+	}
 }
 
 describe("sessionsFromEvents", () => {
@@ -189,6 +206,22 @@ describe("clipToRange / hourRange / date helpers", () => {
 		expect(clipped[0]?.end).toBe(day + 600);
 	});
 
+	it("clips a session reconstructed with end-boundary lookahead to the day end", () => {
+		const day = startOfDayEpoch(new Date(2026, 6, 4));
+		const [session] = sessionsFromEvents([
+			event(day + 23 * 3600 + 50 * 60, "a"),
+			event(addDays(day, 1) + 10 * 60, "a"),
+		]);
+		if (session === undefined) {
+			throw new Error("expected a session");
+		}
+
+		const clipped = clipToRange([session], day, addDays(day, 1));
+
+		expect(clipped[0]?.start).toBe(day + 23 * 3600 + 45 * 60);
+		expect(clipped[0]?.end).toBe(addDays(day, 1));
+	});
+
 	it("drops sessions fully outside the range", () => {
 		const day = startOfDayEpoch(new Date(2026, 6, 4));
 		const [session] = sessionsFromEvents([event(day - 7200, "a")]);
@@ -206,11 +239,11 @@ describe("clipToRange / hourRange / date helpers", () => {
 			throw new Error("expected a session");
 		}
 
-		const range = hourRange([early], day);
+		const range = hourRange([early]);
 
 		expect(range.startHour).toBeLessThanOrEqual(5);
 		expect(range.endHour).toBe(19);
-		expect(hourRange([], day)).toEqual({ startHour: 9, endHour: 19 });
+		expect(hourRange([])).toEqual({ startHour: 9, endHour: 19 });
 	});
 
 	it("hashes project names to a stable palette index", () => {
@@ -220,9 +253,80 @@ describe("clipToRange / hourRange / date helpers", () => {
 		expect(projectColorIndex("workbranch", 6)).toBeGreaterThanOrEqual(0);
 		expect(projectColorIndex("workbranch", 6)).toBeLessThan(6);
 	});
+
+	it("advances to the next local midnight across DST start", () => {
+		withTimeZone("America/New_York", () => {
+			const day = startOfDayEpoch(new Date(2026, 2, 8));
+			const nextDay = addDays(day, 1);
+			const nextDate = new Date(nextDay * 1000);
+
+			expect(nextDate.getFullYear()).toBe(2026);
+			expect(nextDate.getMonth()).toBe(2);
+			expect(nextDate.getDate()).toBe(9);
+			expect(nextDate.getHours()).toBe(0);
+			expect(nextDate.getMinutes()).toBe(0);
+			expect(nextDay - day).toBe(23 * 3600);
+		});
+	});
+
+	it("keeps hour ranges relative to local days across DST start", () => {
+		withTimeZone("America/New_York", () => {
+			const nextDay = startOfDayEpoch(new Date(2026, 2, 9));
+			const [early] = sessionsFromEvents([event(nextDay + 30 * 60, "a")]);
+			if (early === undefined) {
+				throw new Error("expected a session");
+			}
+
+			const range = hourRange([early]);
+
+			expect(range.startHour).toBe(0);
+			expect(range.endHour).toBe(19);
+		});
+	});
 });
 
 const DAY = startOfDayEpoch(new Date(2026, 6, 4));
+
+describe("activityLoadRange", () => {
+	it("loads one idle gap past the visible end for boundary-crossing sessions", () => {
+		const range = activityLoadRange(DAY, addDays(DAY, 1));
+
+		expect(range).toEqual({
+			from: DAY - IDLE_GAP_SECONDS,
+			to: addDays(DAY, 1) + IDLE_GAP_SECONDS,
+		});
+	});
+});
+
+describe("validateProjectFilter", () => {
+	it("clears a selected project that is absent from freshly loaded events", () => {
+		const nextEvents = [
+			{
+				observedAt: DAY + 10 * 3600,
+				root: "/r",
+				project: "project-b",
+				task: "task-b",
+				status: "in-progress",
+			},
+		];
+
+		expect(validateProjectFilter(nextEvents, "project-a")).toBeUndefined();
+	});
+
+	it("keeps a selected project that is still present after loading events", () => {
+		const nextEvents = [
+			{
+				observedAt: DAY + 10 * 3600,
+				root: "/r",
+				project: "project-a",
+				task: "task-a",
+				status: "in-progress",
+			},
+		];
+
+		expect(validateProjectFilter(nextEvents, "project-a")).toBe("project-a");
+	});
+});
 
 function laneSessions(observedAts: readonly number[], task = "feat-x") {
 	return assignLanes(
@@ -253,6 +357,21 @@ describe("CalendarTimeline", () => {
 		expect(html).toContain("feat-x");
 		expect(html).toContain("9 AM");
 		expect(html).toContain("09:55–10:25");
+	});
+
+	it("renders one hour row per visible time interval", () => {
+		const html = renderToStaticMarkup(
+			<CalendarTimeline
+				days={[DAY]}
+				mode="day"
+				selectedKey={undefined}
+				onSelect={() => {}}
+				sessions={[]}
+			/>,
+		);
+
+		expect(html.match(/cal-hour-label/g)?.length).toBe(10);
+		expect(html.match(/cal-hour-rule/g)?.length).toBe(10);
 	});
 
 	it("keeps compact day sessions readable as task and time only", () => {
@@ -369,6 +488,28 @@ describe("CalendarTimeline", () => {
 		);
 	});
 
+	it("provides static project-colored fallbacks before color-mix session colors", () => {
+		const css = readFileSync("src/activity/activity-calendar.css", "utf8");
+		const sessionBlock = css.match(/\.cal-session\s*\{(?<body>[^}]*)\}/)?.groups
+			?.body;
+
+		if (sessionBlock === undefined) {
+			throw new Error("expected .cal-session CSS block");
+		}
+
+		expect(css).toMatch(
+			/\.cal-session\[data-color="0"\]\s*\{[^}]*--cal-bg:\s*rgba/s,
+		);
+		expect(sessionBlock).toMatch(/background:\s*var\(--cal-bg\)/);
+		expect(sessionBlock).toMatch(
+			/border-color:\s*var\(--cal-color,\s*var\(--accent\)\)/,
+		);
+		expect(sessionBlock).not.toContain("color-mix(");
+		expect(css).toMatch(
+			/@supports\s*\(background:\s*color-mix\(in srgb,\s*black,\s*white\)\)\s*\{[\s\S]*\.cal-session\s*\{[\s\S]*background:\s*color-mix/s,
+		);
+	});
+
 	it("separates visually overlapping compact blocks before rendering", () => {
 		const lanes = assignDisplayLanes(
 			sessionsFromEvents([
@@ -396,6 +537,31 @@ describe("CalendarTimeline", () => {
 		);
 
 		expect(html.match(/cal-day-column/g)?.length).toBe(3);
+	});
+
+	it("keeps early three-day hour bounds relative to each visible day", () => {
+		const html = renderToStaticMarkup(
+			<CalendarTimeline
+				days={[DAY, addDays(DAY, 1), addDays(DAY, 2)]}
+				mode="three-day"
+				selectedKey={undefined}
+				onSelect={() => {}}
+				sessions={assignLanes(
+					sessionsFromEvents([
+						{
+							observedAt: addDays(DAY, 1) + 8 * 3600,
+							root: "/r",
+							project: "workbranch",
+							task: "feat-next-day",
+							status: "in-progress",
+						},
+					]),
+				)}
+			/>,
+		);
+
+		expect(html).toContain("8 AM");
+		expect(html).not.toContain("12 AM");
 	});
 });
 
