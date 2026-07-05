@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import { IDLE_GAP_SECONDS } from "../application/activity";
 import {
 	addDays,
-	assignLanes,
 	type CalendarEventInput,
 	type CalendarSession,
 	clipToRange,
@@ -13,6 +12,9 @@ import {
 	sessionsFromEvents,
 	startOfDayEpoch,
 } from "./calendar";
+import { assignDisplayLanes } from "./displaySessions";
+
+export { assignDisplayLanes } from "./displaySessions";
 
 export type CalendarMode = "day" | "three-day";
 
@@ -51,7 +53,6 @@ type CalendarTimelineProps = {
 
 const SECONDS_PER_HOUR = 60 * 60;
 const PALETTE_SIZE = 6;
-const MIN_DISPLAY_LANE_SECONDS = 90 * 60;
 
 function modeDays(mode: CalendarMode): number {
 	switch (mode) {
@@ -206,12 +207,6 @@ function daySessions(
 	return sessions.filter(
 		(session) => session.end > dayStart && session.start < dayEnd,
 	);
-}
-
-export function assignDisplayLanes(
-	sessions: readonly CalendarSession[],
-): readonly LaneSession[] {
-	return assignLanes(sessions, MIN_DISPLAY_LANE_SECONDS);
 }
 
 export function activityLoadRange(
