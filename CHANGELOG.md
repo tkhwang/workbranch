@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.10.0](https://github.com/tkhwang/workbranch/compare/v2.9.0...v2.10.0) (2026-07-05)
+
+
+### Features
+
+* **activity:** coalesce calendar display sessions ([e43e656](https://github.com/tkhwang/workbranch/commit/e43e6565e5b162a51d121f97cb2ede3a534bedc3))
+* **calendar:** improve session display and lane assignment ([0323509](https://github.com/tkhwang/workbranch/commit/032350901dec4028f24ddddc4572dd834002032b))
+* **companion:** activity display ([32775f6](https://github.com/tkhwang/workbranch/commit/32775f69b0c18ffa26eb9fe71d6d793f99caa6d0))
+* **companion:** add activity timeline to companion ([e5715a6](https://github.com/tkhwang/workbranch/commit/e5715a616eff58daba3a1acb6f5dbb07ad4656d4))
+
+
+### Bug Fixes
+
+* **activity:** improve session coalescing logic ([abe9b2a](https://github.com/tkhwang/workbranch/commit/abe9b2a659ffa6528a0f698a5ec2c23b13b21da9))
+* **companion:** clarify companion activity view source ([ff7e99c](https://github.com/tkhwang/workbranch/commit/ff7e99cca4c32db6aed8298f9487278b619b1b80)), closes [#123](https://github.com/tkhwang/workbranch/issues/123)
+
 ## [2.9.0](https://github.com/tkhwang/workbranch/compare/v2.8.0...v2.9.0) (2026-07-02)
 
 
