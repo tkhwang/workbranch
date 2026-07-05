@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { sessionsFromEvents, startOfDayEpoch } from "../src/activity/calendar";
+import {
+	type CalendarSession,
+	sessionsFromEvents,
+	startOfDayEpoch,
+} from "../src/activity/calendar";
 import { assignDisplayLanes } from "../src/activity/displaySessions";
 
 const DAY = startOfDayEpoch(new Date(2026, 6, 4));
@@ -11,6 +15,19 @@ function event(observedAt: number, task: string) {
 		project: "workbranch",
 		task,
 		status: "in-progress",
+	};
+}
+
+function session(start: number, end: number, task: string): CalendarSession {
+	return {
+		key: `${task}\u0000${start}`,
+		root: "/r",
+		project: "workbranch",
+		task,
+		start,
+		end,
+		status: "in-progress",
+		planTitles: [],
 	};
 }
 
@@ -47,5 +64,28 @@ describe("assignDisplayLanes", () => {
 			new Set([0, 1]),
 		);
 		expect(lanes.every((session) => session.laneCount === 2)).toBe(true);
+	});
+
+	it("unifies long same-task sessions with a small gap after the end", () => {
+		const lanes = assignDisplayLanes([
+			session(
+				DAY + 7 * 3600,
+				DAY + 9 * 3600 + 30 * 60,
+				"feat-calendar-workflow",
+			),
+			session(
+				DAY + 9 * 3600 + 35 * 60,
+				DAY + 9 * 3600 + 45 * 60,
+				"feat-calendar-workflow",
+			),
+		]);
+
+		expect(lanes).toHaveLength(1);
+		expect(lanes[0]).toMatchObject({
+			lane: 0,
+			laneCount: 1,
+			start: DAY + 7 * 3600,
+			end: DAY + 9 * 3600 + 45 * 60,
+		});
 	});
 });

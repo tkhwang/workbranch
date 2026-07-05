@@ -11,14 +11,14 @@ function displayGroupKey(session: CalendarSession): string {
 }
 
 function displayLaneEnd(session: CalendarSession): number {
-	return Math.max(session.end, session.start + MIN_DISPLAY_LANE_SECONDS);
+	return session.end + MIN_DISPLAY_LANE_SECONDS;
 }
 
 function shouldCoalesce(
 	current: CalendarSession,
 	next: CalendarSession,
 ): boolean {
-	return current.end <= next.start && next.start < displayLaneEnd(current);
+	return current.end <= next.start && next.start <= displayLaneEnd(current);
 }
 
 function mergePlanTitles(
@@ -34,6 +34,7 @@ function mergeDisplaySession(
 ): CalendarSession {
 	return {
 		...current,
+		start: Math.min(current.start, next.start),
 		end: Math.max(current.end, next.end),
 		planTitles: mergePlanTitles(current.planTitles, next.planTitles),
 		status: next.status,
