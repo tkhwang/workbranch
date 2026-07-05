@@ -1,5 +1,6 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ActivityCalendarView } from "./activity/ActivityCalendarView";
 import { createActivityRefresh } from "./application/activity";
 import { resolvedCompanionTheme } from "./application/preferences";
 import { buildMenuModel, type MenuModel } from "./application/state";
@@ -11,6 +12,7 @@ import {
 	type CompanionCommand,
 	onRootChanged,
 	quitCompanion,
+	readActivityEvents,
 	refreshStatus,
 	runAction,
 	watchRoots,
@@ -45,8 +47,13 @@ function commandForTaskAction(
 	}
 }
 
+export function nextActivityReloadToken(current: number): number {
+	return current + 1;
+}
+
 export function App() {
 	const [state, setState] = useState<GlobalState>(EMPTY_STATE);
+	const [activityReloadToken, setActivityReloadToken] = useState(0);
 	const [status, setStatus] = useState("Ready");
 	const [visibleError, setVisibleError] = useState<string>();
 	const [currentView, setCurrentView] = useState<CompanionView>("main");
@@ -90,6 +97,7 @@ export function App() {
 	const applyState = useCallback(
 		(next: GlobalState) => {
 			setState(next);
+			setActivityReloadToken(nextActivityReloadToken);
 			showStatus("Updated");
 		},
 		[showStatus],
@@ -208,10 +216,13 @@ export function App() {
 			{currentView === "activity" ? (
 				<section
 					className="activity-view view-panel"
-					aria-label="Activity report"
+					aria-label="Activity calendar"
 				>
-					<h2>Activity report</h2>
-					<p>Activity reporting will land in a future companion slice.</p>
+					<ActivityCalendarView
+						loadEvents={readActivityEvents}
+						reloadToken={activityReloadToken}
+						today={() => new Date()}
+					/>
 				</section>
 			) : null}
 			{currentView === "settings" ? (

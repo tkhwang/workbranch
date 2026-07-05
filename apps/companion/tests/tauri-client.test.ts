@@ -13,6 +13,7 @@ import {
 	CompanionActionError,
 	ensureRunSucceeded,
 	quitCompanion,
+	readActivityEvents,
 	runAction,
 } from "../src/infrastructure/tauriClient";
 
@@ -52,6 +53,27 @@ describe("appendActivityEvents", () => {
 					planTitle: "Backend",
 				}),
 			],
+		});
+	});
+});
+
+describe("readActivityEvents", () => {
+	beforeEach(() => {
+		tauri.invoke.mockReset();
+	});
+
+	it("invokes the Tauri activity read command and filters invalid rows", async () => {
+		tauri.invoke.mockResolvedValue([
+			{ observedAt: 100, root: "/r", project: "workbranch", task: "feat-x" },
+			{ observedAt: 200, project: "missing-root", task: "bad" },
+		]);
+
+		await expect(readActivityEvents(0, 300)).resolves.toEqual([
+			{ observedAt: 100, root: "/r", project: "workbranch", task: "feat-x" },
+		]);
+		expect(tauri.invoke).toHaveBeenCalledWith("read_activity_events", {
+			fromEpoch: 0,
+			toEpoch: 300,
 		});
 	});
 });

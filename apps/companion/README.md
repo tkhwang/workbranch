@@ -6,6 +6,8 @@ Tauri v2 + React menu bar companion for the `workbranch` CLI.
 
 The companion is a presentation-first consumer of the CLI JSON contract. It reads task state through `workbranch list --global --json`, maps the DTOs through `packages/contract`, and delegates only the v1 allowlisted operational actions to the CLI: memo edit/clear, notification clear, Finder/IDE/terminal launch, and copy path. Task lifecycle and Git mutation commands remain CLI-only.
 
+The Activity view reads the local append-only activity log and renders project-colored task sessions in day or three-day calendar timelines. It is a navigation/reporting surface only; activity recording still comes from normal Companion refreshes and CLI state changes.
+
 ## Development
 
 ```bash

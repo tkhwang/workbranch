@@ -118,6 +118,18 @@ async fn append_activity_events(
 }
 
 #[tauri::command]
+async fn read_activity_events(
+    from_epoch: u64,
+    to_epoch: u64,
+) -> Result<Vec<serde_json::Value>, CompanionError> {
+    tauri::async_runtime::spawn_blocking(move || {
+        activity_store::read_activity_events_default(from_epoch, to_epoch)
+    })
+    .await
+    .map_err(|error| std::io::Error::other(error.to_string()))?
+}
+
+#[tauri::command]
 async fn workbranch_run(
     action: CompanionCommand,
     cwd: String,
@@ -259,6 +271,7 @@ pub fn run() {
             workbranch_list_global,
             workbranch_run,
             append_activity_events,
+            read_activity_events,
             watch_roots,
             quit_app,
         ]);

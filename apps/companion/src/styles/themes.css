@@ -34,6 +34,12 @@ main[data-theme="catppuccin-dark"] {
 	--current-step-bg:
 		linear-gradient(135deg, var(--accent-soft), transparent 70%),
 		var(--surface-3);
+	--cal-1: #cba6f7;
+	--cal-2: #89b4fa;
+	--cal-3: #a6e3a1;
+	--cal-4: #f9e2af;
+	--cal-5: #f5c2e7;
+	--cal-6: #94e2d5;
 }
 
 main[data-theme="breakfast-light"] {
@@ -77,6 +83,12 @@ main[data-theme="breakfast-light"] {
 	--current-step-bg:
 		linear-gradient(135deg, var(--accent-soft), transparent 72%),
 		var(--surface-3);
+	--cal-1: #7c3aed;
+	--cal-2: #1d4ed8;
+	--cal-3: #2f9e44;
+	--cal-4: #d97706;
+	--cal-5: #db2777;
+	--cal-6: #0d9488;
 }
 
 main[data-theme$="-light"] {
