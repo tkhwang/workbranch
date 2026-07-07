@@ -6,6 +6,7 @@ import {
 	assignDisplayLanes,
 	CALENDAR_MODES,
 	CalendarTimeline,
+	shouldShowLoading,
 	validateProjectFilter,
 } from "../src/activity/ActivityCalendarView";
 import {
@@ -128,6 +129,18 @@ describe("sessionsFromEvents", () => {
 		const sessions = sessionsFromEvents([event(BASE)]);
 
 		expect((sessions[0]?.end ?? 0) - (sessions[0]?.start ?? 0)).toBe(600);
+	});
+
+	it("keeps the session key stable when a reload extends an ongoing session", () => {
+		const [before] = sessionsFromEvents([event(BASE), event(BASE + 600)]);
+		const [after] = sessionsFromEvents([
+			event(BASE),
+			event(BASE + 600),
+			event(BASE + 1200),
+		]);
+
+		expect(before?.key).toBeDefined();
+		expect(after?.key).toBe(before?.key);
 	});
 
 	it("collects plan titles in order without duplicates", () => {
@@ -295,6 +308,32 @@ describe("activityLoadRange", () => {
 			from: DAY - IDLE_GAP_SECONDS,
 			to: addDays(DAY, 1) + IDLE_GAP_SECONDS,
 		});
+	});
+});
+
+describe("shouldShowLoading", () => {
+	it("shows the loading placeholder for the first load", () => {
+		expect(
+			shouldShowLoading(undefined, { from: DAY, to: addDays(DAY, 1) }),
+		).toBe(true);
+	});
+
+	it("shows the loading placeholder when the visible range changes", () => {
+		expect(
+			shouldShowLoading(
+				{ from: DAY, to: addDays(DAY, 1) },
+				{ from: addDays(DAY, 1), to: addDays(DAY, 2) },
+			),
+		).toBe(true);
+	});
+
+	it("reloads silently when only the reload token changed for the same range", () => {
+		expect(
+			shouldShowLoading(
+				{ from: DAY, to: addDays(DAY, 1) },
+				{ from: DAY, to: addDays(DAY, 1) },
+			),
+		).toBe(false);
 	});
 });
 
