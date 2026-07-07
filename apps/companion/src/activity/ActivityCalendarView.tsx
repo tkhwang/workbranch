@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { IDLE_GAP_SECONDS } from "../application/activity";
 import {
 	addDays,
@@ -219,6 +219,17 @@ export function activityLoadRange(
 	};
 }
 
+export function shouldShowLoading(
+	loadedRange: ActivityLoadRange | undefined,
+	nextRange: ActivityLoadRange,
+): boolean {
+	return (
+		loadedRange === undefined ||
+		loadedRange.from !== nextRange.from ||
+		loadedRange.to !== nextRange.to
+	);
+}
+
 export function CalendarTimeline({
 	days,
 	sessions,
@@ -320,6 +331,7 @@ export function ActivityCalendarView({
 	const [error, setError] = useState<string>();
 	const [selectedProject, setSelectedProject] = useState<string>();
 	const [selectedKey, setSelectedKey] = useState<string>();
+	const loadedRangeRef = useRef<ActivityLoadRange>();
 	const days = useMemo(
 		() =>
 			Array.from({ length: modeDays(mode) }, (_, index) =>
@@ -338,16 +350,22 @@ export function ActivityCalendarView({
 
 	useEffect(() => {
 		let cancelled = false;
-		setLoading(true);
+		const showLoading = shouldShowLoading(loadedRangeRef.current, loadRange);
+		if (showLoading) {
+			setLoading(true);
+		}
 		setError(undefined);
 		void loadEvents(loadRange.from, loadRange.to)
 			.then((nextEvents) => {
 				if (!cancelled) {
+					loadedRangeRef.current = { from: loadRange.from, to: loadRange.to };
 					setEvents(nextEvents);
 					setSelectedProject((currentProject) =>
 						validateProjectFilter(nextEvents, currentProject),
 					);
-					setSelectedKey(undefined);
+					if (showLoading) {
+						setSelectedKey(undefined);
+					}
 				}
 			})
 			.catch((loadError) => {
