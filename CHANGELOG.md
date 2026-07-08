@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.10.1](https://github.com/tkhwang/workbranch/compare/v2.10.0...v2.10.1) (2026-07-08)
+
+
+### Bug Fixes
+
+* **activity:** prevent ui flicker on silent reload ([d54d87d](https://github.com/tkhwang/workbranch/commit/d54d87dc3114b4bab26ebf2086976d068af0c86e))
+* **activity:** prevent ui flicker on silent reload ([0b3814e](https://github.com/tkhwang/workbranch/commit/0b3814e9029a10d5c0b26c47d3638fcc062af569)), closes [#0042](https://github.com/tkhwang/workbranch/issues/0042)
+
 ## [2.10.0](https://github.com/tkhwang/workbranch/compare/v2.9.0...v2.10.0) (2026-07-05)
 
 
