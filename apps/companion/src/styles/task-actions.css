@@ -1,62 +1,49 @@
 .task-actions {
-	align-items: center;
-	background: var(--surface-1);
+	align-items: stretch;
 	border: 1px solid var(--line);
-	border-radius: 8px;
+	border-radius: 4px;
 	display: flex;
 	flex: 1 1 100%;
-	gap: 2px;
-	margin-top: 0;
 	min-height: 32px;
-	width: 100%;
 	overflow: visible;
-	padding: 3px;
+	width: 100%;
 }
 
 .task-action {
 	align-items: center;
 	background: transparent;
-	border-color: transparent;
-	border-radius: 6px;
-	color: var(--muted);
+	border: 0;
+	border-radius: 0;
+	color: var(--accent);
 	display: inline-flex;
 	flex: 1 1 0;
-	font-size: 11px;
-	gap: 5px;
+	font-size: 10px;
 	justify-content: center;
-	min-height: 24px;
+	min-height: 30px;
 	min-width: 0;
-	padding: 4px 7px;
+	padding: 5px 7px;
 	touch-action: manipulation;
-	transition-duration: 120ms;
-	transition-property: background-color, border-color, color, transform;
-	transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+	transition:
+		background-color 120ms ease,
+		color 120ms ease,
+		transform 120ms ease;
+}
+
+.task-action + .task-action {
+	border-left: 1px solid var(--line);
 }
 
 .task-action:hover:not(:disabled) {
-	color: var(--text);
+	background: var(--button-bg-hover);
+	color: var(--accent-strong);
 }
 
 .task-action:active:not(:disabled) {
-	transform: scale(0.96);
+	transform: scale(0.98);
 }
 
 .task-action:disabled {
 	color: var(--faint);
 	cursor: not-allowed;
 	opacity: 0.55;
-}
-
-.task-action-icon {
-	fill: none;
-	height: 13px;
-	stroke: currentcolor;
-	stroke-linecap: round;
-	stroke-linejoin: round;
-	stroke-width: 1.9;
-	width: 13px;
-}
-
-.task-action-separator {
-	display: none;
 }

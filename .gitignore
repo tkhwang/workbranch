@@ -1,6 +1,7 @@
 # Local agent/runtime state
 .omc/
 .omx/
+.superpowers/
 
 # macOS / OS metadata
 .DS_Store

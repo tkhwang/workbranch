@@ -1,145 +1,107 @@
 .task {
-	background: var(--task-bg);
+	background: var(--surface-1);
 	border: 1px solid var(--line);
-	border-radius: var(--radius-row);
-	box-shadow: var(--shadow-card);
-	margin-bottom: 8px;
+	border-radius: 4px;
+	margin-bottom: 6px;
 	overflow: hidden;
-	transition-duration: 140ms;
-	transition-property: box-shadow, border-color, transform;
-	transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.task:last-child {
+	margin-bottom: 0;
 }
 
 .task:hover {
+	background: var(--surface-2);
 	border-color: var(--line-strong);
-	box-shadow: var(--shadow-card-hover);
-	transform: translateY(-1px);
 }
 
-.task-in-progress {
-	border-color: color-mix(in srgb, var(--accent) 38%, var(--line-strong));
+.task[open] {
+	background: var(--surface-2);
+	border-color: var(--line-strong);
 }
 
 summary {
 	cursor: default;
 	list-style: none;
-	padding: 9px 10px;
+	padding: 7px 8px;
 }
 
 summary::-webkit-details-marker {
 	display: none;
 }
 
-.task-summary-line {
+.task[open] > summary {
+	background: var(--task-selected-summary-bg);
+	border-inline-start: var(--task-selected-accent-width) solid var(--emphasis);
+}
+
+.task-summary-line .prompt-line {
+	width: 100%;
+}
+
+.task-summary-line .prompt-content {
 	align-items: center;
 	display: grid;
 	gap: 8px;
-	grid-template-columns: 16px minmax(0, 1fr) auto auto;
-}
-
-.task-status-rail {
-	align-items: center;
-	background: var(--surface-2);
-	border-radius: 999px;
-	display: inline-flex;
-	height: 16px;
-	justify-content: center;
-	width: 16px;
-}
-
-.task-status-dot {
-	background: var(--faint);
-	border-radius: 999px;
-	box-shadow: 0 0 0 2px var(--surface-2);
-	display: block;
-	height: 6px;
-	width: 6px;
-}
-
-.task-in-progress .task-status-dot {
-	background: var(--accent);
-	box-shadow: 0 0 0 4px var(--active-rail-bg);
-}
-
-.task-blocked .task-status-dot {
-	background: var(--blocked);
-	box-shadow: 0 0 0 4px var(--blocked-soft);
-}
-
-.task-review .task-status-dot {
-	background: var(--review);
-	box-shadow: 0 0 0 4px var(--review-soft);
-}
-
-.task-done .task-status-dot {
-	background: var(--done);
-	box-shadow: 0 0 0 4px var(--done-soft);
+	grid-template-columns: minmax(0, 1fr) auto auto auto;
 }
 
 .task-name {
 	color: var(--text);
-	font-size: 13px;
+	font-size: 12px;
 	font-weight: 600;
-	letter-spacing: -0.01em;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 
-.progress-pill,
-.noti-pill {
-	border: 1px solid var(--line);
-	border-radius: 999px;
-	font-family: var(--app-font-family);
-	font-size: 11px;
-	font-weight: 600;
-	line-height: 1;
-	padding: 4px 7px;
-}
-
-.progress-pill {
+.task-progress,
+.task-notification {
 	color: var(--muted);
+	font-variant-numeric: tabular-nums;
 }
 
-.task-done .progress-pill {
-	background: var(--done-soft);
-	border-color: var(--done);
-	color: var(--done);
+.task-progress {
+	background: var(--surface-3);
+	border: 1px solid var(--line-strong);
+	border-radius: var(--progress-pill-radius);
+	color: var(--text);
+	font-size: var(--progress-pill-font-size);
+	line-height: 1;
+	padding: var(--progress-pill-padding);
 }
 
-.noti-pill {
-	background: var(--notify-soft);
-	border-color: var(--notify);
+.task-notification {
 	color: var(--notify);
+	font-size: 10px;
 }
 
 .task-detail {
 	border-top: 1px solid var(--line);
-	padding: 8px 10px 9px;
+	padding: 8px;
 }
 
 .task-detail-header {
 	align-items: flex-start;
 	display: flex;
 	flex-wrap: wrap;
-	gap: 8px;
+	gap: 7px;
 	justify-content: space-between;
 }
 
 .current-step-strip {
-	background: var(--surface-2);
-	border: 1px solid var(--line);
-	border-radius: 8px;
-	box-shadow: inset 1px 0 0 var(--accent);
+	border-block: 1px solid var(--line);
+	margin-top: 8px;
+	padding-block: 5px;
+}
+
+.current-step-strip .prompt-content {
 	display: grid;
 	gap: 2px;
-	margin-top: 8px;
-	padding: 6px 8px 6px 10px;
 }
 
 .plan-title {
-	color: var(--accent);
-	font-family: var(--app-font-family);
+	color: var(--emphasis);
 	font-size: 9px;
 	font-weight: 600;
 	letter-spacing: 0.06em;
@@ -148,15 +110,14 @@ summary::-webkit-details-marker {
 
 .current-step {
 	color: var(--text);
-	font-size: 12px;
+	font-size: 11px;
 	overflow-wrap: anywhere;
-	white-space: normal;
 }
 
 .repo-chips {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 6px;
+	gap: 5px;
 	list-style: none;
 	margin: 0;
 	padding: 0;
@@ -169,16 +130,14 @@ summary::-webkit-details-marker {
 
 .repo-chip {
 	align-items: center;
-	background: var(--surface-2);
 	border: 1px solid var(--line);
-	border-radius: 7px;
+	border-radius: 4px;
 	color: var(--muted);
 	display: inline-flex;
-	font-family: var(--app-font-family);
-	font-size: 11px;
+	font-size: 10px;
 	gap: 5px;
 	max-width: 100%;
-	padding: 4px 6px;
+	padding: 3px 5px;
 }
 
 .repo-dirty {
@@ -194,7 +153,7 @@ summary::-webkit-details-marker {
 }
 
 .repo-branch {
-	color: var(--faint);
+	color: var(--muted);
 }
 
 .repo-dot {
@@ -205,10 +164,10 @@ summary::-webkit-details-marker {
 .steps {
 	border-left: 1px solid var(--line);
 	color: var(--muted);
-	font-size: 12px;
+	font-size: 11px;
 	line-height: 1.45;
 	list-style: none;
-	margin: 9px 0 0 7px;
+	margin: 8px 0 0 6px;
 	padding: 0 0 0 8px;
 }
 
@@ -221,6 +180,7 @@ summary::-webkit-details-marker {
 }
 
 .step-marker {
+	border: 1px solid var(--line);
 	border-radius: 999px;
 	box-sizing: border-box;
 	display: inline-block;
@@ -230,12 +190,10 @@ summary::-webkit-details-marker {
 .step-depth-0 .step-marker {
 	border-radius: 2px;
 	height: 8px;
-	margin-top: 5px;
 	width: 8px;
 }
 
 .step-depth-1 .step-marker {
-	border-radius: 999px;
 	height: 7px;
 	width: 7px;
 }
@@ -247,36 +205,20 @@ summary::-webkit-details-marker {
 	width: 5px;
 }
 
-.step-marker-done {
-	background: var(--faint);
-	box-shadow: 0 0 0 2px var(--line);
-}
-
+.step-marker-done,
 .step-depth-0.step-item-done .step-marker {
 	background: var(--faint);
-	box-shadow: 0 0 0 2px var(--line);
-}
-
-.step-depth-1.step-item-done .step-marker {
-	box-shadow: 0 0 0 2px var(--line);
-}
-
-.step-depth-2.step-item-done .step-marker {
-	box-shadow: 0 0 0 1px var(--line);
 }
 
 .step-marker-todo {
 	background: var(--surface-2);
-	border: 1px solid var(--line-strong);
-}
-
-.step-depth-0.step-item-todo .step-marker {
 	border-color: var(--line-strong);
-	box-shadow: 0 0 0 2px var(--line);
 }
 
 .step-text {
-	overflow-wrap: anywhere;
+	overflow-wrap: break-word;
+	text-wrap: balance;
+	word-break: keep-all;
 }
 
 .step-item-done .step-text {
@@ -287,20 +229,21 @@ summary::-webkit-details-marker {
 	color: var(--text);
 }
 
-.error {
-	background: var(--blocked-soft);
-	border: 1px solid var(--blocked);
-	border-radius: 8px;
-	color: var(--blocked);
+.error,
+.empty {
+	border-radius: 4px;
 	font-size: 12px;
 	padding: 8px;
 }
 
+.error {
+	background: var(--blocked-soft);
+	border: 1px solid var(--blocked);
+	color: var(--blocked);
+}
+
 .empty {
 	border: 1px dashed var(--line-strong);
-	border-radius: var(--radius-row);
 	color: var(--muted);
-	font-size: 12px;
-	padding: 14px;
 	text-align: center;
 }

@@ -1,6 +1,7 @@
 @import "./styles/base.css";
 @import "./styles/themes.css";
 @import "./styles/chrome.css";
+@import "./styles/agent-shell.css";
 @import "./styles/task-details.css";
 @import "./styles/task-actions.css";
 @import "./styles/status-groups.css";

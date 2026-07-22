@@ -1,17 +1,10 @@
 import { Fragment } from "react";
+import type { CompanionTheme } from "../application/preferences";
 import { currentItem } from "../application/state";
 import type { Step, Task } from "../domain/model";
 import { activePlan, taskProgress, taskStatus } from "../domain/model";
-import { TaskActionIcon } from "./TaskActionIcon";
-
-const STATUS_META = {
-	todo: { label: "Todo" },
-	planning: { label: "Planning" },
-	"in-progress": { label: "In progress" },
-	review: { label: "Review" },
-	blocked: { label: "Blocked" },
-	done: { label: "Done" },
-} as const;
+import { PromptLine } from "./PromptLine";
+import { StatusToken } from "./StatusToken";
 
 const TASK_ACTION_KINDS = ["ide", "terminal", "finder"] as const;
 
@@ -30,11 +23,18 @@ const TASK_ACTION_LABELS: Record<TaskActionKind, string> = {
 	finder: "Finder",
 } as const;
 
-type Props = {
+export type TaskActionHandler = (
+	root: string,
+	task: Task,
+	kind: TaskActionKind,
+) => void;
+
+type TaskRowProps = {
 	readonly root: string;
 	readonly task: Task;
+	readonly theme: CompanionTheme;
 	readonly expanded: boolean;
-	readonly onAction: (root: string, task: Task, kind: TaskActionKind) => void;
+	readonly onAction: TaskActionHandler;
 };
 
 type StepItemsProps = {
@@ -88,53 +88,54 @@ function StepItems({ steps, keyPrefix }: StepItemsProps) {
 
 type TaskSummaryProps = {
 	readonly task: Task;
+	readonly theme: CompanionTheme;
 	readonly status: ReturnType<typeof taskStatus>;
 	readonly progress: ReturnType<typeof taskProgress>;
 };
 
-function TaskSummary({ task, status, progress }: TaskSummaryProps) {
-	const meta = STATUS_META[status];
+function TaskSummary({ task, theme, status, progress }: TaskSummaryProps) {
 	return (
 		<div className="task-summary-line">
-			<span
-				className="task-status-rail"
-				aria-label={meta.label}
-				role="img"
-				title={meta.label}
-			>
-				<span className="task-status-dot" />
-			</span>
-			<span className="task-name" title={task.name}>
-				{task.name}
-			</span>
-			{progress.total > 0 ? (
-				<span className="progress-pill">
-					{progress.done}/{progress.total}
+			<PromptLine theme={theme}>
+				<span className="task-name" title={task.name}>
+					{task.name}
 				</span>
-			) : null}
-			{task.notiCount > 0 ? (
-				<span className="noti-pill" title={`${task.notiCount} notifications`}>
-					+{task.notiCount}
-				</span>
-			) : null}
+				<StatusToken status={status} />
+				{progress.total > 0 ? (
+					<span className="task-progress">
+						{progress.done}/{progress.total}
+					</span>
+				) : null}
+				{task.notiCount > 0 ? (
+					<span
+						className="task-notification"
+						title={`${task.notiCount} notifications`}
+					>
+						+{task.notiCount}
+					</span>
+				) : null}
+			</PromptLine>
 		</div>
 	);
 }
 
 type CurrentStepProps = {
+	readonly theme: CompanionTheme;
 	readonly planTitle: string;
 	readonly currentItem: string;
 };
 
-function CurrentStep({ planTitle, currentItem }: CurrentStepProps) {
+function CurrentStep({ theme, planTitle, currentItem }: CurrentStepProps) {
 	return (
 		<div className="current-step-strip">
-			<span className="plan-title" title={planTitle}>
-				{planTitle}
-			</span>
-			<span className="current-step" title={currentItem}>
-				{currentItem}
-			</span>
+			<PromptLine theme={theme} current={true}>
+				<span className="plan-title" title={planTitle}>
+					{planTitle}
+				</span>
+				<span className="current-step" title={currentItem}>
+					{currentItem}
+				</span>
+			</PromptLine>
 		</div>
 	);
 }
@@ -168,7 +169,13 @@ function RepoChips({ repos }: RepoChipsProps) {
 	);
 }
 
-export function TaskRow({ root, task, expanded, onAction }: Props) {
+export function TaskRow({
+	root,
+	task,
+	theme,
+	expanded,
+	onAction,
+}: TaskRowProps) {
 	const status = taskStatus(task);
 	const progress = taskProgress(task);
 	const now = currentItem(task);
@@ -176,35 +183,33 @@ export function TaskRow({ root, task, expanded, onAction }: Props) {
 	return (
 		<details className={`task task-${status}`} open={expanded}>
 			<summary>
-				<TaskSummary task={task} status={status} progress={progress} />
+				<TaskSummary
+					task={task}
+					theme={theme}
+					status={status}
+					progress={progress}
+				/>
 			</summary>
 			<div className="task-detail">
 				<div className="task-detail-header">
 					<RepoChips repos={task.repos} />
 					<div className="task-actions">
-						{taskActionsFor(task).map((action, index) => (
-							<Fragment key={action.kind}>
-								{index > 0 ? (
-									<span className="task-action-separator" aria-hidden="true">
-										·
-									</span>
-								) : null}
-								<button
-									aria-label={action.ariaLabel}
-									className="task-action"
-									disabled={action.disabled}
-									onClick={() => onAction(root, task, action.kind)}
-									type="button"
-								>
-									<TaskActionIcon kind={action.kind} />
-									<span>{action.label}</span>
-								</button>
-							</Fragment>
+						{taskActionsFor(task).map((action) => (
+							<button
+								aria-label={action.ariaLabel}
+								className="task-action"
+								disabled={action.disabled}
+								key={action.kind}
+								onClick={() => onAction(root, task, action.kind)}
+								type="button"
+							>
+								{action.label}
+							</button>
 						))}
 					</div>
 				</div>
 				{plan && now ? (
-					<CurrentStep planTitle={plan.title} currentItem={now} />
+					<CurrentStep theme={theme} planTitle={plan.title} currentItem={now} />
 				) : null}
 				{plan ? (
 					<ul className="steps">

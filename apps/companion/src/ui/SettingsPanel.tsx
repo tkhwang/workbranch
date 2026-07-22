@@ -1,16 +1,13 @@
-import type {
-	CompanionPreferences,
-	CompanionResolvedThemeMode,
-} from "../application/preferences";
+import type { CompanionPreferences } from "../application/preferences";
 import {
 	COMPANION_FONT_OPTIONS,
-	COMPANION_THEME_MODE_OPTIONS,
 	isCompanionFont,
 } from "../application/preferences";
+import { AgentThemePicker } from "./AgentThemePicker";
+import { TerminalPanel } from "./TerminalPanel";
 
 type Props = {
 	readonly preferences: CompanionPreferences;
-	readonly systemThemeMode: CompanionResolvedThemeMode;
 	readonly launchAtLogin: boolean;
 	readonly launchAtLoginLoading: boolean;
 	readonly onLaunchAtLoginChange: (enabled: boolean) => void;
@@ -19,7 +16,6 @@ type Props = {
 
 export function SettingsPanel({
 	preferences,
-	systemThemeMode,
 	launchAtLogin,
 	launchAtLoginLoading,
 	onLaunchAtLoginChange,
@@ -30,10 +26,6 @@ export function SettingsPanel({
 	);
 	const fontFamily = fontOption?.cssFamily ?? preferences.font;
 	const fontName = fontOption?.label ?? preferences.font;
-	const modeHint =
-		preferences.themeMode === "system"
-			? `System (${systemThemeMode === "dark" ? "Dark" : "Light"} now)`
-			: `${preferences.themeMode === "dark" ? "Dark" : "Light"} mode`;
 
 	return (
 		<section className="settings-panel" aria-label="Settings">
@@ -43,8 +35,7 @@ export function SettingsPanel({
 					<p>Companion preferences</p>
 				</div>
 			</div>
-			<fieldset className="settings-section">
-				<legend>Startup</legend>
+			<TerminalPanel theme={preferences.theme} label="Startup">
 				<div className="settings-row">
 					<label htmlFor="launch-at-login">Open at Login</label>
 					<input
@@ -64,9 +55,8 @@ export function SettingsPanel({
 							? "Opens automatically when you sign in"
 							: "Opens only when opened manually"}
 				</p>
-			</fieldset>
-			<fieldset className="settings-section">
-				<legend>Font</legend>
+			</TerminalPanel>
+			<TerminalPanel theme={preferences.theme} label="Font">
 				<div className="settings-row settings-row-select">
 					<label htmlFor="companion-font">Font</label>
 					<select
@@ -92,37 +82,16 @@ export function SettingsPanel({
 					<span>1234567890 · RUN 1 · 21/21</span>
 				</div>
 				<p className="settings-hint">Current font: {fontName}</p>
-			</fieldset>
-			<fieldset className="settings-section">
-				<legend>Theme</legend>
-				<div className="theme-mode-toggle">
-					{COMPANION_THEME_MODE_OPTIONS.map((option) => {
-						const selected = option.value === preferences.themeMode;
-						return (
-							<button
-								aria-label={`Use ${option.label} theme mode`}
-								aria-pressed={selected}
-								className="theme-mode-button"
-								data-active={selected ? "true" : "false"}
-								key={option.value}
-								onClick={() =>
-									onPreferencesChange({
-										...preferences,
-										themeFamily: "companion",
-										themeMode: option.value,
-									})
-								}
-								type="button"
-							>
-								{option.label}
-							</button>
-						);
-					})}
-				</div>
+			</TerminalPanel>
+			<TerminalPanel theme={preferences.theme} label="Theme">
+				<AgentThemePicker
+					value={preferences.theme}
+					onChange={(theme) => onPreferencesChange({ ...preferences, theme })}
+				/>
 				<p className="settings-hint">
-					{modeHint} · Palette: Catppuccin Dark / White Light
+					Applies immediately across Main, Activity, and Settings.
 				</p>
-			</fieldset>
+			</TerminalPanel>
 		</section>
 	);
 }

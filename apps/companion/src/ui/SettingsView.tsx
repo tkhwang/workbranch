@@ -1,12 +1,8 @@
-import type {
-	CompanionPreferences,
-	CompanionResolvedThemeMode,
-} from "../application/preferences";
+import type { CompanionPreferences } from "../application/preferences";
 import { SettingsPanel } from "./SettingsPanel";
 
 type Props = {
 	readonly preferences: CompanionPreferences;
-	readonly systemThemeMode: CompanionResolvedThemeMode;
 	readonly launchAtLogin: boolean;
 	readonly launchAtLoginLoading: boolean;
 	readonly onLaunchAtLoginChange: (enabled: boolean) => void;
@@ -15,7 +11,6 @@ type Props = {
 
 export function SettingsView({
 	preferences,
-	systemThemeMode,
 	launchAtLogin,
 	launchAtLoginLoading,
 	onLaunchAtLoginChange,
@@ -25,7 +20,6 @@ export function SettingsView({
 		<section className="settings-view view-panel" aria-label="Settings View">
 			<SettingsPanel
 				preferences={preferences}
-				systemThemeMode={systemThemeMode}
 				launchAtLogin={launchAtLogin}
 				launchAtLoginLoading={launchAtLoginLoading}
 				onLaunchAtLoginChange={onLaunchAtLoginChange}
