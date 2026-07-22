@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { Children, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -140,11 +141,15 @@ const doneFixtureTask: Task = {
 	],
 };
 
-function renderTaskRow(task: Task): string {
+function renderTaskRow(
+	task: Task,
+	theme: "claude" | "codex" = "claude",
+): string {
 	return renderToStaticMarkup(
 		<TaskRow
 			root="/tmp/workbranch"
 			task={task}
+			theme={theme}
 			expanded={true}
 			onAction={() => {}}
 		/>,
@@ -170,10 +175,11 @@ describe("TaskRow", () => {
 		expect(html).not.toContain("☐ Generated Plan");
 		expect(html).not.toContain("☐ Implement change");
 	});
-	it("renders a Raycast-style task summary with current step and repo state", () => {
+	it("renders a terminal task summary with current step and repo state", () => {
 		const html = renderTaskRow(linearFixtureTask);
 
-		expect(html).toContain("task-status-rail");
+		expect(html).toContain("❯");
+		expect(html).toContain("REVIEW");
 		expect(html).toContain("Companion UI refresh");
 		expect(html).toContain("Review screenshot");
 		expect(html).toContain("2/4");
@@ -181,21 +187,68 @@ describe("TaskRow", () => {
 		expect(html).toContain("workbranch");
 		expect(html).toContain("feat/update-0617");
 	});
-	it("renders task status as a quiet dot without a check glyph", () => {
+	it("highlights the expanded task and renders progress as a compact pill", () => {
+		const html = renderTaskRow(linearFixtureTask);
+		const inProgressHtml = renderTaskRow(nestedChecklistTask);
+		const baseCss = readFileSync("src/styles/base.css", "utf8");
+		const css = readFileSync("src/styles/task-details.css", "utf8");
+		const themeCss = readFileSync("src/styles/themes.css", "utf8");
+
+		expect(html).toContain('<details class="task task-review" open="">');
+		expect(html).toContain('<span class="task-progress">2/4</span>');
+		expect(inProgressHtml).toMatch(
+			/task-summary-line[\s\S]*?data-current="false"/,
+		);
+		expect(inProgressHtml).toMatch(
+			/current-step-strip[\s\S]*?data-current="true"/,
+		);
+		expect(css).toMatch(
+			/\.task\[open\]\s*\{[^}]*background:\s*var\(--surface-2\)/s,
+		);
+		expect(baseCss).toContain("--task-selected-accent-width: 2px");
+		expect(themeCss).toMatch(
+			/main\[data-theme="claude"\]\s*\{[^}]*--task-selected-summary-bg:\s*rgba\(192,\s*202,\s*245,\s*0\.06\)/s,
+		);
+		expect(themeCss).toMatch(
+			/main\[data-theme="codex"\]\s*\{[^}]*--task-selected-summary-bg:\s*rgba\(237,\s*237,\s*237,\s*0\.06\)/s,
+		);
+		expect(css).toMatch(
+			/\.task\[open\] > summary\s*\{[^}]*background:\s*var\(--task-selected-summary-bg\)[^}]*border-inline-start:\s*var\(--task-selected-accent-width\) solid var\(--emphasis\)/s,
+		);
+		expect(css).not.toMatch(
+			/\.task\[open\] > summary\s*\{[^}]*background:\s*var\(--emphasis-soft\)/s,
+		);
+		expect(css).not.toMatch(
+			/\.task-in-progress\s*\{[^}]*border-color:\s*var\(--emphasis\)/s,
+		);
+		expect(css).toMatch(
+			/\.task-progress\s*\{[^}]*border-radius:\s*var\(--progress-pill-radius\)[^}]*font-size:\s*var\(--progress-pill-font-size\)[^}]*padding:\s*var\(--progress-pill-padding\)/s,
+		);
+	});
+	it("balances narrow CJK checklist lines to preserve semantic phrases", () => {
+		const css = readFileSync("src/styles/task-details.css", "utf8");
+
+		expect(css).toMatch(/\.step-text\s*\{[^}]*text-wrap:\s*balance/s);
+	});
+	it("renders task status as visible text with a quiet marker", () => {
 		const html = renderTaskRow(doneFixtureTask);
 
-		expect(html).toContain('aria-label="Done"');
-		expect(html).toContain('class="task-status-dot"');
-		expect(html).not.toContain('class="task-status-rail">✓</span>');
+		expect(html).toContain('data-status="done"');
+		expect(html).toContain('class="status-token-marker"');
+		expect(html).toContain('class="status-token-label">DONE</span>');
 	});
 	it("exposes only IDE, Terminal, and Finder actions", () => {
 		const html = renderTaskRow(nestedChecklistTask);
 
+		expect(html).toContain("RUN");
 		expect(html).toContain('aria-label="open generated-task in IDE"');
 		expect(html).toContain('aria-label="open generated-task in terminal"');
 		expect(html).toContain('aria-label="open generated-task in Finder"');
-		expect(html).toContain('class="task-action-icon"');
-		expect(html).toContain('class="task-action-separator"');
+		expect(html).toContain(">IDE</button>");
+		expect(html).toContain(">Terminal</button>");
+		expect(html).toContain(">Finder</button>");
+		expect(html).not.toContain("<svg");
+		expect(html).not.toContain("task-action-separator");
 		expect(html).not.toContain("edit memo for generated-task");
 		expect(html).not.toContain("clear memo for generated-task");
 		expect(html).not.toContain("clear notifications for generated-task");
@@ -217,6 +270,14 @@ describe("TaskRow", () => {
 		expect(actionIndex).toBeGreaterThan(-1);
 		expect(stepsIndex).toBeGreaterThan(-1);
 		expect(actionIndex).toBeLessThan(stepsIndex);
+	});
+
+	it("renders the Codex prompt marker through semantic markup", () => {
+		const html = renderTaskRow(linearFixtureTask, "codex");
+
+		expect(html).toContain('data-prompt-theme="codex"');
+		expect(html).toContain("›");
+		expect(html).not.toContain("❯");
 	});
 
 	it("renders checklist status as visual markers outside the step text", () => {
@@ -257,6 +318,7 @@ describe("TaskRow", () => {
 		const element = TaskRow({
 			root: "/tmp/workbranch",
 			task: nestedChecklistTask,
+			theme: "claude",
 			expanded: true,
 			onAction: (root, task, kind) => {
 				calls.push({ root, taskName: task.name, kind });

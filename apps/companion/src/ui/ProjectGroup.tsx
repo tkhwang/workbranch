@@ -1,33 +1,32 @@
+import type { CompanionTheme } from "../application/preferences";
 import type { ProjectGroup as ProjectGroupModel } from "../application/state";
-import type { Task } from "../domain/model";
-import { type TaskActionKind, TaskRow } from "./TaskRow";
+import { type TaskActionHandler, TaskRow } from "./TaskRow";
+import { TerminalPanel } from "./TerminalPanel";
 
-type Props = {
+type ProjectGroupProps = {
 	readonly group: ProjectGroupModel;
-	readonly onAction: (root: string, task: Task, kind: TaskActionKind) => void;
+	readonly theme: CompanionTheme;
+	readonly onAction: TaskActionHandler;
 };
 
-export function ProjectGroup({ group, onAction }: Props) {
+export function ProjectGroup({ group, theme, onAction }: ProjectGroupProps) {
 	const count = group.rows.length;
 	return (
-		<section className="project-group" aria-label={group.project}>
-			<div className="project-group-header">
-				<span className="project-group-name" title={group.project}>
-					{group.project}
-				</span>
-				<span className="project-group-count">
-					{count} {count === 1 ? "task" : "tasks"}
-				</span>
-			</div>
+		<TerminalPanel
+			className="project-group"
+			label={`${group.project} · ${count} ${count === 1 ? "task" : "tasks"}`}
+			theme={theme}
+		>
 			{group.rows.map((row) => (
 				<TaskRow
 					key={`${row.root}-${row.task.name}`}
 					root={row.root}
 					task={row.task}
+					theme={theme}
 					expanded={row.expanded}
 					onAction={onAction}
 				/>
 			))}
-		</section>
+		</TerminalPanel>
 	);
 }

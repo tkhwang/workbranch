@@ -54,31 +54,52 @@ describe("App shell settings wiring", () => {
 		}
 	});
 
-	it("renders terminal preference data attributes, icon controls, screen-reader status, and bottom view nav", () => {
+	it("renders the shared text-only agent header and terminal tabs on Main", () => {
 		// Given the companion app shell at its initial render
 		// When static markup is rendered
 		const html = renderToStaticMarkup(<App />);
 
 		// Then the settings-capable shell contract is present before effects run
-		expect(html).toContain('data-theme="catppuccin-dark"');
+		expect(html).toContain('data-theme="claude"');
 		expect(html).toContain('data-font="system-mono"');
+		expect(html).toContain('data-agent-header="claude"');
+		expect(html).toContain("<h1>Workbranch Companion</h1>");
+		expect(html).not.toContain("<fieldset");
+		expect(html).not.toContain("<svg");
 		expect(html).toContain('aria-label="Refresh tasks"');
 		expect(html).toContain('aria-label="Quit Companion"');
 		expect(html).toContain('class="toolbar-status-sr"');
-		expect(html).not.toContain('class="toolbar-status"');
 		expect(html).toContain(">Ready</span>");
 		expect(html).not.toContain("<footer");
-		expect(html).not.toContain(">Refresh</button>");
-		expect(html).not.toContain(">Quit</button>");
-		expect(html).toContain('class="toolbar-icon"');
 		expect(html).toContain('aria-label="Companion views"');
-		expect(html).toContain('aria-label="Open Main View"');
-		expect(html).toContain('aria-label="Open Activity report"');
-		expect(html).toContain('aria-label="Open Settings"');
+		expect(html).toContain(">Main</button>");
+		expect(html).toContain(">Activity</button>");
+		expect(html).toContain(">Settings</button>");
 		expect(html).toContain('role="status"');
 		expect(html).toContain('aria-live="polite"');
 		expect(html).not.toContain('class="app-error"');
 		expect(html).not.toContain('role="alert"');
+	});
+
+	it("uses the expanded agent header across every view without legacy theme or navigation code", () => {
+		const source = readFileSync("src/App.tsx", "utf8");
+		const tabsIndex = source.indexOf("<AgentTabs");
+		const alertIndex = source.indexOf("<StatusAlert");
+		const errorsIndex = source.indexOf("{model.errors.map");
+
+		expect(source).toContain("const activeTheme = preferences.theme");
+		expect(source).toContain("<AgentHeader");
+		expect(source).not.toContain("AgentBar");
+		expect(source).toContain("theme={activeTheme}");
+		expect(tabsIndex).toBeGreaterThan(0);
+		expect(alertIndex).toBeLessThan(tabsIndex);
+		expect(tabsIndex).toBeGreaterThan(errorsIndex);
+		expect(source).not.toContain("useSystemThemeMode");
+		expect(source).not.toContain("resolvedCompanionTheme");
+		expect(source).not.toContain("ViewNav");
+		expect(source).not.toContain("HintBar");
+		expect(source).not.toContain("onKeyDown");
+		expect(source).not.toContain("⌘1");
 	});
 
 	it("renders operation failures as a visible alert instead of only screen-reader status", () => {
@@ -119,15 +140,16 @@ describe("App shell settings wiring", () => {
 		expect(css).not.toMatch(/\.toolbar-status\s*\{/s);
 	});
 
-	it("keeps toolbar status available to assistive tech without a visible top-line chip", () => {
+	it("keeps agent status available to assistive tech without a visible chip", () => {
 		// Given the companion toolbar stylesheet
 		// When the status chip CSS contract is inspected
 		const css = readCssContract("src/style.css");
 
 		// Then status updates remain announced while the visible top line stays focused on controls
-		expect(css).toMatch(/header\s*\{[^}]*flex-wrap:\s*wrap/s);
-		expect(css).toMatch(/\.toolbar\s*\{[^}]*flex:\s*1 1 180px/s);
-		expect(css).toMatch(/\.toolbar\s*\{[^}]*justify-content:\s*flex-end/s);
+		expect(css).toMatch(/\.agent-controls\s*\{[^}]*display:\s*flex/s);
+		expect(css).toMatch(
+			/\.agent-controls\s*\{[^}]*justify-content:\s*flex-end/s,
+		);
 		expect(css).toMatch(/\.toolbar-status-sr\s*\{[^}]*position:\s*absolute/s);
 		expect(css).toMatch(
 			/\.toolbar-status-sr\s*\{[^}]*clip-path:\s*inset\(50%\)/s,
@@ -149,23 +171,43 @@ describe("App shell settings wiring", () => {
 		expect(css).toContain('--app-font-family: "Menlo"');
 	});
 
-	it("keeps static button background fallbacks outside color-mix supports", () => {
+	it("keeps fixed dark button backgrounds in each theme contract", () => {
 		// Given the companion stylesheet is built for chrome105 and safari13 WebViews
 		// When the button background token contract is inspected
 		const css = readCssContract("src/style.css");
-		const [cssBeforeColorMixSupports = ""] = css.split(
-			"@supports (background: color-mix(in srgb, black, white))",
+		expect(css).toMatch(
+			/main\[data-theme="claude"\]\s*\{[^}]*--button-bg:\s*rgba\(192,\s*202,\s*245,\s*0\.06\);[^}]*--button-bg-hover:\s*rgba\(192,\s*202,\s*245,\s*0\.12\);/s,
 		);
+		expect(css).toMatch(
+			/main\[data-theme="codex"\]\s*\{[^}]*--button-bg:\s*rgba\(237,\s*237,\s*237,\s*0\.06\);[^}]*--button-bg-hover:\s*rgba\(237,\s*237,\s*237,\s*0\.12\);/s,
+		);
+	});
 
-		// Then unsupported color-mix tokens cannot invalidate default button backgrounds
+	it("keeps Claude structural surfaces neutral and reserves orange for accents", () => {
+		const css = readCssContract("src/style.css");
+
 		expect(css).toMatch(
-			/main\s*\{[^}]*--button-bg:\s*rgba\(255,\s*215,\s*154,\s*0\.07\);[^}]*--button-bg-hover:\s*rgba\(255,\s*215,\s*154,\s*0\.13\);/s,
+			/main\[data-theme="claude"\]\s*\{[^}]*--line:\s*#3a3a3a;[^}]*--line-strong:\s*#565656;/s,
 		);
 		expect(css).toMatch(
-			/@supports\s*\(background:\s*color-mix\(in srgb,\s*black,\s*white\)\)\s*\{\s*main\s*\{[^}]*--button-bg:\s*color-mix\(in srgb,\s*var\(--text\) 6%,\s*transparent\);[^}]*--button-bg-hover:\s*color-mix\(in srgb,\s*var\(--text\) 12%,\s*transparent\);/s,
+			/main\[data-theme="claude"\]\s*\{[^}]*--emphasis-soft:\s*rgba\(192,\s*202,\s*245,\s*0\.08\);[^}]*--task-selected-summary-bg:\s*rgba\(192,\s*202,\s*245,\s*0\.06\);/s,
 		);
-		expect(cssBeforeColorMixSupports).not.toMatch(
-			/--button-bg:\s*color-mix\(in srgb,\s*var\(--text\)/,
+		expect(css).toMatch(
+			/main\[data-theme="claude"\]\s*\{[^}]*--current-step-bg:\s*rgba\(192,\s*202,\s*245,\s*0\.08\);/s,
+		);
+	});
+
+	it("keeps both theme headers on the same compact row at narrow widths", () => {
+		const css = readCssContract("src/style.css");
+
+		expect(css).not.toContain("fieldset.agent-header");
+		expect(css).not.toContain(".workbranch-mark");
+		expect(css).toMatch(/\.agent-header-copy\s*\{[^}]*flex:\s*1 1 auto/s);
+		expect(css).toMatch(
+			/@media \(max-width: 400px\)\s*\{[\s\S]*?\.agent-header-row\s*\{[^}]*flex-wrap:\s*nowrap/s,
+		);
+		expect(css).toMatch(
+			/@media \(max-width: 400px\)\s*\{[\s\S]*?\.agent-header h1\s*\{[^}]*font-size:\s*13px[^}]*text-overflow:\s*ellipsis[^}]*white-space:\s*nowrap/s,
 		);
 	});
 
@@ -194,10 +236,16 @@ describe("App shell settings wiring", () => {
 
 		// Then the current step reads as a low-profile status strip, not a nested card
 		expect(css).toMatch(
-			/\.current-step-strip\s*\{[^}]*background:\s*var\(--surface-2\)/s,
+			/\.current-step-strip\s*\{[^}]*border-block:\s*1px solid var\(--line\)/s,
 		);
 		expect(css).toMatch(
-			/\.current-step-strip\s*\{[^}]*box-shadow:\s*inset 1px 0 0 var\(--accent\)/s,
+			/\.current-step-strip\s+\.prompt-content\s*\{[^}]*display:\s*grid/s,
+		);
+		expect(css).toMatch(
+			/\.prompt-line\[data-current="true"\]\s*\{[^}]*background:\s*var\(--current-step-bg\)/s,
+		);
+		expect(css).not.toMatch(
+			/\.current-step-strip\s*\{[^}]*(?:background|box-shadow|border-radius):/s,
 		);
 		expect(css).not.toMatch(
 			/\.current-step-strip\s*\{[^}]*var\(--shadow-card\)/s,
@@ -220,7 +268,7 @@ describe("App shell settings wiring", () => {
 		expect(css).toMatch(/\.task-action\s*\{[^}]*display:\s*inline-flex/s);
 		expect(css).toMatch(/\.task-action\s*\{[^}]*flex:\s*1 1 0/s);
 		expect(css).toMatch(/\.task-action\s*\{[^}]*min-width:\s*0/s);
-		expect(css).toMatch(/\.task-action-separator\s*\{[^}]*display:\s*none/s);
+		expect(css).not.toContain(".task-action-separator");
 		expect(css).not.toMatch(/\.task-actions\s*\{[^}]*grid-template-columns/s);
 	});
 
@@ -239,23 +287,63 @@ describe("App shell settings wiring", () => {
 			/\.step-depth-0\s+\.step-marker\s*\{[^}]*border-radius:\s*2px[^}]*height:\s*8px[^}]*width:\s*8px/s,
 		);
 		expect(css).toMatch(
-			/\.step-depth-1\s+\.step-marker\s*\{[^}]*border-radius:\s*999px[^}]*height:\s*7px[^}]*width:\s*7px/s,
+			/\.step-depth-1\s+\.step-marker\s*\{[^}]*height:\s*7px[^}]*width:\s*7px/s,
 		);
 		expect(css).toMatch(
 			/\.step-depth-2\s+\.step-marker\s*\{[^}]*height:\s*5px[^}]*width:\s*5px/s,
 		);
 		expect(css).toMatch(
-			/\.step-marker-done\s*\{[^}]*background:\s*var\(--faint\)/s,
+			/\.step-marker-done,\s*\.step-depth-0\.step-item-done\s+\.step-marker\s*\{[^}]*background:\s*var\(--faint\)/s,
 		);
 		expect(css).toMatch(
-			/\.step-depth-0\.step-item-done\s+\.step-marker\s*\{[^}]*background:\s*var\(--faint\)[^}]*box-shadow:\s*0 0 0 2px var\(--line\)/s,
+			/\.step-depth-0\.step-item-done\s+\.step-marker\s*\{[^}]*background:\s*var\(--faint\)/s,
 		);
+		expect(css).not.toMatch(/\.step-marker[^}]*box-shadow:/s);
 		expect(css).not.toMatch(
 			/\.step-marker-done\s*\{[^}]*background:\s*var\(--done\)/s,
 		);
 		expect(css).toMatch(
-			/\.step-marker-todo\s*\{[^}]*border:\s*1px solid var\(--line-strong\)/s,
+			/\.step-marker-todo\s*\{[^}]*border-color:\s*var\(--line-strong\)/s,
 		);
+	});
+
+	it("keeps Korean checklist words intact while allowing long paths to wrap", () => {
+		const css = readCssContract("src/style.css");
+
+		expect(css).toMatch(
+			/\.step-text\s*\{[^}]*overflow-wrap:\s*break-word[^}]*word-break:\s*keep-all/s,
+		);
+		expect(css).not.toMatch(/\.step-text\s*\{[^}]*overflow-wrap:\s*anywhere/s);
+	});
+
+	it("uses a readable text token for small secondary copy", () => {
+		const css = readCssContract("src/style.css");
+
+		expect(css).toContain("--muted: #949494");
+		expect(css).toMatch(
+			/\.settings-panel p,\s*\.settings-hint\s*\{[^}]*color:\s*var\(--muted\)/s,
+		);
+		expect(css).toMatch(
+			/\.font-preview-label\s*\{[^}]*color:\s*var\(--muted\)/s,
+		);
+		expect(css).toMatch(/\.cal-hour-label\s*\{[^}]*color:\s*var\(--muted\)/s);
+		expect(css).toMatch(/\.repo-branch\s*\{[^}]*color:\s*var\(--muted\)/s);
+	});
+
+	it("keeps theme tokens in the theme contract and calendar fills theme-aware", () => {
+		const baseCss = readFileSync("src/styles/base.css", "utf8");
+		const themeCss = readFileSync("src/styles/themes.css", "utf8");
+		const activityCss = readFileSync(
+			"src/activity/activity-calendar.css",
+			"utf8",
+		);
+
+		expect(baseCss).not.toContain("--surface-0:");
+		expect(themeCss).toContain("--cal-bg-1:");
+		expect(themeCss).toContain("--cal-bg-6:");
+		expect(activityCss).toContain("--cal-bg: var(--cal-bg-1)");
+		expect(activityCss).toContain("--cal-bg: var(--cal-bg-6)");
+		expect(activityCss).not.toMatch(/--cal-bg:\s*rgba\(/);
 	});
 
 	it("renders settings inside the flexible view panel so bottom nav stays at the shell bottom", () => {
@@ -271,60 +359,62 @@ describe("App shell settings wiring", () => {
 		);
 	});
 
-	it("keeps the bottom view menu floating without covering task content", () => {
+	it("lays out a floating bottom terminal tab row without obscuring content", () => {
 		// Given the companion shell stylesheet
 		// When the bottom navigation CSS contract is inspected
 		const css = readCssContract("src/style.css");
 
-		// Then the command bar stays visible as a sticky floating affordance
 		expect(css).toMatch(/main\s*\{[^}]*padding:\s*12px/s);
 		expect(css).toMatch(/main\s*\{[^}]*max-width:\s*100%/s);
 		expect(css).toMatch(/main\s*\{[^}]*width:\s*100vw/s);
 		expect(css).toMatch(/main\s*\{[^}]*display:\s*flex/s);
 		expect(css).toMatch(/main\s*\{[^}]*flex-direction:\s*column/s);
 		expect(css).toMatch(/\.view-panel\s*\{[^}]*flex:\s*1 1 auto/s);
-		expect(css).toMatch(/\.view-panel\s*\{[^}]*padding-bottom:\s*52px/s);
-		expect(css).not.toMatch(/main\s*\{[^}]*padding:[^;}]*78px/s);
-		expect(css).toMatch(/\.view-nav\s*\{[^}]*bottom:\s*10px/s);
-		expect(css).toMatch(/\.view-nav\s*\{[^}]*position:\s*sticky/s);
-		expect(css).toMatch(/\.view-nav\s*\{[^}]*z-index:\s*3/s);
+		expect(css).toMatch(/main\s*\{[^}]*padding-bottom:\s*[^;]+/s);
 		expect(css).toMatch(
-			/\.view-nav\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/s,
+			/\.agent-tabs\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/s,
 		);
-		expect(css).toMatch(/\.view-nav-button\s*\{[^}]*min-width:\s*0/s);
-		expect(css).toMatch(/\.view-nav-button\s*\{[^}]*justify-self:\s*stretch/s);
-		expect(css).not.toMatch(/\.view-nav-button\s*\{[^}]*width:\s*100%/s);
-		expect(css).not.toMatch(/\.view-nav\s*\{[^}]*position:\s*fixed/s);
-		expect(css).not.toMatch(/\.view-nav\s*\{[^}]*position:\s*static/s);
+		expect(css).toMatch(/\.agent-tabs\s*\{[^}]*position:\s*fixed/s);
+		expect(css).toMatch(/\.agent-tabs\s*\{[^}]*bottom:\s*[^;]+/s);
+		expect(css).not.toContain(".view-nav");
+		expect(css).toMatch(/\.agent-tabs\s*\{[^}]*box-shadow/s);
 	});
 
-	it("defines only the curated dark and light theme token selectors", () => {
+	it("gives the active agent tab an unmistakable terminal selection state", () => {
+		const css = readCssContract("src/style.css");
+
+		expect(css).toMatch(
+			/\.agent-tabs\s*\{[^}]*background:\s*var\(--surface-0\)[^}]*border:\s*1px solid var\(--line\)[^}]*border-radius:\s*var\(--floating-tabs-radius\)[^}]*overflow:\s*hidden/s,
+		);
+		expect(css).toMatch(
+			/\.agent-tab\s*\{[^}]*border-bottom:\s*2px solid transparent[^}]*min-height:\s*var\(--floating-tabs-height\)/s,
+		);
+		expect(css).toMatch(
+			/\.agent-tab\[data-active="true"\]\s*\{[^}]*background:\s*var\(--surface-2\)[^}]*border-bottom-color:\s*var\(--emphasis\)[^}]*color:\s*var\(--emphasis\)[^}]*font-weight:\s*700/s,
+		);
+	});
+
+	it("does not force horizontal overflow when the 360px window gains a scrollbar", () => {
+		const baseCss = readFileSync("src/styles/base.css", "utf8");
+
+		expect(baseCss).not.toMatch(/body\s*\{[^}]*min-width:/s);
+		expect(baseCss).toMatch(/main\s*\{[^}]*max-width:\s*100%/s);
+	});
+
+	it("defines only the fixed-dark Claude Code and Codex theme tokens", () => {
 		// Given the companion stylesheet
 		// When theme selector contracts are inspected
 		const css = readCssContract("src/style.css");
 
-		// Then the app exposes one dark and one light palette with no swatch-card CSS
-		expect(css).toContain('main[data-theme="catppuccin-dark"]');
-		expect(css).toContain('main[data-theme="breakfast-light"]');
-		expect(css).toContain("#1e1e2e");
-		expect(css).toContain("#cba6f7");
-		expect(css).toContain("#ffffff");
-		expect(css).toContain("#7c3aed");
-		for (const removedTheme of [
-			"breakfast-dark",
-			"solarized-dark",
-			"dracula-dark",
-			"github-dark",
-			"solarized-light",
-			"dracula-light",
-			"catppuccin-light",
-			"github-light",
-			"nord-dark",
-			"gruvbox-dark",
-		]) {
-			expect(css).not.toContain(`main[data-theme="${removedTheme}"]`);
-		}
-		expect(css).not.toContain(".theme-swatch-");
-		expect(css).not.toContain("--theme-swatch-accent");
+		expect(css).toContain('main[data-theme="claude"]');
+		expect(css).toContain('main[data-theme="codex"]');
+		expect(css).toContain("--accent: #cd694a");
+		expect(css).toContain("--emphasis: #cd694a");
+		expect(css).toContain("--text: #c0caf5");
+		expect(css).toContain("--accent: #5cc2e0");
+		expect(css).toContain("--emphasis: #ededed");
+		expect(css).toContain("--text: #ededed");
+		expect(css).not.toContain('data-theme$="-light"');
+		expect(css).not.toMatch(/gradient\(/);
 	});
 });

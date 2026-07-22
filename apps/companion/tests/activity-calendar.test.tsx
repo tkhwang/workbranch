@@ -527,8 +527,9 @@ describe("CalendarTimeline", () => {
 		);
 	});
 
-	it("provides static project-colored fallbacks before color-mix session colors", () => {
+	it("provides theme-owned project fallbacks before color-mix session colors", () => {
 		const css = readFileSync("src/activity/activity-calendar.css", "utf8");
+		const themes = readFileSync("src/styles/themes.css", "utf8");
 		const sessionBlock = css.match(/\.cal-session\s*\{(?<body>[^}]*)\}/)?.groups
 			?.body;
 
@@ -537,8 +538,9 @@ describe("CalendarTimeline", () => {
 		}
 
 		expect(css).toMatch(
-			/\.cal-session\[data-color="0"\]\s*\{[^}]*--cal-bg:\s*rgba/s,
+			/\.cal-chip\[data-color="0"\],\s*\.cal-session\[data-color="0"\]\s*\{[^}]*--cal-bg:\s*var\(--cal-bg-1\)/s,
 		);
+		expect(themes).toMatch(/--cal-bg-1:\s*rgba\(/);
 		expect(sessionBlock).toMatch(/background:\s*var\(--cal-bg\)/);
 		expect(sessionBlock).toMatch(
 			/border-color:\s*var\(--cal-color,\s*var\(--accent\)\)/,
@@ -546,6 +548,23 @@ describe("CalendarTimeline", () => {
 		expect(sessionBlock).not.toContain("color-mix(");
 		expect(css).toMatch(
 			/@supports\s*\(background:\s*color-mix\(in srgb,\s*black,\s*white\)\)\s*\{[\s\S]*\.cal-session\s*\{[\s\S]*background:\s*color-mix/s,
+		);
+	});
+
+	it("uses flat fixed-dark terminal tokens for calendar surfaces", () => {
+		const css = readFileSync("src/activity/activity-calendar.css", "utf8");
+
+		expect(css).toContain("var(--surface-1)");
+		expect(css).toContain("var(--surface-2)");
+		expect(css).toContain("var(--line)");
+		for (const index of [1, 2, 3, 4, 5, 6]) {
+			expect(css).toContain(`var(--cal-${index})`);
+		}
+		const nonCircularCss = css.replace(/border-radius:\s*999px/g, "");
+		expect(css).not.toMatch(/gradient\(/);
+		expect(css).not.toContain("box-shadow");
+		expect(nonCircularCss).not.toMatch(
+			/border-radius:\s*(?:[7-9]|[1-9][0-9]+)px/,
 		);
 	});
 

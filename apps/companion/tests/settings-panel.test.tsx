@@ -4,8 +4,9 @@ import { describe, expect, it } from "vitest";
 import type {
 	CompanionFont,
 	CompanionPreferences,
-	CompanionResolvedThemeMode,
+	CompanionTheme,
 } from "../src/application/preferences";
+import { AgentThemePicker } from "../src/ui/AgentThemePicker";
 import { SettingsPanel } from "../src/ui/SettingsPanel";
 
 type InputProps = {
@@ -25,14 +26,13 @@ type SelectProps = {
 	}) => void;
 };
 
-type ButtonProps = {
-	readonly "aria-label"?: string;
-	readonly "aria-pressed"?: boolean;
-	readonly onClick?: () => void;
-};
-
 type TraversableProps = {
 	readonly children?: ReactNode;
+};
+
+type ThemePickerProps = {
+	readonly value: CompanionTheme;
+	readonly onChange: (theme: CompanionTheme) => void;
 };
 
 function collectByType<TProps>(
@@ -53,40 +53,51 @@ function collectByType<TProps>(
 	return props;
 }
 
+function findThemePicker(node: ReactNode): ThemePickerProps | undefined {
+	let result: ThemePickerProps | undefined;
+	const visit = (child: ReactNode): void => {
+		if (!isValidElement<ThemePickerProps & TraversableProps>(child)) {
+			return;
+		}
+		if (child.type === AgentThemePicker) {
+			result = child.props;
+		}
+		Children.forEach(child.props.children, visit);
+	};
+	visit(node);
+	return result;
+}
+
 const preferences: CompanionPreferences = {
 	font: "system-mono",
-	themeFamily: "companion",
-	themeMode: "system",
+	theme: "claude",
 };
 
 function renderSettingsPanel({
 	currentPreferences = preferences,
-	systemThemeMode = "dark",
+	launchAtLoginLoading = false,
 }: {
 	readonly currentPreferences?: CompanionPreferences;
-	readonly systemThemeMode?: CompanionResolvedThemeMode;
+	readonly launchAtLoginLoading?: boolean;
 } = {}): string {
 	return renderToStaticMarkup(
 		<SettingsPanel
 			preferences={currentPreferences}
-			systemThemeMode={systemThemeMode}
 			launchAtLogin={false}
-			launchAtLoginLoading={false}
-			onLaunchAtLoginChange={() => {}}
-			onPreferencesChange={() => {}}
+			launchAtLoginLoading={launchAtLoginLoading}
+			onLaunchAtLoginChange={() => undefined}
+			onPreferencesChange={() => undefined}
 		/>,
 	);
 }
 
 describe("SettingsPanel", () => {
-	it("renders labeled fieldsets for startup, font, and mode controls", () => {
-		// Given current companion preferences and launch-at-login status
-		// When the settings panel is rendered
+	it("renders Claude terminal panels and exactly two agent themes", () => {
 		const html = renderSettingsPanel();
 
-		// Then semantic groups, labels, and fixed choices are visible
+		expect(html).toContain('data-terminal-panel="claude"');
+		expect(html).toContain('data-terminal-panel-anatomy="claude"');
 		expect(html).toContain("<fieldset");
-		expect(html).toContain("<h2>Settings</h2>");
 		expect(html).toContain("<legend>Startup</legend>");
 		expect(html).toContain("<legend>Font</legend>");
 		expect(html).toContain("<legend>Theme</legend>");
@@ -95,73 +106,55 @@ describe("SettingsPanel", () => {
 		expect(html).toContain("Open at Login");
 		expect(html).toContain("System Mono");
 		expect(html).toContain("JetBrains Mono");
-		expect(html).toContain("Light");
-		expect(html).toContain("Dark");
-		expect(html).toContain("System");
-		expect(html).toContain("System (Dark now)");
-		expect(html).toContain("Palette: Catppuccin Dark / White Light");
-		expect(html).not.toContain('id="companion-theme"');
+		expect(html).toContain("Claude Code");
+		expect(html).toContain("Codex");
+		expect(html.match(/<button/g)).toHaveLength(2);
+		expect(html).not.toContain(">Light</button>");
+		expect(html).not.toContain(">Dark</button>");
+		expect(html).not.toContain(">System</button>");
+		expect(html).not.toContain("theme mode");
+	});
+
+	it("renders Codex settings with Claude fieldset sections", () => {
+		const html = renderSettingsPanel({
+			currentPreferences: { font: "menlo", theme: "codex" },
+		});
+
+		expect(html).toContain('data-terminal-panel="codex"');
+		expect(html).toContain('data-terminal-panel-anatomy="claude"');
+		expect(html).toContain("<fieldset");
+		expect(html).toContain("<legend>Startup</legend>");
+		expect(html).toContain("<legend>Font</legend>");
+		expect(html).toContain("<legend>Theme</legend>");
+		expect(html).not.toContain('class="terminal-panel-heading"');
+		expect(html).toContain('aria-label="Use Codex theme"');
+		expect(html).toContain('aria-pressed="true"');
 	});
 
 	it("shows the selected font in a live preview sample", () => {
-		// Given Menlo is the selected companion font
 		const html = renderSettingsPanel({
-			currentPreferences: {
-				font: "menlo",
-				themeFamily: "companion",
-				themeMode: "system",
-			},
+			currentPreferences: { font: "menlo", theme: "claude" },
 		});
 
-		// When the settings panel is rendered
-		// Then the sample text uses the selected font family
 		expect(html).toContain('class="font-preview"');
 		expect(html).toContain("font-family:Menlo");
 		expect(html).toContain("workbranch feat/update-0619");
 		expect(html).toContain("1234567890");
 	});
 
-	it("renders only the theme mode toggle without color family cards", () => {
-		// Given explicit light mode is selected
-		const html = renderSettingsPanel({
-			currentPreferences: {
-				font: "system-mono",
-				themeFamily: "companion",
-				themeMode: "light",
-			},
-		});
+	it("disables launch-at-login while its state is loading", () => {
+		const html = renderSettingsPanel({ launchAtLoginLoading: true });
 
-		// When settings are rendered
-		// Then the color-family grid and swatches are absent
-		expect(html).toContain("Light mode");
-		expect(html).toContain("Palette: Catppuccin Dark / White Light");
-		expect(html).not.toContain('class="theme-button-grid"');
-		expect(html).not.toContain('class="theme-button"');
-		expect(html).not.toContain("theme-swatch");
-		expect(html).not.toContain("Use GitHub theme");
-		expect(html).not.toContain("Current theme:");
+		expect(html).toContain('id="launch-at-login"');
+		expect(html).toContain('disabled=""');
+		expect(html).toContain("Checking login item state");
 	});
 
-	it("renders system mode using the current system dark or light mode", () => {
-		// Given system mode is selected while the OS is currently light
-		const html = renderSettingsPanel({
-			currentPreferences: preferences,
-			systemThemeMode: "light",
-		});
-
-		// When settings are rendered
-		// Then mode state is visible without exposing color-family choices
-		expect(html).toContain("System (Light now)");
-		expect(html).not.toContain("theme-swatch");
-	});
-
-	it("delegates launch, font, and mode updates to app-shell callbacks", () => {
-		// Given a rendered settings panel with callback spies
+	it("delegates launch, font, and theme updates to app-shell callbacks", () => {
 		const launchCalls: boolean[] = [];
 		const preferenceCalls: CompanionPreferences[] = [];
 		const element = SettingsPanel({
 			preferences,
-			systemThemeMode: "dark",
 			launchAtLogin: false,
 			launchAtLoginLoading: false,
 			onLaunchAtLoginChange: (enabled) => {
@@ -171,28 +164,24 @@ describe("SettingsPanel", () => {
 				preferenceCalls.push(next);
 			},
 		});
-
-		// When controls change
 		const launchToggle = collectByType<InputProps>(element, "input").find(
 			(input) => input.id === "launch-at-login",
 		);
-		const selects = collectByType<SelectProps>(element, "select");
-		const buttons = collectByType<ButtonProps>(element, "button");
-		const fontSelect = selects.find((select) => select.id === "companion-font");
-		const modeButton = buttons.find(
-			(button) => button["aria-label"] === "Use Light theme mode",
+		const fontSelect = collectByType<SelectProps>(element, "select").find(
+			(select) => select.id === "companion-font",
 		);
+		const themePicker = findThemePicker(element);
+
 		launchToggle?.onChange?.({ currentTarget: { checked: true } });
 		fontSelect?.onChange?.({
 			currentTarget: { value: "menlo" satisfies CompanionFont },
 		});
-		modeButton?.onClick?.();
+		themePicker?.onChange("codex");
 
-		// Then the app shell receives every change without the panel swallowing failures
 		expect(launchCalls).toEqual([true]);
 		expect(preferenceCalls).toEqual([
-			{ font: "menlo", themeFamily: "companion", themeMode: "system" },
-			{ font: "system-mono", themeFamily: "companion", themeMode: "light" },
+			{ font: "menlo", theme: "claude" },
+			{ font: "system-mono", theme: "codex" },
 		]);
 	});
 });

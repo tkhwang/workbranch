@@ -2,9 +2,7 @@ import { isTauri } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityCalendarView } from "./activity/ActivityCalendarView";
 import { createActivityRefresh } from "./application/activity";
-import { resolvedCompanionTheme } from "./application/preferences";
 import { buildMenuModel, type MenuModel } from "./application/state";
-import { useSystemThemeMode } from "./application/systemThemeMode";
 import { useCompanionSettings } from "./application/useCompanionSettings";
 import type { GlobalState, Task } from "./domain/model";
 import {
@@ -18,13 +16,12 @@ import {
 	watchRoots,
 } from "./infrastructure/tauriClient";
 import { startWorkspaceMonitor } from "./infrastructure/workspaceMonitor";
-import { AppSummary } from "./ui/AppSummary";
-import { AppToolbar } from "./ui/AppToolbar";
+import { AgentHeader } from "./ui/AgentHeader";
+import { AgentTabs, type CompanionView } from "./ui/AgentTabs";
 import { ProjectGroup } from "./ui/ProjectGroup";
 import { SettingsView } from "./ui/SettingsView";
 import { StatusAlert } from "./ui/StatusAlert";
 import type { TaskActionKind } from "./ui/TaskRow";
-import { type CompanionView, ViewNav } from "./ui/ViewNav";
 
 const EMPTY_STATE: GlobalState = { projects: [], errors: [] };
 const TAURI_RUNTIME_UNAVAILABLE = "Tauri runtime unavailable";
@@ -57,7 +54,6 @@ export function App() {
 	const [status, setStatus] = useState("Ready");
 	const [visibleError, setVisibleError] = useState<string>();
 	const [currentView, setCurrentView] = useState<CompanionView>("main");
-	const systemThemeMode = useSystemThemeMode();
 	const model: MenuModel = buildMenuModel(state);
 	const tauriRuntimeAvailable = isTauri();
 	const refreshWithActivity = useMemo(
@@ -92,7 +88,7 @@ export function App() {
 		updateLaunchAtLogin,
 		updatePreferences,
 	} = useCompanionSettings({ onError: showError, onStatus: showStatus });
-	const activeTheme = resolvedCompanionTheme(preferences, systemThemeMode);
+	const activeTheme = preferences.theme;
 
 	const applyState = useCallback(
 		(next: GlobalState) => {
@@ -188,14 +184,13 @@ export function App() {
 
 	return (
 		<main data-font={preferences.font} data-theme={activeTheme}>
-			<header>
-				<AppSummary summary={model.summary} />
-				<AppToolbar
-					onRefresh={() => void refresh()}
-					onQuit={handleQuit}
-					status={status}
-				/>
-			</header>
+			<AgentHeader
+				theme={activeTheme}
+				summary={model.summary}
+				status={status}
+				onRefresh={() => void refresh()}
+				onQuit={handleQuit}
+			/>
 			<StatusAlert message={visibleError} />
 			{currentView === "main" ? (
 				<section className="view-panel" aria-label="Main View">
@@ -206,6 +201,7 @@ export function App() {
 						<ProjectGroup
 							key={group.root}
 							group={group}
+							theme={activeTheme}
 							onAction={(root, task, kind) =>
 								void handleTaskAction(root, task, kind)
 							}
@@ -228,7 +224,6 @@ export function App() {
 			{currentView === "settings" ? (
 				<SettingsView
 					preferences={preferences}
-					systemThemeMode={systemThemeMode}
 					launchAtLogin={launchAtLogin}
 					launchAtLoginLoading={launchAtLoginLoading}
 					onLaunchAtLoginChange={(enabled) => void updateLaunchAtLogin(enabled)}
@@ -240,7 +235,7 @@ export function App() {
 					{error.root}: {error.message}
 				</p>
 			))}
-			<ViewNav currentView={currentView} onViewChange={setCurrentView} />
+			<AgentTabs currentView={currentView} onViewChange={setCurrentView} />
 		</main>
 	);
 }

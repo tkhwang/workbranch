@@ -2,7 +2,7 @@
 	align-items: stretch;
 	background: var(--surface-1);
 	border: 1px solid var(--line);
-	border-radius: var(--radius-row);
+	border-radius: 6px;
 	display: block;
 	padding: 10px;
 	text-align: left;
@@ -82,37 +82,37 @@
 
 .cal-chip[data-color="0"],
 .cal-session[data-color="0"] {
-	--cal-bg: rgba(203, 166, 247, 0.18);
+	--cal-bg: var(--cal-bg-1);
 	--cal-color: var(--cal-1);
 }
 
 .cal-chip[data-color="1"],
 .cal-session[data-color="1"] {
-	--cal-bg: rgba(137, 180, 250, 0.18);
+	--cal-bg: var(--cal-bg-2);
 	--cal-color: var(--cal-2);
 }
 
 .cal-chip[data-color="2"],
 .cal-session[data-color="2"] {
-	--cal-bg: rgba(166, 227, 161, 0.18);
+	--cal-bg: var(--cal-bg-3);
 	--cal-color: var(--cal-3);
 }
 
 .cal-chip[data-color="3"],
 .cal-session[data-color="3"] {
-	--cal-bg: rgba(249, 226, 175, 0.18);
+	--cal-bg: var(--cal-bg-4);
 	--cal-color: var(--cal-4);
 }
 
 .cal-chip[data-color="4"],
 .cal-session[data-color="4"] {
-	--cal-bg: rgba(245, 194, 231, 0.18);
+	--cal-bg: var(--cal-bg-5);
 	--cal-color: var(--cal-5);
 }
 
 .cal-chip[data-color="5"],
 .cal-session[data-color="5"] {
-	--cal-bg: rgba(148, 226, 213, 0.18);
+	--cal-bg: var(--cal-bg-6);
 	--cal-color: var(--cal-6);
 }
 
@@ -134,7 +134,7 @@
 }
 
 .cal-hour-label {
-	color: var(--faint);
+	color: var(--muted);
 	font-size: 10px;
 	line-height: 1;
 	padding-top: 1px;
@@ -150,7 +150,7 @@
 .cal-day-column {
 	background: var(--surface-2);
 	border: 1px solid var(--line);
-	border-radius: 10px;
+	border-radius: 4px;
 	min-width: 0;
 	overflow: hidden;
 	position: relative;
@@ -188,8 +188,7 @@
 	background: var(--cal-bg);
 	border-color: var(--cal-color, var(--accent));
 	border-left: 3px solid var(--cal-color, var(--accent));
-	border-radius: 7px;
-	box-shadow: none;
+	border-radius: 4px;
 	color: var(--text);
 	display: grid;
 	gap: 1px;
@@ -215,6 +214,10 @@
 .cal-session:hover:not(:disabled),
 .cal-session[data-selected="true"] {
 	background: var(--cal-bg);
+}
+
+.cal-session[data-selected="true"] {
+	border-color: var(--emphasis);
 }
 
 @supports (background: color-mix(in srgb, black, white)) {
@@ -282,7 +285,7 @@
 .cal-detail {
 	background: var(--surface-2);
 	border: 1px solid var(--line);
-	border-radius: 10px;
+	border-radius: 4px;
 	display: grid;
 	gap: 5px;
 	padding: 8px;

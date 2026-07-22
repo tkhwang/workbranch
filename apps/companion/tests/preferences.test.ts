@@ -1,129 +1,98 @@
 import assert from "node:assert/strict";
-import { describe, expect, it } from "vitest";
+import { load } from "@tauri-apps/plugin-store";
+import { describe, expect, it, vi } from "vitest";
 import {
 	COMPANION_FONT_OPTIONS,
+	COMPANION_PREFERENCES_STORE_FILE,
 	COMPANION_THEME_OPTIONS,
+	type CompanionPreferenceStore,
 	DEFAULT_COMPANION_PREFERENCES,
 	enqueuePreferenceSave,
+	loadCompanionPreferenceStore,
 	preferencesToStoreEntries,
-	resolvedCompanionTheme,
 	sanitizeCompanionPreferences,
 	shouldRestoreFailedPreferenceUpdate,
+	writeCompanionPreferences,
 } from "../src/application/preferences";
 
+vi.mock("@tauri-apps/plugin-store", () => ({ load: vi.fn() }));
+
 describe("companion preferences", () => {
-	it("defaults to the Companion palette with system mode and system-mono", () => {
-		// Given no stored preference values
-		// When the default preference contract is read
-		// Then the HUD follows the OS theme with one curated palette
+	it("defaults to the Claude Code theme with system-mono", () => {
 		expect(DEFAULT_COMPANION_PREFERENCES).toEqual({
 			font: "system-mono",
-			themeFamily: "companion",
-			themeMode: "system",
+			theme: "claude",
 		});
 	});
 
-	it("sanitizes invalid stored font, theme family, and theme mode values to defaults", () => {
-		// Given corrupted persisted preference values
-		const stored = {
-			font: "comic-sans",
-			themeFamily: "rainbow",
-			themeMode: "sepia",
-		};
-
-		// When preferences are sanitized at the store boundary
-		const result = sanitizeCompanionPreferences(stored);
-
-		// Then defaults are applied and sanitization is reported
-		expect(result).toEqual({
+	it("sanitizes invalid stored values to the fixed-dark defaults", () => {
+		expect(
+			sanitizeCompanionPreferences({
+				font: "comic-sans",
+				theme: "rainbow",
+			}),
+		).toEqual({
 			preferences: DEFAULT_COMPANION_PREFERENCES,
 			sanitized: true,
 		});
 	});
 
-	it("migrates a legacy concrete theme value into Companion family and mode preferences", () => {
-		// Given a previous settings file stored one concrete dark/light theme value
-		const stored = { font: "menlo", theme: "nord-light" };
-
-		// When preferences are sanitized at the store boundary
-		const result = sanitizeCompanionPreferences(stored);
-
-		// Then the legacy color family collapses to Companion while preserving mode
-		expect(result).toEqual({
-			preferences: {
+	it("migrates legacy appearance fields to Claude Code", () => {
+		expect(
+			sanitizeCompanionPreferences({
 				font: "menlo",
 				themeFamily: "companion",
 				themeMode: "light",
-			},
+			}),
+		).toEqual({
+			preferences: { font: "menlo", theme: "claude" },
 			sanitized: true,
 		});
 	});
 
-	it("migrates previous theme enum values before falling back to defaults", () => {
-		// Given settings files stored earlier companion theme enum values
-		const migrations = [
+	it("loads raw stored values so missing theme keys trigger migration", async () => {
+		await loadCompanionPreferenceStore();
+
+		expect(load).toHaveBeenCalledWith(COMPANION_PREFERENCES_STORE_FILE, {
+			autoSave: false,
+			defaults: {},
+		});
+	});
+
+	it("migrates every former concrete theme to Claude Code", () => {
+		const legacyThemes = [
 			"terminal-dark",
 			"amber-crt",
-			"green-mono",
-			"high-contrast",
+			"nord-light",
+			"catppuccin-dark",
+			"breakfast-light",
 		] as const;
 
-		for (const theme of migrations) {
-			// When preferences are sanitized at the store boundary
-			const result = sanitizeCompanionPreferences({
-				font: "monaco",
-				theme,
-			});
-
-			// Then previous dark choices converge to the Companion dark palette
-			expect(result).toEqual({
-				preferences: {
-					font: "monaco",
-					themeFamily: "companion",
-					themeMode: "dark",
-				},
+		for (const theme of legacyThemes) {
+			expect(sanitizeCompanionPreferences({ font: "monaco", theme })).toEqual({
+				preferences: { font: "monaco", theme: "claude" },
 				sanitized: true,
 			});
 		}
 	});
 
-	it("migrates removed stored theme families before falling back to defaults", () => {
-		// Given stored family values from removed themes
-		const gruvboxResult = sanitizeCompanionPreferences({
-			font: "sf-mono",
-			themeFamily: "gruvbox",
-			themeMode: "dark",
-		});
-		const nordResult = sanitizeCompanionPreferences({
-			font: "sf-mono",
-			themeFamily: "nord",
-			themeMode: "light",
-		});
-
-		// When preferences are sanitized at the store boundary
-		// Then removed families collapse to Companion and preserve mode
-		expect(gruvboxResult).toEqual({
-			preferences: {
-				font: "sf-mono",
-				themeFamily: "companion",
-				themeMode: "dark",
-			},
-			sanitized: true,
-		});
-		expect(nordResult).toEqual({
-			preferences: {
-				font: "sf-mono",
-				themeFamily: "companion",
-				themeMode: "light",
-			},
-			sanitized: true,
+	it("preserves a valid Codex theme without sanitization", () => {
+		expect(
+			sanitizeCompanionPreferences({ font: "menlo", theme: "codex" }),
+		).toEqual({
+			preferences: { font: "menlo", theme: "codex" },
+			sanitized: false,
 		});
 	});
 
+	it("exposes only Claude Code and Codex themes", () => {
+		expect(COMPANION_THEME_OPTIONS).toEqual([
+			{ value: "claude", label: "Claude Code" },
+			{ value: "codex", label: "Codex" },
+		]);
+	});
+
 	it("exposes only fixed-width font choices", () => {
-		// Given the font option list used by the settings panel
-		// When option CSS stacks are inspected
-		// Then each stack ends in a monospace fallback and no arbitrary font input is present
 		expect(COMPANION_FONT_OPTIONS.map((option) => option.value)).toEqual([
 			"system-mono",
 			"sf-mono",
@@ -138,84 +107,19 @@ describe("companion preferences", () => {
 		).toBe(true);
 	});
 
-	it("exposes only Catppuccin Dark and White Light theme variants", () => {
-		// Given the active theme option list
-		// When option values are read
-		// Then Settings has one curated dark/light palette instead of multiple families
-		expect(COMPANION_THEME_OPTIONS).toEqual([
-			{
-				value: "catppuccin-dark",
-				family: "companion",
-				familyLabel: "Companion",
-				label: "Catppuccin Dark",
-				mode: "dark",
-			},
-			{
-				value: "breakfast-light",
-				family: "companion",
-				familyLabel: "Companion",
-				label: "White Light",
-				mode: "light",
-			},
-		]);
-	});
+	it("restores a failed optimistic update only while it is current", () => {
+		const failedAttempt = { font: "menlo", theme: "claude" } as const;
+		const newerCurrent = { font: "menlo", theme: "codex" } as const;
 
-	it("resolves system theme mode using the current OS color scheme", () => {
-		// Given preferences in explicit and system modes
-		const explicitLight = {
-			font: "system-mono",
-			themeFamily: "companion",
-			themeMode: "light",
-		} as const;
-		const systemCompanion = {
-			font: "system-mono",
-			themeFamily: "companion",
-			themeMode: "system",
-		} as const;
-
-		// When concrete data-theme values are resolved
-		// Then system mode follows the supplied system mode while explicit mode wins
-		expect(resolvedCompanionTheme(explicitLight, "dark")).toBe(
-			"breakfast-light",
-		);
-		expect(resolvedCompanionTheme(systemCompanion, "light")).toBe(
-			"breakfast-light",
-		);
-		expect(resolvedCompanionTheme(systemCompanion, "dark")).toBe(
-			"catppuccin-dark",
-		);
-	});
-
-	it("restores a failed optimistic preference update only when no newer update won", () => {
-		// Given one failed optimistic update and a later successful update
-		const failedAttempt = {
-			font: "menlo",
-			themeFamily: "companion",
-			themeMode: "system",
-		} as const;
-		const newerCurrent = {
-			font: "menlo",
-			themeFamily: "companion",
-			themeMode: "light",
-		} as const;
-
-		// When deciding whether the failed request may roll back local state
-		const staleRollbackAllowed = shouldRestoreFailedPreferenceUpdate(
-			newerCurrent,
-			failedAttempt,
-		);
-		const currentRollbackAllowed = shouldRestoreFailedPreferenceUpdate(
-			failedAttempt,
-			failedAttempt,
-		);
-
-		// Then only the still-current failed attempt can restore the previous state
-		expect(staleRollbackAllowed).toBe(false);
-		expect(currentRollbackAllowed).toBe(true);
+		expect(
+			shouldRestoreFailedPreferenceUpdate(newerCurrent, failedAttempt),
+		).toBe(false);
+		expect(
+			shouldRestoreFailedPreferenceUpdate(failedAttempt, failedAttempt),
+		).toBe(true);
 	});
 
 	it("runs preference saves sequentially so the latest write lands last", async () => {
-		// Given two preference writes where the first write is still pending
 		const writes: string[] = [];
 		let releaseFirstWrite: (() => void) | undefined;
 		const firstWrite = new Promise<void>((resolve) => {
@@ -223,7 +127,6 @@ describe("companion preferences", () => {
 		});
 		let saveQueue = Promise.resolve();
 
-		// When a newer write is enqueued before the first write resolves
 		saveQueue = enqueuePreferenceSave(saveQueue, async () => {
 			writes.push("font");
 			await firstWrite;
@@ -234,7 +137,6 @@ describe("companion preferences", () => {
 		await Promise.resolve();
 		await Promise.resolve();
 
-		// Then the newer write waits and lands after the older write
 		expect(writes).toEqual(["font"]);
 		assert.ok(releaseFirstWrite, "releaseFirstWrite must be initialized");
 		releaseFirstWrite();
@@ -242,21 +144,38 @@ describe("companion preferences", () => {
 		expect(writes).toEqual(["font", "theme"]);
 	});
 
-	it("serializes only font, theme family, and theme mode store keys", () => {
-		// Given a sanitized preference pair
-		// When the pair is converted for persistence
+	it("serializes only font and theme store keys", () => {
 		const entries = preferencesToStoreEntries({
 			font: "menlo",
-			themeFamily: "companion",
-			themeMode: "light",
+			theme: "codex",
 		});
 
-		// Then launch-at-login and other app state are excluded from the store contract
-		expect(entries).toEqual({
-			font: "menlo",
-			themeFamily: "companion",
-			themeMode: "light",
+		expect(entries).toEqual({ font: "menlo", theme: "codex" });
+		expect(Object.keys(entries)).toEqual(["font", "theme"]);
+	});
+
+	it("writes only font and theme to the preference store", async () => {
+		const writes: Array<readonly [string, unknown]> = [];
+		let saveCount = 0;
+		const store: CompanionPreferenceStore = {
+			get: async <T>(_key: string): Promise<T | undefined> => undefined,
+			set: async (key, value) => {
+				writes.push([key, value]);
+			},
+			save: async () => {
+				saveCount += 1;
+			},
+		};
+
+		await writeCompanionPreferences(store, {
+			font: "sf-mono",
+			theme: "claude",
 		});
-		expect(Object.keys(entries)).toEqual(["font", "themeFamily", "themeMode"]);
+
+		expect(writes).toEqual([
+			["font", "sf-mono"],
+			["theme", "claude"],
+		]);
+		expect(saveCount).toBe(1);
 	});
 });

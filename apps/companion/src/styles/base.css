@@ -1,9 +1,9 @@
 :root {
-	color: #faf6ef;
-	background: #15110d;
+	background: #0e0e0e;
+	color: #c0caf5;
 	font-family:
-		-apple-system, "SF Pro Text", "Segoe UI", system-ui, "Helvetica Neue",
-		arial, sans-serif;
+		ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+		monospace;
 	-webkit-font-smoothing: antialiased;
 	text-rendering: optimizelegibility;
 }
@@ -13,89 +13,39 @@
 }
 
 body {
+	background: #0e0e0e;
 	margin: 0;
-	min-width: 360px;
-	background: #15110d;
-}
-
-body:has(main[data-theme$="-light"]) {
-	background: #ffffff;
 }
 
 main {
-	--ui-font-family:
-		-apple-system, "SF Pro Text", "Segoe UI", system-ui, "Helvetica Neue",
-		arial, sans-serif;
 	--app-font-family:
-		ui-monospace, "SFMono-Regular", "Menlo", "Monaco", "Consolas",
-		"Liberation Mono", monospace;
-	--surface-0: #15110d;
-	--surface-1: #201913;
-	--surface-2: #2a2118;
-	--surface-3: #3a2b1e;
-	--line: rgba(255, 215, 154, 0.12);
-	--line-strong: rgba(255, 215, 154, 0.26);
-	--text: #faf6ef;
-	--muted: #b4aca2;
-	--faint: #8a837a;
-	--accent: #f59e0b;
-	--accent-strong: #ffd79a;
-	--accent-soft: rgba(245, 158, 11, 0.18);
-	--blocked: #e5484d;
-	--blocked-soft: rgba(229, 72, 77, 0.16);
-	--review: #c9c2ff;
-	--review-soft: rgba(201, 194, 255, 0.16);
-	--done: #1ca86a;
-	--done-soft: rgba(28, 168, 106, 0.16);
-	--notify: #ffc24b;
-	--notify-soft: rgba(255, 194, 75, 0.17);
-	--shell-bg:
-		radial-gradient(120% 120px at 50% 0, rgba(245, 158, 11, 0.13), transparent),
-		radial-gradient(
-			90% 160px at 100% 12%,
-			rgba(255, 138, 30, 0.08),
-			transparent
-		),
-		var(--surface-0);
-	--shell-topline: linear-gradient(
-		90deg,
-		transparent,
-		var(--accent),
-		transparent
-	);
-	--task-bg: var(--surface-2);
-	--task-bg-hover: var(--surface-3);
-	--button-bg: rgba(255, 215, 154, 0.07);
-	--button-bg-hover: rgba(255, 215, 154, 0.13);
-	--current-step-bg:
-		linear-gradient(135deg, var(--accent-soft), transparent 70%),
-		var(--surface-3);
-	--active-rail-bg: var(--accent-soft);
-	--shadow-soft: rgba(0, 0, 0, 0.32);
-	--shadow-strong: rgba(0, 0, 0, 0.52);
-	--shadow-card:
-		0 1px 2px var(--shadow-soft), 0 8px 20px -10px var(--shadow-strong);
-	--shadow-card-hover:
-		0 2px 4px var(--shadow-soft), 0 14px 28px -10px var(--shadow-strong);
-	--shadow-pop: 0 14px 36px var(--shadow-strong);
-	--radius-row: 11px;
-	--radius-shell: 14px;
+		ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+		monospace;
+	--floating-tabs-bottom: 10px;
+	--floating-tabs-content-clearance: 64px;
+	--floating-tabs-font-size: 11px;
+	--floating-tabs-height: 36px;
+	--floating-tabs-inset: 12px;
+	--floating-tabs-radius: 999px;
+	--floating-tabs-shadow: 0 8px 24px rgba(0, 0, 0, 0.46);
+	--progress-pill-font-size: 10px;
+	--progress-pill-padding: 3px 6px;
+	--progress-pill-radius: 999px;
+	--task-selected-accent-width: 2px;
 
-	position: relative;
-	max-width: 100%;
-	width: 100vw;
-	background: var(--shell-bg);
+	background: var(--surface-0);
 	color: var(--text);
 	display: flex;
 	flex-direction: column;
 	font-family: var(--app-font-family);
+	max-width: 100%;
 	min-height: 100vh;
 	padding: 12px;
-}
-
-@supports (background: color-mix(in srgb, black, white)) {
-	main {
-		--button-bg: color-mix(in srgb, var(--text) 6%, transparent);
-		--button-bg-hover: color-mix(in srgb, var(--text) 12%, transparent);
-	}
+	/* biome-ignore format: Stylelint requires the continued operator at line start. */
+	padding-bottom: calc(
+		var(--floating-tabs-content-clearance)
+		+ env(safe-area-inset-bottom)
+	);
+	position: relative;
+	width: 100vw;
 }

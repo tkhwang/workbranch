@@ -34,16 +34,24 @@ const group: ProjectGroupModel = {
 };
 
 describe("ProjectGroup", () => {
-	it("renders the project header with task count above its task rows", () => {
-		const html = renderToStaticMarkup(
-			<ProjectGroup group={group} onAction={() => {}} />,
+	it("renders theme-specific terminal panels around project tasks", () => {
+		const claudeHtml = renderToStaticMarkup(
+			<ProjectGroup theme="claude" group={group} onAction={() => undefined} />,
 		);
-		expect(html).toContain("project-group-header");
-		expect(html).toContain("acme");
-		expect(html).toContain("2 tasks");
-		expect(html).toContain("feat-a");
-		expect(html.indexOf("project-group-header")).toBeLessThan(
-			html.indexOf("feat-a"),
+		const codexHtml = renderToStaticMarkup(
+			<ProjectGroup theme="codex" group={group} onAction={() => undefined} />,
+		);
+
+		expect(claudeHtml).toContain('data-terminal-panel="claude"');
+		expect(claudeHtml).toContain("<fieldset");
+		expect(claudeHtml).toContain("❯");
+		expect(codexHtml).toContain('data-terminal-panel="codex"');
+		expect(codexHtml).toContain("<section");
+		expect(codexHtml).toContain("›");
+		expect(claudeHtml).toContain("acme · 2 tasks");
+		expect(claudeHtml).toContain("feat-a");
+		expect(claudeHtml.indexOf("acme · 2 tasks")).toBeLessThan(
+			claudeHtml.indexOf("feat-a"),
 		);
 	});
 });

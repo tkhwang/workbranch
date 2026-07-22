@@ -2,7 +2,7 @@
 
 ## Source of truth
 - Status: Active
-- Last refreshed: 2026-06-21
+- Last refreshed: 2026-07-23
 - Primary product surfaces: Workbranch Companion macOS menu bar popover.
 - Evidence reviewed:
   - `docs/plans/0032-companion-tauri-react-rewrite.md`
@@ -12,11 +12,13 @@
   - `apps/companion/src/App.tsx`
   - `apps/companion/src/ui/TaskRow.tsx`
   - `apps/companion/src/style.css`
+  - `https://brainless.swerdlow.dev/components`
+  - Brainless `claude-header`, `claude-message`, `codex-header`, and `codex-message` registry sources reviewed on 2026-07-20
 
 ## Brand
 - Personality: fast, focused, terminal-native, command-line HUD.
 - Trust signals: fast refresh, clear current step, visible repo dirty/branch state, fixed-width readability, restrained terminal accents.
-- Avoid: marketing hero layouts, oversized cards, large SaaS rows, generic dashboard cards, decorative animation, glossy neon chrome. Tasteful elevation and a sans/mono type hierarchy are welcome.
+- Avoid: marketing hero layouts, oversized cards, large SaaS rows, generic dashboard cards, decorative animation, glossy neon chrome, soft-elevation card stacks, and mixed UI typography that weakens the terminal identity.
 
 ## Product goals
 - Goals:
@@ -24,6 +26,7 @@
   - Make the current plan step feel like the selected command/result in a launcher.
   - Keep repo branch/dirty state visible without competing with task progress.
   - Keep actions discoverable but visually secondary.
+  - Let the user choose a Claude Code or Codex CLI experience that applies to Main, Activity, and Settings.
 - Non-goals:
   - Task lifecycle mutation UI.
   - Full activity report implementation.
@@ -43,15 +46,15 @@
 - Key contexts of use: quick menu bar glance while coding, before switching tasks, during AI-agent execution.
 
 ## Information architecture
-- Primary navigation: sticky floating bottom view bar with three destinations: Main, Activity, Setting.
-- Core screens: Main task list, Activity report stub, Setting preferences view.
+- Primary navigation: an inset floating terminal tab bar anchored to the viewport bottom with three destinations: Main, Activity, Settings.
+- Core screens: Main task list, Activity report, Settings preferences view.
 - Content hierarchy:
-  1. Global inventory + status rollup and icon-only refresh.
+  1. Compact global inventory (`projects · tasks`) and icon-only refresh.
   2. Active view content.
   3. Main view: project group header, task name/status/progress/notification, repo branch/dirty state, active plan/current step, actions.
-  4. Activity view: future report stub only in this slice.
-  5. Setting view: launch-at-login, font, and theme controls.
-  6. Screen-reader live status in the top toolbar and bottom view navigation; routine `Updated`/`Ready` text stays out of the visible top line.
+  4. Activity view: existing day/three-day calendar, session selection, and reload behavior inside the agent shell.
+  5. Settings view: launch-at-login, font, and agent theme controls.
+  6. Screen-reader live status in the agent shell; routine `Updated`/`Ready` text stays out of the visible header.
 
 ## Design principles
 - Principle 1: Status is a launcher signal, not a paragraph. Use compact dots, counts, and labels.
@@ -60,42 +63,48 @@
 - Tradeoffs: density is preferred over spaciousness, but tap/click targets remain at least 32px high where practical.
 
 ## Visual language
-- Color: Settings exposes one curated companion palette rather than parallel color families. Dark mode resolves to Catppuccin-inspired surfaces (`#1e1e2e`, `#181825`) with lavender/pink accents (`#cba6f7`, `#f5c2e7`) because it is the preferred dark look. Light mode is white/neutral rather than yellow: near-white surfaces (`#ffffff`, `#fbfcff`, `#f4f6fb`) with dark slate text (`#242633`) and a subtle lavender accent (`#7c3aed`). The visible setting is only `Light | Dark | System`; legacy theme families and concrete theme values collapse to this Companion palette while preserving mode.
-- Typography: dual-axis. UI chrome (task/project names, headings, button and nav labels, settings controls) uses a system sans stack for hierarchy and readability; developer data (repo/branch/path, counts, plan label) stays monospace. The user-selectable font preference controls the monospace data stack.
-- Spacing/layout rhythm: compact terminal/preferences rhythm, 8px grid, row-first grouping, prompt-like separators, subtle grid or border lines, no large cards.
-- Shape/radius/elevation: one fixed radius scale (`6px` controls, `10px` rows, `14px` shell); depth from clearly stepped tonal surfaces, soft elevation shadows on cards, and hairline borders; cards lift on hover. Avoid heavy gradients and glossy neon glow.
+- Color: Settings exposes two fixed-dark agent themes. Claude Code uses `#cd694a` only for small identity and interaction signals such as prompt markers, active underlines, focus rings, and narrow selected-state boundaries. Structural borders and broad selected/current surfaces use the same neutral graphite family as Codex, while `#c0caf5` remains the primary terminal text and `#949494` remains muted text. Codex uses `#ededed` for primary text, `#949494` for secondary text, `#3a3a3a` for borders, and `#5cc2e0` only for command-like actions and links. Existing Companion, Light, Dark, System, and legacy family values migrate to Claude Code.
+- Typography: the agent shell, navigation, content panels, form controls, task metadata, and activity labels use the user-selected monospace stack. Weight, contrast, spacing, and rules create hierarchy instead of a sans/mono split.
+- Spacing/layout rhythm: compact terminal rhythm, 8px grid, row-first grouping, prompt markers, and thin rules. Main, Activity, and Settings use the same expanded agent header so switching tabs does not shift the content vertically.
+- Shape/radius/elevation: agent headers use a restrained `6px` radius from the Brainless reference. Panels and rows use square or near-square corners, flat tonal separation, and hairline borders. The bottom navigation and progress count may use pill radii, and the floating navigation may use one restrained shadow to separate it from scrolling content. Do not use card hover lift, gradient, or decorative shadows elsewhere.
 - Motion: 120ms press/reveal feedback only; respect reduced motion.
 - Imagery/iconography: status state uses quiet color dots with accessible labels; avoid status checkmark glyphs in task headers. Checklist rows use a separate aligned marker column instead of checkmark or checkbox text prefixes; depth 0 uses a small quiet square marker, depth 1+ keeps circular markers, and completed markers use neutral muted tones rather than loud green. No decorative illustration.
 
 ## Components
-- Existing components to reuse: `TaskRow`, action buttons, native `details/summary` disclosure.
+- Existing components to reuse: `TaskRow`, action buttons, native `details/summary` disclosure, activity calendar behavior, and settings preference controls.
 - New/changed components:
-  - global inventory/status summary,
+  - shared `AgentShell` that applies `claude` or `codex` to all views,
+  - shared expanded `AgentHeader` for Main, Activity, and Settings with one theme-neutral text anatomy,
+  - `AgentTabs` as an inset floating bottom terminal navigation,
+  - shared `TerminalPanel`, `PromptLine`, and `StatusToken` primitives,
+  - compact global inventory summary limited to project and task counts,
   - project group header,
   - top toolbar with icon-only refresh/quit controls and screen-reader-only live status,
-  - sticky floating bottom view navigation for Main, Activity, and Setting,
-  - Setting view preferences panel,
-  - Activity report stub view,
+  - Settings view preferences panel,
+  - Settings preference sections always use the Claude Code `fieldset`/`legend` anatomy in both themes; the selected theme still owns colors and control state,
+  - Activity report view,
   - switch row for launch-at-login,
   - font select row,
-  - theme mode segmented control (`Light`, `Dark`, `System`) with no visible color-family grid,
-  - launcher-like task summary line,
+  - agent theme segmented control (`Claude Code`, `Codex`) with Claude Code as the default and migration target,
+  - launcher-like task summary line with a compact progress pill,
   - current-step strip,
   - detail header row containing repo chips and a full-width IDE/Terminal/Finder action bar split into equal thirds above current step and checklist content,
   - nested step tree with aligned status markers separate from step text: small depth 0 square, depth 1 circle, deeper levels smaller circles.
-- Variants and states: todo, planning, in-progress, review, blocked, done, notification present, dirty repo.
+- Variants and states: todo, planning, in-progress, review, blocked, done, notification present, dirty repo. In-progress identity uses the compact status marker rather than recoloring the full Task perimeter.
+- Selected Task: the expanded native `details[open]` row uses a stronger neutral surface and border while collapsed tasks remain quiet. Its summary uses the theme-owned `--task-selected-summary-bg` low-opacity tint plus a `2px` inline-start accent boundary; the accent must not fill the entire summary row at full strength.
+- Shared header anatomy: Claude Code and Codex use the same text-only title block: `Workbranch Companion` above `projects · tasks`. The top banner contains no Workbranch mark, product icon, or Claude/Codex prompt prefix; theme identity comes from surrounding color tokens rather than different header geometry. Task/current-step rows may retain their theme-specific prompt and action accents.
 - Token/component ownership: `style.css` is the CSS import manifest; `src/styles/base.css`, `themes.css`, `chrome.css`, `task-details.css`, `status-groups.css`, `settings.css`, and `motion.css` own CSS custom properties and component classes by surface.
 
 ## Accessibility
 - Target standard: keyboard-operable popover controls and readable contrast.
 - Keyboard/focus behavior: buttons and `summary` expose clear focus rings.
 - Contrast/readability: status text and current step must pass practical dark-mode contrast; disabled action may be muted but legible.
-- Screen-reader semantics: preserve button `aria-label`s; bottom view buttons expose destination labels and `aria-current`; settings controls use associated labels, switch state text, and the toolbar keeps a screen-reader-only `role="status"` region with polite live updates.
+- Screen-reader semantics: preserve button `aria-label`s; agent tab buttons expose destination labels and `aria-current`; settings controls use associated labels, switch state text, and the agent shell keeps a screen-reader-only `role="status"` region with polite live updates.
 - Reduced motion and sensory considerations: disable transform transitions under `prefers-reduced-motion: reduce`.
 
 ## Responsive behavior
 - Supported breakpoints/devices: narrow menu popover around 360-460px width.
-- Layout adaptations: the detail header keeps repo chips above a full-width launch-action row; IDE, Terminal, and Finder each occupy one third of that row above steps; repo chips wrap; long task/step names truncate with accessible full text via `title`.
+- Layout adaptations: the shared expanded header collapses its internal columns consistently on every tab. The detail header keeps repo chips above a full-width launch-action row; IDE, Terminal, and Finder each occupy one-third of that row above steps; repo chips wrap; long task/step names truncate with accessible full text via `title`.
 - Touch/hover differences: hover is enhancement only; core state is visible without hover.
 
 ## Interaction states
@@ -104,6 +113,7 @@
 - Error: root-scoped error row with red accent; operation failures such as refresh/action/preference errors also render a visible alert row while routine Ready/Updated statuses stay screen-reader-only.
 - Success: routine `Updated` / `Action complete` messages are not shown as a visible top-line chip; they remain available to assistive tech.
 - Disabled: disabled action has muted text and no press transform.
+- Theme selection: Settings is the only visible theme switch surface. Selection applies to every view immediately and persists through the existing preference store. Unsupported and legacy theme values migrate to Claude Code.
 - Offline/slow network: not applicable; CLI/local filesystem driven.
 
 ## Content voice
@@ -112,14 +122,15 @@
 - Microcopy rules: prefer short row action labels (`IDE`, `Terminal`, `Finder`) over sentences; omit `Copy`/`Memo`/`Noti`/`Clear` row vocabulary because those companion actions are removed, not hidden.
 
 ## Implementation constraints
-- Framework/styling system: React 18 + plain CSS; no Tailwind/shadcn in this refresh. Primary reference is a modern developer HUD with a terminal core (mono data) and a modern shell (sans chrome, stepped surfaces, soft elevation); Raycast remains a secondary compact-popover cue.
+- Framework/styling system: React 18 + plain CSS. Adapt the structure and accessibility behavior of the Brainless Claude and Codex components into local reusable primitives. Do not add Tailwind, shadcn, or a new runtime package.
 - Design-token constraints: CSS custom properties in `style.css`.
 - Performance constraints: no extra runtime package; no animation loops; preserve 0033 responsiveness fixes.
 - Compatibility constraints: no CLI/contract/Rust port changes.
-- Test/screenshot expectations: Vitest static markup tests plus `pnpm --filter @workbranch/companion tauri build`; run a browser/app screenshot review before final handoff.
+- Scope constraints: do not add keyboard shortcuts or display shortcut hints for behavior that does not exist.
+- Test/screenshot expectations: cover preference migration, persistence, both theme variants, and the Main/Activity/Settings shell contracts with Vitest. Run typecheck, lint, Vite build, Tauri build, then inspect both themes on all three tabs at 360px and 460px before final handoff.
 
 ## Open questions
-- [ ] Whether a later v2 should add shadcn/Radix primitives after the plain CSS refresh proves the needed component gaps.
+- [ ] Whether a later release should restore a light appearance as a separate axis after the two fixed-dark agent themes ship.
 
 
 ## Direction revision
@@ -134,3 +145,12 @@
 - 2026-06-22 (toolbar): Removed the visible top toolbar status chip after review; the top line now keeps task inventory plus icon controls only. A screen-reader-only polite live region preserves status announcements without showing routine `Updated` text in the popover chrome.
 
 - 2026-06-23: Light mode shifted from yellow/warm Breakfast parchment to a whiter neutral palette with subtle lavender accents after visual review.
+- 2026-07-20: Replaced the Companion `Light | Dark | System` direction with two fixed-dark agent themes: Claude Code and Codex. Both themes apply to Main, Activity, and Settings and change component anatomy as well as tokens. The app uses an Agent Shell with terminal tabs and local React/plain-CSS primitives adapted from the Brainless component semantics. Claude Code is the default and migration target. Existing behavior and Tauri/Rust contracts remain unchanged.
+- 2026-07-23: Removed the visible `Claude Code` legend from the expanded Main header so neither theme displays an agent product name as a banner label. The Settings theme-picker labels remain unchanged.
+- 2026-07-23 (tab stability): Main, Activity, and Settings now share the same expanded `AgentHeader` anatomy and size. The compact secondary-view bar was removed so tab changes preserve a stable top-banner footprint.
+- 2026-07-23 (floating navigation): Moved `AgentTabs` from below the header to an inset floating bottom bar while preserving the terminal theme. Expanded tasks now use selected-row background emphasis and progress is shown in a compact pill.
+- 2026-07-23 (selected Task tone): Reduced the expanded Task summary from the broad `--emphasis-soft` fill to a theme-owned low-opacity surface tint with a narrow `2px` inline-start accent. The selected state remains visible through the boundary, prompt marker, border, and progress pill without creating a wide saturated band.
+- 2026-07-23 (Claude accent restraint): Replaced Claude's orange structural borders and broad selected/current fills with Codex-like graphite borders and cool neutral translucent surfaces. Claude orange remains only on compact identity, focus, prompt, and active-state signals.
+- 2026-07-23 (header inventory): Limited both theme headers to `projects · tasks`, removed Codex-only model/directory metadata, and aligned the Claude/Codex banner footprint.
+- 2026-07-23 (text-only header): Removed the Workbranch mark and Claude/Codex prompt prefixes from the top banner. Both themes now share the exact `Workbranch Companion` plus `projects · tasks` text structure and header geometry.
+- 2026-07-23 (Settings anatomy): Standardized Startup, Font, and Theme sections on the Claude Code `fieldset`/`legend` structure in both themes while preserving each theme's color tokens and selected state.
