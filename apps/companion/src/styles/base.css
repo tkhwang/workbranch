@@ -2,8 +2,8 @@
 	background: #0e0e0e;
 	color: #c0caf5;
 	font-family:
-		ui-monospace, "SFMono-Regular", "Menlo", "Monaco", "Consolas",
-		"Liberation Mono", monospace;
+		ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+		monospace;
 	-webkit-font-smoothing: antialiased;
 	text-rendering: optimizelegibility;
 }
@@ -19,8 +19,8 @@ body {
 
 main {
 	--app-font-family:
-		ui-monospace, "SFMono-Regular", "Menlo", "Monaco", "Consolas",
-		"Liberation Mono", monospace;
+		ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+		monospace;
 	--floating-tabs-bottom: 10px;
 	--floating-tabs-content-clearance: 64px;
 	--floating-tabs-font-size: 11px;
@@ -41,9 +41,10 @@ main {
 	max-width: 100%;
 	min-height: 100vh;
 	padding: 12px;
+	/* biome-ignore format: Stylelint requires the continued operator at line start. */
 	padding-bottom: calc(
-		var(--floating-tabs-content-clearance) +
-		env(safe-area-inset-bottom)
+		var(--floating-tabs-content-clearance)
+		+ env(safe-area-inset-bottom)
 	);
 	position: relative;
 	width: 100vw;

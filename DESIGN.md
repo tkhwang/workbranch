@@ -63,7 +63,7 @@
 - Tradeoffs: density is preferred over spaciousness, but tap/click targets remain at least 32px high where practical.
 
 ## Visual language
-- Color: Settings exposes two fixed-dark agent themes. Claude Code uses `#cd694a` only for small identity and interaction signals such as prompt markers, active underlines, focus rings, and narrow selected-state boundaries. Structural borders and broad selected/current surfaces use the same neutral graphite family as Codex, while `#c0caf5` remains the primary terminal text and `#949494` remains muted text. Codex uses `#ededed` for primary text, `#7a7a7a` for secondary text, `#3a3a3a` for borders, and `#5cc2e0` only for command-like actions and links. Existing Companion, Light, Dark, System, and legacy family values migrate to Claude Code.
+- Color: Settings exposes two fixed-dark agent themes. Claude Code uses `#cd694a` only for small identity and interaction signals such as prompt markers, active underlines, focus rings, and narrow selected-state boundaries. Structural borders and broad selected/current surfaces use the same neutral graphite family as Codex, while `#c0caf5` remains the primary terminal text and `#949494` remains muted text. Codex uses `#ededed` for primary text, `#949494` for secondary text, `#3a3a3a` for borders, and `#5cc2e0` only for command-like actions and links. Existing Companion, Light, Dark, System, and legacy family values migrate to Claude Code.
 - Typography: the agent shell, navigation, content panels, form controls, task metadata, and activity labels use the user-selected monospace stack. Weight, contrast, spacing, and rules create hierarchy instead of a sans/mono split.
 - Spacing/layout rhythm: compact terminal rhythm, 8px grid, row-first grouping, prompt markers, and thin rules. Main, Activity, and Settings use the same expanded agent header so switching tabs does not shift the content vertically.
 - Shape/radius/elevation: agent headers use a restrained `6px` radius from the Brainless reference. Panels and rows use square or near-square corners, flat tonal separation, and hairline borders. The bottom navigation and progress count may use pill radii, and the floating navigation may use one restrained shadow to separate it from scrolling content. Do not use card hover lift, gradient, or decorative shadows elsewhere.
@@ -81,6 +81,7 @@
   - project group header,
   - top toolbar with icon-only refresh/quit controls and screen-reader-only live status,
   - Settings view preferences panel,
+  - Settings preference sections always use the Claude Code `fieldset`/`legend` anatomy in both themes; the selected theme still owns colors and control state,
   - Activity report view,
   - switch row for launch-at-login,
   - font select row,
@@ -103,7 +104,7 @@
 
 ## Responsive behavior
 - Supported breakpoints/devices: narrow menu popover around 360-460px width.
-- Layout adaptations: the shared expanded header collapses its internal columns consistently on every tab. The detail header keeps repo chips above a full-width launch-action row; IDE, Terminal, and Finder each occupy one third of that row above steps; repo chips wrap; long task/step names truncate with accessible full text via `title`.
+- Layout adaptations: the shared expanded header collapses its internal columns consistently on every tab. The detail header keeps repo chips above a full-width launch-action row; IDE, Terminal, and Finder each occupy one-third of that row above steps; repo chips wrap; long task/step names truncate with accessible full text via `title`.
 - Touch/hover differences: hover is enhancement only; core state is visible without hover.
 
 ## Interaction states
@@ -152,3 +153,4 @@
 - 2026-07-23 (Claude accent restraint): Replaced Claude's orange structural borders and broad selected/current fills with Codex-like graphite borders and cool neutral translucent surfaces. Claude orange remains only on compact identity, focus, prompt, and active-state signals.
 - 2026-07-23 (header inventory): Limited both theme headers to `projects · tasks`, removed Codex-only model/directory metadata, and aligned the Claude/Codex banner footprint.
 - 2026-07-23 (text-only header): Removed the Workbranch mark and Claude/Codex prompt prefixes from the top banner. Both themes now share the exact `Workbranch Companion` plus `projects · tasks` text structure and header geometry.
+- 2026-07-23 (Settings anatomy): Standardized Startup, Font, and Theme sections on the Claude Code `fieldset`/`legend` structure in both themes while preserving each theme's color tokens and selected state.

@@ -12,7 +12,9 @@ export type AgentHeaderProps = {
 function AgentInventory({ summary }: { readonly summary: MenuSummary }) {
 	return (
 		<span className="agent-inventory">
-			{summary.projectCount} projects · {summary.taskCount} tasks
+			{summary.projectCount}{" "}
+			{summary.projectCount === 1 ? "project" : "projects"} ·{" "}
+			{summary.taskCount} {summary.taskCount === 1 ? "task" : "tasks"}
 		</span>
 	);
 }

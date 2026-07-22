@@ -96,6 +96,7 @@ describe("SettingsPanel", () => {
 		const html = renderSettingsPanel();
 
 		expect(html).toContain('data-terminal-panel="claude"');
+		expect(html).toContain('data-terminal-panel-anatomy="claude"');
 		expect(html).toContain("<fieldset");
 		expect(html).toContain("<legend>Startup</legend>");
 		expect(html).toContain("<legend>Font</legend>");
@@ -114,13 +115,18 @@ describe("SettingsPanel", () => {
 		expect(html).not.toContain("theme mode");
 	});
 
-	it("renders Codex settings with ruled terminal sections", () => {
+	it("renders Codex settings with Claude fieldset sections", () => {
 		const html = renderSettingsPanel({
 			currentPreferences: { font: "menlo", theme: "codex" },
 		});
 
 		expect(html).toContain('data-terminal-panel="codex"');
-		expect(html).toContain('class="terminal-panel-heading">Startup</h2>');
+		expect(html).toContain('data-terminal-panel-anatomy="claude"');
+		expect(html).toContain("<fieldset");
+		expect(html).toContain("<legend>Startup</legend>");
+		expect(html).toContain("<legend>Font</legend>");
+		expect(html).toContain("<legend>Theme</legend>");
+		expect(html).not.toContain('class="terminal-panel-heading"');
 		expect(html).toContain('aria-label="Use Codex theme"');
 		expect(html).toContain('aria-pressed="true"');
 	});

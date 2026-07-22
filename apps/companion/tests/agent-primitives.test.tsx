@@ -54,6 +54,28 @@ describe("agent primitives", () => {
 		}
 	});
 
+	it("uses singular inventory labels only for counts of one", () => {
+		const singular = renderToStaticMarkup(
+			<AgentHeader
+				theme="claude"
+				summary={{ ...summary, projectCount: 1, taskCount: 1 }}
+				{...controls}
+			/>,
+		);
+		const zero = renderToStaticMarkup(
+			<AgentHeader
+				theme="claude"
+				summary={{ ...summary, projectCount: 0, taskCount: 0 }}
+				{...controls}
+			/>,
+		);
+
+		expect(singular).toContain("1 project · 1 task");
+		expect(singular).not.toContain("1 projects");
+		expect(singular).not.toContain("1 tasks");
+		expect(zero).toContain("0 projects · 0 tasks");
+	});
+
 	it("renders three text-only accessible terminal tabs", () => {
 		const html = renderToStaticMarkup(
 			<AgentTabs currentView="activity" onViewChange={() => undefined} />,

@@ -35,7 +35,7 @@ export function SettingsPanel({
 					<p>Companion preferences</p>
 				</div>
 			</div>
-			<TerminalPanel theme={preferences.theme} label="Startup">
+			<TerminalPanel anatomy="claude" label="Startup" theme={preferences.theme}>
 				<div className="settings-row">
 					<label htmlFor="launch-at-login">Open at Login</label>
 					<input
@@ -56,7 +56,7 @@ export function SettingsPanel({
 							: "Opens only when opened manually"}
 				</p>
 			</TerminalPanel>
-			<TerminalPanel theme={preferences.theme} label="Font">
+			<TerminalPanel anatomy="claude" label="Font" theme={preferences.theme}>
 				<div className="settings-row settings-row-select">
 					<label htmlFor="companion-font">Font</label>
 					<select
@@ -83,7 +83,7 @@ export function SettingsPanel({
 				</div>
 				<p className="settings-hint">Current font: {fontName}</p>
 			</TerminalPanel>
-			<TerminalPanel theme={preferences.theme} label="Theme">
+			<TerminalPanel anatomy="claude" label="Theme" theme={preferences.theme}>
 				<AgentThemePicker
 					value={preferences.theme}
 					onChange={(theme) => onPreferencesChange({ ...preferences, theme })}

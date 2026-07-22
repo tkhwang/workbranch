@@ -207,7 +207,7 @@ Evidence (2026-07-20): `pnpm --filter @workbranch/companion exec vitest run test
 
 After `rg -n "useSystemThemeMode|CompanionThemeMode|CompanionResolvedThemeMode" apps/companion/src apps/companion/tests` returns only the files being removed or updated, delete `apps/companion/src/application/systemThemeMode.ts`.
 
-Evidence (2026-07-23): `systemThemeMode.ts` and every production reference were removed. Source-only residue checks for `useSystemThemeMode` and former light/system selectors returned no matches.
+Evidence (2026-07-22 UTC): `systemThemeMode.ts` and every production reference were removed. Source-only residue checks for `useSystemThemeMode` and former light/system selectors returned no matches.
 
 - [ ] **Step 7: Commit gate**
 
@@ -785,7 +785,7 @@ git diff --check
 
 Expected: every command exits 0. If a pre-existing informational diagnostic remains, record the exact output and confirm the command still exits 0.
 
-Evidence (2026-07-23): full Vitest passed 15 files / 116 tests; Companion typecheck, lint, Vite build, Tauri release build, and `git diff --check` all exited 0. Lint retained 42 existing informational `useLiteralKeys` diagnostics and no errors. The macOS app bundle was generated at `apps/companion/src-tauri/target/release/bundle/macos/WorkbranchCompanion.app`.
+Evidence (2026-07-22 UTC): full Vitest passed 15 files / 116 tests; Companion typecheck, lint, Vite build, Tauri release build, and `git diff --check` all exited 0. Lint retained 42 existing informational `useLiteralKeys` diagnostics and no errors. The macOS app bundle was generated at `apps/companion/src-tauri/target/release/bundle/macos/WorkbranchCompanion.app`.
 
 - [x] **Step 2: Prove removed concepts and forbidden additions are absent**
 
@@ -797,7 +797,7 @@ rg -n 'tailwind|shadcn|@radix|brainless' apps/companion/package.json pnpm-lock.y
 
 Expected: no production/test matches for removed appearance modes or shortcuts. Package searches return no newly introduced dependency; documentation comments may mention Brainless only where provenance requires it.
 
-Evidence (2026-07-23): production source contains no system-theme hook, former light selector, shortcut bar, or QA instrumentation residue. `themeFamily` and `themeMode` remain only as the planned read-only migration inputs plus migration fixtures. `package.json` and `pnpm-lock.yaml` have no implementation diff.
+Evidence (2026-07-22 UTC): production source contains no system-theme hook, former light selector, shortcut bar, or QA instrumentation residue. `themeFamily` and `themeMode` remain only as the planned read-only migration inputs plus migration fixtures. `package.json` and `pnpm-lock.yaml` have no implementation diff.
 
 - [x] **Step 3: Run the native visual QA gate in both themes**
 
@@ -818,19 +818,19 @@ Inspect these six states at approximately 360px and 460px widths:
 
 For every state, verify keyboard focus, task disclosure, IDE/Terminal/Finder actions, refresh, quit, launch-at-login, font change, error display, long text truncation, and reduced motion. Do not claim native visual QA if the Tauri window was not observed.
 
-Evidence (2026-07-23): the native Tauri app was observed across Claude/Codex × Main/Activity/Settings at 360px and 460px. The 12 final full-window states passed independent visual-design and visual-fidelity reviews with HIGH confidence. The user-reported tab ambiguity was resolved with active fill, 700-weight label, and a 2px theme indicator; CJK wrapping, helper contrast, focus, actions, refresh, login toggle, font, and reduced-motion states were also exercised.
+Evidence (2026-07-22 UTC): the native Tauri app was observed across Claude/Codex × Main/Activity/Settings at 360px and 460px. The 12 final full-window states passed independent visual-design and visual-fidelity reviews with HIGH confidence. The user-reported tab ambiguity was resolved with active fill, 700-weight label, and a 2px theme indicator; CJK wrapping, helper contrast, focus, actions, refresh, login toggle, font, and reduced-motion states were also exercised.
 
 - [x] **Step 4: Record migration proof**
 
 Start once with an existing preference store containing `themeFamily: "companion"` and any former `themeMode`; verify Claude Code loads and the next save writes `theme: "claude"`. Restart after selecting Codex and verify Codex remains selected.
 
-Evidence (2026-07-23): a legacy store loaded Claude and wrote the canonical `theme: "claude"`; selecting Codex and restarting preserved `theme: "codex"`.
+Evidence (2026-07-22 UTC): a legacy store loaded Claude and wrote the canonical `theme: "claude"`; selecting Codex and restarting preserved `theme: "codex"`.
 
 - [x] **Step 5: Update task state and archive only after all gates pass**
 
 Set `../TASK-WORKBRANCH.md` to `status: done` only after automated and native visual proof passes. Keep `DESIGN.md` as the current contract. Archive the active plan according to the workbranch done workflow; do not archive on test-only evidence when visual QA remains open.
 
-Evidence (2026-07-23): automated proof, native visual proof, migration proof, dependency checks, and cleanup checks passed. Commit gates were intentionally skipped because no explicit commit authorization was given; the branch and worktree remain available for review.
+Evidence (2026-07-22 UTC): automated proof, native visual proof, migration proof, dependency checks, and cleanup checks passed. Commit gates were intentionally skipped because no explicit commit authorization was given; the branch and worktree remain available for review.
 
 ---
 
