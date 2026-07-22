@@ -28,6 +28,8 @@ if 'bin/workbranch' not in extra_files:
 
 if cfg.get('separate-pull-requests') is not True:
     raise SystemExit('release-please must preserve independent package PRs')
+if cfg.get('always-update') is not True:
+    raise SystemExit('release-please must update stale split release PR branches after another release PR lands')
 if 'companion' in cfg['packages'] or 'companion' in manifest:
     raise SystemExit('legacy companion release package key must be migrated')
 if 'apps/companion' not in manifest:

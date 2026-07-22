@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.8.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.7.1...workbranch-companion-v2.8.0) (2026-07-22)
+
+
+### Features
+
+* **companion/ui:** update ui design specification ([3cdb018](https://github.com/tkhwang/workbranch/commit/3cdb0181fe2ddcb743de0ec1b3253aabc62395c8))
+* **companion/ui:** update ui design specification ([ed0cdfe](https://github.com/tkhwang/workbranch/commit/ed0cdfe53eacbacb1668c0e682e6c64028c83bc9))
+
+
+### Bug Fixes
+
+* **ui:** update settings panel and header text ([fcc068b](https://github.com/tkhwang/workbranch/commit/fcc068bad16f353517b2ce2e05d748c3703341e1))
+
 ## [2.7.1](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.7.0...workbranch-companion-v2.7.1) (2026-07-07)
 
 
