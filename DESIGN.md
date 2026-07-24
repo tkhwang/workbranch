@@ -2,7 +2,7 @@
 
 ## Source of truth
 - Status: Active
-- Last refreshed: 2026-07-23
+- Last refreshed: 2026-07-24
 - Primary product surfaces: Workbranch Companion macOS menu bar popover.
 - Evidence reviewed:
   - `docs/plans/0032-companion-tauri-react-rewrite.md`
@@ -34,7 +34,7 @@
 - Success signals:
   - A user can identify active/blocked work in under three seconds.
   - A user can find the current step without expanding every row.
-  - The popover remains readable at approximately 360px width.
+  - The popover remains readable at its 460px native minimum width.
 
 ## Personas and jobs
 - Primary personas: developers using `workbranch` task workspaces and AI agents.
@@ -63,8 +63,8 @@
 - Tradeoffs: density is preferred over spaciousness, but tap/click targets remain at least 32px high where practical.
 
 ## Visual language
-- Color: Settings exposes two fixed-dark agent themes. Claude Code uses `#cd694a` only for small identity and interaction signals such as prompt markers, active underlines, focus rings, and narrow selected-state boundaries. Structural borders and broad selected/current surfaces use the same neutral graphite family as Codex, while `#c0caf5` remains the primary terminal text and `#949494` remains muted text. Codex uses `#ededed` for primary text, `#949494` for secondary text, `#3a3a3a` for borders, and `#5cc2e0` only for command-like actions and links. Existing Companion, Light, Dark, System, and legacy family values migrate to Claude Code.
-- Typography: the agent shell, navigation, content panels, form controls, task metadata, and activity labels use the user-selected monospace stack. Weight, contrast, spacing, and rules create hierarchy instead of a sans/mono split.
+- Color: Settings exposes two fixed-dark agent themes. Claude Code uses low-saturation warm-graphite surfaces and neutral warm-gray borders; `#cd694a` remains the identity anchor but is reserved for compact prompt, focus, and active-state signals rather than broad backgrounds. Selected/current-step backgrounds use a cool-neutral low-opacity tint; `#c0caf5` remains primary terminal text and `#9aa5ce` is the brighter muted text. Codex uses brighter cool-neutral surfaces and borders, `#ededed` for primary text, `#a8a8ad` for muted text, and `#5cc2e0` only for command-like actions and links. Existing Companion, Light, Dark, System, and legacy family values migrate to Claude Code.
+- Typography: the agent shell, navigation, content panels, form controls, task metadata, and activity labels use the user-selected monospace stack. The fixed-dark type scale is raised by one pixel with no production size below `10px`, except that the narrow-width agent header remains `13px`; explicit WebKit antialias smoothing is removed so native rendering controls glyph weight. Weight, contrast, spacing, and rules create hierarchy instead of a sans/mono split.
 - Spacing/layout rhythm: compact terminal rhythm, 8px grid, row-first grouping, prompt markers, and thin rules. Main, Activity, and Settings use the same expanded agent header so switching tabs does not shift the content vertically.
 - Shape/radius/elevation: agent headers use a restrained `6px` radius from the Brainless reference. Panels and rows use square or near-square corners, flat tonal separation, and hairline borders. The bottom navigation and progress count may use pill radii, and the floating navigation may use one restrained shadow to separate it from scrolling content. Do not use card hover lift, gradient, or decorative shadows elsewhere.
 - Motion: 120ms press/reveal feedback only; respect reduced motion.
@@ -88,7 +88,7 @@
   - agent theme segmented control (`Claude Code`, `Codex`) with Claude Code as the default and migration target,
   - launcher-like task summary line with a compact progress pill,
   - current-step strip,
-  - detail header row containing repo chips and a full-width IDE/Terminal/Finder action bar split into equal thirds above current step and checklist content,
+  - detail header row containing plain repository names paired with branch-only chips and a full-width IDE/Terminal/Finder action bar split into equal thirds above current step and checklist content,
   - nested step tree with aligned status markers separate from step text: small depth 0 square, depth 1 circle, deeper levels smaller circles.
 - Variants and states: todo, planning, in-progress, review, blocked, done, notification present, dirty repo. In-progress identity uses the compact status marker rather than recoloring the full Task perimeter.
 - Selected Task: the expanded native `details[open]` row uses a stronger neutral surface and border while collapsed tasks remain quiet. Its summary uses the theme-owned `--task-selected-summary-bg` low-opacity tint plus a `2px` inline-start accent boundary; the accent must not fill the entire summary row at full strength.
@@ -103,8 +103,8 @@
 - Reduced motion and sensory considerations: disable transform transitions under `prefers-reduced-motion: reduce`.
 
 ## Responsive behavior
-- Supported breakpoints/devices: narrow menu popover around 360-460px width.
-- Layout adaptations: the shared expanded header collapses its internal columns consistently on every tab. The detail header keeps repo chips above a full-width launch-action row; IDE, Terminal, and Finder each occupy one-third of that row above steps; repo chips wrap; long task/step names truncate with accessible full text via `title`.
+- Supported breakpoints/devices: the native menu popover opens at 460px and cannot resize below 460px.
+- Layout adaptations: the shared expanded header keeps its internal columns consistent on every tab. The detail header keeps repository/branch pairs above a full-width launch-action row; each repository is plain text, only its branch name uses a chip, and each pair wraps as one unit without a literal separator. IDE, Terminal, and Finder each occupy one-third of the action row above steps; long task/step names truncate with accessible full text via `title`.
 - Touch/hover differences: hover is enhancement only; core state is visible without hover.
 
 ## Interaction states
@@ -127,7 +127,7 @@
 - Performance constraints: no extra runtime package; no animation loops; preserve 0033 responsiveness fixes.
 - Compatibility constraints: no CLI/contract/Rust port changes.
 - Scope constraints: do not add keyboard shortcuts or display shortcut hints for behavior that does not exist.
-- Test/screenshot expectations: cover preference migration, persistence, both theme variants, and the Main/Activity/Settings shell contracts with Vitest. Run typecheck, lint, Vite build, Tauri build, then inspect both themes on all three tabs at 360px and 460px before final handoff.
+- Test/screenshot expectations: cover preference migration, persistence, both theme variants, the 460px native window boundary, and the Main/Activity/Settings shell contracts with Vitest. Run typecheck, lint, Vite build, Tauri build, then inspect both themes on all three tabs at 460px before final handoff.
 
 ## Open questions
 - [ ] Whether a later release should restore a light appearance as a separate axis after the two fixed-dark agent themes ship.
@@ -154,3 +154,6 @@
 - 2026-07-23 (header inventory): Limited both theme headers to `projects · tasks`, removed Codex-only model/directory metadata, and aligned the Claude/Codex banner footprint.
 - 2026-07-23 (text-only header): Removed the Workbranch mark and Claude/Codex prompt prefixes from the top banner. Both themes now share the exact `Workbranch Companion` plus `projects · tasks` text structure and header geometry.
 - 2026-07-23 (Settings anatomy): Standardized Startup, Font, and Theme sections on the Claude Code `fieldset`/`legend` structure in both themes while preserving each theme's color tokens and selected state.
+- 2026-07-24 (theme vibrancy and typography): Superseded the 2026-07-23 Claude accent-restraint direction after the neutral shell read as too drab. Claude structure now uses warm terracotta-tinted surfaces and lines, Codex uses brighter cool-neutral surfaces, muted text is brighter in both themes, status labels carry state colors, and the fixed-dark type scale increases by one pixel with native font smoothing.
+- 2026-07-24 (native width and repository identity): Set 460px as both the initial and minimum native window width. Repository and branch identities no longer share one chip: the repository is plain text, only the branch name is a chip, dirty state stays with the repository, and no literal `|` separator is rendered.
+- 2026-07-24 (Claude background restraint): User review found the terracotta structure visually excessive. Claude keeps its orange identity for compact accents, while broad surfaces, borders, selected summaries, and current-step fills move to low-saturation warm graphite and neutral translucent tones. Codex tokens remain unchanged.

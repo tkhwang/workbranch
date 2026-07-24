@@ -48,7 +48,7 @@ summary::-webkit-details-marker {
 
 .task-name {
 	color: var(--text);
-	font-size: 12px;
+	font-size: 13px;
 	font-weight: 600;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -73,7 +73,7 @@ summary::-webkit-details-marker {
 
 .task-notification {
 	color: var(--notify);
-	font-size: 10px;
+	font-size: 11px;
 }
 
 .task-detail {
@@ -102,7 +102,7 @@ summary::-webkit-details-marker {
 
 .plan-title {
 	color: var(--emphasis);
-	font-size: 9px;
+	font-size: 10px;
 	font-weight: 600;
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
@@ -110,7 +110,7 @@ summary::-webkit-details-marker {
 
 .current-step {
 	color: var(--text);
-	font-size: 11px;
+	font-size: 12px;
 	overflow-wrap: anywhere;
 }
 
@@ -128,44 +128,53 @@ summary::-webkit-details-marker {
 	min-width: 0;
 }
 
-.repo-chip {
+.repo-pair {
 	align-items: center;
-	border: 1px solid var(--line);
-	border-radius: 4px;
-	color: var(--muted);
 	display: inline-flex;
-	font-size: 10px;
 	gap: 5px;
 	max-width: 100%;
-	padding: 3px 5px;
+	min-width: 0;
 }
 
-.repo-dirty {
-	border-color: var(--notify);
-	color: var(--notify);
-}
-
-.repo-name,
-.repo-branch {
+.repo-name {
+	align-items: center;
+	color: var(--muted);
+	display: inline-flex;
+	font-size: 11px;
+	gap: 4px;
+	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 
-.repo-branch {
+.repo-branch-chip {
+	border: 1px solid var(--line);
+	border-radius: 4px;
 	color: var(--muted);
+	font-size: 11px;
+	min-width: 0;
+	overflow: hidden;
+	padding: 3px 5px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.repo-dirty {
+	color: var(--notify);
 }
 
 .repo-dot {
 	color: var(--notify);
-	font-size: 9px;
+	flex: 0 0 auto;
+	font-size: 10px;
 }
 
 .steps {
 	border-left: 1px solid var(--line);
 	color: var(--muted);
-	font-size: 11px;
-	line-height: 1.45;
+	font-size: 12px;
+	line-height: 1.5;
 	list-style: none;
 	margin: 8px 0 0 6px;
 	padding: 0 0 0 8px;
@@ -232,7 +241,7 @@ summary::-webkit-details-marker {
 .error,
 .empty {
 	border-radius: 4px;
-	font-size: 12px;
+	font-size: 13px;
 	padding: 8px;
 }
 

@@ -14,7 +14,8 @@
     "windows": [
       {
         "title": "Workbranch Companion",
-        "width": 420,
+        "width": 460,
+        "minWidth": 460,
         "height": 680,
         "resizable": true,
         "visible": false,
