@@ -57,7 +57,7 @@ No high-impact unresolved decision remains. The 460px window contract and `repo 
 
 - `DESIGN.md`: replace the superseded neutral-Claude color direction and append the 2026-07-24 direction revision.
 - `apps/companion/tests/app-shell.test.tsx`: replace the neutral-Claude contract, update `--muted` anchors, add tone-up, status-color, and typography contracts.
-- `apps/companion/tests/task-row.test.tsx`: update the existing selected-summary token contract to the approved Claude terracotta value.
+- `apps/companion/tests/task-row.test.tsx`: update the existing selected-summary token contract to the final neutral `#c0caf5` translucent value.
 - `apps/companion/src/ui/TaskRow.tsx`: render repository name as text and only `branchName` as a chip, with dirty state attached to the repository identity.
 - `apps/companion/src/styles/themes.css`: new Claude and Codex token values.
 - `apps/companion/src/styles/base.css`: root/body background, remove font smoothing, bump size variables.
@@ -88,32 +88,32 @@ No file is created or removed. `TaskRow.tsx` is the only production markup chang
 
 Update `DESIGN.md` before production CSS:
 
-- In **Visual language / Color**, replace the neutral-Claude structural contract with warm terracotta-tinted surfaces and lines, low-opacity terracotta selected/current-step backgrounds, brighter per-theme muted text, and the unchanged identity anchors.
+- In **Visual language / Color**, use low-saturation warm-graphite Claude surfaces and warm-neutral structural lines, neutral `#c0caf5` translucent selected/current-step backgrounds, brighter per-theme muted text, and unchanged identity anchors. Orange remains limited to compact prompt, focus, action, and active-state signals.
 - In **Visual language / Typography**, record the one-pixel type-scale increase, 10px production minimum, preserved narrow-header 13px exception, and removal of explicit thin-glyph WebKit smoothing.
-- Append a `2026-07-24` direction revision explicitly superseding the `2026-07-23 (Claude accent restraint)` revision.
+- Append a `2026-07-24` direction revision recording the final warm-graphite structure and explicitly superseding the rejected broad terracotta treatment.
 - Keep the existing no-gradient, restrained-shadow, fixed-dark, monospace, and cross-view consistency contracts.
 
-Evidence (2026-07-24): `DESIGN.md` now records warm Claude structure, brighter cool-neutral Codex structure, brighter muted text, the exact typography floor/exception, native smoothing, and a superseding 2026-07-24 direction revision.
+Evidence (2026-07-24, synchronized after Task 6): `DESIGN.md` records low-saturation warm-graphite Claude structure, neutral selected/current-step fills, compact orange identity signals, brighter cool-neutral Codex structure, the typography floor/exception, native smoothing, and the final 2026-07-24 direction revision.
 
-- [x] **Step 2: Replace the neutral-structure contract with the warm-tint contract**
+- [x] **Step 2: Lock the final warm-graphite and compact-orange contract**
 
 In `apps/companion/tests/app-shell.test.tsx`, delete the test `"keeps Claude structural surfaces neutral and reserves orange for accents"` (currently around lines 186-198) and add these two tests in its place:
 
 ```tsx
-it("gives Claude structure a warm terracotta tint with accent-tinted selection", () => {
+it("reserves Claude orange for compact accents instead of structural backgrounds", () => {
 	const css = readCssContract("src/style.css");
 
 	expect(css).toMatch(
-		/main\[data-theme="claude"\]\s*\{[^}]*--line:\s*rgba\(205,\s*105,\s*74,\s*0\.28\);[^}]*--line-strong:\s*rgba\(205,\s*105,\s*74,\s*0\.55\);/s,
+		/main\[data-theme="claude"\]\s*\{[^}]*--line:\s*#403b38;[^}]*--line-strong:\s*#625952;/s,
 	);
 	expect(css).toMatch(
-		/main\[data-theme="claude"\]\s*\{[^}]*--emphasis-soft:\s*rgba\(205,\s*105,\s*74,\s*0\.14\);[^}]*--task-selected-summary-bg:\s*rgba\(205,\s*105,\s*74,\s*0\.1\);/s,
+		/main\[data-theme="claude"\]\s*\{[^}]*--emphasis-soft:\s*rgba\(205,\s*105,\s*74,\s*0\.14\);[^}]*--task-selected-summary-bg:\s*rgba\(192,\s*202,\s*245,\s*0\.06\);/s,
 	);
 	expect(css).toMatch(
-		/main\[data-theme="claude"\]\s*\{[^}]*--current-step-bg:\s*rgba\(205,\s*105,\s*74,\s*0\.12\);/s,
+		/main\[data-theme="claude"\]\s*\{[^}]*--current-step-bg:\s*rgba\(192,\s*202,\s*245,\s*0\.08\);/s,
 	);
 	expect(css).not.toMatch(
-		/main\[data-theme="claude"\]\s*\{[^}]*--line:\s*#3a3a3a/s,
+		/main\[data-theme="claude"\]\s*\{[^}]*--line:\s*rgba\(205,\s*105,\s*74/s,
 	);
 });
 
@@ -121,7 +121,7 @@ it("tones up both fixed-dark themes with tinted surfaces and lines", () => {
 	const css = readCssContract("src/style.css");
 
 	expect(css).toMatch(
-		/main\[data-theme="claude"\]\s*\{[^}]*--surface-0:\s*#131110;[^}]*--surface-1:\s*#1a1715;[^}]*--surface-2:\s*#221e1b;[^}]*--surface-3:\s*#2d2824;/s,
+		/main\[data-theme="claude"\]\s*\{[^}]*--surface-0:\s*#131313;[^}]*--surface-1:\s*#1a1918;[^}]*--surface-2:\s*#22201f;[^}]*--surface-3:\s*#2c2927;/s,
 	);
 	expect(css).toMatch(
 		/main\[data-theme="codex"\]\s*\{[^}]*--surface-0:\s*#121214;[^}]*--surface-1:\s*#18181b;[^}]*--surface-2:\s*#202024;[^}]*--surface-3:\s*#2b2b30;/s,
@@ -129,8 +129,8 @@ it("tones up both fixed-dark themes with tinted surfaces and lines", () => {
 	expect(css).toMatch(
 		/main\[data-theme="codex"\]\s*\{[^}]*--line:\s*#414147;[^}]*--line-strong:\s*#60606a;/s,
 	);
-	expect(css).toMatch(/:root\s*\{[^}]*background:\s*#131110/s);
-	expect(css).toMatch(/body\s*\{[^}]*background:\s*#131110/s);
+	expect(css).toMatch(/:root\s*\{[^}]*background:\s*#131313/s);
+	expect(css).toMatch(/body\s*\{[^}]*background:\s*#131313/s);
 });
 ```
 
@@ -152,9 +152,9 @@ expect(css).not.toContain("--faint: #5d5d5d");
 pnpm --filter @workbranch/companion exec vitest run tests/app-shell.test.tsx
 ```
 
-Expected: exactly the three touched/added tests fail on the old `#3a3a3a`, `#0e0e0e`, `#949494`, `#626262`, and `#5d5d5d` values; every other test stays green.
+Expected: the final palette/readability contracts fail against the pre-change `#3a3a3a`, `#0e0e0e`, `#949494`, `#626262`, and `#5d5d5d` values; every unrelated test stays green.
 
-Evidence (2026-07-24): focused Vitest executed 25 tests; exactly the three intended theme/readability contracts failed and the remaining 22 passed.
+Evidence (2026-07-24, final contract): the focused RED run failed only on the intended Claude surface/line/fill and readability differences. Task 6 later replaced the intermediate terracotta values before the final GREEN proof.
 
 - [x] **Step 4: Replace both token blocks in `themes.css`**
 
@@ -162,12 +162,12 @@ Replace the two theme blocks (keep the `main[data-font=...]` selectors at the bo
 
 ```css
 main[data-theme="claude"] {
-	--surface-0: #131110;
-	--surface-1: #1a1715;
-	--surface-2: #221e1b;
-	--surface-3: #2d2824;
-	--line: rgba(205, 105, 74, 0.28);
-	--line-strong: rgba(205, 105, 74, 0.55);
+	--surface-0: #131313;
+	--surface-1: #1a1918;
+	--surface-2: #22201f;
+	--surface-3: #2c2927;
+	--line: #403b38;
+	--line-strong: #625952;
 	--text: #c0caf5;
 	--muted: #9aa5ce;
 	--faint: #767c99;
@@ -176,7 +176,7 @@ main[data-theme="claude"] {
 	--accent-soft: rgba(205, 105, 74, 0.14);
 	--emphasis: #cd694a;
 	--emphasis-soft: rgba(205, 105, 74, 0.14);
-	--task-selected-summary-bg: rgba(205, 105, 74, 0.1);
+	--task-selected-summary-bg: rgba(192, 202, 245, 0.06);
 	--blocked: #f7768e;
 	--blocked-soft: rgba(247, 118, 142, 0.14);
 	--review: #bb9af7;
@@ -187,7 +187,7 @@ main[data-theme="claude"] {
 	--notify-soft: rgba(224, 175, 104, 0.14);
 	--button-bg: rgba(192, 202, 245, 0.06);
 	--button-bg-hover: rgba(192, 202, 245, 0.12);
-	--current-step-bg: rgba(205, 105, 74, 0.12);
+	--current-step-bg: rgba(192, 202, 245, 0.08);
 	--cal-1: #cd694a;
 	--cal-2: #7dcfff;
 	--cal-3: #87d787;
@@ -244,22 +244,22 @@ main[data-theme="codex"] {
 }
 ```
 
-Changed relative to today: surfaces 0-3 (both themes), `--line`/`--line-strong` (both), `--muted`/`--faint` (both), Claude `--accent-soft` unchanged in value but listed for clarity, Claude `--emphasis-soft`, `--task-selected-summary-bg`, `--current-step-bg`. Everything else is byte-identical to the current file; `base.css` must still not define `--surface-0:` (a test asserts this).
+Final contract: Claude surfaces 0-3 and structural lines use the warm-graphite ramp, while `--task-selected-summary-bg` and `--current-step-bg` use neutral `#c0caf5` translucency. Claude orange identity values, Codex tokens, status/calendar tokens, and button backgrounds remain unchanged. `base.css` must still not define `--surface-0:` (a test asserts this).
 
 - [x] **Step 5: Update the hardcoded pre-theme background in `base.css`**
 
-In `apps/companion/src/styles/base.css` replace both `background: #0e0e0e;` declarations (`:root` and `body`) with `background: #131110;` so the pre-hydration flash matches the Claude default surface. Leave `color: #c0caf5;` as is.
+In `apps/companion/src/styles/base.css` replace both `background: #0e0e0e;` declarations (`:root` and `body`) with `background: #131313;` so the pre-hydration flash matches the final Claude default surface. Leave `color: #c0caf5;` as is.
 
 - [x] **Step 6: Run the focused test and residue checks, confirm GREEN**
 
 ```bash
 pnpm --filter @workbranch/companion exec vitest run tests/app-shell.test.tsx
-rg -n '#0e0e0e|#949494|#3a3a3a|#565656|#626262|#5d5d5d' apps/companion/src
+rg -n '#0e0e0e|#131110|#1a1715|#221e1b|#2d2824|#949494|#3a3a3a|#565656|#626262|#5d5d5d' apps/companion/src
 ```
 
 Expected: all app-shell tests pass; the `rg` search returns no production matches.
 
-Evidence (2026-07-24): focused Vitest passed 25/25 tests, and the old-token residue search returned no production matches.
+Evidence (2026-07-24, synchronized after Task 6): focused Vitest passed `app-shell.test.tsx` and `task-row.test.tsx` (2 files / 39 tests), and the rejected-token residue search returned no production matches.
 
 - [x] **Step 7: Commit gate**
 
@@ -599,7 +599,7 @@ pnpm companion:dev
 
 Inspect at the 460px minimum width:
 
-1. Claude / Main: warm-tinted panels and borders, orange selection/current-step backgrounds, colored DONE/BLOCKED status text, Korean step text crisp at 12px.
+1. Claude / Main: warm-graphite panels and borders, neutral `#c0caf5` translucent selection/current-step backgrounds, compact orange identity signals, colored DONE/BLOCKED status text, Korean step text crisp at 12px.
 2. Claude / Activity + Settings: same header footprint, brighter secondary text, no washed-out gray.
 3. Codex / Main + Activity + Settings: cool toned-up surfaces, cyan still limited to command-like actions, status colors visible.
 4. Both themes: font smoothing change renders glyphs heavier/sharper; no layout overflow at the supported 460px boundary from the +1px sweep (task rows, chips, tabs, calendar, long Korean/`path` truncation).
