@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.12.0](https://github.com/tkhwang/workbranch/compare/v2.11.0...v2.12.0) (2026-07-24)
+
+
+### Features
+
+* **ui:** update companion ui ([05e6eca](https://github.com/tkhwang/workbranch/commit/05e6eca1d431f8c47e1733c02c454151a8a63812))
+* **ui:** update companion ui ([9818046](https://github.com/tkhwang/workbranch/commit/981804658a758f81ff9d3a41a897f900ee8b556c))
+
 ## [2.11.0](https://github.com/tkhwang/workbranch/compare/v2.10.1...v2.11.0) (2026-07-22)
 
 
