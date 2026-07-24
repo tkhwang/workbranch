@@ -29,6 +29,24 @@ function readCssContract(path: string, visited = new Set<string>()): string {
 }
 
 describe("App shell settings wiring", () => {
+	it("pins the native Companion window to the 460px product boundary", () => {
+		const config = JSON.parse(
+			readFileSync("src-tauri/tauri.conf.json", "utf8"),
+		) as {
+			readonly app: {
+				readonly windows: readonly {
+					readonly width: number;
+					readonly minWidth?: number;
+				}[];
+			};
+		};
+
+		expect(config.app.windows[0]).toMatchObject({
+			width: 460,
+			minWidth: 460,
+		});
+	});
+
 	it("advances the activity reload token after successful app refreshes", () => {
 		expect(nextActivityReloadToken(0)).toBe(1);
 		expect(nextActivityReloadToken(41)).toBe(42);
@@ -183,17 +201,69 @@ describe("App shell settings wiring", () => {
 		);
 	});
 
-	it("keeps Claude structural surfaces neutral and reserves orange for accents", () => {
+	it("reserves Claude orange for compact accents instead of structural backgrounds", () => {
+		// Given the fixed-dark Claude theme contract
+		// When structural and selected-state tokens are inspected
 		const css = readCssContract("src/style.css");
 
+		// Then warm graphite owns broad surfaces while orange remains the emphasis signal
 		expect(css).toMatch(
-			/main\[data-theme="claude"\]\s*\{[^}]*--line:\s*#3a3a3a;[^}]*--line-strong:\s*#565656;/s,
+			/main\[data-theme="claude"\]\s*\{[^}]*--line:\s*#403b38;[^}]*--line-strong:\s*#625952;/s,
 		);
 		expect(css).toMatch(
-			/main\[data-theme="claude"\]\s*\{[^}]*--emphasis-soft:\s*rgba\(192,\s*202,\s*245,\s*0\.08\);[^}]*--task-selected-summary-bg:\s*rgba\(192,\s*202,\s*245,\s*0\.06\);/s,
+			/main\[data-theme="claude"\]\s*\{[^}]*--emphasis-soft:\s*rgba\(205,\s*105,\s*74,\s*0\.14\);[^}]*--task-selected-summary-bg:\s*rgba\(192,\s*202,\s*245,\s*0\.06\);/s,
 		);
 		expect(css).toMatch(
 			/main\[data-theme="claude"\]\s*\{[^}]*--current-step-bg:\s*rgba\(192,\s*202,\s*245,\s*0\.08\);/s,
+		);
+		expect(css).not.toMatch(
+			/main\[data-theme="claude"\]\s*\{[^}]*--line:\s*rgba\(205,\s*105,\s*74/s,
+		);
+	});
+
+	it("tones up both fixed-dark themes with tinted surfaces and lines", () => {
+		// Given the two fixed-dark theme blocks
+		// When their structural surfaces and pre-hydration background are inspected
+		const css = readCssContract("src/style.css");
+
+		// Then Claude is warm graphite and Codex is brighter cool-neutral from first paint
+		expect(css).toMatch(
+			/main\[data-theme="claude"\]\s*\{[^}]*--surface-0:\s*#131313;[^}]*--surface-1:\s*#1a1918;[^}]*--surface-2:\s*#22201f;[^}]*--surface-3:\s*#2c2927;/s,
+		);
+		expect(css).toMatch(
+			/main\[data-theme="codex"\]\s*\{[^}]*--surface-0:\s*#121214;[^}]*--surface-1:\s*#18181b;[^}]*--surface-2:\s*#202024;[^}]*--surface-3:\s*#2b2b30;/s,
+		);
+		expect(css).toMatch(
+			/main\[data-theme="codex"\]\s*\{[^}]*--line:\s*#414147;[^}]*--line-strong:\s*#60606a;/s,
+		);
+		expect(css).toMatch(/:root\s*\{[^}]*background:\s*#131313/s);
+		expect(css).toMatch(/body\s*\{[^}]*background:\s*#131313/s);
+	});
+
+	it("colors status token text by state instead of relying on the dot alone", () => {
+		// Given visible status labels with state-specific data attributes
+		// When the shared status token stylesheet is inspected
+		const css = readCssContract("src/style.css");
+
+		// Then active states inherit semantic colors while todo and planning stay muted
+		expect(css).toMatch(/\.status-token\s*\{[^}]*color:\s*var\(--muted\)/s);
+		expect(css).toMatch(
+			/\.status-token\[data-status="in-progress"\]\s*\{[^}]*color:\s*var\(--emphasis\)/s,
+		);
+		expect(css).toMatch(
+			/\.status-token\[data-status="blocked"\]\s*\{[^}]*color:\s*var\(--blocked\)/s,
+		);
+		expect(css).toMatch(
+			/\.status-token\[data-status="review"\]\s*\{[^}]*color:\s*var\(--review\)/s,
+		);
+		expect(css).toMatch(
+			/\.status-token\[data-status="done"\]\s*\{[^}]*color:\s*var\(--done\)/s,
+		);
+		expect(css).toMatch(
+			/\.status-token-marker\s*\{[^}]*height:\s*7px[^}]*width:\s*7px/s,
+		);
+		expect(css).not.toMatch(
+			/\.status-token\[data-status="(?:todo|planning)"\]\s*\{[^}]*color:/s,
 		);
 	});
 
@@ -319,7 +389,13 @@ describe("App shell settings wiring", () => {
 	it("uses a readable text token for small secondary copy", () => {
 		const css = readCssContract("src/style.css");
 
-		expect(css).toContain("--muted: #949494");
+		expect(css).toContain("--muted: #9aa5ce");
+		expect(css).toContain("--muted: #a8a8ad");
+		expect(css).not.toContain("--muted: #949494");
+		expect(css).toContain("--faint: #767c99");
+		expect(css).toContain("--faint: #6b6b70");
+		expect(css).not.toContain("--faint: #626262");
+		expect(css).not.toContain("--faint: #5d5d5d");
 		expect(css).toMatch(
 			/\.settings-panel p,\s*\.settings-hint\s*\{[^}]*color:\s*var\(--muted\)/s,
 		);
@@ -327,7 +403,59 @@ describe("App shell settings wiring", () => {
 			/\.font-preview-label\s*\{[^}]*color:\s*var\(--muted\)/s,
 		);
 		expect(css).toMatch(/\.cal-hour-label\s*\{[^}]*color:\s*var\(--muted\)/s);
-		expect(css).toMatch(/\.repo-branch\s*\{[^}]*color:\s*var\(--muted\)/s);
+		expect(css).toMatch(/\.repo-branch-chip\s*\{[^}]*color:\s*var\(--muted\)/s);
+	});
+
+	it("keeps companion typography at the exact legible fixed-dark scale", () => {
+		// Given the approved one-pixel typography map
+		// When every production selector in the map is inspected
+		const css = readCssContract("src/style.css");
+		const expectedTypographyRules = [
+			/main\s*\{[^}]*--floating-tabs-font-size:\s*12px/s,
+			/main\s*\{[^}]*--progress-pill-font-size:\s*11px/s,
+			/\.terminal-panel legend\s*\{[^}]*font-size:\s*11px/s,
+			/\.agent-header h1\s*\{[^}]*font-size:\s*15px/s,
+			/\.agent-inventory\s*\{[^}]*font-size:\s*11px/s,
+			/\.agent-control\s*\{[^}]*font-size:\s*16px/s,
+			/\.terminal-panel-heading\s*\{[^}]*font-size:\s*11px/s,
+			/\.status-token\s*\{[^}]*font-size:\s*11px/s,
+			/\.task-name\s*\{[^}]*font-size:\s*13px/s,
+			/\.task-notification\s*\{[^}]*font-size:\s*11px/s,
+			/\.plan-title\s*\{[^}]*font-size:\s*10px/s,
+			/\.current-step\s*\{[^}]*font-size:\s*12px/s,
+			/\.repo-name\s*\{[^}]*font-size:\s*11px/s,
+			/\.repo-branch-chip\s*\{[^}]*font-size:\s*11px/s,
+			/\.repo-dot\s*\{[^}]*font-size:\s*10px/s,
+			/\.steps\s*\{[^}]*font-size:\s*12px[^}]*line-height:\s*1\.5/s,
+			/\.error,\s*\.empty\s*\{[^}]*font-size:\s*13px/s,
+			/\.task-action\s*\{[^}]*font-size:\s*11px/s,
+			/\.app-error\s*\{[^}]*font-size:\s*13px/s,
+			/\.settings-panel h2\s*\{[^}]*font-size:\s*14px/s,
+			/\.settings-panel p,\s*\.settings-hint\s*\{[^}]*font-size:\s*11px/s,
+			/\.settings-row label\s*\{[^}]*font-size:\s*12px/s,
+			/\.settings-row-select::after\s*\{[^}]*font-size:\s*12px/s,
+			/\.font-preview\s*\{[^}]*font-size:\s*12px/s,
+			/\.font-preview-label\s*\{[^}]*font-size:\s*10px/s,
+			/\.agent-theme-button\s*\{[^}]*font-size:\s*11px/s,
+			/\.cal-title\s*\{[^}]*font-size:\s*14px/s,
+			/\.cal-nav-button,\s*\.cal-today-button,\s*\.cal-mode-button,\s*\.cal-chip\s*\{[^}]*font-size:\s*12px/s,
+			/\.cal-hour-label\s*\{[^}]*font-size:\s*11px/s,
+			/\.cal-day-heading\s*\{[^}]*font-size:\s*11px/s,
+			/\.cal-block-task\s*\{[^}]*font-size:\s*12px/s,
+			/\.cal-block-time\s*\{[^}]*font-size:\s*11px/s,
+			/\.cal-block-plan\s*\{[^}]*font-size:\s*10px/s,
+			/\.cal-timeline\[data-mode="day"\]\s*\.cal-session\[data-width="narrow"\]\s*\.cal-block-task\s*\{[^}]*font-size:\s*11px/s,
+			/\.cal-timeline\[data-mode="day"\]\s*\.cal-session\[data-width="narrow"\]\s*\.cal-block-time\s*\{[^}]*font-size:\s*10px/s,
+			/\.cal-detail strong\s*\{[^}]*font-size:\s*13px/s,
+			/\.cal-detail span,\s*\.cal-detail li\s*\{[^}]*font-size:\s*11px/s,
+		] as const;
+
+		// Then native smoothing is used and every mapped selector has its final size
+		expect(css).not.toContain("-webkit-font-smoothing");
+		expect(css).not.toMatch(/font-size:\s*9px/);
+		for (const rule of expectedTypographyRules) {
+			expect(css).toMatch(rule);
+		}
 	});
 
 	it("keeps theme tokens in the theme contract and calendar fills theme-aware", () => {
@@ -394,7 +522,7 @@ describe("App shell settings wiring", () => {
 		);
 	});
 
-	it("does not force horizontal overflow when the 360px window gains a scrollbar", () => {
+	it("does not force horizontal overflow when the 460px window gains a scrollbar", () => {
 		const baseCss = readFileSync("src/styles/base.css", "utf8");
 
 		expect(baseCss).not.toMatch(/body\s*\{[^}]*min-width:/s);
@@ -411,6 +539,10 @@ describe("App shell settings wiring", () => {
 		expect(css).toContain("--accent: #cd694a");
 		expect(css).toContain("--emphasis: #cd694a");
 		expect(css).toContain("--text: #c0caf5");
+		expect(css).toContain("--surface-0: #131313");
+		expect(css).toContain("--surface-1: #1a1918");
+		expect(css).toContain("--line: #403b38");
+		expect(css).not.toContain("--line: rgba(205, 105, 74");
 		expect(css).toContain("--accent: #5cc2e0");
 		expect(css).toContain("--emphasis: #ededed");
 		expect(css).toContain("--text: #ededed");

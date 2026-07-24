@@ -183,9 +183,13 @@ describe("TaskRow", () => {
 		expect(html).toContain("Companion UI refresh");
 		expect(html).toContain("Review screenshot");
 		expect(html).toContain("2/4");
-		expect(html).toContain("repo-chip repo-dirty");
-		expect(html).toContain("workbranch");
-		expect(html).toContain("feat/update-0617");
+		expect(html).toContain('class="repo-pair"');
+		expect(html).toContain('class="repo-name repo-dirty"');
+		expect(html).toContain('class="repo-branch-chip">feat/update-0617</span>');
+		expect(html).not.toContain('class="repo-chip"');
+		expect(html).not.toContain('class="repo-chip repo-dirty"');
+		expect(html).not.toContain('class="repo-separator"');
+		expect(html).not.toContain(" | ");
 	});
 	it("highlights the expanded task and renders progress as a compact pill", () => {
 		const html = renderTaskRow(linearFixtureTask);

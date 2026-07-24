@@ -152,17 +152,19 @@ function RepoChips({ repos }: RepoChipsProps) {
 		<ul className="repo-chips" aria-label="repositories">
 			{repos.map((repo) => (
 				<li
-					className={`repo-chip${repo.dirty ? " repo-dirty" : ""}`}
+					className="repo-pair"
 					key={`${repo.name}:${repo.branch}`}
 					title={`${repo.name} ${repo.branch}${repo.dirty ? " dirty" : " clean"}`}
 				>
-					<span className="repo-name">{repo.name}</span>
-					<span className="repo-branch">{repo.branch}</span>
-					{repo.dirty ? (
-						<span className="repo-dot" aria-label="dirty" role="img">
-							●
-						</span>
-					) : null}
+					<span className={`repo-name${repo.dirty ? " repo-dirty" : ""}`}>
+						{repo.name}
+						{repo.dirty ? (
+							<span className="repo-dot" aria-label="dirty" role="img">
+								●
+							</span>
+						) : null}
+					</span>
+					<span className="repo-branch-chip">{repo.branch}</span>
 				</li>
 			))}
 		</ul>

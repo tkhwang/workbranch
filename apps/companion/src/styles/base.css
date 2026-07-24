@@ -1,10 +1,9 @@
 :root {
-	background: #0e0e0e;
+	background: #131313;
 	color: #c0caf5;
 	font-family:
 		ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
 		monospace;
-	-webkit-font-smoothing: antialiased;
 	text-rendering: optimizelegibility;
 }
 
@@ -13,7 +12,7 @@
 }
 
 body {
-	background: #0e0e0e;
+	background: #131313;
 	margin: 0;
 }
 
@@ -23,12 +22,12 @@ main {
 		monospace;
 	--floating-tabs-bottom: 10px;
 	--floating-tabs-content-clearance: 64px;
-	--floating-tabs-font-size: 11px;
+	--floating-tabs-font-size: 12px;
 	--floating-tabs-height: 36px;
 	--floating-tabs-inset: 12px;
 	--floating-tabs-radius: 999px;
 	--floating-tabs-shadow: 0 8px 24px rgba(0, 0, 0, 0.46);
-	--progress-pill-font-size: 10px;
+	--progress-pill-font-size: 11px;
 	--progress-pill-padding: 3px 6px;
 	--progress-pill-radius: 999px;
 	--task-selected-accent-width: 2px;
