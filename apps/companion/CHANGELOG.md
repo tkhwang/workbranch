@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.9.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.8.0...workbranch-companion-v2.9.0) (2026-07-24)
+
+
+### Features
+
+* **ui:** update companion ui ([05e6eca](https://github.com/tkhwang/workbranch/commit/05e6eca1d431f8c47e1733c02c454151a8a63812))
+* **ui:** update companion ui ([9818046](https://github.com/tkhwang/workbranch/commit/981804658a758f81ff9d3a41a897f900ee8b556c))
+
 ## [2.8.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.7.1...workbranch-companion-v2.8.0) (2026-07-22)
 
 
