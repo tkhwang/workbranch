@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.10.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.9.0...workbranch-companion-v2.10.0) (2026-08-16)
+
+
+### Features
+
+* **design:** implementnew stage viewer concept ([bb2423b](https://github.com/tkhwang/workbranch/commit/bb2423b40c684e99896467e5443ce4abcff44daf))
+* **design:** implementnew stage viewer concept ([22b833a](https://github.com/tkhwang/workbranch/commit/22b833ae49a171110d44532a49e557279b6aec9d))
+
+
+### Bug Fixes
+
+* **companion:** preserve repository metadata width ([a63c4e8](https://github.com/tkhwang/workbranch/commit/a63c4e8f2c655040c4b7ab9ef68265b53a463a49))
+* **task-state:** clarify blocked lifecycle ([b79775d](https://github.com/tkhwang/workbranch/commit/b79775d53751d66f429ca9c1cd1f85ef8f4d75be))
+
 ## [2.9.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.8.0...workbranch-companion-v2.9.0) (2026-07-24)
 
 
