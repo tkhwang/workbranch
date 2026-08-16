@@ -1,11 +1,11 @@
 @media (prefers-reduced-motion: reduce) {
 	.task-action,
-	.task {
+	.task-meta-row {
 		transition: none;
 	}
 
 	.task-action:active:not(:disabled),
-	.task:hover {
+	.task-meta-row:hover {
 		transform: none;
 	}
 }

@@ -1,33 +1,33 @@
 {
-  "name": "@workbranch/companion",
-  "version": "2.9.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc -p tsconfig.json && vite build",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "lint": "biome check src tests",
-    "test": "vitest run",
-    "tauri": "tauri"
-  },
-  "dependencies": {
-    "@tauri-apps/api": "^2.9.0",
-    "@tauri-apps/plugin-autostart": "~2",
-    "@tauri-apps/plugin-store": "~2",
-    "@workbranch/contract": "workspace:*",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
-  },
-  "devDependencies": {
-    "@tauri-apps/cli": "^2.9.5",
-    "@types/react": "^18.3.18",
-    "@types/react-dom": "^18.3.5",
-    "@vitejs/plugin-react": "^5.1.1",
-    "typescript": "^5.9.3",
-    "vite": "^7.2.7",
-    "vitest": "^4.0.15",
-    "@types/node": "^25.0.2",
-    "@biomejs/biome": "^2.3.8"
-  }
+	"name": "@workbranch/companion",
+	"version": "2.9.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite",
+		"build": "tsc -p tsconfig.json && vite build",
+		"typecheck": "tsc --noEmit -p tsconfig.json",
+		"lint": "biome check src tests --vcs-enabled=true --vcs-client-kind=git --vcs-use-ignore-file=true --vcs-root=../..",
+		"test": "vitest run",
+		"tauri": "tauri"
+	},
+	"dependencies": {
+		"@tauri-apps/api": "^2.9.0",
+		"@tauri-apps/plugin-autostart": "~2",
+		"@tauri-apps/plugin-store": "~2",
+		"@workbranch/contract": "workspace:*",
+		"react": "^18.3.1",
+		"react-dom": "^18.3.1"
+	},
+	"devDependencies": {
+		"@tauri-apps/cli": "^2.9.5",
+		"@types/react": "^18.3.18",
+		"@types/react-dom": "^18.3.5",
+		"@vitejs/plugin-react": "^5.1.1",
+		"typescript": "^5.9.3",
+		"vite": "^7.2.7",
+		"vitest": "^4.0.15",
+		"@types/node": "^25.0.2",
+		"@biomejs/biome": "^2.3.8"
+	}
 }

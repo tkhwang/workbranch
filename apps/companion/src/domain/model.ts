@@ -8,6 +8,9 @@ export const PLAN_STATUSES = [
 ] as const;
 export type PlanStatus = (typeof PLAN_STATUSES)[number];
 
+export const TASK_STAGES = ["plan", "execution", "review"] as const;
+export type TaskStage = (typeof TASK_STAGES)[number];
+
 export type Step = {
 	readonly text: string;
 	readonly checked: boolean;
@@ -34,7 +37,6 @@ export type Repo = {
 export type Task = {
 	readonly name: string;
 	readonly path: string;
-	readonly memoTitle: string;
 	readonly notiCount: number;
 	readonly plans: readonly Plan[];
 	readonly repos: readonly Repo[];
@@ -78,6 +80,21 @@ export function activePlan(task: Task): Plan | undefined {
 
 export function taskStatus(task: Task): PlanStatus {
 	return activePlan(task)?.status ?? "todo";
+}
+
+export function taskStage(task: Task): TaskStage | undefined {
+	switch (taskStatus(task)) {
+		case "todo":
+		case "planning":
+			return "plan";
+		case "in-progress":
+		case "blocked":
+			return "execution";
+		case "review":
+			return "review";
+		case "done":
+			return undefined;
+	}
 }
 
 export function taskProgress(task: Task): {

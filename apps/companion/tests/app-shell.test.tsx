@@ -90,6 +90,10 @@ describe("App shell settings wiring", () => {
 		expect(html).toContain(">Ready</span>");
 		expect(html).not.toContain("<footer");
 		expect(html).toContain('aria-label="Companion views"');
+		expect(html).toContain('aria-label="Task stage board"');
+		expect(html).toContain('data-stage="plan"');
+		expect(html).toContain('data-stage="execution"');
+		expect(html).toContain('data-stage="review"');
 		expect(html).toContain(">Main</button>");
 		expect(html).toContain(">Activity</button>");
 		expect(html).toContain(">Settings</button>");
@@ -299,91 +303,67 @@ describe("App shell settings wiring", () => {
 		);
 	});
 
-	it("keeps the current step strip visually flat instead of card-like", () => {
-		// Given the task detail stylesheet
-		// When the current-step CSS contract is inspected
+	it("keeps the stage board framed and width-safe at the native boundary", () => {
 		const css = readCssContract("src/style.css");
 
-		// Then the current step reads as a low-profile status strip, not a nested card
 		expect(css).toMatch(
-			/\.current-step-strip\s*\{[^}]*border-block:\s*1px solid var\(--line\)/s,
-		);
-		expect(css).toMatch(
-			/\.current-step-strip\s+\.prompt-content\s*\{[^}]*display:\s*grid/s,
+			/\.stage-board\s*\{[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/s,
 		);
 		expect(css).toMatch(
-			/\.prompt-line\[data-current="true"\]\s*\{[^}]*background:\s*var\(--current-step-bg\)/s,
+			/\.stage-column\s*\{[^}]*min-width:\s*0[^}]*overflow:\s*hidden/s,
 		);
-		expect(css).not.toMatch(
-			/\.current-step-strip\s*\{[^}]*(?:background|box-shadow|border-radius):/s,
+		expect(css).toMatch(
+			/\.stage-card\s*\{[^}]*background:\s*var\(--surface-2\)[^}]*min-width:\s*0/s,
 		);
-		expect(css).not.toMatch(
-			/\.current-step-strip\s*\{[^}]*var\(--shadow-card\)/s,
+		expect(css).toMatch(
+			/\.stage-board\s*\{[^}]*border:\s*1px solid var\(--line-strong\)[^}]*border-top:\s*2px solid var\(--emphasis\)/s,
 		);
-		expect(css).not.toMatch(
-			/\.current-step-strip\s*\{[^}]*var\(--current-step-bg\)/s,
-		);
+		expect(css).not.toContain(".current-step-strip");
+		expect(css).not.toContain("--shadow-card");
 	});
 
-	it("lays out task launch actions as a full-width thirds command bar", () => {
-		// Given the task action stylesheet
-		// When the action bar CSS contract is inspected
+	it("stacks full-width repository metadata above full-width launch actions", () => {
 		const css = readCssContract("src/style.css");
 
-		// Then IDE, Terminal, and Finder each occupy one third of the row.
-		expect(css).toMatch(/\.task-actions\s*\{[^}]*display:\s*flex/s);
-		expect(css).toMatch(/\.task-actions\s*\{[^}]*flex:\s*1 1 100%/s);
-		expect(css).toMatch(/\.task-actions\s*\{[^}]*width:\s*100%/s);
-		expect(css).toMatch(/\.task-actions\s*\{[^}]*overflow:\s*visible/s);
+		expect(css).toMatch(
+			/\.task-meta-secondary\s*\{[^}]*display:\s*grid[^}]*width:\s*100%/s,
+		);
+		expect(css).toMatch(/\.repo-chips\s*\{[^}]*width:\s*100%/s);
+		expect(css).toMatch(
+			/\.task-actions\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)[^}]*width:\s*100%/s,
+		);
+		expect(css).toMatch(/\.task-actions\s*\{[^}]*overflow:\s*hidden/s);
 		expect(css).toMatch(/\.task-action\s*\{[^}]*display:\s*inline-flex/s);
-		expect(css).toMatch(/\.task-action\s*\{[^}]*flex:\s*1 1 0/s);
 		expect(css).toMatch(/\.task-action\s*\{[^}]*min-width:\s*0/s);
+		expect(css).toMatch(/\.task-action\s*\{[^}]*width:\s*100%/s);
 		expect(css).not.toContain(".task-action-separator");
-		expect(css).not.toMatch(/\.task-actions\s*\{[^}]*grid-template-columns/s);
 	});
 
-	it("renders checklist status markers as aligned dots instead of text glyphs", () => {
-		// Given the task detail stylesheet
-		// When checklist marker CSS is inspected
-		const css = readCssContract("src/style.css");
-
-		// Then marker layout separates status from readable step text
-		expect(css).toMatch(/\.step-item\s*\{[^}]*display:\s*grid/s);
-		expect(css).toMatch(
-			/\.step-item\s*\{[^}]*grid-template-columns:\s*12px minmax\(0, 1fr\)/s,
-		);
-		expect(css).toMatch(/\.step-marker\s*\{[^}]*border-radius:\s*999px/s);
-		expect(css).toMatch(
-			/\.step-depth-0\s+\.step-marker\s*\{[^}]*border-radius:\s*2px[^}]*height:\s*8px[^}]*width:\s*8px/s,
-		);
-		expect(css).toMatch(
-			/\.step-depth-1\s+\.step-marker\s*\{[^}]*height:\s*7px[^}]*width:\s*7px/s,
-		);
-		expect(css).toMatch(
-			/\.step-depth-2\s+\.step-marker\s*\{[^}]*height:\s*5px[^}]*width:\s*5px/s,
-		);
-		expect(css).toMatch(
-			/\.step-marker-done,\s*\.step-depth-0\.step-item-done\s+\.step-marker\s*\{[^}]*background:\s*var\(--faint\)/s,
-		);
-		expect(css).toMatch(
-			/\.step-depth-0\.step-item-done\s+\.step-marker\s*\{[^}]*background:\s*var\(--faint\)/s,
-		);
-		expect(css).not.toMatch(/\.step-marker[^}]*box-shadow:/s);
-		expect(css).not.toMatch(
-			/\.step-marker-done\s*\{[^}]*background:\s*var\(--done\)/s,
-		);
-		expect(css).toMatch(
-			/\.step-marker-todo\s*\{[^}]*border-color:\s*var\(--line-strong\)/s,
-		);
-	});
-
-	it("keeps Korean checklist words intact while allowing long paths to wrap", () => {
+	it("uses semantic stage-card cues instead of checklist detail chrome", () => {
 		const css = readCssContract("src/style.css");
 
 		expect(css).toMatch(
-			/\.step-text\s*\{[^}]*overflow-wrap:\s*break-word[^}]*word-break:\s*keep-all/s,
+			/\.stage-card\[data-blocked="true"\]\s*\{[^}]*border-color:\s*var\(--blocked\)/s,
 		);
-		expect(css).not.toMatch(/\.step-text\s*\{[^}]*overflow-wrap:\s*anywhere/s);
+		expect(css).toMatch(
+			/\.stage-card-blocked\s*\{[^}]*color:\s*var\(--blocked\)/s,
+		);
+		expect(css).toMatch(
+			/\.stage-card-notification\s*\{[^}]*color:\s*var\(--notify\)/s,
+		);
+		expect(css).not.toContain(".step-marker");
+		expect(css).not.toContain(".steps");
+	});
+
+	it("wraps full board names while truncating detail task names", () => {
+		const css = readCssContract("src/style.css");
+
+		expect(css).toMatch(
+			/\.stage-card-name\s*\{[^}]*overflow-wrap:\s*anywhere[^}]*white-space:\s*normal/s,
+		);
+		expect(css).toMatch(
+			/\.task-name\s*\{[^}]*overflow:\s*hidden[^}]*text-overflow:\s*ellipsis[^}]*white-space:\s*nowrap/s,
+		);
 	});
 
 	it("uses a readable text token for small secondary copy", () => {
@@ -403,7 +383,7 @@ describe("App shell settings wiring", () => {
 			/\.font-preview-label\s*\{[^}]*color:\s*var\(--muted\)/s,
 		);
 		expect(css).toMatch(/\.cal-hour-label\s*\{[^}]*color:\s*var\(--muted\)/s);
-		expect(css).toMatch(/\.repo-branch-chip\s*\{[^}]*color:\s*var\(--muted\)/s);
+		expect(css).toMatch(/\.repo-branch-name\s*\{[^}]*color:\s*var\(--muted\)/s);
 	});
 
 	it("keeps companion typography at the exact legible fixed-dark scale", () => {
@@ -412,21 +392,21 @@ describe("App shell settings wiring", () => {
 		const css = readCssContract("src/style.css");
 		const expectedTypographyRules = [
 			/main\s*\{[^}]*--floating-tabs-font-size:\s*12px/s,
-			/main\s*\{[^}]*--progress-pill-font-size:\s*11px/s,
 			/\.terminal-panel legend\s*\{[^}]*font-size:\s*11px/s,
 			/\.agent-header h1\s*\{[^}]*font-size:\s*15px/s,
 			/\.agent-inventory\s*\{[^}]*font-size:\s*11px/s,
 			/\.agent-control\s*\{[^}]*font-size:\s*16px/s,
 			/\.terminal-panel-heading\s*\{[^}]*font-size:\s*11px/s,
 			/\.status-token\s*\{[^}]*font-size:\s*11px/s,
+			/\.stage-column-header h2\s*\{[^}]*font-size:\s*10px/s,
+			/\.stage-column-header span\s*\{[^}]*font-size:\s*10px/s,
+			/\.stage-card-project\s*\{[^}]*font-size:\s*10px/s,
+			/\.stage-card-name\s*\{[^}]*font-size:\s*11px/s,
+			/\.stage-card-blocked,\s*\.stage-card-progress,\s*\.stage-card-notification\s*\{[^}]*font-size:\s*10px/s,
 			/\.task-name\s*\{[^}]*font-size:\s*13px/s,
-			/\.task-notification\s*\{[^}]*font-size:\s*11px/s,
-			/\.plan-title\s*\{[^}]*font-size:\s*10px/s,
-			/\.current-step\s*\{[^}]*font-size:\s*12px/s,
 			/\.repo-name\s*\{[^}]*font-size:\s*11px/s,
-			/\.repo-branch-chip\s*\{[^}]*font-size:\s*11px/s,
+			/\.repo-branch-name\s*\{[^}]*font-size:\s*11px/s,
 			/\.repo-dot\s*\{[^}]*font-size:\s*10px/s,
-			/\.steps\s*\{[^}]*font-size:\s*12px[^}]*line-height:\s*1\.5/s,
 			/\.error,\s*\.empty\s*\{[^}]*font-size:\s*13px/s,
 			/\.task-action\s*\{[^}]*font-size:\s*11px/s,
 			/\.app-error\s*\{[^}]*font-size:\s*13px/s,
@@ -452,7 +432,10 @@ describe("App shell settings wiring", () => {
 
 		// Then native smoothing is used and every mapped selector has its final size
 		expect(css).not.toContain("-webkit-font-smoothing");
-		expect(css).not.toMatch(/font-size:\s*9px/);
+		const pixelFontSizes = [
+			...css.matchAll(/font-size:\s*(\d+(?:\.\d+)?)px/g),
+		].map(([, size]) => Number(size));
+		expect(pixelFontSizes.every((size) => size >= 10)).toBe(true);
 		for (const rule of expectedTypographyRules) {
 			expect(css).toMatch(rule);
 		}

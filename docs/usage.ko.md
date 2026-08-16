@@ -85,19 +85,17 @@ WORKBRANCH_COLOR=always workbranch help # enhanced display 강제
 기본 task brief 포맷은 사람, agent, `workbranch list --json`, companion app이 함께 쓰는 contract입니다.
 
 ```markdown
-# Short task summary
-
+# <task>
 status: todo
-
-- [ ] Start work
-- [ ] Run verification
 ```
 
-첫 `#` heading은 memo title입니다. 분리된 `status:` 줄은 `todo`, `planning`, `in-progress`, `review`, `blocked`, `done` 중 하나를 사용할 수 있습니다. 분리된 `plan:` 줄은 Step들을 묶는 구체적인 Plan 이름입니다. `status:` 줄이 없으면 checklist 진행도로 상태를 도출합니다. 완료 항목이 없거나 checklist가 없으면 `todo`, 일부 완료는 `in-progress`, 전부 완료는 `done`입니다. Markdown checklist 항목은 Step이며 진행도를 정의합니다. 완료 Step은 `progressDone`, 전체 Step은 `progressTotal`, 첫 번째 미완료 Step은 `currentItem`이 됩니다. Generated `AGENTS.md`는 agent가 시작/재개, active step 변경, 검증 전후, blocked, final response 직전에 task brief를 갱신하도록 안내합니다.
+첫 `#` heading은 현재 Plan 이름이며, 새로 생성된 brief는 task 이름으로 시작합니다. 바로 다음 `status:` 줄이 source of truth이고 `todo`, `planning`, `in-progress`, `review`, `blocked`, `done` 중 하나를 사용합니다. 일반적인 `todo → planning → in-progress → review → done` 단계가 바뀔 때 이 한 줄만 갱신하며, 계획을 포함한 의미 있는 작업을 시작하면 `todo`에서 `planning`으로 즉시 변경합니다. `blocked`는 Execution 전용 pause 상태로 `in-progress`에서만 진입하고, blocker가 해소되면 `in-progress`로 복원합니다. Checklist, `plan:` metadata, note는 사용자가 명시적으로 요청한 경우에만 추가합니다.
+
+기존 brief 호환을 위해 명시적인 `status:` 줄이 없으면 parser가 Markdown checklist에서 상태와 진행도를 계속 도출합니다. 완료 항목이 없으면 `todo`, 일부 완료는 `in-progress`, 전부 완료는 `done`입니다. 완료 항목은 `progressDone`, 전체 항목은 `progressTotal`, 첫 미완료 항목은 `currentItem`이 됩니다. Schema v1의 `memoTitle`도 첫 H1의 legacy alias로 유지하지만 Companion domain model은 이 필드에 의존하지 않습니다.
 
 `workbranch memo <task>`는 task brief를 출력하고, `workbranch memo <task> "text"`는 덮어쓰며, `workbranch memo <task> --clear`는 삭제합니다. Registered task workspace 안에서는 읽기일 때만 task를 생략할 수 있습니다. `workbranch memo`는 현재 task brief를 출력합니다. 쓰기와 삭제는 명시적인 task 인자가 필요합니다.
 
-Notification은 `<task>/.workbranch/notifications.jsonl`의 append-only JSON Lines입니다. `workbranch noti add <task> "text"`는 event를 추가하고, `workbranch noti list <task>`는 오래된 순서대로 text를 출력하며, `workbranch noti clear <task>`는 inbox를 비웁니다. Companion app은 `workbranch list --json`의 `notiCount`, `planTitle`, `status`, `progressDone`, `progressTotal`, `currentItem`, `updatedAt`을 읽고, 상세/확인은 `noti list` / `noti clear`를 호출할 수 있습니다.
+Notification은 `<task>/.workbranch/notifications.jsonl`의 append-only JSON Lines입니다. `workbranch noti add <task> "text"`는 event를 추가하고, `workbranch noti list <task>`는 오래된 순서대로 text를 출력하며, `workbranch noti clear <task>`는 inbox를 비웁니다. Companion app은 `workbranch list --json`의 `notiCount`, `planTitle`, `status`, `progressDone`, `progressTotal`, `currentItem`, `updatedAt`을 읽고, 상세/확인은 `noti list` / `noti clear`를 호출할 수 있습니다. 현재 Companion은 StageBoard card에만 `+N`을 표시합니다.
 
 `workbranch remove <task>`는 task worktree, local task branch, known generated task-root state(`TASK-WORKBRANCH.md`, generated `AGENTS.md`, `.workbranch/`, `.workbranch.task`)를 제거합니다. 그 밖에 task root에 남은 항목은 `.omx/`, `.omc/`를 포함해 git으로 관리되지 않는 잔여물입니다. Normal remove는 남은 항목 이름을 출력하고, interactive shell에서는 task root 전체를 삭제할지 한 번 묻습니다. No/EOF는 task root를 보존합니다. `workbranch remove <task> --force`는 일반 safety preflight를 그대로 실행한 뒤 묻지 않고 task root를 삭제합니다.
 

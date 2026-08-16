@@ -52,7 +52,6 @@ function mapTask(dto: WorkbranchListDocument["tasks"][number]): Task {
 	return {
 		name: dto.name,
 		path: dto.path,
-		memoTitle: dto.memoTitle,
 		notiCount: dto.notiCount,
 		plans,
 		repos: dto.repos.map((repo) => ({
