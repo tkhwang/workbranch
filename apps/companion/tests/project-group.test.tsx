@@ -7,7 +7,6 @@ import { ProjectGroup } from "../src/ui/ProjectGroup";
 const task = (name: string, updatedAt: number): Task => ({
 	name,
 	path: `/tmp/acme/${name}`,
-	memoTitle: "",
 	notiCount: 0,
 	updatedAt,
 	repos: [],

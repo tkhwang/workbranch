@@ -2,10 +2,10 @@
 	align-items: stretch;
 	border: 1px solid var(--line);
 	border-radius: 4px;
-	display: flex;
-	flex: 1 1 100%;
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
 	min-height: 32px;
-	overflow: visible;
+	overflow: hidden;
 	width: 100%;
 }
 
@@ -16,7 +16,6 @@
 	border-radius: 0;
 	color: var(--accent);
 	display: inline-flex;
-	flex: 1 1 0;
 	font-size: 11px;
 	justify-content: center;
 	min-height: 30px;
@@ -27,6 +26,7 @@
 		background-color 120ms ease,
 		color 120ms ease,
 		transform 120ms ease;
+	width: 100%;
 }
 
 .task-action + .task-action {

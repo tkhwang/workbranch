@@ -1,49 +1,34 @@
-.task {
+.task-meta-row {
 	background: var(--surface-1);
 	border: 1px solid var(--line);
 	border-radius: 4px;
+	display: grid;
+	gap: 7px;
 	margin-bottom: 6px;
-	overflow: hidden;
-}
-
-.task:last-child {
-	margin-bottom: 0;
-}
-
-.task:hover {
-	background: var(--surface-2);
-	border-color: var(--line-strong);
-}
-
-.task[open] {
-	background: var(--surface-2);
-	border-color: var(--line-strong);
-}
-
-summary {
-	cursor: default;
-	list-style: none;
+	min-width: 0;
 	padding: 7px 8px;
 }
 
-summary::-webkit-details-marker {
-	display: none;
+.task-meta-row:last-child {
+	margin-bottom: 0;
 }
 
-.task[open] > summary {
-	background: var(--task-selected-summary-bg);
-	border-inline-start: var(--task-selected-accent-width) solid var(--emphasis);
+.task-meta-row:hover {
+	background: var(--surface-2);
+	border-color: var(--line-strong);
 }
 
-.task-summary-line .prompt-line {
+.task-meta-primary,
+.task-meta-primary .prompt-line {
+	min-width: 0;
 	width: 100%;
 }
 
-.task-summary-line .prompt-content {
+.task-meta-primary .prompt-content {
 	align-items: center;
 	display: grid;
 	gap: 8px;
-	grid-template-columns: minmax(0, 1fr) auto auto auto;
+	grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .task-name {
@@ -55,85 +40,33 @@ summary::-webkit-details-marker {
 	white-space: nowrap;
 }
 
-.task-progress,
-.task-notification {
-	color: var(--muted);
-	font-variant-numeric: tabular-nums;
-}
-
-.task-progress {
-	background: var(--surface-3);
-	border: 1px solid var(--line-strong);
-	border-radius: var(--progress-pill-radius);
-	color: var(--text);
-	font-size: var(--progress-pill-font-size);
-	line-height: 1;
-	padding: var(--progress-pill-padding);
-}
-
-.task-notification {
-	color: var(--notify);
-	font-size: 11px;
-}
-
-.task-detail {
-	border-top: 1px solid var(--line);
-	padding: 8px;
-}
-
-.task-detail-header {
-	align-items: flex-start;
-	display: flex;
-	flex-wrap: wrap;
-	gap: 7px;
-	justify-content: space-between;
-}
-
-.current-step-strip {
-	border-block: 1px solid var(--line);
-	margin-top: 8px;
-	padding-block: 5px;
-}
-
-.current-step-strip .prompt-content {
+.task-meta-secondary {
+	align-items: stretch;
 	display: grid;
-	gap: 2px;
-}
-
-.plan-title {
-	color: var(--emphasis);
-	font-size: 10px;
-	font-weight: 600;
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-}
-
-.current-step {
-	color: var(--text);
-	font-size: 12px;
-	overflow-wrap: anywhere;
+	gap: 7px;
+	min-width: 0;
+	width: 100%;
 }
 
 .repo-chips {
-	display: flex;
-	flex-wrap: wrap;
+	display: grid;
 	gap: 5px;
+	grid-template-columns: minmax(0, 1fr);
 	list-style: none;
 	margin: 0;
-	padding: 0;
-}
-
-.task-detail-header .repo-chips {
-	flex: 1 1 auto;
 	min-width: 0;
+	padding: 0;
+	width: 100%;
 }
 
 .repo-pair {
 	align-items: center;
-	display: inline-flex;
+	display: grid;
 	gap: 5px;
+	grid-template-columns: auto minmax(0, 1fr);
 	max-width: 100%;
 	min-width: 0;
+	width: 100%;
 }
 
 .repo-name {
@@ -148,94 +81,25 @@ summary::-webkit-details-marker {
 	white-space: nowrap;
 }
 
-.repo-branch-chip {
-	border: 1px solid var(--line);
-	border-radius: 4px;
+.repo-branch-name {
 	color: var(--muted);
+	display: block;
 	font-size: 11px;
 	min-width: 0;
 	overflow: hidden;
-	padding: 3px 5px;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+	width: 100%;
 }
 
-.repo-dirty {
+.repo-dirty,
+.repo-dot {
 	color: var(--notify);
 }
 
 .repo-dot {
-	color: var(--notify);
 	flex: 0 0 auto;
 	font-size: 10px;
-}
-
-.steps {
-	border-left: 1px solid var(--line);
-	color: var(--muted);
-	font-size: 12px;
-	line-height: 1.5;
-	list-style: none;
-	margin: 8px 0 0 6px;
-	padding: 0 0 0 8px;
-}
-
-.step-item {
-	align-items: start;
-	display: grid;
-	gap: 6px;
-	grid-template-columns: 12px minmax(0, 1fr);
-	padding: 2px 0;
-}
-
-.step-marker {
-	border: 1px solid var(--line);
-	border-radius: 999px;
-	box-sizing: border-box;
-	display: inline-block;
-	margin-top: 5px;
-}
-
-.step-depth-0 .step-marker {
-	border-radius: 2px;
-	height: 8px;
-	width: 8px;
-}
-
-.step-depth-1 .step-marker {
-	height: 7px;
-	width: 7px;
-}
-
-.step-depth-2 .step-marker {
-	height: 5px;
-	margin-left: 1px;
-	margin-top: 6px;
-	width: 5px;
-}
-
-.step-marker-done,
-.step-depth-0.step-item-done .step-marker {
-	background: var(--faint);
-}
-
-.step-marker-todo {
-	background: var(--surface-2);
-	border-color: var(--line-strong);
-}
-
-.step-text {
-	overflow-wrap: break-word;
-	text-wrap: balance;
-	word-break: keep-all;
-}
-
-.step-item-done .step-text {
-	color: var(--muted);
-}
-
-.step-item-todo .step-text {
-	color: var(--text);
 }
 
 .error,

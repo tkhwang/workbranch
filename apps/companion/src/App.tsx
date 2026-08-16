@@ -2,7 +2,11 @@ import { isTauri } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityCalendarView } from "./activity/ActivityCalendarView";
 import { createActivityRefresh } from "./application/activity";
-import { buildMenuModel, type MenuModel } from "./application/state";
+import {
+	buildBoardModel,
+	buildMenuModel,
+	type MenuModel,
+} from "./application/state";
 import { useCompanionSettings } from "./application/useCompanionSettings";
 import type { GlobalState, Task } from "./domain/model";
 import {
@@ -20,6 +24,7 @@ import { AgentHeader } from "./ui/AgentHeader";
 import { AgentTabs, type CompanionView } from "./ui/AgentTabs";
 import { ProjectGroup } from "./ui/ProjectGroup";
 import { SettingsView } from "./ui/SettingsView";
+import { StageBoard } from "./ui/StageBoard";
 import { StatusAlert } from "./ui/StatusAlert";
 import type { TaskActionKind } from "./ui/TaskRow";
 
@@ -55,6 +60,7 @@ export function App() {
 	const [visibleError, setVisibleError] = useState<string>();
 	const [currentView, setCurrentView] = useState<CompanionView>("main");
 	const model: MenuModel = buildMenuModel(state);
+	const board = buildBoardModel(state);
 	const tauriRuntimeAvailable = isTauri();
 	const refreshWithActivity = useMemo(
 		() =>
@@ -194,6 +200,7 @@ export function App() {
 			<StatusAlert message={visibleError} />
 			{currentView === "main" ? (
 				<section className="view-panel" aria-label="Main View">
+					<StageBoard board={board} />
 					{model.groups.length === 0 ? (
 						<p className="empty">No workbranch tasks registered.</p>
 					) : null}

@@ -26,5 +26,5 @@ Use plain Conventional Commit style with scopes, without emoji prefixes, for exa
 ## Agent-Specific Instructions
 
 For generated-surface changes, update source first, rebuild `bin/workbranch`, then verify both syntax and tests. Keep docs and specs synchronized when command behavior changes.
-When updating generated task guidance, keep task status values synchronized as `todo | planning | in-progress | review | blocked | done`; starting meaningful work, including planning, should move a task from `todo` to `planning` immediately.
-Generated task briefs use `# <plan>` as the current Plan H1 with a Plan-local `status:` line and checklist Steps; completed Plans move to `.workbranch/plans/done/` through `workbranch done` or confirmed land/finalize/pull archive prompts.
+When updating generated task guidance, keep task status values synchronized as `todo | planning | in-progress | review | blocked | done`. Update only the `status:` line when the stage changes through `todo → planning → in-progress → review → done`; use `blocked` temporarily and restore the prior stage when unblocked.
+Generated task briefs start with `# <task>` and `status: todo`; the H1 may become the current Plan title. Add checklist Steps or notes only when the user explicitly requests them. Completed Plans move to `.workbranch/plans/done/` through `workbranch done` or confirmed land/finalize/pull archive prompts.

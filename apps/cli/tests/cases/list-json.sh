@@ -118,8 +118,9 @@ for key in ["status", "progressDone", "progressTotal", "currentItem", "updatedAt
     assert key in login, login
 assert login["status"] == "todo", login
 assert login["progressDone"] == 0, login
-assert login["progressTotal"] >= 1, login
-assert isinstance(login["currentItem"], str), login
+assert login["progressTotal"] == 0, login
+assert login["currentItem"] == "", login
+assert login["memoTitle"] == "login", login
 assert isinstance(login["updatedAt"], int), login
 assert login["updatedAt"] > 0, login'
 }

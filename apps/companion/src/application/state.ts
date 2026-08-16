@@ -1,5 +1,5 @@
-import type { GlobalState, Task } from "../domain/model";
-import { activePlan, taskStatus } from "../domain/model";
+import type { GlobalState, Task, TaskStage } from "../domain/model";
+import { activePlan, taskStage, taskStatus } from "../domain/model";
 
 export type TaskRow = {
 	readonly project: string;
@@ -27,6 +27,30 @@ export type MenuModel = {
 	readonly groups: readonly ProjectGroup[];
 	readonly errors: GlobalState["errors"];
 };
+
+export type BoardCard = {
+	readonly project: string;
+	readonly root: string;
+	readonly task: Task;
+	readonly stage: TaskStage;
+	readonly blocked: boolean;
+};
+
+export type StageColumn = {
+	readonly stage: TaskStage;
+	readonly label: "PLAN" | "EXECUTION" | "REVIEW";
+	readonly cards: readonly BoardCard[];
+};
+
+export type BoardModel = {
+	readonly columns: readonly StageColumn[];
+};
+
+const STAGE_COLUMNS: readonly Pick<StageColumn, "stage" | "label">[] = [
+	{ stage: "plan", label: "PLAN" },
+	{ stage: "execution", label: "EXECUTION" },
+	{ stage: "review", label: "REVIEW" },
+];
 
 function latestUpdate(group: ProjectGroup): number {
 	return group.rows.reduce((max, row) => Math.max(max, row.task.updatedAt), 0);
@@ -61,6 +85,33 @@ export function buildMenuModel(state: GlobalState): MenuModel {
 		},
 		groups,
 		errors: state.errors,
+	};
+}
+
+export function buildBoardModel(state: GlobalState): BoardModel {
+	const cards: BoardCard[] = [];
+	for (const project of state.projects) {
+		for (const task of project.tasks) {
+			const stage = taskStage(task);
+			if (stage === undefined) continue;
+			cards.push({
+				project: project.name,
+				root: project.root,
+				task,
+				stage,
+				blocked: taskStatus(task) === "blocked",
+			});
+		}
+	}
+
+	return {
+		columns: STAGE_COLUMNS.map(({ stage, label }) => ({
+			stage,
+			label,
+			cards: cards
+				.filter((card) => card.stage === stage)
+				.sort((left, right) => right.task.updatedAt - left.task.updatedAt),
+		})),
 	};
 }
 

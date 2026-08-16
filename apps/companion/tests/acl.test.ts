@@ -46,6 +46,7 @@ describe("ACL", () => {
 			state.projects[0]?.tasks[0]?.plans[0]?.steps[0]?.children[0]?.text,
 		).toBe("wire API");
 		expect(state.projects[0]?.tasks[0]?.repos[0]?.dirty).toBe(true);
+		expect(state.projects[0]?.tasks[0]).not.toHaveProperty("memoTitle");
 		expect(state.errors[0]?.root).toBe("/tmp/missing");
 	});
 

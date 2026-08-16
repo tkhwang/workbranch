@@ -16,7 +16,6 @@ const SECOND_STATE: GlobalState = {
 				{
 					name: "feat-login",
 					path: "/tmp/workbranch/feat-login",
-					memoTitle: "",
 					notiCount: 0,
 					updatedAt: 20,
 					repos: [],

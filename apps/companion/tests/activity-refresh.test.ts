@@ -44,7 +44,6 @@ const UPDATED_PLAN: Plan = {
 const BASELINE_TASK: Task = {
 	name: "feat-login",
 	path: "/tmp/workbranch/feat-login",
-	memoTitle: "Login",
 	notiCount: 0,
 	updatedAt: 10,
 	repos: [],

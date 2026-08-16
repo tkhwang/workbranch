@@ -1,0 +1,113 @@
+.stage-board {
+	background: var(--surface-0);
+	border: 1px solid var(--line-strong);
+	border-radius: 5px;
+	border-top: 2px solid var(--emphasis);
+	display: grid;
+	gap: 6px;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	margin-bottom: 10px;
+	min-width: 0;
+	padding: 6px;
+}
+
+.stage-column {
+	background: var(--surface-1);
+	border: 1px solid var(--line);
+	border-radius: 4px;
+	min-width: 0;
+	overflow: hidden;
+}
+
+.stage-column-header {
+	align-items: center;
+	border-bottom: 1px solid var(--line);
+	display: flex;
+	gap: 4px;
+	justify-content: space-between;
+	padding: 6px;
+}
+
+.stage-column-header h2 {
+	color: var(--emphasis);
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.stage-column-header span {
+	color: var(--faint);
+	font-size: 10px;
+	font-variant-numeric: tabular-nums;
+}
+
+.stage-card-list {
+	display: grid;
+	gap: 5px;
+	padding: 5px;
+}
+
+.stage-card {
+	background: var(--surface-2);
+	border: 1px solid var(--line);
+	border-radius: 3px;
+	display: grid;
+	gap: 4px;
+	min-width: 0;
+	padding: 6px;
+}
+
+.stage-card[data-blocked="true"] {
+	border-color: var(--blocked);
+}
+
+.stage-card-project {
+	color: var(--faint);
+	font-size: 10px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+
+.stage-card-name {
+	color: var(--text);
+	font-size: 11px;
+	font-weight: 600;
+	line-height: 1.25;
+	overflow-wrap: anywhere;
+	white-space: normal;
+}
+
+.stage-card-meta {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	min-height: 11px;
+}
+
+.stage-card-blocked,
+.stage-card-progress,
+.stage-card-notification {
+	font-size: 10px;
+	font-variant-numeric: tabular-nums;
+	line-height: 1;
+}
+
+.stage-card-blocked {
+	color: var(--blocked);
+	font-weight: 700;
+}
+
+.stage-card-progress {
+	color: var(--muted);
+}
+
+.stage-card-notification {
+	color: var(--notify);
+	margin-left: auto;
+}

@@ -85,19 +85,17 @@ WORKBRANCH_COLOR=always workbranch help # force enhanced display
 The default task brief format is shared by humans, agents, `workbranch list --json`, and companion apps:
 
 ```markdown
-# Short task summary
-
+# <task>
 status: todo
-
-- [ ] Start work
-- [ ] Run verification
 ```
 
-The first `#` heading is the memo title. A separated `status:` line may be `todo`, `planning`, `in-progress`, `review`, `blocked`, or `done`. A separated `plan:` line names the concrete Plan that groups the Steps. When `status:` is absent, checklist progress derives status as `todo` for no completed checklist work or no checklist, `in-progress` for partial progress, and `done` when all checklist items are complete. Markdown checklist items are Steps and define progress; completed Steps count toward `progressDone`, all Steps count toward `progressTotal`, and the first unchecked Step becomes `currentItem`. The generated `AGENTS.md` asks agents to update the brief when starting/resuming, changing the active step, before/after verification, when blocked, and before the final response.
+The first `#` heading names the current Plan; a newly generated brief starts with the task name. The immediately following `status:` line is the source of truth and may be `todo`, `planning`, `in-progress`, `review`, `blocked`, or `done`. Update only that line when the task moves through the normal `todo → planning → in-progress → review → done` flow. Use `blocked` only while work cannot continue, then restore the prior stage. Add checklists, `plan:` metadata, or notes only when the user explicitly requests them.
+
+For compatibility with older briefs, the parser still derives status and progress from Markdown checklist items when an explicit `status:` line is absent: no completed work is `todo`, partial work is `in-progress`, and all items complete is `done`. Completed items count toward `progressDone`, all items count toward `progressTotal`, and the first unchecked item becomes `currentItem`. Schema v1 also retains `memoTitle` as a legacy alias for the first H1, but the Companion domain model does not depend on it.
 
 Use `workbranch memo <task>` to print the task brief, `workbranch memo <task> "text"` to overwrite it, and `workbranch memo <task> --clear` to remove it. From inside a registered task workspace, the task may be omitted only for reading: `workbranch memo` prints the current task brief. Writes and clears require an explicit task argument.
 
-Notifications are append-only JSON Lines at `<task>/.workbranch/notifications.jsonl`. `workbranch noti add <task> "text"` appends one event, `workbranch noti list <task>` prints notification text oldest-first, and `workbranch noti clear <task>` clears the inbox. Companion apps should read `notiCount`, `planTitle`, `status`, `progressDone`, `progressTotal`, `currentItem`, and `updatedAt` from `workbranch list --json` and may call `noti list` / `noti clear` for details and acknowledgement.
+Notifications are append-only JSON Lines at `<task>/.workbranch/notifications.jsonl`. `workbranch noti add <task> "text"` appends one event, `workbranch noti list <task>` prints notification text oldest-first, and `workbranch noti clear <task>` clears the inbox. Companion apps should read `notiCount`, `planTitle`, `status`, `progressDone`, `progressTotal`, `currentItem`, and `updatedAt` from `workbranch list --json` and may call `noti list` / `noti clear` for details and acknowledgement. The current Companion shows `+N` on StageBoard cards only.
 
 `workbranch remove <task>` removes task worktrees, local task branches, and known generated task-root state: `TASK-WORKBRANCH.md`, generated `AGENTS.md`, `.workbranch/`, and `.workbranch.task`. Everything else left in the task root, including `.omx/` and `.omc/`, is not git-managed. Normal remove prints those remaining item names and, in an interactive shell, asks once whether to delete the entire task root. No/EOF keeps the task root. `workbranch remove <task> --force` still runs the normal safety preflights, then deletes the task root without prompting.
 

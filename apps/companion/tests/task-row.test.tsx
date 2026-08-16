@@ -2,10 +2,12 @@ import { readFileSync } from "node:fs";
 import { Children, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import type { Task } from "../src/domain/model";
+import { buildBoardModel } from "../src/application/state";
+import type { GlobalState, Task } from "../src/domain/model";
+import { StageBoard } from "../src/ui/StageBoard";
 import {
 	type TaskActionKind,
-	TaskRow,
+	TaskMetaRow,
 	taskActionsFor,
 } from "../src/ui/TaskRow";
 
@@ -24,24 +26,19 @@ type ActionCall = {
 function collectButtonProps(node: ReactNode): readonly ButtonProps[] {
 	const buttons: ButtonProps[] = [];
 	const visit = (child: ReactNode): void => {
-		if (!isValidElement<ButtonProps>(child)) {
-			return;
-		}
-		if (child.type === "button") {
-			buttons.push(child.props);
-		}
+		if (!isValidElement<ButtonProps>(child)) return;
+		if (child.type === "button") buttons.push(child.props);
 		Children.forEach(child.props.children, visit);
 	};
 	visit(node);
 	return buttons;
 }
 
-const nestedChecklistTask: Task = {
-	name: "generated-task",
-	path: "/tmp/workbranch/generated-task",
-	memoTitle: "",
+const executionTask: Task = {
+	name: "generated-task-with-a-very-long-name",
+	path: "/tmp/workbranch/generated-task-with-a-very-long-name",
 	notiCount: 2,
-	updatedAt: 10,
+	updatedAt: 30,
 	repos: [],
 	plans: [
 		{
@@ -51,44 +48,16 @@ const nestedChecklistTask: Task = {
 			progressDone: 0,
 			progressTotal: 2,
 			currentItem: "Implement change",
-			steps: [
-				{
-					text: "Generated Plan",
-					checked: false,
-					depth: 0,
-					children: [
-						{
-							text: "Implement change",
-							checked: false,
-							depth: 1,
-							children: [
-								{
-									text: "Wire depth-specific marker",
-									checked: false,
-									depth: 2,
-									children: [],
-								},
-							],
-						},
-						{
-							text: "Run verification",
-							checked: false,
-							depth: 1,
-							children: [],
-						},
-					],
-				},
-			],
+			steps: [],
 		},
 	],
 };
 
-const linearFixtureTask: Task = {
+const reviewTask: Task = {
 	name: "feat-update-0617-part2",
 	path: "/tmp/workbranch/feat-update-0617-part2",
-	memoTitle: "Review companion UI",
 	notiCount: 1,
-	updatedAt: 30,
+	updatedAt: 20,
 	repos: [
 		{ name: "workbranch", branch: "feat/update-0617", dirty: true },
 		{ name: "docs", branch: "main", dirty: false },
@@ -101,241 +70,225 @@ const linearFixtureTask: Task = {
 			progressDone: 2,
 			progressTotal: 4,
 			currentItem: "Review screenshot",
-			steps: [
-				{
-					text: "Companion UI refresh",
-					checked: true,
-					depth: 0,
-					children: [
-						{
-							text: "Write design contract",
-							checked: true,
-							depth: 1,
-							children: [],
-						},
-						{
-							text: "Review screenshot",
-							checked: false,
-							depth: 1,
-							children: [],
-						},
-					],
-				},
-			],
-		},
-	],
-};
-
-const doneFixtureTask: Task = {
-	...linearFixtureTask,
-	plans: [
-		{
-			title: "Companion UI refresh",
-			index: 0,
-			status: "done",
-			progressDone: 4,
-			progressTotal: 4,
-			currentItem: "Done",
 			steps: [],
 		},
 	],
 };
 
-function renderTaskRow(
+const blockedTask: Task = {
+	...executionTask,
+	name: "blocked-task",
+	notiCount: 0,
+	updatedAt: 40,
+	plans: executionTask.plans.map((plan) => ({ ...plan, status: "blocked" })),
+};
+
+const planningTask: Task = {
+	...executionTask,
+	name: "planning-task",
+	notiCount: 0,
+	updatedAt: 10,
+	plans: executionTask.plans.map((plan) => ({ ...plan, status: "planning" })),
+};
+
+const doneTask: Task = {
+	...reviewTask,
+	name: "done-task",
+	updatedAt: 50,
+	plans: reviewTask.plans.map((plan) => ({
+		...plan,
+		status: "done",
+		progressDone: 4,
+	})),
+};
+
+const state: GlobalState = {
+	projects: [
+		{
+			name: "acme",
+			root: "/tmp/acme",
+			tasks: [planningTask, executionTask, blockedTask, reviewTask, doneTask],
+		},
+	],
+	errors: [],
+};
+
+function renderTaskMetaRow(
 	task: Task,
 	theme: "claude" | "codex" = "claude",
 ): string {
 	return renderToStaticMarkup(
-		<TaskRow
+		<TaskMetaRow
 			root="/tmp/workbranch"
 			task={task}
 			theme={theme}
-			expanded={true}
-			onAction={() => {}}
+			onAction={() => undefined}
 		/>,
 	);
 }
 
-describe("TaskRow", () => {
-	it("renders nested checklist children for generated task briefs", () => {
-		const html = renderTaskRow(nestedChecklistTask);
-
-		expect(html).toContain("Generated Plan");
-		expect(html).toContain("Implement change");
-		expect(html).toContain("Run verification");
-		expect(html).toContain("Wire depth-specific marker");
-		expect(html).toContain('class="step-item step-item-todo step-depth-0"');
-		expect(html).toContain('class="step-item step-item-todo step-depth-1"');
-		expect(html).toContain('class="step-item step-item-todo step-depth-2"');
-		expect(html).toContain('class="step-marker step-marker-todo"');
-		expect(html).toContain('class="step-text"');
-		expect(html.indexOf("Generated Plan")).toBeLessThan(
-			html.indexOf("Implement change"),
+describe("StageBoard", () => {
+	it("renders three stage columns with compact active task cards", () => {
+		const html = renderToStaticMarkup(
+			<StageBoard board={buildBoardModel(state)} />,
 		);
-		expect(html).not.toContain("☐ Generated Plan");
-		expect(html).not.toContain("☐ Implement change");
+
+		expect(html).toContain('aria-label="Task stage board"');
+		expect(html).toContain('data-stage="plan"');
+		expect(html).toContain('data-stage="execution"');
+		expect(html).toContain('data-stage="review"');
+		expect(html).toContain("PLAN");
+		expect(html).toContain("EXECUTION");
+		expect(html).toContain("REVIEW");
+		expect(html).toContain("planning-task");
+		expect(html).toContain("blocked-task");
+		expect(html).toContain("feat-update-0617-part2");
+		expect(html).not.toContain("done-task");
 	});
-	it("renders a terminal task summary with current step and repo state", () => {
-		const html = renderTaskRow(linearFixtureTask);
+
+	it("keeps project, blocked, progress, notification, and title metadata on cards", () => {
+		const html = renderToStaticMarkup(
+			<StageBoard board={buildBoardModel(state)} />,
+		);
+
+		expect(html).toContain('class="stage-card-project">acme</span>');
+		expect(html).toContain('class="stage-card-blocked">BLOCKED</span>');
+		expect(html).toContain('class="stage-card-progress">0/2</span>');
+		expect(html).toContain('class="stage-card-notification"');
+		expect(html).toContain("+2");
+		expect(html).toContain('title="generated-task-with-a-very-long-name"');
+	});
+
+	it("uses a fixed three-column narrow-window CSS contract", () => {
+		const css = readFileSync("src/styles/stage-board.css", "utf8");
+		const taskNameRule = css.match(/\.stage-card-name\s*\{([^}]*)\}/s);
+
+		expect(css).toMatch(
+			/\.stage-board\s*\{[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/s,
+		);
+		expect(css).toMatch(/\.stage-column\s*\{[^}]*min-width:\s*0/s);
+		expect(taskNameRule?.[1]).toMatch(/overflow-wrap:\s*anywhere/);
+		expect(taskNameRule?.[1]).toMatch(/white-space:\s*normal/);
+		expect(taskNameRule?.[1]).not.toMatch(/text-overflow:\s*ellipsis/);
+		expect(taskNameRule?.[1]).not.toMatch(/overflow:\s*hidden/);
+	});
+
+	it("frames the board as the primary Main surface", () => {
+		const css = readFileSync("src/styles/stage-board.css", "utf8");
+
+		expect(css).toMatch(
+			/\.stage-board\s*\{[^}]*border:\s*1px solid var\(--line-strong\)/s,
+		);
+		expect(css).toMatch(
+			/\.stage-board\s*\{[^}]*border-top:\s*2px solid var\(--emphasis\)/s,
+		);
+		expect(css).toMatch(/\.stage-board\s*\{[^}]*padding:\s*6px/s);
+	});
+});
+
+describe("TaskMetaRow", () => {
+	it("renders status, repositories, and launch actions without board-only metadata", () => {
+		const html = renderTaskMetaRow(reviewTask);
 
 		expect(html).toContain("❯");
 		expect(html).toContain("REVIEW");
-		expect(html).toContain("Companion UI refresh");
-		expect(html).toContain("Review screenshot");
-		expect(html).toContain("2/4");
 		expect(html).toContain('class="repo-pair"');
 		expect(html).toContain('class="repo-name repo-dirty"');
-		expect(html).toContain('class="repo-branch-chip">feat/update-0617</span>');
-		expect(html).not.toContain('class="repo-chip"');
-		expect(html).not.toContain('class="repo-chip repo-dirty"');
-		expect(html).not.toContain('class="repo-separator"');
-		expect(html).not.toContain(" | ");
+		expect(html).toContain('class="repo-branch-name">feat/update-0617</span>');
+		expect(html).not.toContain("repo-branch-chip");
+		expect(html).toContain('aria-label="open feat-update-0617-part2 in IDE"');
+		expect(html).toContain(
+			'aria-label="open feat-update-0617-part2 in terminal"',
+		);
+		expect(html).toContain(
+			'aria-label="open feat-update-0617-part2 in Finder"',
+		);
+		expect(html).not.toContain("task-notification");
+		expect(html).not.toContain("task-progress");
+		expect(html).not.toContain("Review screenshot");
+		expect(html).not.toContain("<details");
+		expect(html).not.toContain('class="steps"');
 	});
-	it("highlights the expanded task and renders progress as a compact pill", () => {
-		const html = renderTaskRow(linearFixtureTask);
-		const inProgressHtml = renderTaskRow(nestedChecklistTask);
-		const baseCss = readFileSync("src/styles/base.css", "utf8");
-		const css = readFileSync("src/styles/task-details.css", "utf8");
-		const themeCss = readFileSync("src/styles/themes.css", "utf8");
 
-		expect(html).toContain('<details class="task task-review" open="">');
-		expect(html).toContain('<span class="task-progress">2/4</span>');
-		expect(inProgressHtml).toMatch(
-			/task-summary-line[\s\S]*?data-current="false"/,
-		);
-		expect(inProgressHtml).toMatch(
-			/current-step-strip[\s\S]*?data-current="true"/,
-		);
-		expect(css).toMatch(
-			/\.task\[open\]\s*\{[^}]*background:\s*var\(--surface-2\)/s,
-		);
-		expect(baseCss).toContain("--task-selected-accent-width: 2px");
-		expect(themeCss).toMatch(
-			/main\[data-theme="claude"\]\s*\{[^}]*--task-selected-summary-bg:\s*rgba\(192,\s*202,\s*245,\s*0\.06\)/s,
-		);
-		expect(themeCss).toMatch(
-			/main\[data-theme="codex"\]\s*\{[^}]*--task-selected-summary-bg:\s*rgba\(237,\s*237,\s*237,\s*0\.06\)/s,
-		);
-		expect(css).toMatch(
-			/\.task\[open\] > summary\s*\{[^}]*background:\s*var\(--task-selected-summary-bg\)[^}]*border-inline-start:\s*var\(--task-selected-accent-width\) solid var\(--emphasis\)/s,
-		);
-		expect(css).not.toMatch(
-			/\.task\[open\] > summary\s*\{[^}]*background:\s*var\(--emphasis-soft\)/s,
-		);
-		expect(css).not.toMatch(
-			/\.task-in-progress\s*\{[^}]*border-color:\s*var\(--emphasis\)/s,
-		);
-		expect(css).toMatch(
-			/\.task-progress\s*\{[^}]*border-radius:\s*var\(--progress-pill-radius\)[^}]*font-size:\s*var\(--progress-pill-font-size\)[^}]*padding:\s*var\(--progress-pill-padding\)/s,
-		);
-	});
-	it("balances narrow CJK checklist lines to preserve semantic phrases", () => {
-		const css = readFileSync("src/styles/task-details.css", "utf8");
+	it("keeps done tasks visible in the project meta rows", () => {
+		const html = renderTaskMetaRow(doneTask);
 
-		expect(css).toMatch(/\.step-text\s*\{[^}]*text-wrap:\s*balance/s);
-	});
-	it("renders task status as visible text with a quiet marker", () => {
-		const html = renderTaskRow(doneFixtureTask);
-
+		expect(html).toContain("done-task");
 		expect(html).toContain('data-status="done"');
-		expect(html).toContain('class="status-token-marker"');
 		expect(html).toContain('class="status-token-label">DONE</span>');
 	});
-	it("exposes only IDE, Terminal, and Finder actions", () => {
-		const html = renderTaskRow(nestedChecklistTask);
 
-		expect(html).toContain("RUN");
-		expect(html).toContain('aria-label="open generated-task in IDE"');
-		expect(html).toContain('aria-label="open generated-task in terminal"');
-		expect(html).toContain('aria-label="open generated-task in Finder"');
-		expect(html).toContain(">IDE</button>");
-		expect(html).toContain(">Terminal</button>");
-		expect(html).toContain(">Finder</button>");
-		expect(html).not.toContain("<svg");
-		expect(html).not.toContain("task-action-separator");
-		expect(html).not.toContain("edit memo for generated-task");
-		expect(html).not.toContain("clear memo for generated-task");
-		expect(html).not.toContain("clear notifications for generated-task");
-		expect(html).not.toContain("copy path for generated-task");
-		expect(
-			taskActionsFor(nestedChecklistTask).map((action) => action.label),
-		).toEqual(["IDE", "Terminal", "Finder"]);
-	});
-	it("renders launch actions in the detail header before checklist steps", () => {
-		// Given a task with repo chips and checklist steps
-		const html = renderTaskRow(linearFixtureTask);
-
-		// When the expanded detail markup is rendered
-		const actionIndex = html.indexOf('class="task-actions"');
-		const stepsIndex = html.indexOf('class="steps"');
-
-		// Then launch actions stay in the top detail header before long steps
-		expect(html).toContain('class="task-detail-header"');
-		expect(actionIndex).toBeGreaterThan(-1);
-		expect(stepsIndex).toBeGreaterThan(-1);
-		expect(actionIndex).toBeLessThan(stepsIndex);
-	});
-
-	it("renders the Codex prompt marker through semantic markup", () => {
-		const html = renderTaskRow(linearFixtureTask, "codex");
+	it("uses the selected theme prompt anatomy", () => {
+		const html = renderTaskMetaRow(reviewTask, "codex");
 
 		expect(html).toContain('data-prompt-theme="codex"');
 		expect(html).toContain("›");
 		expect(html).not.toContain("❯");
 	});
 
-	it("renders checklist status as visual markers outside the step text", () => {
-		// Given a task with completed and pending checklist rows
-		const html = renderTaskRow(linearFixtureTask);
-
-		// When the expanded checklist is rendered
-		// Then checked/pending state is a marker, not a loose text glyph prefix
-		expect(html).toContain('class="step-item step-item-done step-depth-0"');
-		expect(html).toContain('class="step-marker step-marker-done"');
-		expect(html).toContain('aria-label="completed step"');
-		expect(html).toContain('class="step-item step-item-todo step-depth-1"');
-		expect(html).toContain('class="step-marker step-marker-todo"');
-		expect(html).toContain('aria-label="pending step"');
-		expect(html).not.toContain("✓ Companion UI refresh");
-		expect(html).not.toContain("☐ Review screenshot");
-	});
-
-	it("marks checklist hierarchy with stronger classes for higher levels", () => {
-		// Given nested plan, step, and sub-step checklist rows
-		const html = renderTaskRow(nestedChecklistTask);
-
-		// When the expanded checklist is rendered
-		// Then each depth gets a separate visual marker class, capped at sub-step level
-		expect(html).toContain('class="step-item step-item-todo step-depth-0"');
-		expect(html).toContain('class="step-item step-item-todo step-depth-1"');
-		expect(html).toContain('class="step-item step-item-todo step-depth-2"');
-		expect(html.indexOf("step-depth-0")).toBeLessThan(
-			html.indexOf("step-depth-1"),
-		);
-		expect(html.indexOf("step-depth-1")).toBeLessThan(
-			html.indexOf("step-depth-2"),
+	it("exposes only IDE, Terminal, and Finder actions", () => {
+		expect(taskActionsFor(executionTask).map((action) => action.label)).toEqual(
+			["IDE", "Terminal", "Finder"],
 		);
 	});
 
-	it("passes the project root, task, and action kind when a row action is clicked", () => {
+	it("gives repository metadata and launch tools separate full-width rows", () => {
+		const detailsCss = readFileSync("src/styles/task-details.css", "utf8");
+		const actionsCss = readFileSync("src/styles/task-actions.css", "utf8");
+
+		expect(detailsCss).toMatch(
+			/\.task-meta-secondary\s*\{[^}]*display:\s*grid[^}]*width:\s*100%/s,
+		);
+		expect(detailsCss).toMatch(
+			/\.repo-chips\s*\{[^}]*display:\s*grid[^}]*width:\s*100%/s,
+		);
+		expect(detailsCss).toMatch(
+			/\.repo-pair\s*\{[^}]*grid-template-columns:\s*auto minmax\(0, 1fr\)[^}]*width:\s*100%/s,
+		);
+		expect(actionsCss).toMatch(
+			/\.task-actions\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)[^}]*width:\s*100%/s,
+		);
+		expect(actionsCss).toMatch(
+			/\.task-action\s*\{[^}]*min-width:\s*0[^}]*width:\s*100%/s,
+		);
+	});
+
+	it("renders the branch name as full-width plain text without another box", () => {
+		const detailsCss = readFileSync("src/styles/task-details.css", "utf8");
+		const branchRule = detailsCss.match(/\.repo-branch-name\s*\{([^}]*)\}/s);
+
+		expect(branchRule?.[1]).toMatch(/color:\s*var\(--muted\)/);
+		expect(branchRule?.[1]).toMatch(/text-overflow:\s*ellipsis/);
+		expect(branchRule?.[1]).toMatch(/width:\s*100%/);
+		expect(branchRule?.[1]).not.toMatch(/border(?:-radius)?:/);
+		expect(branchRule?.[1]).not.toMatch(/background:/);
+		expect(branchRule?.[1]).not.toMatch(/padding:/);
+	});
+
+	it("passes the project root, task, and action kind when clicked", () => {
 		const calls: ActionCall[] = [];
-		const element = TaskRow({
+		const element = TaskMetaRow({
 			root: "/tmp/workbranch",
-			task: nestedChecklistTask,
+			task: executionTask,
 			theme: "claude",
-			expanded: true,
 			onAction: (root, task, kind) => {
 				calls.push({ root, taskName: task.name, kind });
 			},
 		});
 		const ideButton = collectButtonProps(element).find(
-			(button) => button["aria-label"] === "open generated-task in IDE",
+			(button) =>
+				button["aria-label"] ===
+				"open generated-task-with-a-very-long-name in IDE",
 		);
 
 		ideButton?.onClick?.();
 
 		expect(calls).toEqual([
-			{ root: "/tmp/workbranch", taskName: "generated-task", kind: "ide" },
+			{
+				root: "/tmp/workbranch",
+				taskName: "generated-task-with-a-very-long-name",
+				kind: "ide",
+			},
 		]);
 	});
 });

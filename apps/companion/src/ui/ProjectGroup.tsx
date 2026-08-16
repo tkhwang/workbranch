@@ -1,6 +1,6 @@
 import type { CompanionTheme } from "../application/preferences";
 import type { ProjectGroup as ProjectGroupModel } from "../application/state";
-import { type TaskActionHandler, TaskRow } from "./TaskRow";
+import { type TaskActionHandler, TaskMetaRow } from "./TaskRow";
 import { TerminalPanel } from "./TerminalPanel";
 
 type ProjectGroupProps = {
@@ -18,12 +18,11 @@ export function ProjectGroup({ group, theme, onAction }: ProjectGroupProps) {
 			theme={theme}
 		>
 			{group.rows.map((row) => (
-				<TaskRow
+				<TaskMetaRow
 					key={`${row.root}-${row.task.name}`}
 					root={row.root}
 					task={row.task}
 					theme={theme}
-					expanded={row.expanded}
 					onAction={onAction}
 				/>
 			))}
