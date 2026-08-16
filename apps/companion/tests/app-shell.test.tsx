@@ -432,8 +432,10 @@ describe("App shell settings wiring", () => {
 
 		// Then native smoothing is used and every mapped selector has its final size
 		expect(css).not.toContain("-webkit-font-smoothing");
-		expect(css).not.toMatch(/font-size:\s*8px/);
-		expect(css).not.toMatch(/font-size:\s*9px/);
+		const pixelFontSizes = [
+			...css.matchAll(/font-size:\s*(\d+(?:\.\d+)?)px/g),
+		].map(([, size]) => Number(size));
+		expect(pixelFontSizes.every((size) => size >= 10)).toBe(true);
 		for (const rule of expectedTypographyRules) {
 			expect(css).toMatch(rule);
 		}
