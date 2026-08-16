@@ -77,11 +77,16 @@ describe("taskStage", () => {
 		["todo", "plan"],
 		["planning", "plan"],
 		["in-progress", "execution"],
-		["blocked", "execution"],
 		["review", "review"],
 		["done", undefined],
 	] as const)("maps %s to %s", (status, stage) => {
 		expect(taskStage(taskWithStatus(status, status, 1))).toBe(stage);
+	});
+
+	it("treats blocked as an execution-only pause", () => {
+		expect(taskStage(taskWithStatus("blocked", "blocked", 1))).toBe(
+			"execution",
+		);
 	});
 });
 

@@ -89,7 +89,7 @@ WORKBRANCH_COLOR=always workbranch help # enhanced display 강제
 status: todo
 ```
 
-첫 `#` heading은 현재 Plan 이름이며, 새로 생성된 brief는 task 이름으로 시작합니다. 바로 다음 `status:` 줄이 source of truth이고 `todo`, `planning`, `in-progress`, `review`, `blocked`, `done` 중 하나를 사용합니다. 일반적인 `todo → planning → in-progress → review → done` 단계가 바뀔 때 이 한 줄만 갱신합니다. 진행할 수 없는 동안에만 `blocked`를 사용하고, blocker가 해소되면 이전 단계로 복원합니다. Checklist, `plan:` metadata, note는 사용자가 명시적으로 요청한 경우에만 추가합니다.
+첫 `#` heading은 현재 Plan 이름이며, 새로 생성된 brief는 task 이름으로 시작합니다. 바로 다음 `status:` 줄이 source of truth이고 `todo`, `planning`, `in-progress`, `review`, `blocked`, `done` 중 하나를 사용합니다. 일반적인 `todo → planning → in-progress → review → done` 단계가 바뀔 때 이 한 줄만 갱신하며, 계획을 포함한 의미 있는 작업을 시작하면 `todo`에서 `planning`으로 즉시 변경합니다. `blocked`는 Execution 전용 pause 상태로 `in-progress`에서만 진입하고, blocker가 해소되면 `in-progress`로 복원합니다. Checklist, `plan:` metadata, note는 사용자가 명시적으로 요청한 경우에만 추가합니다.
 
 기존 brief 호환을 위해 명시적인 `status:` 줄이 없으면 parser가 Markdown checklist에서 상태와 진행도를 계속 도출합니다. 완료 항목이 없으면 `todo`, 일부 완료는 `in-progress`, 전부 완료는 `done`입니다. 완료 항목은 `progressDone`, 전체 항목은 `progressTotal`, 첫 미완료 항목은 `currentItem`이 됩니다. Schema v1의 `memoTitle`도 첫 H1의 legacy alias로 유지하지만 Companion domain model은 이 필드에 의존하지 않습니다.
 

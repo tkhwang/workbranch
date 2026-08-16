@@ -234,13 +234,13 @@ test_add_agents_md_describes_status_update_protocol() {
 
   guidance=$(cat "$project/login/AGENTS.md")
   assert_contains "$guidance" "Task progress update protocol"
-  assert_contains "$guidance" 'Update only the `status:` line when the task stage changes.'
-  assert_contains "$guidance" "todo → planning → in-progress → review → done"
-  assert_contains "$guidance" 'Use `blocked` only while progress cannot continue, then restore the prior stage when unblocked.'
-  assert_contains "$guidance" "Add checklists or notes only when the user explicitly requests them."
-  assert_contains "$guidance" "workbranch done <task>"
-  assert_not_contains "$guidance" "starting or resuming meaningful work"
-  assert_not_contains "$guidance" "before running verification"
+	assert_contains "$guidance" 'Update only the `status:` line when the task stage changes.'
+	assert_contains "$guidance" "todo → planning → in-progress → review → done"
+	assert_contains "$guidance" 'When meaningful work starts, including planning, move `status:` from `todo` to `planning` immediately.'
+	assert_contains "$guidance" 'Use `blocked` only from `in-progress`; when unblocked, restore `in-progress`.'
+	assert_contains "$guidance" "Add checklists or notes only when the user explicitly requests them."
+	assert_contains "$guidance" "workbranch done <task>"
+	assert_not_contains "$guidance" "before running verification"
   assert_not_contains "$guidance" "before final response"
   assert_not_contains "$guidance" "mark completed Steps"
 }
@@ -261,10 +261,11 @@ CONFIG
 status: todo" ] || fail "status-only 기본 brief를 기대했지만 다음을 받음: $brief"
   guidance=$(cat "$project/login/AGENTS.md")
   assert_contains "$guidance" "Workbranch 작업 안내"
-  assert_contains "$guidance" '작업 단계가 바뀔 때만 `status:` 한 줄을 갱신합니다.'
-  assert_contains "$guidance" "todo → planning → in-progress → review → done"
-  assert_contains "$guidance" '진행할 수 없는 동안에만 `blocked`를 사용하고, blocker가 해소되면 이전 단계로 복원합니다.'
-  assert_contains "$guidance" "사용자가 명시적으로 요청한 경우에만 checklist나 note를 추가합니다."
+	assert_contains "$guidance" '작업 단계가 바뀔 때만 `status:` 한 줄을 갱신합니다.'
+	assert_contains "$guidance" "todo → planning → in-progress → review → done"
+	assert_contains "$guidance" '계획을 포함한 의미 있는 작업을 시작하면 `status:`를 `todo`에서 `planning`으로 즉시 변경합니다.'
+	assert_contains "$guidance" '`blocked`는 `in-progress`에서만 사용하고, blocker가 해소되면 `in-progress`로 복원합니다.'
+	assert_contains "$guidance" "사용자가 명시적으로 요청한 경우에만 checklist나 note를 추가합니다."
   assert_contains "$guidance" '실제 Git repo는 `<task>/<repo>` 아래에 있습니다.'
   assert_not_contains "$guidance" "검증을 실행하기 전"
   assert_not_contains "$guidance" "final response 직전"

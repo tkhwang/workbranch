@@ -28,9 +28,9 @@ Write 쪽과 read 쪽의 불균형이 코드로 확인됐다.
 
 ## 결정 사항 (2026-08-16, 사용자 확정)
 
-> **D1. agent 프로토콜은 status-only.** 생성 `AGENTS.md`는 stage 전환 시 `status:` 한 줄 갱신만 요구한다: `todo → planning`(계획 시작) `→ in-progress`(구현 시작) `→ review`(구현 완료, 검증/리뷰) `→ done`(완료). 막히면 `blocked`, 해소되면 이전 stage로 복귀. step 체크리스트·메모는 "사용자가 요청할 때만"으로 강등한다. 기본 brief 템플릿도 `# <task>` + `status: todo` 2줄로 축소한다.
+> **D1. agent 프로토콜은 status-only.** 생성 `AGENTS.md`는 stage 전환 시 `status:` 한 줄 갱신만 요구한다: `todo → planning`(계획을 포함한 의미 있는 작업을 시작하면 즉시) `→ in-progress`(구현 시작) `→ review`(구현 완료, 검증/리뷰) `→ done`(완료). `blocked`는 `in-progress`에서만 진입하고 해제 시 `in-progress`로 복원한다. step 체크리스트·메모는 "사용자가 요청할 때만"으로 강등한다. 기본 brief 템플릿도 `# <task>` + `status: todo` 2줄로 축소한다.
 >
-> **D2. 보드는 3컬럼 + blocked 배지 + done 숨김.** 컬럼 매핑: PLAN ← `todo`,`planning` · EXECUTION ← `in-progress` · REVIEW ← `review`. `blocked`는 stage 정보가 없으므로 EXECUTION 컬럼에 blocked 강조 배지로 표시한다. `done`은 보드에서 제외한다(요약 카운트는 유지).
+> **D2. 보드는 3컬럼 + blocked 배지 + done 숨김.** 컬럼 매핑: PLAN ← `todo`,`planning` · EXECUTION ← `in-progress` · REVIEW ← `review`. `blocked`는 Execution 전용 pause 상태로 `in-progress`에서만 진입하고, 해제 시 항상 `in-progress`로 복원한다. 따라서 EXECUTION 컬럼에 blocked 강조 배지로 표시한다. `done`은 보드에서 제외한다(요약 카운트는 유지).
 >
 > **D3. 안 읽히는 데이터는 semantic model에서 먼저 정리한다.** 이번 slice에서는 Companion domain `Task`와 ACL/UI에서 `memoTitle`을 제거하되, 독립 배포 호환을 위해 schema v1의 CLI JSON·`@workbranch/contract` DTO·파서 필수 검증은 유지한다. 새 Companion은 v1 `memoTitle`을 wire compatibility field로만 수용하고 semantic state에는 보존하지 않는다. 실제 wire 필드 제거는 후속 schema v2 slice에서 dual-read/배포 순서와 함께 처리한다. noti 배지는 유지(데이터 있으면 표시). `plan:` 등 다른 필드는 건드리지 않는다.
 >
@@ -62,6 +62,10 @@ Write 쪽과 read 쪽의 불균형이 코드로 확인됐다.
   - Impact: 460px 3컬럼에서 worktree 식별 정확성과 카드 높이/밀도
   - Evidence: single-line ellipsis는 공통 prefix 뒤의 구분 suffix를 숨기며, native 화면에서는 hover tooltip에 의존하지 않고 이름을 직접 읽을 수 있어야 한다.
   - Status: resolved — 사용자 선택 A. 카드 높이 가변을 허용하고 전체 이름을 줄바꿈해 표시한다.
+- [x] `blocked`의 이전 stage 손실
+  - Impact: status lifecycle, StageBoard 배치, agent 재개 동작
+  - Evidence: status-only 한 줄은 `blocked` 진입 전의 `planning`/`review`를 보존할 수 없으며, 기존 StageBoard는 모든 blocked task를 Execution에 배치한다.
+  - Status: resolved — 사용자 선택 A. `blocked`를 `in-progress`에서만 진입 가능한 Execution pause 상태로 제한하고, 해제 시 `in-progress`로 복원한다.
 
 ## Global Constraints
 
