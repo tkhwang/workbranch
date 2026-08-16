@@ -243,7 +243,7 @@ describe("TaskMetaRow", () => {
 			/\.repo-chips\s*\{[^}]*display:\s*grid[^}]*width:\s*100%/s,
 		);
 		expect(detailsCss).toMatch(
-			/\.repo-pair\s*\{[^}]*grid-template-columns:\s*auto minmax\(0, 1fr\)[^}]*width:\s*100%/s,
+			/\.repo-pair\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)[^}]*width:\s*100%/s,
 		);
 		expect(actionsCss).toMatch(
 			/\.task-actions\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)[^}]*width:\s*100%/s,
