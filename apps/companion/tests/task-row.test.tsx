@@ -265,10 +265,14 @@ describe("StageBoard", () => {
 			/grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/,
 		);
 		expect(boardRule?.[1]).toMatch(/row-gap:\s*6px/);
-		expect(headerRule?.[1]).toMatch(/border-bottom:\s*1px solid var\(--line\)/);
-		expect(headerRule?.[1]).toMatch(/column-gap:\s*inherit/);
+		expect(headerRule?.[1]).toMatch(
+			/box-shadow:\s*inset 0 0 0 1px var\(--line\)/,
+		);
+		expect(headerRule?.[1]).toMatch(/column-gap:\s*6px/);
 		expect(headerRule?.[1]).toMatch(/display:\s*grid/);
-		expect(headerRule?.[1]).toMatch(/grid-template-columns:\s*subgrid/);
+		expect(headerRule?.[1]).toMatch(
+			/grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/,
+		);
 		expect(css).toMatch(/\.stage-board-heading-meta\s*\{[^}]*display:\s*flex/s);
 		expect(countRule?.[1]).toMatch(/color:\s*var\(--faint\)/);
 		expect(countRule?.[1]).toMatch(/font-size:\s*10px/);

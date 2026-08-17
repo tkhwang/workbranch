@@ -25,7 +25,7 @@
 >
 > **D4. PLAN 컬럼은 `planning`만. `todo`는 board 제외.** `taskStage()` 매핑을 `todo → undefined`로 바꾼다(`done`과 동일 처리). todo task는 0048 D4의 done과 똑같이 하단 TaskMetaRow에 남아 IDE/Terminal/Finder 재접근이 가능하다. agent가 planning을 시작해 `status: planning`으로 올리는 순간 카드가 PLAN에 나타난다 — "지금 움직이는 것만 보이는" 보드.
 >
-> **D5. stage/role은 StageBoard 전체가 공유하는 하나의 2행 header로 표시.** 각 `.stage-column` 안에 독립 header를 반복하지 않는다. `.stage-board-header` 하나가 3열 grid를 이루고, 첫 행은 `PLAN | EXECUTION | REVIEW`, 둘째 행은 `AI·ME | AI | ME`를 같은 열 축에 맞춰 표시한다. header 바깥 테두리/배경/하단 구분선은 보드 폭 전체에 한 번만 적용해 세 칸이 하나의 header surface로 읽혀야 한다. 카드 목록 3열은 그 아래에서 동일한 grid 축을 공유한다.
+> **D5. stage/role은 StageBoard 전체가 공유하는 하나의 2행 header로 표시.** 각 `.stage-column` 안에 독립 header를 반복하지 않는다. `.stage-board-header` 하나가 3열 grid를 이루고, 첫 행은 `PLAN | EXECUTION | REVIEW`, 둘째 행은 `AI·ME | AI | ME`를 같은 열 축에 맞춰 표시한다. header와 카드 영역은 모두 동일한 `repeat(3, minmax(0, 1fr))`과 6px column gap을 사용하고, header 바깥선은 track 폭을 줄이지 않는 inset shadow로 표현해 세 칸이 하나의 header surface로 읽혀야 한다.
 >
 > **D6. stage별 카드 count는 유지하되 역할보다 약하게 표시.** 각 heading cell의 둘째 행은 role을 왼쪽, count를 오른쪽에 두는 `.stage-board-heading-meta` flex row로 구성한다. count는 기존 정보를 보존하되 `var(--faint)`, tabular numeral, 10px로 낮춰 `AI·ME`/`AI`/`ME`가 주 신호로 읽히게 한다.
 
@@ -93,11 +93,11 @@ DESIGN.md                                      # "Done visibility" 문단 → "T
 **Red:** `tests/task-row.test.tsx` StageBoard describe에 다음 구조를 고정한다.
 - `.stage-board-header`는 DOM에 정확히 하나만 존재하고, `.stage-column-header`는 존재하지 않는다.
 - header 안에 3개의 `.stage-board-heading`이 있고 각각 `PLAN`+`AI·ME`, `EXECUTION`+`AI`, `REVIEW`+`ME`를 같은 cell 안에 렌더한다.
-- CSS 계약은 `.stage-board-header { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }`와 보드 폭 전체에 한 번만 적용되는 `border-bottom`을 고정한다.
+- CSS 계약은 parent와 `.stage-board-header`가 동일한 `repeat(3, minmax(0, 1fr))` + `column-gap: 6px`를 사용하고, parent의 `row-gap: 6px`은 별도로 유지함을 고정한다. header 외곽선은 track 폭에 영향을 주지 않는 `box-shadow: inset 0 0 0 1px var(--line)`으로 고정한다.
 - 각 `.stage-board-heading-meta` 안에서 role 뒤에 현재 column의 카드 count가 렌더되고, PLAN/EXECUTION/REVIEW fixture가 각각 기대 count를 표시함을 고정한다.
 - `.stage-board-heading-meta`는 flex row, `.stage-board-count`는 `margin-left: auto`, `font-variant-numeric: tabular-nums`, 10px, `var(--faint)`를 사용함을 CSS 계약으로 고정한다.
 
-**Green:** `StageBoard.tsx`에 `const STAGE_ROLES: Record<TaskStage, string> = { plan: "AI·ME", execution: "AI", review: "ME" }`. `StageBoard`의 첫 child로 `<header className="stage-board-header">`를 두고, `board.columns`를 순회해 각 `.stage-board-heading` 안에 `<h2>{label}</h2>`와 둘째 행 `<div className="stage-board-heading-meta"><span className="stage-board-role">…</span><span className="stage-board-count">{column.cards.length}</span></div>`를 렌더한다. 기존 `.stage-column-header`는 제거하고 각 `.stage-column`은 카드 목록만 소유한다. header와 카드 영역은 모두 `repeat(3, minmax(0, 1fr))`를 사용해 열 축을 공유한다. CSS는 header 전체에 하나의 background/border-bottom을 적용하고, heading cell 사이에는 가벼운 vertical divider만 둔다. role은 muted, count는 faint로 시각적 우선순위를 분리한다.
+**Green:** `StageBoard.tsx`에 `const STAGE_ROLES: Record<TaskStage, string> = { plan: "AI·ME", execution: "AI", review: "ME" }`. `StageBoard`의 첫 child로 `<header className="stage-board-header">`를 두고, `board.columns`를 순회해 각 `.stage-board-heading` 안에 `<h2>{label}</h2>`와 둘째 행 `<div className="stage-board-heading-meta"><span className="stage-board-role">…</span><span className="stage-board-count">{column.cards.length}</span></div>`를 렌더한다. 기존 `.stage-column-header`는 제거하고 각 `.stage-column`은 카드 목록만 소유한다. header와 카드 영역은 모두 `repeat(3, minmax(0, 1fr))` + 6px column gap을 사용해 열 축을 공유한다. CSS는 header 전체에 하나의 background/inset border를 적용하고, heading cell 사이에는 가벼운 vertical divider만 둔다. role은 muted, count는 faint로 시각적 우선순위를 분리한다.
 
 - [x] red 확인 (공통 header DOM/CSS 계약 2건이 기존 컬럼별 header 때문에 실패)
 - [x] green: targeted 12 tests + typecheck 통과
