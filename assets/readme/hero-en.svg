@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" role="img" aria-labelledby="title desc">
+  <title id="title">workbranch</title>
+  <desc id="desc">Workbranch creates one multi-repository task folder per feature and shows active work in PLAN, EXECUTION, and REVIEW stages in Companion.</desc>
+  <rect width="1200" height="400" rx="24" fill="#131313"/>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+    <text x="64" y="65" font-size="18" letter-spacing="2.5" fill="#9AA5CE">GIT WORKTREE TASK ORCHESTRATOR</text>
+    <text x="62" y="132" font-size="62" font-weight="700" letter-spacing="-2" fill="#C0CAF5">workbranch</text>
+    <rect x="63" y="151" width="248" height="4" rx="2" fill="#CD694A"/>
+    <text x="64" y="187" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="24" fill="#E4E4E7">One task folder per feature.</text>
+    <text x="64" y="219" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="24" fill="#E4E4E7">Every repo in one place.</text>
+
+    <g transform="translate(64 240)">
+      <rect width="470" height="116" rx="8" fill="#1A1918" stroke="#403B38" stroke-width="2"/>
+      <circle cx="22" cy="22" r="4" fill="#CD694A"/>
+      <text x="38" y="29" font-size="21" fill="#C0CAF5">$ workbranch add login</text>
+      <line x1="18" y1="48" x2="452" y2="48" stroke="#403B38"/>
+      <path d="M28 67 V96 M28 78 H46 M28 96 H46" fill="none" stroke="#625952" stroke-width="2"/>
+      <text x="52" y="75" font-size="18" fill="#E4E4E7">feat-login/</text>
+      <text x="52" y="101" font-size="18" fill="#9AA5CE">frontend</text>
+      <text x="162" y="101" font-size="18" fill="#9AA5CE">backend</text>
+      <text x="270" y="101" font-size="18" fill="#9AA5CE">docs</text>
+    </g>
+
+    <g transform="translate(570 48)">
+      <text x="0" y="24" font-size="18" letter-spacing="1.8" fill="#9AA5CE">WORKBRANCH COMPANION</text>
+      <text x="566" y="24" text-anchor="end" font-size="16" fill="#6F738A">2 projects · 6 tasks</text>
+      <rect x="0" y="46" width="566" height="258" rx="7" fill="#1A1918" stroke="#625952" stroke-width="2"/>
+      <rect x="0" y="46" width="4" height="258" rx="2" fill="#CD694A"/>
+      <line x1="188.7" y1="46" x2="188.7" y2="304" stroke="#403B38"/>
+      <line x1="377.3" y1="46" x2="377.3" y2="304" stroke="#403B38"/>
+      <line x1="0" y1="112" x2="566" y2="112" stroke="#625952"/>
+
+      <text x="94" y="78" text-anchor="middle" font-size="20" font-weight="700" fill="#E4E4E7">PLAN</text>
+      <text x="283" y="78" text-anchor="middle" font-size="20" font-weight="700" fill="#E4E4E7">EXECUTION</text>
+      <text x="472" y="78" text-anchor="middle" font-size="20" font-weight="700" fill="#E4E4E7">REVIEW</text>
+      <text x="94" y="101" text-anchor="middle" font-size="18" fill="#9AA5CE">AI·ME  2</text>
+      <text x="283" y="101" text-anchor="middle" font-size="18" fill="#9AA5CE">AI  3</text>
+      <text x="472" y="101" text-anchor="middle" font-size="18" fill="#9AA5CE">ME  1</text>
+
+      <g transform="translate(14 128)">
+        <rect width="160" height="78" rx="5" fill="#22201F" stroke="#403B38"/>
+        <circle cx="16" cy="17" r="4" fill="#D7BA7D"/>
+        <text x="28" y="23" font-size="18" fill="#E4E4E7">search-refactor</text>
+        <text x="14" y="49" font-size="16" fill="#9AA5CE">api · web</text>
+        <text x="14" y="68" font-size="16" fill="#6F738A">Plan 2 / 5</text>
+      </g>
+      <g transform="translate(203 128)">
+        <rect width="160" height="104" rx="5" fill="#22201F" stroke="#625952"/>
+        <rect width="3" height="104" rx="1.5" fill="#CD694A"/>
+        <circle cx="17" cy="17" r="4" fill="#CD694A"/>
+        <text x="29" y="23" font-size="18" fill="#E4E4E7">feat-login</text>
+        <text x="14" y="49" font-size="16" fill="#9AA5CE">frontend*</text>
+        <text x="14" y="69" font-size="16" fill="#9AA5CE">backend</text>
+        <text x="14" y="93" font-size="16" fill="#DFA18C">blocked · +1</text>
+      </g>
+      <g transform="translate(392 128)">
+        <rect width="160" height="78" rx="5" fill="#22201F" stroke="#403B38"/>
+        <circle cx="16" cy="17" r="4" fill="#7DCFFF"/>
+        <text x="28" y="23" font-size="18" fill="#E4E4E7">release-docs</text>
+        <text x="14" y="49" font-size="16" fill="#9AA5CE">workbranch</text>
+        <text x="14" y="68" font-size="16" fill="#6F738A">Review 4 / 4</text>
+      </g>
+      <text x="283" y="282" text-anchor="middle" font-size="18" fill="#9AA5CE">PLAN  →  EXECUTION  →  REVIEW</text>
+    </g>
+
+    <text x="64" y="378" font-size="18" fill="#9AA5CE">Create and refresh with the CLI · scan stages in Companion</text>
+  </g>
+</svg>

@@ -1,5 +1,9 @@
 # workbranch
 
+<p align="center">
+  <img src="./assets/readme/hero-ko.svg" width="100%" alt="workbranch는 여러 repository를 하나의 feature task 폴더에 모으고 Companion에서 진행 중인 task를 PLAN, EXECUTION, REVIEW 단계로 보여줍니다.">
+</p>
+
 **한국어** | [English](README.md)
 
 [![CI](https://github.com/tkhwang/workbranch/actions/workflows/ci.yml/badge.svg)](https://github.com/tkhwang/workbranch/actions/workflows/ci.yml)
@@ -11,7 +15,7 @@
 
 `workbranch`는 feature마다 하나의 task 폴더를 만들고, single repo와 multi-repo 프로젝트 모두에서 짧고 안전한 branch refresh 명령을 제공합니다.
 
-CLI는 workspace/project 상태를 읽고 task worktree와 Git 흐름을 실행합니다. Companion은 macOS menu bar에서 그 task 상태와 Plan 진행률을 보여주고, Activity view는 별도의 로컬 append-only activity log를 읽어 timeline을 만듭니다.
+CLI는 workspace/project 상태를 읽고 task worktree와 Git 흐름을 실행합니다. Companion은 macOS menu bar에서 진행 중인 task를 PLAN, EXECUTION, REVIEW 단계로 모아 보여줍니다. Activity view는 별도의 로컬 append-only activity log를 읽어 timeline을 만듭니다.
 
 ![workbranch demo](./docs/figs/workbranch-demo.gif)
 
@@ -20,7 +24,7 @@ CLI는 workspace/project 상태를 읽고 task worktree와 Git 흐름을 실행�
 | 필요할 때                                      | 사용                 | 역할                         | 설치                                                   |
 | ---------------------------------------------- | -------------------- | ---------------------------- | ------------------------------------------------------ |
 | task workspace 생성, 최신화, land/push         | `workbranch` CLI     | 실제 Git/worktree 작업 실행  | `brew install tkhwang/tap/workbranch`                  |
-| task 상태, Plan 진행률, activity timeline, 알림 확인 | Workbranch Companion | workspace 상태와 로컬 activity log를 menu bar에서 표시 | `brew install --cask tkhwang/tap/workbranch-companion` |
+| task 단계, Plan 진행률, repo 상태, activity timeline, 알림 확인 | Workbranch Companion | workspace 상태와 로컬 activity log를 menu bar에서 표시 | `brew install --cask tkhwang/tap/workbranch-companion` |
 
 ## 빠른 시작
 
@@ -102,7 +106,7 @@ agent가 작업을 시작하기 전에 `workbranch refresh <task>` 한 번이면
 
 multi-repo에서의 장점은 [AI agent workflow](docs/ai-agents.ko.md)를 참고하세요.
 
-Companion은 이 구조를 `workbranch list --global --json`으로 읽어 task별 상태, Plan 진행률, 알림을 보여줍니다. Activity timeline은 별도의 로컬 append-only log에서 읽으며, task 생성, 최신화, land/push 같은 Git 변경은 계속 CLI에서 실행합니다.
+Companion은 이 구조를 `workbranch list --global --json`으로 읽습니다. Main view는 진행 중인 task를 Plan 단계별로 모으고 project, repo, dirty/blocked 상태, 진행률, 알림을 보여줍니다. Activity timeline은 별도의 로컬 append-only log에서 읽으며, task 생성, 최신화, land/push 같은 Git 변경은 계속 CLI에서 실행합니다.
 
 ## 작업 흐름
 
@@ -205,11 +209,14 @@ Combined flow shortcut:
 
 ## Companion으로 보기
 
-Workbranch Companion은 CLI가 만든 project/task 상태를 macOS menu bar에서 보여주고, Activity view는 로컬 append-only activity log로 timeline을 그리는 앱입니다.
+Workbranch Companion은 Main, Activity, Settings view를 제공하는 macOS menu bar app입니다.
 
-- Companion: `status`, Plan/Step 진행률, notification, memo, Finder/IDE/terminal 열기처럼 workspace/project 상태를 확인하고 이동하는 화면
-- Activity view: `$XDG_STATE_HOME/workbranch/activity.jsonl` 로컬 append-only log(기본 `~/.local/state/workbranch/activity.jsonl`)를 읽어 activity calendar timeline 표시
-- 공통 상태: task root의 `TASK-WORKBRANCH.md`, `.workbranch/notifications.jsonl`, 그리고 `workbranch list --global --json` 출력
+- Main: 진행 중인 task를 PLAN, EXECUTION, REVIEW column으로 분류하고 project, task와 Plan title, repo, dirty/blocked 상태, Step 진행률, 알림을 card에 표시
+- Project details: 각 repo와 branch를 표시하고 Finder, IDE, terminal 실행 action 제공
+- Activity: `$XDG_STATE_HOME/workbranch/activity.jsonl`(기본 `~/.local/state/workbranch/activity.jsonl`)을 읽어 하루 또는 3일 calendar timeline 표시
+- Settings: login 시 자동 실행, interface font, Claude Code 또는 Codex theme 설정
+
+Companion은 task root의 `TASK-WORKBRANCH.md`, `.workbranch/notifications.jsonl`, `workbranch list --global --json` 출력을 사용합니다. Task lifecycle이나 Git 변경 명령은 실행하지 않습니다.
 
 설치:
 

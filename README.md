@@ -1,5 +1,9 @@
 # workbranch
 
+<p align="center">
+  <img src="./assets/readme/hero-en.svg" width="100%" alt="workbranch creates one feature task folder across multiple repositories and Companion groups active tasks into PLAN, EXECUTION, and REVIEW stages.">
+</p>
+
 **English** | [한국어](README.ko.md)
 
 [![CI](https://github.com/tkhwang/workbranch/actions/workflows/ci.yml/badge.svg)](https://github.com/tkhwang/workbranch/actions/workflows/ci.yml)
@@ -11,7 +15,7 @@ Manage Git worktree task spaces without memorizing `git worktree` commands.
 
 `workbranch` creates one task folder per feature, works with one repo or many repos, and keeps branch refresh commands short and safe.
 
-The CLI reads shared workbranch project state and runs the task worktree/Git flow. Companion shows that task status and Plan progress from the macOS menu bar, while the Activity view reads the separate local append-only activity log to build its timeline.
+The CLI reads shared workbranch project state and runs the task worktree/Git flow. Companion groups active tasks into PLAN, EXECUTION, and REVIEW stages in the macOS menu bar. Its Activity view builds a timeline from the separate local append-only activity log.
 
 ![workbranch demo](./docs/figs/workbranch-demo.gif)
 
@@ -20,7 +24,7 @@ The CLI reads shared workbranch project state and runs the task worktree/Git flo
 | When you need to | Use | Role | Install |
 | ---------------- | --- | ---- | ------- |
 | Create, refresh, land, or push task workspaces | `workbranch` CLI | Runs the actual Git/worktree workflow | `brew install tkhwang/tap/workbranch` |
-| Check task status, Plan progress, activity timelines, and notifications | Workbranch Companion | Shows workspace state and local activity-log history from the menu bar | `brew install --cask tkhwang/tap/workbranch-companion` |
+| Check task stages, Plan progress, repo state, activity timelines, and notifications | Workbranch Companion | Shows workspace state and local activity-log history from the menu bar | `brew install --cask tkhwang/tap/workbranch-companion` |
 
 ## Quick start
 
@@ -102,7 +106,7 @@ Before an agent starts, `workbranch refresh <task>` brings every repo in the tas
 
 See [AI agent workflows](docs/ai-agents.md) for the multi-repo benefits.
 
-Companion reads this structure through `workbranch list --global --json` and shows each task's status, Plan progress, and notifications. The activity timeline reads from the separate local append-only log; task creation, refresh, land, and push remain CLI actions.
+Companion reads this structure through `workbranch list --global --json`. Its Main view groups active tasks by Plan stage and shows project, repo, dirty, blocked, progress, and notification details. The Activity timeline reads from the separate local append-only log; task creation, refresh, land, and push remain CLI actions.
 
 ## Working on a task
 
@@ -205,11 +209,14 @@ Combined flow shortcuts:
 
 ## View with Companion
 
-Workbranch Companion is a macOS menu bar app that shows the project/task state created by the CLI, while the Activity view draws its timeline from the local append-only activity log.
+Workbranch Companion is a macOS menu bar app with Main, Activity, and Settings views.
 
-- Companion: check and navigate workspace/project task status, Plan/Step progress, notifications, memo, Finder/IDE/terminal launch actions
-- Activity view: reads the `$XDG_STATE_HOME/workbranch/activity.jsonl` local append-only log (default `~/.local/state/workbranch/activity.jsonl`) to show the activity calendar timeline
-- Shared state: the task root's `TASK-WORKBRANCH.md`, `.workbranch/notifications.jsonl`, and `workbranch list --global --json` output
+- Main: groups active tasks into PLAN, EXECUTION, and REVIEW columns; each card shows its project, task and Plan title, repos, dirty/blocked state, Step progress, and notifications
+- Project details: lists each repo and branch, then provides Finder, IDE, and terminal launch actions
+- Activity: reads `$XDG_STATE_HOME/workbranch/activity.jsonl` (default `~/.local/state/workbranch/activity.jsonl`) and shows day or three-day calendar timelines
+- Settings: controls launch at login, the interface font, and the Claude Code or Codex theme
+
+Companion consumes the task root's `TASK-WORKBRANCH.md`, `.workbranch/notifications.jsonl`, and `workbranch list --global --json` output. It does not run task lifecycle or Git mutation commands.
 
 Install:
 
