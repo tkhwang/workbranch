@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.14.0](https://github.com/tkhwang/workbranch/compare/v2.13.0...v2.14.0) (2026-08-17)
+
+
+### Features
+
+* **stage-board:** update header and card details ([69f9ba9](https://github.com/tkhwang/workbranch/commit/69f9ba994bffe3174675e0f83f5e0d7cf4bc444f))
+* **stage-board:** update header and card details ([cc6337b](https://github.com/tkhwang/workbranch/commit/cc6337b3da97d2087dee5b926312af97c60b1a2b)), closes [#456](https://github.com/tkhwang/workbranch/issues/456)
+
+
+### Bug Fixes
+
+* **stage-board:** align header grid and labels ([f2f27ca](https://github.com/tkhwang/workbranch/commit/f2f27ca0d0230b2eb32204018153ea9e52b93b5c))
+* **stage-board:** preserve macOS 13 grid alignment ([0bd2a76](https://github.com/tkhwang/workbranch/commit/0bd2a76c6ed48a6935832d5bd27645e63f8cb7f5))
+
 ## [2.13.0](https://github.com/tkhwang/workbranch/compare/v2.12.0...v2.13.0) (2026-08-16)
 
 
