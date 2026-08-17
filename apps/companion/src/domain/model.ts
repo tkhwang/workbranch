@@ -84,7 +84,6 @@ export function taskStatus(task: Task): PlanStatus {
 
 export function taskStage(task: Task): TaskStage | undefined {
 	switch (taskStatus(task)) {
-		case "todo":
 		case "planning":
 			return "plan";
 		case "in-progress":
@@ -92,6 +91,7 @@ export function taskStage(task: Task): TaskStage | undefined {
 			return "execution";
 		case "review":
 			return "review";
+		case "todo":
 		case "done":
 			return undefined;
 	}

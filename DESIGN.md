@@ -2,7 +2,7 @@
 
 ## Source of truth
 - Status: Active
-- Last refreshed: 2026-07-24
+- Last refreshed: 2026-08-17
 - Primary product surfaces: Workbranch Companion macOS menu bar popover.
 - Evidence reviewed:
   - `docs/plans/0032-companion-tauri-react-rewrite.md`
@@ -79,7 +79,7 @@
   - `AgentTabs` as an inset floating bottom terminal navigation,
   - shared `TerminalPanel`, `PromptLine`, and `StatusToken` primitives,
   - compact global inventory summary limited to project and task counts,
-  - `StageBoard` with three fixed columns and compact active-task cards, enclosed by one strong outer status frame with a theme emphasis rail so the board reads as Main's primary surface,
+  - `StageBoard` with one shared two-row, three-column stage/role/count header aligned to three fixed active-task card columns, enclosed by one strong outer status frame with a theme emphasis rail so the board reads as Main's primary surface,
   - project group header,
   - top toolbar with icon-only refresh/quit controls and screen-reader-only live status,
   - Settings view preferences panel,
@@ -89,9 +89,9 @@
   - font select row,
   - agent theme segmented control (`Claude Code`, `Codex`) with Claude Code as the default and migration target,
   - `TaskMetaRow` containing task name/status, a full-width repository metadata stack, and a separate full-width IDE/Terminal/Finder action row split into equal thirds,
-  - StageCard metadata containing project label, optional blocked cue, progress, and board-only notification `+N`.
+  - StageCard metadata containing project label, active Plan title when it differs from the task name, compact repository names with dirty cues and branch tooltips, optional blocked cue, progress, and board-only notification `+N`.
 - Variants and states: todo, planning, in-progress, review, blocked, done, notification present, dirty repo. In-progress identity uses the compact status marker rather than recoloring the full Task perimeter.
-- Done visibility: done tasks are excluded from StageBoard but remain visible in TaskMetaRow so IDE/Terminal/Finder actions stay available.
+- Todo/done visibility: todo tasks with no active planning work and done tasks are excluded from StageBoard but remain visible in TaskMetaRow so IDE/Terminal/Finder actions stay available. The PLAN column contains planning tasks only.
 - Shared header anatomy: Claude Code and Codex use the same text-only title block: `Workbranch Companion` above `projects · tasks`. The top banner contains no Workbranch mark, product icon, or Claude/Codex prompt prefix; theme identity comes from surrounding color tokens rather than different header geometry. Task metadata rows may retain their theme-specific prompt and action accents.
 - Token/component ownership: `style.css` is the CSS import manifest; `src/styles/base.css`, `themes.css`, `chrome.css`, `stage-board.css`, `task-details.css`, `task-actions.css`, `status-groups.css`, `settings.css`, and `motion.css` own CSS custom properties and component classes by surface.
 
@@ -104,7 +104,7 @@
 
 ## Responsive behavior
 - Supported breakpoints/devices: the native menu popover opens at 460px and cannot resize below 460px.
-- Layout adaptations: the shared expanded header keeps its internal columns consistent on every tab. At 460px, StageBoard keeps three equal `minmax(0, 1fr)` columns without horizontal overflow. Each StageCard and TaskMetaRow uses `min-width: 0`; StageCard task/worktree names wrap to their full value with variable card height, while TaskMetaRow task names remain single-line ellipsized with full text in `title`. Each repository/branch pair occupies the full metadata width with the plain branch name taking the remaining inline space, and the action group always sits below metadata as a full-width three-column row.
+- Layout adaptations: the shared expanded header keeps its internal columns consistent on every tab. At 460px, the StageBoard's shared two-row header and card area use the same three equal `minmax(0, 1fr)` column axis without horizontal overflow. Each StageCard and TaskMetaRow uses `min-width: 0`; StageCard task/worktree names wrap to their full value with variable card height, compact repository names ellipsize inside their card without clipping the dirty cue, and TaskMetaRow task names remain single-line ellipsized with full text in `title`. Each TaskMetaRow repository/branch pair occupies the full metadata width with the plain branch name taking the remaining inline space, and the action group always sits below metadata as a full-width three-column row.
 - Touch/hover differences: hover is enhancement only; core state is visible without hover.
 
 ## Interaction states
@@ -161,3 +161,4 @@
 - 2026-08-16 (stage-frame and metadata scan): Made StageBoard the dominant Main surface through one strong outer frame and theme emphasis rail while keeping its three internal columns compact. TaskMetaRow repository metadata now uses the full row width, with IDE/Terminal/Finder moved to a separate full-width equal-third row below it so branch and dirty information cannot be squeezed by actions.
 - 2026-08-16 (branch de-boxing): Removed the branch chip border, radius, and padding. Branch names remain muted, full-width, and ellipsized beside the repository identity, but render as plain text so the StageBoard, TaskMetaRow, and tool group are the only structural boxes in the Main hierarchy.
 - 2026-08-16 (full worktree identity): Replaced StageCard's single-line task ellipsis with unrestricted natural wrapping. Worktree names often share a long prefix, so preserving the full distinguishing suffix takes priority over uniform card height; the lower TaskMetaRow keeps its compact single-line behavior.
+- 2026-08-17 (shared stage-role header and plan-level cards): Replaced the three independent column headers with one shared two-row StageBoard header. Stage names occupy the first row; `AI·ME | AI | ME` roles and faint per-stage counts occupy the second. PLAN now contains planning tasks only, while todo remains available in TaskMetaRow. StageCards add the active Plan title plus compact repository names and dirty cues, with long repository names ellipsized at the 460px minimum width.
