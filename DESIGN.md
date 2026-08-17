@@ -2,7 +2,7 @@
 
 ## Source of truth
 - Status: Active
-- Last refreshed: 2026-07-24
+- Last refreshed: 2026-08-17
 - Primary product surfaces: Workbranch Companion macOS menu bar popover.
 - Evidence reviewed:
   - `docs/plans/0032-companion-tauri-react-rewrite.md`

@@ -79,7 +79,11 @@ export function StageBoard({ board }: { readonly board: BoardModel }) {
 		<section className="stage-board" aria-label="Task stage board">
 			<header className="stage-board-header">
 				{board.columns.map((column) => (
-					<div className="stage-board-heading" key={column.stage}>
+					<div
+						className="stage-board-heading"
+						id={`stage-heading-${column.stage}`}
+						key={column.stage}
+					>
 						<h2>{column.label}</h2>
 						<div className="stage-board-heading-meta">
 							<span className="stage-board-role">
@@ -94,6 +98,7 @@ export function StageBoard({ board }: { readonly board: BoardModel }) {
 				<section
 					className="stage-column"
 					data-stage={column.stage}
+					aria-labelledby={`stage-heading-${column.stage}`}
 					key={column.stage}
 				>
 					<div className="stage-card-list">

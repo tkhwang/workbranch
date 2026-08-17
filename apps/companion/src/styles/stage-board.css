@@ -3,12 +3,13 @@
 	border: 1px solid var(--line-strong);
 	border-radius: 5px;
 	border-top: 2px solid var(--emphasis);
+	column-gap: 6px;
 	display: grid;
-	gap: 6px;
 	grid-template-columns: repeat(3, minmax(0, 1fr));
 	margin-bottom: 10px;
 	min-width: 0;
 	padding: 6px;
+	row-gap: 6px;
 }
 
 .stage-column {
@@ -24,9 +25,10 @@
 	border: 1px solid var(--line);
 	border-bottom: 1px solid var(--line);
 	border-radius: 4px;
+	column-gap: inherit;
 	display: grid;
 	grid-column: 1 / -1;
-	grid-template-columns: repeat(3, minmax(0, 1fr));
+	grid-template-columns: subgrid;
 }
 
 .stage-board-heading {

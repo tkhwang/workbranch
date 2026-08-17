@@ -175,13 +175,22 @@ describe("StageBoard", () => {
 		expect(html.match(/class="stage-board-heading"/g)).toHaveLength(3);
 		expect(html).not.toContain('class="stage-column-header"');
 		expect(html).toMatch(
-			/class="stage-board-heading"><h2>PLAN<\/h2><div class="stage-board-heading-meta"><span class="stage-board-role">AI·ME<\/span><span class="stage-board-count">2<\/span>/,
+			/class="stage-board-heading" id="stage-heading-plan"><h2>PLAN<\/h2><div class="stage-board-heading-meta"><span class="stage-board-role">AI·ME<\/span><span class="stage-board-count">2<\/span>/,
 		);
 		expect(html).toMatch(
-			/class="stage-board-heading"><h2>EXECUTION<\/h2><div class="stage-board-heading-meta"><span class="stage-board-role">AI<\/span><span class="stage-board-count">2<\/span>/,
+			/class="stage-board-heading" id="stage-heading-execution"><h2>EXECUTION<\/h2><div class="stage-board-heading-meta"><span class="stage-board-role">AI<\/span><span class="stage-board-count">2<\/span>/,
 		);
 		expect(html).toMatch(
-			/class="stage-board-heading"><h2>REVIEW<\/h2><div class="stage-board-heading-meta"><span class="stage-board-role">ME<\/span><span class="stage-board-count">1<\/span>/,
+			/class="stage-board-heading" id="stage-heading-review"><h2>REVIEW<\/h2><div class="stage-board-heading-meta"><span class="stage-board-role">ME<\/span><span class="stage-board-count">1<\/span>/,
+		);
+		expect(html).toContain(
+			'<section class="stage-column" data-stage="plan" aria-labelledby="stage-heading-plan">',
+		);
+		expect(html).toContain(
+			'<section class="stage-column" data-stage="execution" aria-labelledby="stage-heading-execution">',
+		);
+		expect(html).toContain(
+			'<section class="stage-column" data-stage="review" aria-labelledby="stage-heading-review">',
 		);
 	});
 
@@ -242,6 +251,8 @@ describe("StageBoard", () => {
 
 	it("uses a fixed three-column narrow-window CSS contract", () => {
 		const css = readFileSync("src/styles/stage-board.css", "utf8");
+		const boardRule = css.match(/\.stage-board\s*\{([^}]*)\}/s);
+		const headerRule = css.match(/\.stage-board-header\s*\{([^}]*)\}/s);
 		const taskNameRule = css.match(/\.stage-card-name\s*\{([^}]*)\}/s);
 		const countRule = css.match(/\.stage-board-count\s*\{([^}]*)\}/s);
 		const planRule = css.match(/\.stage-card-plan\s*\{([^}]*)\}/s);
@@ -249,12 +260,15 @@ describe("StageBoard", () => {
 		const repoRule = css.match(/\.stage-card-repo\s*\{([^}]*)\}/s);
 		const repoNameRule = css.match(/\.stage-card-repo-name\s*\{([^}]*)\}/s);
 
-		expect(css).toMatch(
-			/\.stage-board\s*\{[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/s,
+		expect(boardRule?.[1]).toMatch(/column-gap:\s*6px/);
+		expect(boardRule?.[1]).toMatch(
+			/grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/,
 		);
-		expect(css).toMatch(
-			/\.stage-board-header\s*\{[^}]*border-bottom:\s*1px solid var\(--line\)[^}]*display:\s*grid[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/s,
-		);
+		expect(boardRule?.[1]).toMatch(/row-gap:\s*6px/);
+		expect(headerRule?.[1]).toMatch(/border-bottom:\s*1px solid var\(--line\)/);
+		expect(headerRule?.[1]).toMatch(/column-gap:\s*inherit/);
+		expect(headerRule?.[1]).toMatch(/display:\s*grid/);
+		expect(headerRule?.[1]).toMatch(/grid-template-columns:\s*subgrid/);
 		expect(css).toMatch(/\.stage-board-heading-meta\s*\{[^}]*display:\s*flex/s);
 		expect(countRule?.[1]).toMatch(/color:\s*var\(--faint\)/);
 		expect(countRule?.[1]).toMatch(/font-size:\s*10px/);
