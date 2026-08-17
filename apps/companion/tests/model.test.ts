@@ -74,7 +74,7 @@ describe("activePlan", () => {
 
 describe("taskStage", () => {
 	it.each([
-		["todo", "plan"],
+		["todo", undefined],
 		["planning", "plan"],
 		["in-progress", "execution"],
 		["review", "review"],
@@ -91,7 +91,7 @@ describe("taskStage", () => {
 });
 
 describe("buildBoardModel", () => {
-	it("groups active tasks by stage, newest first, while excluding done", () => {
+	it("groups active tasks by stage, newest first, while excluding todo and done", () => {
 		const state: GlobalState = {
 			projects: [
 				{
@@ -125,7 +125,6 @@ describe("buildBoardModel", () => {
 		]);
 		expect(board.columns[0]?.cards.map((card) => card.task.name)).toEqual([
 			"planning-new",
-			"todo-old",
 		]);
 		expect(board.columns[0]?.cards[0]).toMatchObject({
 			project: "alpha",

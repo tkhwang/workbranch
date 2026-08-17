@@ -61,6 +61,11 @@ const reviewTask: Task = {
 	repos: [
 		{ name: "workbranch", branch: "feat/update-0617", dirty: true },
 		{ name: "docs", branch: "main", dirty: false },
+		{
+			name: "companion-repository-with-a-name-that-exceeds-stage-card-width",
+			branch: "feat/long-repository-name",
+			dirty: true,
+		},
 	],
 	plans: [
 		{
@@ -91,6 +96,30 @@ const planningTask: Task = {
 	plans: executionTask.plans.map((plan) => ({ ...plan, status: "planning" })),
 };
 
+const todoTask: Task = {
+	...planningTask,
+	name: "todo-task",
+	updatedAt: 5,
+	plans: planningTask.plans.map((plan) => ({ ...plan, status: "todo" })),
+};
+
+const freshTask: Task = {
+	...planningTask,
+	name: "fresh-task",
+	updatedAt: 15,
+	plans: planningTask.plans.map((plan) => ({
+		...plan,
+		title: "fresh-task",
+	})),
+};
+
+const noPlanTask: Task = {
+	...todoTask,
+	name: "no-plan-task",
+	updatedAt: 4,
+	plans: [],
+};
+
 const doneTask: Task = {
 	...reviewTask,
 	name: "done-task",
@@ -107,7 +136,16 @@ const state: GlobalState = {
 		{
 			name: "acme",
 			root: "/tmp/acme",
-			tasks: [planningTask, executionTask, blockedTask, reviewTask, doneTask],
+			tasks: [
+				planningTask,
+				freshTask,
+				executionTask,
+				blockedTask,
+				reviewTask,
+				todoTask,
+				noPlanTask,
+				doneTask,
+			],
 		},
 	],
 	errors: [],
@@ -128,6 +166,25 @@ function renderTaskMetaRow(
 }
 
 describe("StageBoard", () => {
+	it("renders one shared two-row stage role and count header", () => {
+		const html = renderToStaticMarkup(
+			<StageBoard board={buildBoardModel(state)} />,
+		);
+
+		expect(html.match(/class="stage-board-header"/g)).toHaveLength(1);
+		expect(html.match(/class="stage-board-heading"/g)).toHaveLength(3);
+		expect(html).not.toContain('class="stage-column-header"');
+		expect(html).toMatch(
+			/class="stage-board-heading"><h2>PLAN<\/h2><div class="stage-board-heading-meta"><span class="stage-board-role">AI·ME<\/span><span class="stage-board-count">2<\/span>/,
+		);
+		expect(html).toMatch(
+			/class="stage-board-heading"><h2>EXECUTION<\/h2><div class="stage-board-heading-meta"><span class="stage-board-role">AI<\/span><span class="stage-board-count">2<\/span>/,
+		);
+		expect(html).toMatch(
+			/class="stage-board-heading"><h2>REVIEW<\/h2><div class="stage-board-heading-meta"><span class="stage-board-role">ME<\/span><span class="stage-board-count">1<\/span>/,
+		);
+	});
+
 	it("renders three stage columns with compact active task cards", () => {
 		const html = renderToStaticMarkup(
 			<StageBoard board={buildBoardModel(state)} />,
@@ -143,7 +200,31 @@ describe("StageBoard", () => {
 		expect(html).toContain("planning-task");
 		expect(html).toContain("blocked-task");
 		expect(html).toContain("feat-update-0617-part2");
+		expect(html).not.toContain("todo-task");
+		expect(html).not.toContain("no-plan-task");
 		expect(html).not.toContain("done-task");
+	});
+
+	it("renders active plan titles and compact repository metadata", () => {
+		const html = renderToStaticMarkup(
+			<StageBoard board={buildBoardModel(state)} />,
+		);
+
+		expect(html).toContain(
+			'class="stage-card-plan" title="Generated Plan">Generated Plan</span>',
+		);
+		expect(html).not.toContain('class="stage-card-plan" title="fresh-task"');
+		expect(html).toContain(
+			'class="stage-card-repo stage-card-repo-dirty" title="workbranch feat/update-0617 dirty"',
+		);
+		expect(html).toContain('class="stage-card-repo" title="docs main clean"');
+		expect(html).toContain(
+			'class="stage-card-repo-name">companion-repository-with-a-name-that-exceeds-stage-card-width</span>',
+		);
+		expect(html).toContain(
+			'class="stage-card-repo-dot" aria-label="dirty" role="img">●</span>',
+		);
+		expect(html).not.toContain('class="repo-branch-name"');
 	});
 
 	it("keeps project, blocked, progress, notification, and title metadata on cards", () => {
@@ -162,15 +243,38 @@ describe("StageBoard", () => {
 	it("uses a fixed three-column narrow-window CSS contract", () => {
 		const css = readFileSync("src/styles/stage-board.css", "utf8");
 		const taskNameRule = css.match(/\.stage-card-name\s*\{([^}]*)\}/s);
+		const countRule = css.match(/\.stage-board-count\s*\{([^}]*)\}/s);
+		const planRule = css.match(/\.stage-card-plan\s*\{([^}]*)\}/s);
+		const reposRule = css.match(/\.stage-card-repos\s*\{([^}]*)\}/s);
+		const repoRule = css.match(/\.stage-card-repo\s*\{([^}]*)\}/s);
+		const repoNameRule = css.match(/\.stage-card-repo-name\s*\{([^}]*)\}/s);
 
 		expect(css).toMatch(
 			/\.stage-board\s*\{[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/s,
 		);
+		expect(css).toMatch(
+			/\.stage-board-header\s*\{[^}]*border-bottom:\s*1px solid var\(--line\)[^}]*display:\s*grid[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/s,
+		);
+		expect(css).toMatch(/\.stage-board-heading-meta\s*\{[^}]*display:\s*flex/s);
+		expect(countRule?.[1]).toMatch(/color:\s*var\(--faint\)/);
+		expect(countRule?.[1]).toMatch(/font-size:\s*10px/);
+		expect(countRule?.[1]).toMatch(/font-variant-numeric:\s*tabular-nums/);
+		expect(countRule?.[1]).toMatch(/margin-left:\s*auto/);
+		expect(css).not.toContain(".stage-column-header");
 		expect(css).toMatch(/\.stage-column\s*\{[^}]*min-width:\s*0/s);
 		expect(taskNameRule?.[1]).toMatch(/overflow-wrap:\s*anywhere/);
 		expect(taskNameRule?.[1]).toMatch(/white-space:\s*normal/);
 		expect(taskNameRule?.[1]).not.toMatch(/text-overflow:\s*ellipsis/);
 		expect(taskNameRule?.[1]).not.toMatch(/overflow:\s*hidden/);
+		expect(planRule?.[1]).toMatch(/text-overflow:\s*ellipsis/);
+		expect(reposRule?.[1]).toMatch(/flex-wrap:\s*wrap/);
+		expect(reposRule?.[1]).toMatch(/min-width:\s*0/);
+		expect(repoRule?.[1]).toMatch(/max-width:\s*100%/);
+		expect(repoRule?.[1]).toMatch(/min-width:\s*0/);
+		expect(repoNameRule?.[1]).toMatch(/min-width:\s*0/);
+		expect(repoNameRule?.[1]).toMatch(/overflow:\s*hidden/);
+		expect(repoNameRule?.[1]).toMatch(/text-overflow:\s*ellipsis/);
+		expect(repoNameRule?.[1]).toMatch(/white-space:\s*nowrap/);
 	});
 
 	it("frames the board as the primary Main surface", () => {
