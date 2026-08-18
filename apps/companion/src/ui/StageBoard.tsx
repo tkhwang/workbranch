@@ -2,9 +2,17 @@ import type { BoardCard, BoardModel } from "../application/state";
 import {
 	activePlan,
 	type Repo,
+	type Task,
 	type TaskStage,
 	taskProgress,
 } from "../domain/model";
+
+export type StageCardOpenIde = (root: string, task: Task) => void;
+
+type StageCardProps = {
+	readonly card: BoardCard;
+	readonly onOpenIde: StageCardOpenIde;
+};
 
 const STAGE_ROLES: Record<TaskStage, string> = {
 	plan: "AI·ME",
@@ -34,7 +42,7 @@ function StageCardRepos({ repos }: { readonly repos: readonly Repo[] }) {
 	);
 }
 
-function StageCard({ card }: { readonly card: BoardCard }) {
+export function StageCard({ card, onOpenIde }: StageCardProps) {
 	const plan = activePlan(card.task);
 	const progress = taskProgress(card.task);
 	return (
@@ -42,6 +50,17 @@ function StageCard({ card }: { readonly card: BoardCard }) {
 			className="stage-card"
 			data-blocked={card.blocked ? "true" : "false"}
 		>
+			<button
+				aria-label={`open ${card.task.name} in IDE`}
+				className="stage-card-open"
+				onClick={(event) => {
+					if (event.detail !== 0) return;
+					onOpenIde(card.root, card.task);
+				}}
+				onDoubleClick={() => onOpenIde(card.root, card.task)}
+				title={`Double-click to open ${card.task.name} in IDE`}
+				type="button"
+			/>
 			<span className="stage-card-project">{card.project}</span>
 			<span className="stage-card-name" title={card.task.name}>
 				{card.task.name}
@@ -74,7 +93,13 @@ function StageCard({ card }: { readonly card: BoardCard }) {
 	);
 }
 
-export function StageBoard({ board }: { readonly board: BoardModel }) {
+export function StageBoard({
+	board,
+	onOpenIde,
+}: {
+	readonly board: BoardModel;
+	readonly onOpenIde: StageCardOpenIde;
+}) {
 	return (
 		<section className="stage-board" aria-label="Task stage board">
 			<header className="stage-board-header">
@@ -103,7 +128,11 @@ export function StageBoard({ board }: { readonly board: BoardModel }) {
 				>
 					<div className="stage-card-list">
 						{column.cards.map((card) => (
-							<StageCard card={card} key={`${card.root}:${card.task.name}`} />
+							<StageCard
+								card={card}
+								key={`${card.root}:${card.task.name}`}
+								onOpenIde={onOpenIde}
+							/>
 						))}
 					</div>
 				</section>

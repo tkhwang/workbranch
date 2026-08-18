@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 import { Children, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { buildBoardModel } from "../src/application/state";
+import { type BoardCard, buildBoardModel } from "../src/application/state";
 import type { GlobalState, Task } from "../src/domain/model";
-import { StageBoard } from "../src/ui/StageBoard";
+import { StageBoard, StageCard } from "../src/ui/StageBoard";
 import {
 	type TaskActionKind,
 	TaskMetaRow,
@@ -14,7 +14,9 @@ import {
 type ButtonProps = {
 	readonly children?: ReactNode;
 	readonly "aria-label"?: string;
-	readonly onClick?: () => void;
+	readonly onClick?: (event: { readonly detail: number }) => void;
+	readonly onDoubleClick?: () => void;
+	readonly onKeyDown?: unknown;
 };
 
 type ActionCall = {
@@ -151,6 +153,14 @@ const state: GlobalState = {
 	errors: [],
 };
 
+const planningCard: BoardCard = {
+	blocked: false,
+	project: "acme",
+	root: "/tmp/acme",
+	stage: "plan",
+	task: planningTask,
+};
+
 function renderTaskMetaRow(
 	task: Task,
 	theme: "claude" | "codex" = "claude",
@@ -168,7 +178,7 @@ function renderTaskMetaRow(
 describe("StageBoard", () => {
 	it("renders one shared two-row stage role and count header", () => {
 		const html = renderToStaticMarkup(
-			<StageBoard board={buildBoardModel(state)} />,
+			<StageBoard board={buildBoardModel(state)} onOpenIde={() => undefined} />,
 		);
 
 		expect(html.match(/class="stage-board-header"/g)).toHaveLength(1);
@@ -196,7 +206,7 @@ describe("StageBoard", () => {
 
 	it("renders three stage columns with compact active task cards", () => {
 		const html = renderToStaticMarkup(
-			<StageBoard board={buildBoardModel(state)} />,
+			<StageBoard board={buildBoardModel(state)} onOpenIde={() => undefined} />,
 		);
 
 		expect(html).toContain('aria-label="Task stage board"');
@@ -214,9 +224,69 @@ describe("StageBoard", () => {
 		expect(html).not.toContain("done-task");
 	});
 
+	it("renders a native IDE launcher button over each active stage card", () => {
+		const html = renderToStaticMarkup(
+			<StageBoard board={buildBoardModel(state)} onOpenIde={() => undefined} />,
+		);
+
+		expect(html.match(/class="stage-card-open"/g)).toHaveLength(5);
+		expect(html).toContain('type="button"');
+		expect(html).toContain('aria-label="open planning-task in IDE"');
+	});
+
+	it("opens the card task in the IDE on pointer double-click", () => {
+		const calls: string[] = [];
+		const element = StageCard({
+			card: planningCard,
+			onOpenIde: (root, task) => calls.push(`${root}:${task.name}`),
+		});
+		const button = collectButtonProps(element).find(
+			(candidate) => candidate["aria-label"] === "open planning-task in IDE",
+		);
+
+		button?.onDoubleClick?.();
+
+		expect(calls).toEqual(["/tmp/acme:planning-task"]);
+	});
+
+	it("uses native click activation without opening on pointer clicks", () => {
+		const calls: string[] = [];
+		const element = StageCard({
+			card: planningCard,
+			onOpenIde: (root, task) => calls.push(`${root}:${task.name}`),
+		});
+		const button = collectButtonProps(element).find(
+			(candidate) => candidate["aria-label"] === "open planning-task in IDE",
+		);
+
+		button?.onClick?.({ detail: 0 });
+		button?.onClick?.({ detail: 1 });
+		button?.onClick?.({ detail: 2 });
+
+		expect(calls).toEqual(["/tmp/acme:planning-task"]);
+		expect(button?.onKeyDown).toBeUndefined();
+	});
+
+	it("styles the full-card launcher with hover and focus signals", () => {
+		const css = readFileSync("src/styles/stage-board.css", "utf8");
+		const cardRule = css.match(/\.stage-card\s*\{([^}]*)\}/s);
+		const openRule = css.match(/\.stage-card-open\s*\{([^}]*)\}/s);
+
+		expect(cardRule?.[1]).toMatch(/cursor:\s*pointer/);
+		expect(cardRule?.[1]).toMatch(/position:\s*relative/);
+		expect(css).toMatch(
+			/\.stage-card:hover\s*\{[^}]*background:\s*var\(--surface-3\)[^}]*border-color:\s*var\(--line-strong\)/s,
+		);
+		expect(openRule?.[1]).toMatch(/inset:\s*0/);
+		expect(openRule?.[1]).toMatch(/position:\s*absolute/);
+		expect(css).toMatch(
+			/\.stage-card-open:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--accent\)[^}]*outline-offset:\s*-2px/s,
+		);
+	});
+
 	it("renders active plan titles and compact repository metadata", () => {
 		const html = renderToStaticMarkup(
-			<StageBoard board={buildBoardModel(state)} />,
+			<StageBoard board={buildBoardModel(state)} onOpenIde={() => undefined} />,
 		);
 
 		expect(html).toContain(
@@ -238,7 +308,7 @@ describe("StageBoard", () => {
 
 	it("keeps project, blocked, progress, notification, and title metadata on cards", () => {
 		const html = renderToStaticMarkup(
-			<StageBoard board={buildBoardModel(state)} />,
+			<StageBoard board={buildBoardModel(state)} onOpenIde={() => undefined} />,
 		);
 
 		expect(html).toContain('class="stage-card-project">acme</span>');
@@ -403,7 +473,7 @@ describe("TaskMetaRow", () => {
 				"open generated-task-with-a-very-long-name in IDE",
 		);
 
-		ideButton?.onClick?.();
+		ideButton?.onClick?.({ detail: 1 });
 
 		expect(calls).toEqual([
 			{
