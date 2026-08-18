@@ -200,7 +200,10 @@ export function App() {
 			<StatusAlert message={visibleError} />
 			{currentView === "main" ? (
 				<section className="view-panel" aria-label="Main View">
-					<StageBoard board={board} />
+					<StageBoard
+						board={board}
+						onOpenIde={(root, task) => void handleTaskAction(root, task, "ide")}
+					/>
 					{model.groups.length === 0 ? (
 						<p className="empty">No workbranch tasks registered.</p>
 					) : null}
