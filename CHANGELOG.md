@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.15.0](https://github.com/tkhwang/workbranch/compare/v2.14.0...v2.15.0) (2026-08-18)
+
+
+### Features
+
+* **func:** implement lauch IME on double click in stage view box ([aa48612](https://github.com/tkhwang/workbranch/commit/aa4861296e792165b133e563e5a2efda5ddf8b22))
+* **func:** implement lauch IME on double click in stage view box ([a11a7e7](https://github.com/tkhwang/workbranch/commit/a11a7e7422a54f5da7f924e3a7a49ef5dae3fa03))
+
 ## [2.14.0](https://github.com/tkhwang/workbranch/compare/v2.13.0...v2.14.0) (2026-08-17)
 
 
