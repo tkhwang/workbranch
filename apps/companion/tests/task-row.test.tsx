@@ -435,7 +435,7 @@ describe("TaskMetaRow", () => {
 			/\.repo-chips\s*\{[^}]*display:\s*grid[^}]*width:\s*100%/s,
 		);
 		expect(detailsCss).toMatch(
-			/\.repo-pair\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)[^}]*width:\s*100%/s,
+			/\.repo-pair\s*\{[^}]*grid-template-columns:\s*fit-content\(50%\) minmax\(0, 1fr\)[^}]*width:\s*100%/s,
 		);
 		expect(actionsCss).toMatch(
 			/\.task-actions\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)[^}]*width:\s*100%/s,
@@ -450,6 +450,7 @@ describe("TaskMetaRow", () => {
 		const branchRule = detailsCss.match(/\.repo-branch-name\s*\{([^}]*)\}/s);
 
 		expect(branchRule?.[1]).toMatch(/color:\s*var\(--muted\)/);
+		expect(branchRule?.[1]).toMatch(/text-align:\s*right/);
 		expect(branchRule?.[1]).toMatch(/text-overflow:\s*ellipsis/);
 		expect(branchRule?.[1]).toMatch(/width:\s*100%/);
 		expect(branchRule?.[1]).not.toMatch(/border(?:-radius)?:/);

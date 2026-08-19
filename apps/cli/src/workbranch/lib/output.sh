@@ -120,7 +120,7 @@ diff_color() {
 next_action_color() {
   case "$1" in
     land|push) printf '%s' "$WB_GREEN" ;;
-    update|pull|check) printf '%s' "$WB_YELLOW" ;;
+    update|pull|check|'update -> land') printf '%s' "$WB_YELLOW" ;;
     -) printf '%s' "$WB_GRAY" ;;
     *) printf '%s' "$WB_GRAY" ;;
   esac
