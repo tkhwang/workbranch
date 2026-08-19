@@ -100,7 +100,7 @@ next_action_for_diff() {
     0) printf '-' ;;
     +*) printf 'land' ;;
     -*) printf 'update' ;;
-    ±*) printf 'update' ;;
+    ±*) printf 'update -> land' ;;
     *) printf 'check' ;;
   esac
 }

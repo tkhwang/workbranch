@@ -100,6 +100,34 @@ test_status_reports_base_task_diff_and_worktree_state() {
   assert_not_contains "$out" "Task summary"
 }
 
+test_status_reports_diverged_task_diff_next_actions() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  git -C "$project/login/frontend" config user.name "Workbranch Test"
+  git -C "$project/login/frontend" config user.email "workbranch-test@example.com"
+  printf '%s\n' "task frontend" > "$project/login/frontend/task.txt"
+  git -C "$project/login/frontend" add task.txt
+  git -C "$project/login/frontend" commit -m "task frontend" >/dev/null
+
+  git -C "$project/_base/frontend" config user.name "Workbranch Test"
+  git -C "$project/_base/frontend" config user.email "workbranch-test@example.com"
+  printf '%s\n' "base frontend" > "$project/_base/frontend/base.txt"
+  git -C "$project/_base/frontend" add base.txt
+  git -C "$project/_base/frontend" commit -m "base frontend" >/dev/null
+
+  base_frontend=$(git -C "$project/_base/frontend" rev-parse --short=9 HEAD)
+  task_frontend=$(git -C "$project/login/frontend" rev-parse --short=9 HEAD)
+
+  out=$(run_expect_success "$WORKBRANCH" status)
+  assert_contains "$out" "$(printf '    %-11s %-10s %-10s %-5s %-9s %s' frontend "$base_frontend" "$task_frontend" ±1/1 clean 'update -> land')"
+  assert_contains "$out" "land    task has commits not in base: workbranch land <task>"
+  assert_contains "$out" "update  task is behind base: workbranch update <task>"
+}
+
 test_status_repo_filter_skips_tasks_without_matching_rows() {
   new_fixture
   project="$FIXTURE_PROJECT"

@@ -202,6 +202,8 @@ Show base commit position versus its cached remote-tracking branch, task commit 
     update  task is behind base: workbranch update <task>
 ```
 
+When a task and its base have both moved (the `diff` column shows `±<base>/<task>`), `next` shows the combined sequence `update -> land`: update the task from base first, then land it.
+
 ### `workbranch add [<task>] [--from <ref>]`
 
 Create one task workspace with one linked worktree per repo. Without `<task>`, prompt for task type and detail name and derive the recommended `type-detail` task key.
