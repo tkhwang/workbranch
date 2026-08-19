@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.13.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.12.0...workbranch-companion-v2.13.0) (2026-08-19)
+
+
+### Features
+
+* **branding:** update application logos and hero image ([2f86b2c](https://github.com/tkhwang/workbranch/commit/2f86b2c1918647e15ba913ec62455d04ecbe17e5))
+* **branding:** update application logos and hero image ([51f254d](https://github.com/tkhwang/workbranch/commit/51f254da1561b2289ccadc081305206b26b174b4))
+* **status:** improve diverged task status reporting ([e387707](https://github.com/tkhwang/workbranch/commit/e3877074a0f78e2dc254bdf8fff5fa23b880db69))
+* **status:** improve diverged task status reporting ([4d5ffe4](https://github.com/tkhwang/workbranch/commit/4d5ffe4b856e13bb9da16b80431b8de1469144d8))
+
 ## [2.12.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.11.0...workbranch-companion-v2.12.0) (2026-08-18)
 
 
