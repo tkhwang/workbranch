@@ -289,6 +289,19 @@ describe("StageBoard", () => {
 		expect(html).toContain('class="stage-task-derived">DERIVED</span>');
 	});
 
+	it("keeps OTHER task launchers on the double-click interaction contract", () => {
+		const html = renderToStaticMarkup(
+			<StageBoard
+				board={buildBoardModel(state)}
+				nowSeconds={3_600}
+				onOpenIde={() => undefined}
+			/>,
+		);
+
+		expect(html).toContain('title="Double-click to open todo-task in IDE"');
+		expect(html).toContain('title="Double-click to open done-task in IDE"');
+	});
+
 	it("renders a native IDE launcher over each active task row", () => {
 		const html = renderToStaticMarkup(
 			<StageBoard

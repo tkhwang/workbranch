@@ -1,5 +1,5 @@
 import { isTauri } from "@tauri-apps/api/core";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityCalendarView } from "./activity/ActivityCalendarView";
 import { createActivityRefresh } from "./application/activity";
 import {
@@ -56,6 +56,7 @@ export function nextActivityReloadToken(current: number): number {
 
 export function App() {
 	const [state, setState] = useState<GlobalState>(EMPTY_STATE);
+	const stateRef = useRef<GlobalState>(EMPTY_STATE);
 	const [activityReloadToken, setActivityReloadToken] = useState(0);
 	const [status, setStatus] = useState("Ready");
 	const [visibleError, setVisibleError] = useState<string>();
@@ -100,6 +101,7 @@ export function App() {
 
 	const applyState = useCallback(
 		(next: GlobalState) => {
+			stateRef.current = next;
 			setState(next);
 			setActivityReloadToken(nextActivityReloadToken);
 			showStatus("Updated");
@@ -166,6 +168,7 @@ export function App() {
 		void startWorkspaceMonitor({
 			refresh: refreshWithActivity.all,
 			refreshRoot: refreshWithActivity.root,
+			getState: () => stateRef.current,
 			onState: applyState,
 			onError: showError,
 			watchRoots,

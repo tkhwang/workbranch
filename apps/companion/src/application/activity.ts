@@ -192,7 +192,14 @@ export function createActivityRefresh(
 		if (events.length > 0) {
 			await deps.append(events);
 		}
-		previousByRoot = projectsByRoot(state.projects);
+		const nextByRoot = projectsByRoot(state.projects);
+		for (const error of state.errors) {
+			const previous = previousByRoot.get(error.root);
+			if (previous !== undefined && !nextByRoot.has(error.root)) {
+				nextByRoot.set(error.root, previous);
+			}
+		}
+		previousByRoot = nextByRoot;
 		return state;
 	};
 	const runRoot = async (root: string): Promise<Project> => {

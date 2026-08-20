@@ -203,4 +203,39 @@ describe("createActivityRefresh", () => {
 			progressDone: 1,
 		});
 	});
+
+	it("retains an errored root baseline until the project recovers", async () => {
+		const partialFailure: GlobalState = {
+			projects: [],
+			errors: [{ root: "/tmp/workbranch", message: "refresh failed" }],
+		};
+		const states = [BASELINE_STATE, partialFailure, UPDATED_STATE];
+		const appended: ActivityEvent[][] = [];
+		const refresh = createActivityRefresh({
+			refresh: () => {
+				const state = states.shift();
+				if (state === undefined) {
+					throw new Error("unexpected refresh");
+				}
+				return Promise.resolve(state);
+			},
+			refreshRoot: () => Promise.resolve(UPDATED_PROJECT),
+			append: (events) => {
+				appended.push([...events]);
+				return Promise.resolve();
+			},
+			now: () => 100,
+		});
+
+		await refresh.all();
+		await refresh.all();
+		await refresh.all();
+
+		expect(appended).toHaveLength(1);
+		expect(appended[0]?.[0]).toMatchObject({
+			root: "/tmp/workbranch",
+			task: "feat-login",
+			progressDone: 1,
+		});
+	});
 });

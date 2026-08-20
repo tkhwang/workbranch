@@ -370,4 +370,47 @@ describe("startWorkspaceMonitor", () => {
 		expect(rendered.at(-1)?.projects[0]).toBe(SECOND_STATE.projects[0]);
 		expect(rendered.at(-1)?.errors).toEqual([]);
 	});
+
+	it("merges a root refresh into the latest externally applied state", async () => {
+		const betaBefore = { name: "beta", root: "/tmp/beta", tasks: [] };
+		const betaAfter = {
+			name: "beta",
+			root: "/tmp/beta",
+			tasks: firstProject(SECOND_STATE).tasks,
+		};
+		const initial: GlobalState = {
+			projects: [firstProject(FIRST_STATE), betaBefore],
+			errors: [],
+		};
+		let latestState = initial;
+		let rootChanged: ((root: string) => void) | undefined;
+		const rendered: GlobalState[] = [];
+		const monitor = await startWorkspaceMonitor({
+			refresh: () => Promise.resolve(initial),
+			refreshRoot: () => Promise.resolve(firstProject(SECOND_STATE)),
+			getState: () => latestState,
+			onState: (state) => {
+				latestState = state;
+				rendered.push(state);
+			},
+			onError: (error) => {
+				throw error;
+			},
+			watchRoots: () => Promise.resolve(),
+			onRootChanged: (callback) => {
+				rootChanged = callback;
+				return Promise.resolve(() => undefined);
+			},
+		});
+
+		latestState = {
+			projects: [firstProject(FIRST_STATE), betaAfter],
+			errors: [],
+		};
+		rootChanged?.("/tmp/workbranch");
+		await monitor.settle();
+		monitor.stop();
+
+		expect(rendered.at(-1)?.projects[1]).toBe(betaAfter);
+	});
 });

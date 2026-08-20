@@ -52,6 +52,13 @@ function latestUpdate(group: ProjectGroup): number {
 	return group.rows.reduce((max, row) => Math.max(max, row.task.updatedAt), 0);
 }
 
+function latestTaskActivity(task: Task): number {
+	return task.repos.reduce(
+		(latest, repo) => Math.max(latest, repo.lastCommitAt),
+		task.updatedAt,
+	);
+}
+
 export function buildMenuModel(state: GlobalState): MenuModel {
 	const groups = state.projects
 		.map((project) => ({
@@ -107,7 +114,8 @@ export function buildBoardModel(state: GlobalState): BoardModel {
 
 	return {
 		cards: cards.sort(
-			(left, right) => right.task.updatedAt - left.task.updatedAt,
+			(left, right) =>
+				latestTaskActivity(right.task) - latestTaskActivity(left.task),
 		),
 		otherTasks: otherTasks.sort(
 			(left, right) => right.task.updatedAt - left.task.updatedAt,

@@ -11,6 +11,7 @@ import {
 	type TaskStage,
 	taskProgress,
 } from "../domain/model";
+import { useCurrentEpochSeconds } from "./useCurrentEpochSeconds";
 
 export type StageCardOpenIde = (root: string, task: Task) => void;
 
@@ -218,7 +219,12 @@ function OtherTaskRow({
 		<li className="stage-other-task">
 			<button
 				aria-label={`open ${card.task.name} in IDE`}
-				onClick={() => onOpenIde(card.root, card.task)}
+				onClick={(event) => {
+					if (event.detail !== 0) return;
+					onOpenIde(card.root, card.task);
+				}}
+				onDoubleClick={() => onOpenIde(card.root, card.task)}
+				title={`Double-click to open ${card.task.name} in IDE`}
 				type="button"
 			>
 				<span>{card.task.name}</span>
@@ -230,13 +236,14 @@ function OtherTaskRow({
 
 export function StageBoard({
 	board,
-	nowSeconds = Math.floor(Date.now() / 1000),
+	nowSeconds,
 	onOpenIde,
 }: {
 	readonly board: BoardModel;
 	readonly nowSeconds?: number;
 	readonly onOpenIde: StageCardOpenIde;
 }) {
+	const currentNowSeconds = useCurrentEpochSeconds(nowSeconds);
 	return (
 		<section className="stage-board" aria-label="Task stage board">
 			<header className="stage-feed-header">
@@ -248,7 +255,7 @@ export function StageBoard({
 					<StageCard
 						card={card}
 						key={`${card.root}:${card.task.name}`}
-						nowSeconds={nowSeconds}
+						nowSeconds={currentNowSeconds}
 						onOpenIde={onOpenIde}
 					/>
 				))}

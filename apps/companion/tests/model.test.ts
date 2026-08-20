@@ -182,4 +182,35 @@ describe("buildBoardModel", () => {
 			"todo-old",
 		]);
 	});
+
+	it("sorts lifecycle cards by the latest task or repository activity", () => {
+		const recentRepositoryActivity = {
+			...DIRTY_REPO,
+			dirty: false,
+			changedFiles: 0,
+			lastCommitAt: 300,
+		};
+		const state: GlobalState = {
+			projects: [
+				{
+					name: "alpha",
+					root: "/tmp/alpha",
+					tasks: [
+						taskWithStatus("recent-repository", "planning", 10, 0, [
+							recentRepositoryActivity,
+						]),
+						taskWithStatus("recent-brief", "in-progress", 200),
+					],
+				},
+			],
+			errors: [],
+		};
+
+		const board = buildBoardModel(state);
+
+		expect(board.cards.map((card) => card.task.name)).toEqual([
+			"recent-repository",
+			"recent-brief",
+		]);
+	});
 });

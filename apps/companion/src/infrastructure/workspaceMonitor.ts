@@ -10,6 +10,7 @@ export type WorkspaceMonitor = {
 export type WorkspaceMonitorDeps = {
 	readonly refresh: () => Promise<GlobalState>;
 	readonly refreshRoot?: (root: string) => Promise<Project>;
+	readonly getState?: () => GlobalState;
 	readonly onState: (state: GlobalState) => void;
 	readonly onError: (error: unknown) => void;
 	readonly watchRoots: (roots: readonly string[]) => Promise<void>;
@@ -83,25 +84,30 @@ export async function startWorkspaceMonitor(
 	};
 
 	const refreshOne = async (root: string): Promise<void> => {
-		if (deps.refreshRoot === undefined || currentState === undefined) {
+		const latestState = (): GlobalState | undefined =>
+			deps.getState?.() ?? currentState;
+		if (deps.refreshRoot === undefined || latestState() === undefined) {
 			await refreshAll();
 			return;
 		}
 		try {
 			const project = await deps.refreshRoot(root);
+			const state = latestState();
+			if (state === undefined) {
+				await refreshAll();
+				return;
+			}
 			await applyState({
-				projects: replaceProject(currentState.projects, project),
-				errors: replaceRootError(currentState.errors, root, undefined),
+				projects: replaceProject(state.projects, project),
+				errors: replaceRootError(state.errors, root, undefined),
 			});
 		} catch (error) {
 			deps.onError(error);
+			const state = latestState();
+			if (state === undefined) return;
 			await applyState({
-				projects: currentState.projects,
-				errors: replaceRootError(
-					currentState.errors,
-					root,
-					errorMessage(error),
-				),
+				projects: state.projects,
+				errors: replaceRootError(state.errors, root, errorMessage(error)),
 			});
 		}
 	};
