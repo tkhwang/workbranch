@@ -54,6 +54,8 @@ test_list_json_repo_activity_facts() {
   run_expect_success "$WORKBRANCH" add login >/dev/null
 
   frontend="$project/login/frontend"
+  git -C "$frontend" config user.name "Workbranch Test"
+  git -C "$frontend" config user.email "workbranch-test@example.com"
   printf '%s\n' committed > "$frontend/activity.txt"
   git -C "$frontend" add activity.txt
   git -C "$frontend" commit -m 'implement "activity" facts' >/dev/null
