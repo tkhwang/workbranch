@@ -12,7 +12,6 @@
 ### Bug Fixes
 
 * **cli:** configure git user for tests ([ae73d7a](https://github.com/tkhwang/workbranch/commit/ae73d7a878f796a20b57283979e794b3e7304c75))
-* **companion:** address activity review feedback ([2349c16](https://github.com/tkhwang/workbranch/commit/2349c16ba043825e6b4effae5ff2db258477f9e4))
 
 ## [2.16.0](https://github.com/tkhwang/workbranch/compare/v2.15.0...v2.16.0) (2026-08-19)
 
