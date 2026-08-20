@@ -12,10 +12,52 @@ import {
 	appendActivityEvents,
 	CompanionActionError,
 	ensureRunSucceeded,
+	onRootChanged,
 	quitCompanion,
 	readActivityEvents,
+	refreshRoot,
 	runAction,
 } from "../src/infrastructure/tauriClient";
+
+describe("root refresh", () => {
+	beforeEach(() => {
+		tauri.invoke.mockReset();
+		tauri.listen.mockReset();
+	});
+
+	it("maps one local list document through the existing project ACL", async () => {
+		tauri.invoke.mockResolvedValue(
+			JSON.stringify({
+				schemaVersion: 1,
+				project: "workbranch",
+				root: "/tmp/workbranch",
+				tasks: [],
+			}),
+		);
+
+		await expect(refreshRoot("/tmp/workbranch")).resolves.toMatchObject({
+			name: "workbranch",
+			root: "/tmp/workbranch",
+		});
+		expect(tauri.invoke).toHaveBeenCalledWith("workbranch_list", {
+			root: "/tmp/workbranch",
+		});
+	});
+
+	it("forwards the roots-changed payload instead of the Tauri event object", async () => {
+		let changedRoot = "";
+		tauri.listen.mockImplementation((_name, callback) => {
+			callback({ payload: "/tmp/workbranch" });
+			return Promise.resolve(() => undefined);
+		});
+
+		await onRootChanged((root) => {
+			changedRoot = root;
+		});
+
+		expect(changedRoot).toBe("/tmp/workbranch");
+	});
+});
 
 describe("appendActivityEvents", () => {
 	beforeEach(() => {

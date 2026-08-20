@@ -61,12 +61,38 @@ const reviewTask: Task = {
 	notiCount: 1,
 	updatedAt: 20,
 	repos: [
-		{ name: "workbranch", branch: "feat/update-0617", dirty: true },
-		{ name: "docs", branch: "main", dirty: false },
+		{
+			name: "workbranch",
+			branch: "feat/update-0617",
+			dirty: true,
+			activityAvailable: true,
+			ahead: 2,
+			behind: 0,
+			changedFiles: 7,
+			lastCommitSubject: "implement companion activity feed",
+			lastCommitAt: 3_500,
+		},
+		{
+			name: "docs",
+			branch: "main",
+			dirty: false,
+			activityAvailable: true,
+			ahead: 0,
+			behind: 1,
+			changedFiles: 0,
+			lastCommitSubject: "document stage board",
+			lastCommitAt: 400,
+		},
 		{
 			name: "companion-repository-with-a-name-that-exceeds-stage-card-width",
 			branch: "feat/long-repository-name",
 			dirty: true,
+			activityAvailable: true,
+			ahead: 0,
+			behind: 0,
+			changedFiles: 1,
+			lastCommitSubject: "long repository activity",
+			lastCommitAt: 0,
 		},
 	],
 	plans: [
@@ -155,10 +181,36 @@ const state: GlobalState = {
 
 const planningCard: BoardCard = {
 	blocked: false,
+	derived: false,
 	project: "acme",
 	root: "/tmp/acme",
 	stage: "plan",
 	task: planningTask,
+};
+
+const legacyDirtyCard: BoardCard = {
+	blocked: false,
+	derived: false,
+	project: "legacy-project",
+	root: "/tmp/legacy",
+	stage: "execution",
+	task: {
+		...executionTask,
+		name: "legacy-task",
+		repos: [
+			{
+				name: "legacy-repo",
+				branch: "feature/legacy-task",
+				dirty: true,
+				ahead: 0,
+				behind: 0,
+				changedFiles: 0,
+				lastCommitSubject: "",
+				lastCommitAt: 0,
+				activityAvailable: false,
+			},
+		],
+	},
 };
 
 function renderTaskMetaRow(
@@ -176,68 +228,86 @@ function renderTaskMetaRow(
 }
 
 describe("StageBoard", () => {
-	it("renders one shared two-row stage role and count header", () => {
+	it("renders the full lifecycle with the current stage on every task", () => {
 		const html = renderToStaticMarkup(
-			<StageBoard board={buildBoardModel(state)} onOpenIde={() => undefined} />,
+			<StageBoard
+				board={buildBoardModel(state)}
+				nowSeconds={3_600}
+				onOpenIde={() => undefined}
+			/>,
 		);
 
-		expect(html.match(/class="stage-board-header"/g)).toHaveLength(1);
-		expect(html.match(/class="stage-board-heading"/g)).toHaveLength(3);
-		expect(html).not.toContain('class="stage-column-header"');
-		expect(html).toMatch(
-			/class="stage-board-heading" id="stage-heading-plan"><h2>PLAN<\/h2><div class="stage-board-heading-meta"><span class="stage-board-role">AI·ME<\/span><span class="stage-board-count">2<\/span>/,
+		expect(html).not.toContain('class="stage-section-header"');
+		expect(html.match(/class="stage-lifecycle"/g)).toHaveLength(6);
+		expect(html.match(/class="stage-lifecycle-heading"/g)).toHaveLength(6);
+		expect(html.match(/class="stage-lifecycle-caption">STAGE/g)).toHaveLength(
+			6,
 		);
-		expect(html).toMatch(
-			/class="stage-board-heading" id="stage-heading-execution"><h2>EXECUTION<\/h2><div class="stage-board-heading-meta"><span class="stage-board-role">AI<\/span><span class="stage-board-count">2<\/span>/,
+		expect(
+			html.match(/class="stage-lifecycle-current-label">PLAN/g),
+		).toHaveLength(2);
+		expect(
+			html.match(/class="stage-lifecycle-current-label">EXECUTION/g),
+		).toHaveLength(3);
+		expect(
+			html.match(/class="stage-lifecycle-current-label">REVIEW/g),
+		).toHaveLength(1);
+		expect(html.match(/class="stage-lifecycle-node"/g)).toHaveLength(18);
+		expect(html.match(/class="stage-lifecycle-connector"/g)).toHaveLength(12);
+		expect(html.match(/data-current="true" data-stage="plan"/g)).toHaveLength(
+			2,
 		);
-		expect(html).toMatch(
-			/class="stage-board-heading" id="stage-heading-review"><h2>REVIEW<\/h2><div class="stage-board-heading-meta"><span class="stage-board-role">ME<\/span><span class="stage-board-count">1<\/span>/,
+		expect(
+			html.match(/data-current="true" data-stage="execution"/g),
+		).toHaveLength(3);
+		expect(html.match(/data-current="true" data-stage="review"/g)).toHaveLength(
+			1,
 		);
-		expect(html).toContain(
-			'<section class="stage-column" data-stage="plan" aria-labelledby="stage-heading-plan">',
-		);
-		expect(html).toContain(
-			'<section class="stage-column" data-stage="execution" aria-labelledby="stage-heading-execution">',
-		);
-		expect(html).toContain(
-			'<section class="stage-column" data-stage="review" aria-labelledby="stage-heading-review">',
-		);
-	});
-
-	it("renders three stage columns with compact active task cards", () => {
-		const html = renderToStaticMarkup(
-			<StageBoard board={buildBoardModel(state)} onOpenIde={() => undefined} />,
-		);
-
-		expect(html).toContain('aria-label="Task stage board"');
-		expect(html).toContain('data-stage="plan"');
-		expect(html).toContain('data-stage="execution"');
-		expect(html).toContain('data-stage="review"');
+		expect(html).not.toContain("[PLAN]");
+		expect(html).not.toContain("[EXECUTION]");
+		expect(html).not.toContain("[REVIEW]");
 		expect(html).toContain("PLAN");
 		expect(html).toContain("EXECUTION");
 		expect(html).toContain("REVIEW");
-		expect(html).toContain("planning-task");
-		expect(html).toContain("blocked-task");
-		expect(html).toContain("feat-update-0617-part2");
-		expect(html).not.toContain("todo-task");
-		expect(html).not.toContain("no-plan-task");
-		expect(html).not.toContain("done-task");
 	});
 
-	it("renders a native IDE launcher button over each active stage card", () => {
+	it("retains clean todo and done tasks in an OTHER disclosure", () => {
 		const html = renderToStaticMarkup(
-			<StageBoard board={buildBoardModel(state)} onOpenIde={() => undefined} />,
+			<StageBoard
+				board={buildBoardModel(state)}
+				nowSeconds={3_600}
+				onOpenIde={() => undefined}
+			/>,
 		);
 
-		expect(html.match(/class="stage-card-open"/g)).toHaveLength(5);
+		expect(html).toContain('class="stage-other"');
+		expect(html).toContain('class="stage-other-label">OTHER</span>');
+		expect(html).toContain('class="stage-other-count">2</span>');
+		expect(html).toContain("todo-task");
+		expect(html).toContain("no-plan-task");
+		expect(html).toContain("done-task");
+		expect(html).toContain('class="stage-task-derived">DERIVED</span>');
+	});
+
+	it("renders a native IDE launcher over each active task row", () => {
+		const html = renderToStaticMarkup(
+			<StageBoard
+				board={buildBoardModel(state)}
+				nowSeconds={3_600}
+				onOpenIde={() => undefined}
+			/>,
+		);
+
+		expect(html.match(/class="stage-task-open"/g)).toHaveLength(6);
 		expect(html).toContain('type="button"');
 		expect(html).toContain('aria-label="open planning-task in IDE"');
 	});
 
-	it("opens the card task in the IDE on pointer double-click", () => {
+	it("opens the task in the IDE on pointer double-click", () => {
 		const calls: string[] = [];
 		const element = StageCard({
 			card: planningCard,
+			nowSeconds: 3_600,
 			onOpenIde: (root, task) => calls.push(`${root}:${task.name}`),
 		});
 		const button = collectButtonProps(element).find(
@@ -253,6 +323,7 @@ describe("StageBoard", () => {
 		const calls: string[] = [];
 		const element = StageCard({
 			card: planningCard,
+			nowSeconds: 3_600,
 			onOpenIde: (root, task) => calls.push(`${root}:${task.name}`),
 		});
 		const button = collectButtonProps(element).find(
@@ -267,105 +338,110 @@ describe("StageBoard", () => {
 		expect(button?.onKeyDown).toBeUndefined();
 	});
 
-	it("styles the full-card launcher with hover and focus signals", () => {
-		const css = readFileSync("src/styles/stage-board.css", "utf8");
-		const cardRule = css.match(/\.stage-card\s*\{([^}]*)\}/s);
-		const openRule = css.match(/\.stage-card-open\s*\{([^}]*)\}/s);
+	it("renders repository branch facts and last commit context", () => {
+		const html = renderToStaticMarkup(
+			<StageBoard
+				board={buildBoardModel(state)}
+				nowSeconds={3_600}
+				onOpenIde={() => undefined}
+			/>,
+		);
 
-		expect(cardRule?.[1]).toMatch(/cursor:\s*pointer/);
-		expect(cardRule?.[1]).toMatch(/position:\s*relative/);
-		expect(css).toMatch(
-			/\.stage-card:hover\s*\{[^}]*background:\s*var\(--surface-3\)[^}]*border-color:\s*var\(--line-strong\)/s,
+		expect(html).toContain(
+			'class="stage-repo-name stage-repo-dirty">workbranch',
 		);
-		expect(openRule?.[1]).toMatch(/inset:\s*0/);
-		expect(openRule?.[1]).toMatch(/position:\s*absolute/);
-		expect(css).toMatch(
-			/\.stage-card-open:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--accent\)[^}]*outline-offset:\s*-2px/s,
+		expect(html).toContain('class="stage-repo-label">REPO</span>');
+		expect(html).toContain('class="stage-repo-label">BRANCH</span>');
+		expect(html).toContain('class="stage-repo-label">COMMIT</span>');
+		expect(html).toContain(
+			'class="stage-repo-branch" title="feat/update-0617">feat/update-0617</span>',
 		);
+		expect(html).toContain(
+			'class="stage-repo-facts">DIRTY 7 FILES · AHEAD 2</span>',
+		);
+		expect(html).toContain("implement companion activity feed · 1m");
+		expect(html).toContain('class="stage-repo-facts">CLEAN · BEHIND 1</span>');
+		expect(html).toContain('title="implement companion activity feed"');
 	});
 
-	it("renders active plan titles and compact repository metadata", () => {
+	it("does not render dirty zero for a mixed-version legacy CLI payload", () => {
 		const html = renderToStaticMarkup(
-			<StageBoard board={buildBoardModel(state)} onOpenIde={() => undefined} />,
+			<StageCard
+				card={legacyDirtyCard}
+				nowSeconds={3_600}
+				onOpenIde={() => undefined}
+			/>,
 		);
 
-		expect(html).toContain(
-			'class="stage-card-plan" title="Generated Plan">Generated Plan</span>',
-		);
-		expect(html).not.toContain('class="stage-card-plan" title="fresh-task"');
-		expect(html).toContain(
-			'class="stage-card-repo stage-card-repo-dirty" title="workbranch feat/update-0617 dirty"',
-		);
-		expect(html).toContain('class="stage-card-repo" title="docs main clean"');
-		expect(html).toContain(
-			'class="stage-card-repo-name">companion-repository-with-a-name-that-exceeds-stage-card-width</span>',
-		);
-		expect(html).toContain(
-			'class="stage-card-repo-dot" aria-label="dirty" role="img">●</span>',
-		);
-		expect(html).not.toContain('class="repo-branch-name"');
+		expect(html).toContain('class="stage-repo-facts">DIRTY</span>');
+		expect(html).not.toContain("DIRTY 0");
 	});
 
-	it("keeps project, blocked, progress, notification, and title metadata on cards", () => {
+	it("keeps task, plan, blocked, progress, and notification metadata", () => {
 		const html = renderToStaticMarkup(
-			<StageBoard board={buildBoardModel(state)} onOpenIde={() => undefined} />,
+			<StageBoard
+				board={buildBoardModel(state)}
+				nowSeconds={3_600}
+				onOpenIde={() => undefined}
+			/>,
 		);
 
-		expect(html).toContain('class="stage-card-project">acme</span>');
-		expect(html).toContain('class="stage-card-blocked">BLOCKED</span>');
-		expect(html).toContain('class="stage-card-progress">0/2</span>');
-		expect(html).toContain('class="stage-card-notification"');
+		expect(html).toContain('class="stage-task-project-label">PROJECT</span>');
+		expect(html).toContain('class="stage-task-project-name">acme</span>');
+		expect(html).toContain('class="stage-task-blocked">BLOCKED</span>');
+		expect(html).toContain('class="stage-task-progress">0/2</span>');
+		expect(html).toContain('class="stage-task-notification"');
 		expect(html).toContain("+2");
-		expect(html).toContain('title="generated-task-with-a-very-long-name"');
+		expect(html).toContain('class="stage-task-plan" title="Generated Plan"');
 	});
 
-	it("uses a fixed three-column narrow-window CSS contract", () => {
+	it("uses a full-width grouped feed CSS contract", () => {
 		const css = readFileSync("src/styles/stage-board.css", "utf8");
 		const boardRule = css.match(/\.stage-board\s*\{([^}]*)\}/s);
-		const headerRule = css.match(/\.stage-board-header\s*\{([^}]*)\}/s);
-		const taskNameRule = css.match(/\.stage-card-name\s*\{([^}]*)\}/s);
-		const countRule = css.match(/\.stage-board-count\s*\{([^}]*)\}/s);
-		const planRule = css.match(/\.stage-card-plan\s*\{([^}]*)\}/s);
-		const reposRule = css.match(/\.stage-card-repos\s*\{([^}]*)\}/s);
-		const repoRule = css.match(/\.stage-card-repo\s*\{([^}]*)\}/s);
-		const repoNameRule = css.match(/\.stage-card-repo-name\s*\{([^}]*)\}/s);
+		const rowRule = css.match(/\.stage-task-row\s*\{([^}]*)\}/s);
+		const branchRule = css.match(/\.stage-repo-branch\s*\{([^}]*)\}/s);
+		const headingRule = css.match(/\.stage-task-heading\s*\{([^}]*)\}/s);
 
-		expect(boardRule?.[1]).toMatch(/column-gap:\s*6px/);
-		expect(boardRule?.[1]).toMatch(
-			/grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/,
+		expect(boardRule?.[1]).toMatch(/display:\s*grid/);
+		expect(boardRule?.[1]).not.toMatch(/grid-template-columns:\s*repeat\(3/);
+		expect(css).toMatch(/\.stage-feed\s*\{[^}]*min-width:\s*0/s);
+		expect(rowRule?.[1]).toMatch(/position:\s*relative/);
+		expect(rowRule?.[1]).toMatch(/min-width:\s*0/);
+		expect(headingRule?.[1]).toMatch(/display:\s*grid/);
+		expect(branchRule?.[1]).toMatch(/text-overflow:\s*ellipsis/);
+		expect(branchRule?.[1]).toMatch(/display:\s*block/);
+		expect(css).toMatch(
+			/\.stage-repo-row\s*\{[^}]*grid-template-columns:\s*48px minmax\(0, 1fr\)/s,
 		);
-		expect(boardRule?.[1]).toMatch(/row-gap:\s*6px/);
-		expect(headerRule?.[1]).toMatch(
-			/box-shadow:\s*inset 0 0 0 1px var\(--line\)/,
+		expect(css).toMatch(
+			/\.stage-lifecycle\s*\{[^}]*background:\s*var\(--surface-1\)[^}]*border:\s*1px solid var\(--line-strong\)[^}]*border-radius:\s*4px/s,
 		);
-		expect(headerRule?.[1]).toMatch(/column-gap:\s*6px/);
-		expect(headerRule?.[1]).toMatch(/display:\s*grid/);
-		expect(headerRule?.[1]).toMatch(
-			/grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/,
+		expect(css).toMatch(/\.stage-lifecycle\s*\{[^}]*padding:\s*6px 8px 7px/s);
+		expect(css).toMatch(
+			/\.stage-lifecycle-track\s*\{[^}]*grid-template-columns:\s*auto 1fr auto 1fr auto/s,
 		);
-		expect(css).toMatch(/\.stage-board-heading-meta\s*\{[^}]*display:\s*flex/s);
-		expect(countRule?.[1]).toMatch(/color:\s*var\(--faint\)/);
-		expect(countRule?.[1]).toMatch(/font-size:\s*10px/);
-		expect(countRule?.[1]).toMatch(/font-variant-numeric:\s*tabular-nums/);
-		expect(countRule?.[1]).toMatch(/margin-left:\s*auto/);
-		expect(css).not.toContain(".stage-column-header");
-		expect(css).toMatch(/\.stage-column\s*\{[^}]*min-width:\s*0/s);
-		expect(taskNameRule?.[1]).toMatch(/overflow-wrap:\s*anywhere/);
-		expect(taskNameRule?.[1]).toMatch(/white-space:\s*normal/);
-		expect(taskNameRule?.[1]).not.toMatch(/text-overflow:\s*ellipsis/);
-		expect(taskNameRule?.[1]).not.toMatch(/overflow:\s*hidden/);
-		expect(planRule?.[1]).toMatch(/text-overflow:\s*ellipsis/);
-		expect(reposRule?.[1]).toMatch(/flex-wrap:\s*wrap/);
-		expect(reposRule?.[1]).toMatch(/min-width:\s*0/);
-		expect(repoRule?.[1]).toMatch(/max-width:\s*100%/);
-		expect(repoRule?.[1]).toMatch(/min-width:\s*0/);
-		expect(repoNameRule?.[1]).toMatch(/min-width:\s*0/);
-		expect(repoNameRule?.[1]).toMatch(/overflow:\s*hidden/);
-		expect(repoNameRule?.[1]).toMatch(/text-overflow:\s*ellipsis/);
-		expect(repoNameRule?.[1]).toMatch(/white-space:\s*nowrap/);
+		expect(css).toMatch(
+			/\.stage-lifecycle-stage\s*\{[^}]*color:\s*var\(--muted\)/s,
+		);
+		expect(css).toMatch(
+			/\.stage-lifecycle-node\s*\{[^}]*border-radius:\s*50%/s,
+		);
+		expect(css).toMatch(
+			/\.stage-lifecycle-current \.stage-lifecycle-node\s*\{[^}]*background:\s*var\(--emphasis\)[^}]*box-shadow:\s*0 0 0 3px var\(--emphasis-soft\)/s,
+		);
+		expect(css).toMatch(
+			/\.stage-task-project-label\s*\{[^}]*color:\s*var\(--muted\)/s,
+		);
+		expect(css).toMatch(/\.stage-repo-label\s*\{[^}]*color:\s*var\(--muted\)/s);
+		expect(css).toMatch(
+			/\.stage-task-open:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--accent\)[^}]*outline-offset:\s*-2px/s,
+		);
+		expect(css).toMatch(
+			/\.stage-other\s*\{[^}]*border-top:\s*1px solid var\(--line\)/s,
+		);
 	});
 
-	it("frames the board as the primary Main surface", () => {
+	it("frames the feed as the primary Main surface", () => {
 		const css = readFileSync("src/styles/stage-board.css", "utf8");
 
 		expect(css).toMatch(
@@ -374,7 +450,6 @@ describe("StageBoard", () => {
 		expect(css).toMatch(
 			/\.stage-board\s*\{[^}]*border-top:\s*2px solid var\(--emphasis\)/s,
 		);
-		expect(css).toMatch(/\.stage-board\s*\{[^}]*padding:\s*6px/s);
 	});
 });
 

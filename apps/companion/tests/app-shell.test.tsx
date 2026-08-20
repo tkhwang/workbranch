@@ -91,9 +91,8 @@ describe("App shell settings wiring", () => {
 		expect(html).not.toContain("<footer");
 		expect(html).toContain('aria-label="Companion views"');
 		expect(html).toContain('aria-label="Task stage board"');
-		expect(html).toContain('data-stage="plan"');
-		expect(html).toContain('data-stage="execution"');
-		expect(html).toContain('data-stage="review"');
+		expect(html).toContain('class="stage-feed-label">ACTIVE</h2>');
+		expect(html).toContain('class="stage-feed"');
 		expect(html).toContain(">Main</button>");
 		expect(html).toContain(">Activity</button>");
 		expect(html).toContain(">Settings</button>");
@@ -306,14 +305,10 @@ describe("App shell settings wiring", () => {
 	it("keeps the stage board framed and width-safe at the native boundary", () => {
 		const css = readCssContract("src/style.css");
 
+		expect(css).not.toMatch(/\.stage-board\s*\{[^}]*repeat\(3/s);
+		expect(css).toMatch(/\.stage-feed\s*\{[^}]*min-width:\s*0/s);
 		expect(css).toMatch(
-			/\.stage-board\s*\{[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/s,
-		);
-		expect(css).toMatch(
-			/\.stage-column\s*\{[^}]*min-width:\s*0[^}]*overflow:\s*hidden/s,
-		);
-		expect(css).toMatch(
-			/\.stage-card\s*\{[^}]*background:\s*var\(--surface-2\)[^}]*min-width:\s*0/s,
+			/\.stage-task-row\s*\{[^}]*background:\s*var\(--surface-2\)[^}]*min-width:\s*0/s,
 		);
 		expect(css).toMatch(
 			/\.stage-board\s*\{[^}]*border:\s*1px solid var\(--line-strong\)[^}]*border-top:\s*2px solid var\(--emphasis\)/s,
@@ -339,27 +334,27 @@ describe("App shell settings wiring", () => {
 		expect(css).not.toContain(".task-action-separator");
 	});
 
-	it("uses semantic stage-card cues instead of checklist detail chrome", () => {
+	it("uses semantic stage-task cues instead of checklist detail chrome", () => {
 		const css = readCssContract("src/style.css");
 
 		expect(css).toMatch(
-			/\.stage-card\[data-blocked="true"\]\s*\{[^}]*border-color:\s*var\(--blocked\)/s,
+			/\.stage-task-row\[data-blocked="true"\]\s*\{[^}]*box-shadow:\s*inset 3px 0 0 var\(--blocked\)/s,
 		);
 		expect(css).toMatch(
-			/\.stage-card-blocked\s*\{[^}]*color:\s*var\(--blocked\)/s,
+			/\.stage-task-blocked\s*\{[^}]*color:\s*var\(--blocked\)/s,
 		);
 		expect(css).toMatch(
-			/\.stage-card-notification\s*\{[^}]*color:\s*var\(--notify\)/s,
+			/\.stage-task-notification\s*\{[^}]*color:\s*var\(--notify\)/s,
 		);
 		expect(css).not.toContain(".step-marker");
 		expect(css).not.toContain(".steps");
 	});
 
-	it("wraps full board names while truncating detail task names", () => {
+	it("truncates grouped-feed and detail task names with full titles in markup", () => {
 		const css = readCssContract("src/style.css");
 
 		expect(css).toMatch(
-			/\.stage-card-name\s*\{[^}]*overflow-wrap:\s*anywhere[^}]*white-space:\s*normal/s,
+			/\.stage-task-name\s*\{[^}]*overflow:\s*hidden[^}]*text-overflow:\s*ellipsis[^}]*white-space:\s*nowrap/s,
 		);
 		expect(css).toMatch(
 			/\.task-name\s*\{[^}]*overflow:\s*hidden[^}]*text-overflow:\s*ellipsis[^}]*white-space:\s*nowrap/s,
@@ -398,12 +393,12 @@ describe("App shell settings wiring", () => {
 			/\.agent-control\s*\{[^}]*font-size:\s*16px/s,
 			/\.terminal-panel-heading\s*\{[^}]*font-size:\s*11px/s,
 			/\.status-token\s*\{[^}]*font-size:\s*11px/s,
-			/\.stage-board-heading h2\s*\{[^}]*font-size:\s*10px/s,
-			/\.stage-board-role\s*\{[^}]*font-size:\s*10px/s,
-			/\.stage-board-count\s*\{[^}]*font-size:\s*10px/s,
-			/\.stage-card-project\s*\{[^}]*font-size:\s*10px/s,
-			/\.stage-card-name\s*\{[^}]*font-size:\s*11px/s,
-			/\.stage-card-blocked,\s*\.stage-card-progress,\s*\.stage-card-notification\s*\{[^}]*font-size:\s*10px/s,
+			/\.stage-feed-label,\s*\.stage-feed-count\s*\{[^}]*font-size:\s*10px/s,
+			/\.stage-lifecycle-caption,\s*\.stage-lifecycle-current-label\s*\{[^}]*font-size:\s*10px/s,
+			/\.stage-lifecycle-label\s*\{[^}]*font-size:\s*10px/s,
+			/\.stage-task-project-label,\s*\.stage-task-project-name\s*\{[^}]*font-size:\s*10px/s,
+			/\.stage-task-name\s*\{[^}]*font-size:\s*11px/s,
+			/\.stage-task-blocked,\s*\.stage-task-progress,\s*\.stage-task-notification\s*\{[^}]*font-size:\s*10px/s,
 			/\.task-name\s*\{[^}]*font-size:\s*13px/s,
 			/\.repo-name\s*\{[^}]*font-size:\s*11px/s,
 			/\.repo-branch-name\s*\{[^}]*font-size:\s*11px/s,

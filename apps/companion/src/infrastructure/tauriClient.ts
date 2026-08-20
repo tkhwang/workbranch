@@ -5,9 +5,9 @@ import {
 	calendarEventFromUnknown,
 } from "../activity/calendar";
 import type { ActivityEvent } from "../application/activity";
-import type { GlobalState } from "../domain/model";
-import { mapGlobalDocumentToState } from "./acl";
-import { parseGlobalDocument } from "./parseContract";
+import type { GlobalState, Project } from "../domain/model";
+import { mapGlobalDocumentToState, mapListDocumentToProject } from "./acl";
+import { parseGlobalDocument, parseListDocument } from "./parseContract";
 
 export type RunResult = {
 	readonly exit_code: number;
@@ -45,6 +45,11 @@ export type CompanionCommand =
 export async function refreshStatus(): Promise<GlobalState> {
 	const raw = await invoke<string>("workbranch_list_global");
 	return mapGlobalDocumentToState(parseGlobalDocument(raw));
+}
+
+export async function refreshRoot(root: string): Promise<Project> {
+	const raw = await invoke<string>("workbranch_list", { root });
+	return mapListDocumentToProject(parseListDocument(raw));
 }
 
 export async function appendActivityEvents(
@@ -88,6 +93,8 @@ export async function watchRoots(roots: readonly string[]): Promise<void> {
 	await invoke("watch_roots", { roots });
 }
 
-export async function onRootChanged(callback: () => void): Promise<() => void> {
-	return listen<string>("roots-changed", callback);
+export async function onRootChanged(
+	callback: (root: string) => void,
+): Promise<() => void> {
+	return listen<string>("roots-changed", (event) => callback(event.payload));
 }

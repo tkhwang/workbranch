@@ -1,5 +1,15 @@
 cmd_list_json() {
   local first_task first_repo path task name repo_path branch title plan_title dirty status counts progress_done progress_total current_item updated_at
+  local i base_commit status_output changed_files ahead behind last_commit last_commit_at last_commit_subject record_separator
+  local -a base_commits
+  base_commits=()
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    base_commits[$i]=$(head_commit_full "$(base_repo_path "$name")")
+    i=$((i + 1))
+  done
+  record_separator=$(printf '\037')
   printf '{'
   printf '"schemaVersion":1,'
   printf '"project":'
@@ -51,10 +61,29 @@ cmd_list_json() {
       name=$(repo_name_at "$i")
       repo_path="$path/$name"
       branch=$(branch_or_unknown "$repo_path")
-      if is_git_dirty "$repo_path"; then
+      status_output=$(git -C "$repo_path" status --porcelain 2>/dev/null) || status_output=""
+      if [ -n "$status_output" ]; then
         dirty=true
+        changed_files=$(printf '%s\n' "$status_output" | awk 'END { print NR }')
       else
         dirty=false
+        changed_files=0
+      fi
+      base_commit=${base_commits[$i]:-?}
+      if counts=$(commit_diff_counts "$repo_path" "$base_commit"); then
+        set -- $counts
+        behind=${1:-0}
+        ahead=${2:-0}
+      else
+        ahead=0
+        behind=0
+      fi
+      if last_commit=$(last_commit_record "$repo_path"); then
+        last_commit_at=${last_commit%%"$record_separator"*}
+        last_commit_subject=${last_commit#*"$record_separator"}
+      else
+        last_commit_at=0
+        last_commit_subject=""
       fi
       if [ $first_repo -eq 1 ]; then
         first_repo=0
@@ -65,7 +94,13 @@ cmd_list_json() {
       json_string "$name"
       printf ',"branch":'
       json_string "$branch"
-      printf ',"dirty":%s}' "$dirty"
+      printf ',"dirty":%s' "$dirty"
+      printf ',"ahead":%s' "$ahead"
+      printf ',"behind":%s' "$behind"
+      printf ',"changedFiles":%s' "$changed_files"
+      printf ',"lastCommitSubject":'
+      json_string "$last_commit_subject"
+      printf ',"lastCommitAt":%s}' "$last_commit_at"
       i=$((i + 1))
     done
     printf ']}'

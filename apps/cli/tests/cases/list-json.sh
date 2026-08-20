@@ -34,9 +34,71 @@ assert login["memoTitle"] == "견적 \"API\" \\ 경로", login
 assert login["notiCount"] == 2, login
 assert [r["name"] for r in login["repos"]] == ["frontend", "backend"], login
 for repo in login["repos"]:
-    assert set(repo) == {"name", "branch", "dirty"}, repo
+    assert set(repo) == {"name", "branch", "dirty", "ahead", "behind", "changedFiles", "lastCommitSubject", "lastCommitAt"}, repo
     assert repo["branch"] == "feature/login", repo
-    assert repo["dirty"] is False, repo' "$project_real"
+    assert repo["dirty"] is False, repo
+    assert repo["ahead"] == 0, repo
+    assert repo["behind"] == 0, repo
+    assert repo["changedFiles"] == 0, repo
+    assert isinstance(repo["lastCommitSubject"], str), repo
+    assert repo["lastCommitSubject"], repo
+    assert isinstance(repo["lastCommitAt"], int), repo
+    assert repo["lastCommitAt"] > 0, repo' "$project_real"
+}
+
+test_list_json_repo_activity_facts() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  frontend="$project/login/frontend"
+  printf '%s\n' committed > "$frontend/activity.txt"
+  git -C "$frontend" add activity.txt
+  git -C "$frontend" commit -m 'implement "activity" facts' >/dev/null
+  printf '%s\n' dirty > "$frontend/dirty.txt"
+
+  out=$(run_expect_success "$WORKBRANCH" list --json)
+  printf '%s' "$out" | python3 -c 'import json, sys
+task = json.load(sys.stdin)["tasks"][0]
+repos = {repo["name"]: repo for repo in task["repos"]}
+frontend = repos["frontend"]
+assert frontend["ahead"] == 1, frontend
+assert frontend["behind"] == 0, frontend
+assert frontend["dirty"] is True, frontend
+assert frontend["changedFiles"] == 1, frontend
+assert frontend["lastCommitSubject"] == "implement \"activity\" facts", frontend
+assert isinstance(frontend["lastCommitAt"], int) and frontend["lastCommitAt"] > 0, frontend
+backend = repos["backend"]
+assert backend["ahead"] == 0, backend
+assert backend["behind"] == 0, backend
+assert backend["dirty"] is False, backend
+assert backend["changedFiles"] == 0, backend
+assert backend["lastCommitSubject"] == "initial backend", backend
+assert isinstance(backend["lastCommitAt"], int) and backend["lastCommitAt"] > 0, backend'
+}
+
+test_list_json_repo_activity_missing_base_commit_falls_back() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  git -C "$project/_base/backend" checkout --orphan no-base-commit >/dev/null 2>&1
+  git -C "$project/_base/backend" rm -rf . >/dev/null 2>&1
+
+  out=$(run_expect_success "$WORKBRANCH" list --json)
+  printf '%s' "$out" | python3 -c 'import json, sys
+repos = {repo["name"]: repo for repo in json.load(sys.stdin)["tasks"][0]["repos"]}
+backend = repos["backend"]
+assert backend["branch"] == "feature/login", backend
+assert backend["dirty"] is False, backend
+assert backend["ahead"] == 0, backend
+assert backend["behind"] == 0, backend
+assert backend["changedFiles"] == 0, backend
+assert backend["lastCommitSubject"] == "initial backend", backend
+assert backend["lastCommitAt"] > 0, backend'
 }
 
 test_list_json_no_color_no_log_noise() {

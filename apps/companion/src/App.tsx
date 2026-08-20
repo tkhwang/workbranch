@@ -15,6 +15,7 @@ import {
 	onRootChanged,
 	quitCompanion,
 	readActivityEvents,
+	refreshRoot,
 	refreshStatus,
 	runAction,
 	watchRoots,
@@ -66,6 +67,7 @@ export function App() {
 		() =>
 			createActivityRefresh({
 				refresh: refreshStatus,
+				refreshRoot,
 				append: appendActivityEvents,
 				now: currentEpochSeconds,
 			}),
@@ -111,7 +113,7 @@ export function App() {
 			return;
 		}
 		try {
-			applyState(await refreshWithActivity());
+			applyState(await refreshWithActivity.all());
 		} catch (error) {
 			showError(error);
 		}
@@ -140,7 +142,7 @@ export function App() {
 			const command = commandForTaskAction(task, kind);
 			try {
 				await runAction(command, root);
-				applyState(await refreshWithActivity());
+				applyState(await refreshWithActivity.all());
 				showStatus("Action complete");
 			} catch (error) {
 				showError(error);
@@ -162,7 +164,8 @@ export function App() {
 		let stop: (() => void) | undefined;
 		let cancelled = false;
 		void startWorkspaceMonitor({
-			refresh: refreshWithActivity,
+			refresh: refreshWithActivity.all,
+			refreshRoot: refreshWithActivity.root,
 			onState: applyState,
 			onError: showError,
 			watchRoots,

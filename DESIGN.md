@@ -23,7 +23,7 @@
 
 ## Product goals
 - Goals:
-  - Show active worktree tasks grouped into Plan, Execution, and Review stages at a glance.
+  - Show every active worktree task's complete Plan → Execution → Review lifecycle with its current stage visible at a glance.
   - Make blocked state, progress, and notification counts scannable without opening task details.
   - Keep repo branch/dirty state visible without competing with task progress.
   - Keep actions discoverable but visually secondary.
@@ -52,7 +52,7 @@
 - Content hierarchy:
   1. Compact global inventory (`projects · tasks`) and icon-only refresh.
   2. Active view content.
-  3. Main view: three-column `PLAN | EXECUTION | REVIEW` board for active tasks, followed by project-grouped task metadata rows with repo branch/dirty state and launch actions.
+  3. Main view: one latest-first active task feed. Every task begins with a bordered inset Stage panel that contains a `STAGE · <CURRENT>` header and connected three-node `PLAN → EXECUTION → REVIEW` stepper; the current stage alone uses a filled node, soft halo, and theme emphasis label, followed by project/task identity and repo activity facts outside the panel.
   4. Activity view: existing day/three-day calendar, session selection, and reload behavior inside the agent shell.
   5. Settings view: launch-at-login, font, and agent theme controls.
   6. Screen-reader live status in the agent shell; routine `Updated`/`Ready` text stays out of the visible header.
@@ -79,7 +79,7 @@
   - `AgentTabs` as an inset floating bottom terminal navigation,
   - shared `TerminalPanel`, `PromptLine`, and `StatusToken` primitives,
   - compact global inventory summary limited to project and task counts,
-  - `StageBoard` with one shared two-row, three-column stage/role/count header aligned to three fixed active-task card columns, enclosed by one strong outer status frame with a theme emphasis rail so the board reads as Main's primary surface; each StageCard is also an IDE launcher through pointer double-click or native button activation,
+  - `StageBoard` with one full-width latest-first active task feed enclosed by a strong outer status frame. Every task row begins with a compact inset Stage panel, visually separated by its own surface, border, radius, and padding. Its header names the information type (`STAGE`) and current value; below it, the five-track connected stepper uses a filled node, soft halo, and theme emphasis label for current while the other outlined nodes and labels remain subdued. Each task row is also an IDE launcher through pointer double-click or native button activation,
   - project group header,
   - top toolbar with icon-only refresh/quit controls and screen-reader-only live status,
   - Settings view preferences panel,
@@ -89,9 +89,9 @@
   - font select row,
   - agent theme segmented control (`Claude Code`, `Codex`) with Claude Code as the default and migration target,
   - `TaskMetaRow` containing task name/status, a full-width repository metadata stack, and a separate full-width IDE/Terminal/Finder action row split into equal thirds,
-  - StageCard metadata containing project label, active Plan title when it differs from the task name, compact repository names with dirty cues and branch tooltips, optional blocked cue, progress, and board-only notification `+N`; a transparent semantic button overlays the card and owns its IDE-launch interaction without changing the visible information density.
+  - Stage task-row metadata containing project label, active Plan title when it differs from the task name, optional derived/blocked cues, progress, and board-only notification `+N`. Each repository uses a two-line activity stack: repo/branch plus dirty/changed/ahead/behind facts, then explicitly labeled last-commit subject and relative time. A transparent semantic button overlays the row and owns its IDE-launch interaction without changing the visible information density.
 - Variants and states: todo, planning, in-progress, review, blocked, done, notification present, dirty repo. In-progress identity uses the compact status marker rather than recoloring the full Task perimeter.
-- Todo/done visibility: todo tasks with no active planning work and done tasks are excluded from StageBoard but remain visible in TaskMetaRow so IDE/Terminal/Finder actions stay available. The PLAN column contains planning tasks only.
+- Todo/done visibility: todo/done tasks with repo `dirty` or `ahead > 0` are derived into EXECUTION and visibly labeled `DERIVED`; clean todo/done tasks remain in the collapsed `OTHER N` disclosure and TaskMetaRow. PLAN contains declared planning tasks only.
 - Shared header anatomy: Claude Code and Codex use the same text-only title block: `Workbranch Companion` above `projects · tasks`. The top banner contains no Workbranch mark, product icon, or Claude/Codex prompt prefix; theme identity comes from surrounding color tokens rather than different header geometry. Task metadata rows may retain their theme-specific prompt and action accents.
 - Token/component ownership: `style.css` is the CSS import manifest; `src/styles/base.css`, `themes.css`, `chrome.css`, `stage-board.css`, `task-details.css`, `task-actions.css`, `status-groups.css`, `settings.css`, and `motion.css` own CSS custom properties and component classes by surface.
 
@@ -99,12 +99,12 @@
 - Target standard: keyboard-operable popover controls and readable contrast.
 - Keyboard/focus behavior: buttons and `summary` expose clear focus rings. The StageCard overlay is a native button whose inset accent outline exposes focus across the full card.
 - Contrast/readability: status text and StageCard metadata must pass practical dark-mode contrast; disabled action may be muted but legible.
-- Screen-reader semantics: preserve button `aria-label`s; the StageCard launcher reuses `open <task> in IDE` and handles the device-independent native `click` generated by keyboard or accessibility API activation; agent tab buttons expose destination labels and `aria-current`; settings controls use associated labels, switch state text, and the agent shell keeps a screen-reader-only `role="status"` region with polite live updates.
+- Screen-reader semantics: preserve button `aria-label`s; each lifecycle track is a named group announcing `Current stage: <stage>`; the StageCard launcher reuses `open <task> in IDE` and handles the device-independent native `click` generated by keyboard or accessibility API activation; agent tab buttons expose destination labels and `aria-current`; settings controls use associated labels, switch state text, and the agent shell keeps a screen-reader-only `role="status"` region with polite live updates.
 - Reduced motion and sensory considerations: disable transform transitions under `prefers-reduced-motion: reduce`.
 
 ## Responsive behavior
 - Supported breakpoints/devices: the native menu popover opens at 460px and cannot resize below 460px.
-- Layout adaptations: the shared expanded header keeps its internal columns consistent on every tab. At 460px, the StageBoard's shared two-row header and card area use the same three equal `minmax(0, 1fr)` column axis without horizontal overflow. Each StageCard and TaskMetaRow uses `min-width: 0`; StageCard task/worktree names wrap to their full value with variable card height, compact repository names ellipsize inside their card without clipping the dirty cue, and TaskMetaRow task names remain single-line ellipsized with full text in `title`. Each TaskMetaRow repository/branch pair occupies the full metadata width with the plain branch name taking the remaining inline space, and the action group always sits below metadata as a full-width three-column row.
+- Layout adaptations: the shared expanded header keeps its internal columns consistent on every tab. At 460px, StageBoard task rows remain one full-width column without horizontal overflow. The lifecycle track uses intrinsic step widths with two flexible separator tracks, so `EXECUTION` stays intact while the rules absorb width changes. Task and repository identity use `min-width: 0`; long task, branch, and last-commit strings ellipsize with their complete values in `title`/accessibility data. Each TaskMetaRow repository/branch pair occupies the full metadata width with the plain branch name taking the remaining inline space, and the action group always sits below metadata as a full-width three-column row.
 - Touch/hover differences: hover is enhancement only; core state is visible without hover. Pointer single-click remains inert and pointer double-click opens the task in the IDE; native button activation preserves keyboard, voice, and switch access without requiring a double-click gesture.
 
 ## Interaction states
@@ -164,3 +164,5 @@
 - 2026-08-16 (full worktree identity): Replaced StageCard's single-line task ellipsis with unrestricted natural wrapping. Worktree names often share a long prefix, so preserving the full distinguishing suffix takes priority over uniform card height; the lower TaskMetaRow keeps its compact single-line behavior.
 - 2026-08-17 (shared stage-role header and plan-level cards): Replaced the three independent column headers with one shared two-row StageBoard header. Stage names occupy the first row; `AI·ME | AI | ME` roles and faint per-stage counts occupy the second. PLAN now contains planning tasks only, while todo remains available in TaskMetaRow. StageCards add the active Plan title plus compact repository names and dirty cues, with long repository names ellipsized at the 460px minimum width.
 - 2026-08-18 (StageCard IDE launcher): Made each active StageCard an IDE-launch entry point without adding visible card chrome. Pointer double-click reuses the existing IDE task action, while the overlay native button's device-independent click preserves Enter, Space, voice, switch, and accessibility API activation; pointer single-click remains inert.
+- 2026-08-20 (repo activity grouped feed): Replaced the narrow three-column StageBoard with full-width vertical PLAN/EXECUTION/REVIEW task-feed sections. Todo/done with `dirty` or `ahead > 0` derive into EXECUTION; clean todo/done remain in `OTHER N`. Each task row shows a two-line repo/branch activity stack with explicit `last commit` context, preserving the native IDE-launch overlay and 460px minimum-width contract.
+- 2026-08-20 (per-task inset lifecycle): Runtime feedback showed that separate PLAN/EXECUTION/REVIEW sections did not explain where an individual task sat in the whole workflow, while a bare stepper still read like ordinary task metadata. After two HTML comparison rounds, the final choice is option B: a bordered inset Stage panel containing a `STAGE · <CURRENT>` header and connected three-node stepper on every task. Repo activity remains outside and full-width below the panel; clean todo/done remain in `OTHER N`.

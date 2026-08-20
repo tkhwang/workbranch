@@ -3,6 +3,7 @@ import { buildBoardModel } from "../src/application/state";
 import type { GlobalState, PlanStatus, Task } from "../src/domain/model";
 import {
 	activePlan,
+	deriveStage,
 	taskProgress,
 	taskStage,
 	taskStatus,
@@ -41,13 +42,14 @@ function taskWithStatus(
 	status: PlanStatus,
 	updatedAt: number,
 	notiCount = 0,
+	repos: Task["repos"] = [],
 ): Task {
 	return {
 		name,
 		path: `/tmp/workbranch/${name}`,
 		notiCount,
 		updatedAt,
-		repos: [],
+		repos,
 		plans: [
 			{
 				title: name,
@@ -61,6 +63,25 @@ function taskWithStatus(
 		],
 	};
 }
+
+const DIRTY_REPO: Task["repos"][number] = {
+	name: "backend",
+	branch: "feature/task",
+	dirty: true,
+	activityAvailable: true,
+	ahead: 0,
+	behind: 0,
+	changedFiles: 2,
+	lastCommitSubject: "implement task",
+	lastCommitAt: 20,
+};
+
+const AHEAD_REPO: Task["repos"][number] = {
+	...DIRTY_REPO,
+	dirty: false,
+	ahead: 1,
+	changedFiles: 0,
+};
 
 describe("activePlan", () => {
 	it("falls back to the last plan when every plan is done", () => {
@@ -88,10 +109,28 @@ describe("taskStage", () => {
 			"execution",
 		);
 	});
+
+	it.each([
+		["todo", DIRTY_REPO, "execution", true],
+		["done", AHEAD_REPO, "execution", true],
+		[
+			"todo",
+			{ ...DIRTY_REPO, dirty: false, changedFiles: 0 },
+			undefined,
+			false,
+		],
+		["done", { ...AHEAD_REPO, ahead: 0 }, undefined, false],
+		["review", DIRTY_REPO, "review", false],
+	] as const)("derives %s with repository evidence as %s", (status, repo, stage, derived) => {
+		expect(deriveStage(taskWithStatus(status, status, 1, 0, [repo]))).toEqual({
+			stage,
+			derived,
+		});
+	});
 });
 
 describe("buildBoardModel", () => {
-	it("groups active tasks by stage, newest first, while excluding todo and done", () => {
+	it("sorts active lifecycle cards by recency with other tasks retained", () => {
 		const state: GlobalState = {
 			projects: [
 				{
@@ -101,7 +140,7 @@ describe("buildBoardModel", () => {
 						taskWithStatus("todo-old", "todo", 10),
 						taskWithStatus("planning-new", "planning", 40, 3),
 						taskWithStatus("blocked", "blocked", 30),
-						taskWithStatus("done", "done", 100),
+						taskWithStatus("done-active", "done", 100, 0, [DIRTY_REPO]),
 					],
 				},
 				{
@@ -118,33 +157,29 @@ describe("buildBoardModel", () => {
 
 		const board = buildBoardModel(state);
 
-		expect(board.columns.map((column) => column.stage)).toEqual([
-			"plan",
-			"execution",
-			"review",
-		]);
-		expect(board.columns[0]?.cards.map((card) => card.task.name)).toEqual([
-			"planning-new",
-		]);
-		expect(board.columns[0]?.cards[0]).toMatchObject({
-			project: "alpha",
-			root: "/tmp/alpha",
-			stage: "plan",
-			blocked: false,
-			task: { notiCount: 3 },
-		});
-		expect(board.columns[1]?.cards.map((card) => card.task.name)).toEqual([
+		expect(board.cards.map((card) => card.task.name)).toEqual([
+			"done-active",
 			"executing",
+			"reviewing",
+			"planning-new",
 			"blocked",
 		]);
-		expect(board.columns[1]?.cards[1]?.blocked).toBe(true);
-		expect(board.columns[2]?.cards.map((card) => card.task.name)).toEqual([
-			"reviewing",
+		expect(board.cards[0]).toMatchObject({
+			project: "alpha",
+			root: "/tmp/alpha",
+			stage: "execution",
+			derived: true,
+		});
+		expect(board.cards[2]?.stage).toBe("review");
+		expect(board.cards[3]).toMatchObject({
+			stage: "plan",
+			blocked: false,
+			derived: false,
+			task: { notiCount: 3 },
+		});
+		expect(board.cards[4]?.blocked).toBe(true);
+		expect(board.otherTasks.map((card) => card.task.name)).toEqual([
+			"todo-old",
 		]);
-		expect(
-			board.columns
-				.flatMap((column) => column.cards)
-				.map((card) => card.task.name),
-		).not.toContain("done");
 	});
 });
