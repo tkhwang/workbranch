@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.14.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.13.0...workbranch-companion-v2.14.0) (2026-08-20)
+
+
+### Features
+
+* **feature:** refine product goals and content hierarchy ([0e0dce8](https://github.com/tkhwang/workbranch/commit/0e0dce827b930654e6a079c95e61276a3bcbb2f2))
+* **feature:** refine product goals and content hierarchy ([e5802f3](https://github.com/tkhwang/workbranch/commit/e5802f3e07d317ce460ea920cebc2a1994aa7078))
+
+
+### Bug Fixes
+
+* **companion:** address activity review feedback ([2349c16](https://github.com/tkhwang/workbranch/commit/2349c16ba043825e6b4effae5ff2db258477f9e4))
+
 ## [2.13.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.12.0...workbranch-companion-v2.13.0) (2026-08-19)
 
 
