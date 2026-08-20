@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.17.0](https://github.com/tkhwang/workbranch/compare/v2.16.0...v2.17.0) (2026-08-20)
+
+
+### Features
+
+* **feature:** refine product goals and content hierarchy ([0e0dce8](https://github.com/tkhwang/workbranch/commit/0e0dce827b930654e6a079c95e61276a3bcbb2f2))
+* **feature:** refine product goals and content hierarchy ([e5802f3](https://github.com/tkhwang/workbranch/commit/e5802f3e07d317ce460ea920cebc2a1994aa7078))
+
+
+### Bug Fixes
+
+* **cli:** configure git user for tests ([ae73d7a](https://github.com/tkhwang/workbranch/commit/ae73d7a878f796a20b57283979e794b3e7304c75))
+* **companion:** address activity review feedback ([2349c16](https://github.com/tkhwang/workbranch/commit/2349c16ba043825e6b4effae5ff2db258477f9e4))
+
 ## [2.16.0](https://github.com/tkhwang/workbranch/compare/v2.15.0...v2.16.0) (2026-08-19)
 
 
