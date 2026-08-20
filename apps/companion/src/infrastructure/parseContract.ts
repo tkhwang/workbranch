@@ -19,6 +19,14 @@ function isNonNegativeInteger(value: unknown): value is number {
 	return typeof value === "number" && Number.isInteger(value) && value >= 0;
 }
 
+function isOptionalNonNegativeInteger(value: unknown): boolean {
+	return value === undefined || isNonNegativeInteger(value);
+}
+
+function isOptionalString(value: unknown): boolean {
+	return value === undefined || isString(value);
+}
+
 function isChecklistItem(value: unknown): value is WorkbranchChecklistItem {
 	if (!isRecord(value)) {
 		return false;
@@ -37,7 +45,12 @@ function isRepo(value: unknown): value is WorkbranchRepo {
 	return (
 		isString(value["name"]) &&
 		isString(value["branch"]) &&
-		typeof value["dirty"] === "boolean"
+		typeof value["dirty"] === "boolean" &&
+		isOptionalNonNegativeInteger(value["ahead"]) &&
+		isOptionalNonNegativeInteger(value["behind"]) &&
+		isOptionalNonNegativeInteger(value["changedFiles"]) &&
+		isOptionalString(value["lastCommitSubject"]) &&
+		isOptionalNonNegativeInteger(value["lastCommitAt"])
 	);
 }
 
@@ -122,6 +135,14 @@ export function parseGlobalDocument(raw: string): WorkbranchListGlobalDocument {
 	const parsed: unknown = JSON.parse(raw);
 	if (!isGlobalDocument(parsed)) {
 		throw new Error("invalid workbranch global list document");
+	}
+	return parsed;
+}
+
+export function parseListDocument(raw: string): WorkbranchListDocument {
+	const parsed: unknown = JSON.parse(raw);
+	if (!isListDocument(parsed)) {
+		throw new Error("invalid workbranch list document");
 	}
 	return parsed;
 }

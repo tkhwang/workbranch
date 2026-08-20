@@ -1,4 +1,4 @@
-import type { GlobalState } from "../domain/model";
+import type { GlobalError, GlobalState, Project } from "../domain/model";
 
 type TimerHandle = number;
 
@@ -9,10 +9,14 @@ export type WorkspaceMonitor = {
 
 export type WorkspaceMonitorDeps = {
 	readonly refresh: () => Promise<GlobalState>;
+	readonly refreshRoot?: (root: string) => Promise<Project>;
+	readonly getState?: () => GlobalState;
 	readonly onState: (state: GlobalState) => void;
 	readonly onError: (error: unknown) => void;
 	readonly watchRoots: (roots: readonly string[]) => Promise<void>;
-	readonly onRootChanged: (callback: () => void) => Promise<() => void>;
+	readonly onRootChanged: (
+		callback: (root: string) => void,
+	) => Promise<() => void>;
 	readonly heartbeatMs?: number;
 	readonly setTimer?: (
 		callback: () => void,
@@ -21,62 +25,145 @@ export type WorkspaceMonitorDeps = {
 	readonly clearTimer?: (handle: TimerHandle) => void;
 };
 
+function errorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
+
+function replaceRootError(
+	errors: readonly GlobalError[],
+	root: string,
+	message: string | undefined,
+): readonly GlobalError[] {
+	const retained = errors.filter((error) => error.root !== root);
+	return message === undefined ? retained : [...retained, { root, message }];
+}
+
+function replaceProject(
+	projects: readonly Project[],
+	project: Project,
+): readonly Project[] {
+	const index = projects.findIndex(
+		(candidate) => candidate.root === project.root,
+	);
+	if (index < 0) return [...projects, project];
+	return projects.map((candidate, candidateIndex) =>
+		candidateIndex === index ? project : candidate,
+	);
+}
+
 export async function startWorkspaceMonitor(
 	deps: WorkspaceMonitorDeps,
 ): Promise<WorkspaceMonitor> {
 	let stopped = false;
 	let running = false;
-	let queued = false;
+	let scheduled = false;
+	let fullQueued = false;
+	let currentState: GlobalState | undefined;
 	let watchedRoots: readonly string[] = [];
+	let pendingRoots = new Set<string>();
 	let pending = Promise.resolve();
 	let heartbeat: TimerHandle | undefined;
 
-	const refreshAndWatch = async (): Promise<void> => {
+	const applyState = async (state: GlobalState): Promise<void> => {
+		if (stopped) return;
+		currentState = state;
+		deps.onState(state);
+		const roots = state.projects.map((project) => project.root);
+		if (!sameRoots(watchedRoots, roots)) {
+			await deps.watchRoots(roots);
+			watchedRoots = roots;
+		}
+	};
+
+	const refreshAll = async (): Promise<void> => {
 		try {
-			const state = await deps.refresh();
-			if (stopped) {
-				return;
-			}
-			deps.onState(state);
-			const roots = state.projects.map((project) => project.root);
-			if (!sameRoots(watchedRoots, roots)) {
-				await deps.watchRoots(roots);
-				watchedRoots = roots;
-			}
+			await applyState(await deps.refresh());
 		} catch (error) {
 			deps.onError(error);
 		}
 	};
 
-	const drainRefreshQueue = async (): Promise<void> => {
+	const refreshOne = async (root: string): Promise<void> => {
+		const latestState = (): GlobalState | undefined =>
+			deps.getState?.() ?? currentState;
+		if (deps.refreshRoot === undefined || latestState() === undefined) {
+			await refreshAll();
+			return;
+		}
+		try {
+			const project = await deps.refreshRoot(root);
+			const state = latestState();
+			if (state === undefined) {
+				await refreshAll();
+				return;
+			}
+			await applyState({
+				projects: replaceProject(state.projects, project),
+				errors: replaceRootError(state.errors, root, undefined),
+			});
+		} catch (error) {
+			deps.onError(error);
+			const state = latestState();
+			if (state === undefined) return;
+			await applyState({
+				projects: state.projects,
+				errors: replaceRootError(state.errors, root, errorMessage(error)),
+			});
+		}
+	};
+
+	const drain = async (): Promise<void> => {
 		running = true;
 		try {
-			do {
-				queued = false;
-				await refreshAndWatch();
-			} while (queued && !stopped);
+			while (!stopped && (fullQueued || pendingRoots.size > 0)) {
+				if (fullQueued) {
+					fullQueued = false;
+					pendingRoots.clear();
+					await refreshAll();
+					continue;
+				}
+				const roots = [...pendingRoots];
+				pendingRoots = new Set<string>();
+				for (const root of roots) {
+					await refreshOne(root);
+				}
+			}
 		} finally {
 			running = false;
 		}
 	};
 
-	const scheduleRefresh = (): void => {
-		if (stopped) {
-			return;
-		}
-		if (running) {
-			queued = true;
-			return;
-		}
-		pending = drainRefreshQueue();
+	const scheduleDrain = (): void => {
+		if (stopped || running || scheduled) return;
+		scheduled = true;
+		pending = Promise.resolve().then(async () => {
+			scheduled = false;
+			await drain();
+		});
 	};
 
-	scheduleRefresh();
+	const scheduleFullRefresh = (): void => {
+		if (stopped) return;
+		fullQueued = true;
+		scheduleDrain();
+	};
+
+	const scheduleRootRefresh = (root: string): void => {
+		if (stopped) return;
+		if (deps.refreshRoot === undefined) {
+			scheduleFullRefresh();
+			return;
+		}
+		pendingRoots.add(root);
+		scheduleDrain();
+	};
+
+	scheduleFullRefresh();
 	await pending;
-	const unlisten = await deps.onRootChanged(scheduleRefresh);
+	const unlisten = await deps.onRootChanged(scheduleRootRefresh);
 	if (deps.heartbeatMs !== undefined) {
 		const setTimer = deps.setTimer ?? window.setInterval;
-		heartbeat = setTimer(scheduleRefresh, deps.heartbeatMs);
+		heartbeat = setTimer(scheduleFullRefresh, deps.heartbeatMs);
 	}
 
 	return {

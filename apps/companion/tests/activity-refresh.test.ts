@@ -109,6 +109,7 @@ describe("createActivityRefresh", () => {
 					? firstRefresh.promise
 					: Promise.resolve(UPDATED_STATE);
 			},
+			refreshRoot: () => Promise.resolve(UPDATED_PROJECT),
 			append: (events) => {
 				appended.push([...events]);
 				return Promise.resolve();
@@ -116,8 +117,8 @@ describe("createActivityRefresh", () => {
 			now: () => 100,
 		});
 
-		const firstResult = refresh();
-		const secondResult = refresh();
+		const firstResult = refresh.all();
+		const secondResult = refresh.all();
 		await nextMicrotask();
 
 		expect(refreshCalls).toBe(1);
@@ -140,6 +141,7 @@ describe("createActivityRefresh", () => {
 				}
 				return Promise.resolve(state);
 			},
+			refreshRoot: () => Promise.resolve(UPDATED_PROJECT),
 			append: (events) => {
 				appended.push([...events]);
 				return Promise.resolve();
@@ -147,8 +149,8 @@ describe("createActivityRefresh", () => {
 			now: () => 100,
 		});
 
-		await refresh();
-		await refresh();
+		await refresh.all();
+		await refresh.all();
 
 		expect(appended).toEqual([
 			[
@@ -175,5 +177,65 @@ describe("createActivityRefresh", () => {
 				},
 			],
 		]);
+	});
+
+	it("appends activity for a root refresh against the shared baseline", async () => {
+		const appended: ActivityEvent[][] = [];
+		const refresh = createActivityRefresh({
+			refresh: () => Promise.resolve(BASELINE_STATE),
+			refreshRoot: () => Promise.resolve(UPDATED_PROJECT),
+			append: (events) => {
+				appended.push([...events]);
+				return Promise.resolve();
+			},
+			now: () => 100,
+		});
+
+		await refresh.all();
+		await expect(refresh.root("/tmp/workbranch")).resolves.toBe(
+			UPDATED_PROJECT,
+		);
+
+		expect(appended).toHaveLength(1);
+		expect(appended[0]?.[0]).toMatchObject({
+			root: "/tmp/workbranch",
+			task: "feat-login",
+			progressDone: 1,
+		});
+	});
+
+	it("retains an errored root baseline until the project recovers", async () => {
+		const partialFailure: GlobalState = {
+			projects: [],
+			errors: [{ root: "/tmp/workbranch", message: "refresh failed" }],
+		};
+		const states = [BASELINE_STATE, partialFailure, UPDATED_STATE];
+		const appended: ActivityEvent[][] = [];
+		const refresh = createActivityRefresh({
+			refresh: () => {
+				const state = states.shift();
+				if (state === undefined) {
+					throw new Error("unexpected refresh");
+				}
+				return Promise.resolve(state);
+			},
+			refreshRoot: () => Promise.resolve(UPDATED_PROJECT),
+			append: (events) => {
+				appended.push([...events]);
+				return Promise.resolve();
+			},
+			now: () => 100,
+		});
+
+		await refresh.all();
+		await refresh.all();
+		await refresh.all();
+
+		expect(appended).toHaveLength(1);
+		expect(appended[0]?.[0]).toMatchObject({
+			root: "/tmp/workbranch",
+			task: "feat-login",
+			progressDone: 1,
+		});
 	});
 });

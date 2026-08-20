@@ -1,5 +1,5 @@
 import { isTauri } from "@tauri-apps/api/core";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityCalendarView } from "./activity/ActivityCalendarView";
 import { createActivityRefresh } from "./application/activity";
 import {
@@ -15,6 +15,7 @@ import {
 	onRootChanged,
 	quitCompanion,
 	readActivityEvents,
+	refreshRoot,
 	refreshStatus,
 	runAction,
 	watchRoots,
@@ -55,6 +56,7 @@ export function nextActivityReloadToken(current: number): number {
 
 export function App() {
 	const [state, setState] = useState<GlobalState>(EMPTY_STATE);
+	const stateRef = useRef<GlobalState>(EMPTY_STATE);
 	const [activityReloadToken, setActivityReloadToken] = useState(0);
 	const [status, setStatus] = useState("Ready");
 	const [visibleError, setVisibleError] = useState<string>();
@@ -66,6 +68,7 @@ export function App() {
 		() =>
 			createActivityRefresh({
 				refresh: refreshStatus,
+				refreshRoot,
 				append: appendActivityEvents,
 				now: currentEpochSeconds,
 			}),
@@ -98,6 +101,7 @@ export function App() {
 
 	const applyState = useCallback(
 		(next: GlobalState) => {
+			stateRef.current = next;
 			setState(next);
 			setActivityReloadToken(nextActivityReloadToken);
 			showStatus("Updated");
@@ -111,7 +115,7 @@ export function App() {
 			return;
 		}
 		try {
-			applyState(await refreshWithActivity());
+			applyState(await refreshWithActivity.all());
 		} catch (error) {
 			showError(error);
 		}
@@ -140,7 +144,7 @@ export function App() {
 			const command = commandForTaskAction(task, kind);
 			try {
 				await runAction(command, root);
-				applyState(await refreshWithActivity());
+				applyState(await refreshWithActivity.all());
 				showStatus("Action complete");
 			} catch (error) {
 				showError(error);
@@ -162,7 +166,9 @@ export function App() {
 		let stop: (() => void) | undefined;
 		let cancelled = false;
 		void startWorkspaceMonitor({
-			refresh: refreshWithActivity,
+			refresh: refreshWithActivity.all,
+			refreshRoot: refreshWithActivity.root,
+			getState: () => stateRef.current,
 			onState: applyState,
 			onError: showError,
 			watchRoots,

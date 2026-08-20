@@ -6,6 +6,7 @@ import {
 } from "../src/application/activity";
 import { buildMenuModel } from "../src/application/state";
 import { mapGlobalDocumentToState } from "../src/infrastructure/acl";
+import { parseGlobalDocument } from "../src/infrastructure/parseContract";
 
 const document: WorkbranchListGlobalDocument = {
 	schemaVersion: 1,
@@ -46,8 +47,62 @@ describe("ACL", () => {
 			state.projects[0]?.tasks[0]?.plans[0]?.steps[0]?.children[0]?.text,
 		).toBe("wire API");
 		expect(state.projects[0]?.tasks[0]?.repos[0]?.dirty).toBe(true);
+		expect(state.projects[0]?.tasks[0]?.repos[0]).toMatchObject({
+			activityAvailable: false,
+			ahead: 0,
+			behind: 0,
+			changedFiles: 0,
+			lastCommitSubject: "",
+			lastCommitAt: 0,
+		});
 		expect(state.projects[0]?.tasks[0]).not.toHaveProperty("memoTitle");
 		expect(state.errors[0]?.root).toBe("/tmp/missing");
+	});
+
+	it("preserves optional repository activity facts at the parser boundary", () => {
+		const project = document.projects.at(0);
+		const task = project?.tasks.at(0);
+		if (project === undefined || task === undefined) {
+			throw new Error("test fixture requires one project task");
+		}
+		const activityDocument: WorkbranchListGlobalDocument = {
+			...document,
+			projects: [
+				{
+					...project,
+					tasks: [
+						{
+							...task,
+							repos: [
+								{
+									name: "backend",
+									branch: "feature/login",
+									dirty: true,
+									ahead: 2,
+									behind: 1,
+									changedFiles: 7,
+									lastCommitSubject: "wire login API",
+									lastCommitAt: 20,
+								},
+							],
+						},
+					],
+				},
+			],
+		};
+
+		const parsed = parseGlobalDocument(JSON.stringify(activityDocument));
+		const repo =
+			mapGlobalDocumentToState(parsed).projects[0]?.tasks[0]?.repos[0];
+
+		expect(repo).toMatchObject({
+			activityAvailable: true,
+			ahead: 2,
+			behind: 1,
+			changedFiles: 7,
+			lastCommitSubject: "wire login API",
+			lastCommitAt: 20,
+		});
 	});
 
 	it("builds a compact menu rollup", () => {

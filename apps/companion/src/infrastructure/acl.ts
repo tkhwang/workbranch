@@ -58,6 +58,12 @@ function mapTask(dto: WorkbranchListDocument["tasks"][number]): Task {
 			name: repo.name,
 			branch: repo.branch,
 			dirty: repo.dirty,
+			activityAvailable: repo.changedFiles !== undefined,
+			ahead: repo.ahead ?? 0,
+			behind: repo.behind ?? 0,
+			changedFiles: repo.changedFiles ?? 0,
+			lastCommitSubject: repo.lastCommitSubject ?? "",
+			lastCommitAt: repo.lastCommitAt ?? 0,
 		})),
 		updatedAt: dto.updatedAt,
 	};

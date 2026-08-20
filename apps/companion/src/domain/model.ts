@@ -32,6 +32,12 @@ export type Repo = {
 	readonly name: string;
 	readonly branch: string;
 	readonly dirty: boolean;
+	readonly activityAvailable: boolean;
+	readonly ahead: number;
+	readonly behind: number;
+	readonly changedFiles: number;
+	readonly lastCommitSubject: string;
+	readonly lastCommitAt: number;
 };
 
 export type Task = {
@@ -95,6 +101,24 @@ export function taskStage(task: Task): TaskStage | undefined {
 		case "done":
 			return undefined;
 	}
+}
+
+export type DerivedStage = {
+	readonly stage: TaskStage | undefined;
+	readonly derived: boolean;
+};
+
+export function deriveStage(task: Task): DerivedStage {
+	const declared = taskStage(task);
+	if (declared !== undefined) {
+		return { stage: declared, derived: false };
+	}
+	const status = taskStatus(task);
+	const hasActivity = task.repos.some((repo) => repo.dirty || repo.ahead > 0);
+	if ((status === "todo" || status === "done") && hasActivity) {
+		return { stage: "execution", derived: true };
+	}
+	return { stage: undefined, derived: false };
 }
 
 export function taskProgress(task: Task): {

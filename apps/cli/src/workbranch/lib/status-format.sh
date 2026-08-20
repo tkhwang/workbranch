@@ -50,12 +50,7 @@ head_commit_full() {
 commit_diff_label() {
   path=$1
   base_commit=$2
-  [ -d "$path" ] || { printf 'missing'; return 0; }
-  case "$base_commit" in
-    missing|\?) printf '?' ; return 0 ;;
-  esac
-
-  counts=$(git -C "$path" rev-list --left-right --count "$base_commit...HEAD" 2>/dev/null) || { printf '?'; return 0; }
+  counts=$(commit_diff_counts "$path" "$base_commit") || { printf '?'; return 0; }
   set -- $counts
   left=${1:-0}
   right=${2:-0}
@@ -69,6 +64,22 @@ commit_diff_label() {
   else
     printf '±%s/%s' "$left" "$right"
   fi
+}
+
+commit_diff_counts() {
+  path=$1
+  base_commit=$2
+  [ -d "$path" ] || return 1
+  case "$base_commit" in
+    missing|\?) return 1 ;;
+  esac
+  git -C "$path" rev-list --left-right --count "$base_commit...HEAD" 2>/dev/null
+}
+
+last_commit_record() {
+  path=$1
+  [ -d "$path" ] || return 1
+  git -C "$path" log -1 --format='%ct%x1f%s' 2>/dev/null
 }
 
 remote_diff_label() {

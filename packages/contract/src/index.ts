@@ -18,6 +18,11 @@ export type WorkbranchRepo = {
 	readonly name: string;
 	readonly branch: string;
 	readonly dirty: boolean;
+	readonly ahead?: number;
+	readonly behind?: number;
+	readonly changedFiles?: number;
+	readonly lastCommitSubject?: string;
+	readonly lastCommitAt?: number;
 };
 
 export type WorkbranchTask = {

@@ -32,8 +32,14 @@ export type PlanReport = {
 
 export type ActivityRefreshDeps = {
 	readonly refresh: () => Promise<GlobalState>;
+	readonly refreshRoot: (root: string) => Promise<Project>;
 	readonly append: (events: readonly ActivityEvent[]) => Promise<void>;
 	readonly now: () => number;
+};
+
+export type ActivityRefresh = {
+	readonly all: () => Promise<GlobalState>;
+	readonly root: (root: string) => Promise<Project>;
 };
 
 export const IDLE_GAP_SECONDS = 25 * 60;
@@ -162,23 +168,20 @@ export function activityEventsForRefresh(
 	return events;
 }
 
-function mergeProjectsByRoot(
-	previous: Map<string, Project>,
-	projects: readonly Project[],
-): Map<string, Project> {
-	const merged = new Map(previous);
-	for (const project of projects) {
-		merged.set(project.root, project);
-	}
-	return merged;
-}
-
 export function createActivityRefresh(
 	deps: ActivityRefreshDeps,
-): () => Promise<GlobalState> {
+): ActivityRefresh {
 	let previousByRoot = new Map<string, Project>();
 	let queue = Promise.resolve();
-	const runRefresh = async (): Promise<GlobalState> => {
+	const serialize = <T>(operation: () => Promise<T>): Promise<T> => {
+		const result = queue.then(operation);
+		queue = result.then(
+			() => undefined,
+			() => undefined,
+		);
+		return result;
+	};
+	const runAll = async (): Promise<GlobalState> => {
 		const state = await deps.refresh();
 		const previousProjects = [...previousByRoot.values()];
 		const events = activityEventsForRefresh(
@@ -189,16 +192,33 @@ export function createActivityRefresh(
 		if (events.length > 0) {
 			await deps.append(events);
 		}
-		previousByRoot = mergeProjectsByRoot(previousByRoot, state.projects);
+		const nextByRoot = projectsByRoot(state.projects);
+		for (const error of state.errors) {
+			const previous = previousByRoot.get(error.root);
+			if (previous !== undefined && !nextByRoot.has(error.root)) {
+				nextByRoot.set(error.root, previous);
+			}
+		}
+		previousByRoot = nextByRoot;
 		return state;
 	};
-	return () => {
-		const result = queue.then(runRefresh);
-		queue = result.then(
-			() => undefined,
-			() => undefined,
+	const runRoot = async (root: string): Promise<Project> => {
+		const project = await deps.refreshRoot(root);
+		const previous = previousByRoot.get(root);
+		const events = activityEventsForRefresh(
+			previous === undefined ? [] : [previous],
+			[project],
+			deps.now(),
 		);
-		return result;
+		if (events.length > 0) {
+			await deps.append(events);
+		}
+		previousByRoot.set(root, project);
+		return project;
+	};
+	return {
+		all: () => serialize(runAll),
+		root: (root) => serialize(() => runRoot(root)),
 	};
 }
 

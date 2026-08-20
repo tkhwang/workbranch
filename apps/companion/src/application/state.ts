@@ -1,5 +1,5 @@
 import type { GlobalState, Task, TaskStage } from "../domain/model";
-import { activePlan, taskStage, taskStatus } from "../domain/model";
+import { activePlan, deriveStage, taskStatus } from "../domain/model";
 
 export type TaskRow = {
 	readonly project: string;
@@ -34,26 +34,29 @@ export type BoardCard = {
 	readonly task: Task;
 	readonly stage: TaskStage;
 	readonly blocked: boolean;
+	readonly derived: boolean;
 };
 
-export type StageColumn = {
-	readonly stage: TaskStage;
-	readonly label: "PLAN" | "EXECUTION" | "REVIEW";
-	readonly cards: readonly BoardCard[];
+export type OtherTaskCard = {
+	readonly project: string;
+	readonly root: string;
+	readonly task: Task;
 };
 
 export type BoardModel = {
-	readonly columns: readonly StageColumn[];
+	readonly cards: readonly BoardCard[];
+	readonly otherTasks: readonly OtherTaskCard[];
 };
-
-const STAGE_COLUMNS: readonly Pick<StageColumn, "stage" | "label">[] = [
-	{ stage: "plan", label: "PLAN" },
-	{ stage: "execution", label: "EXECUTION" },
-	{ stage: "review", label: "REVIEW" },
-];
 
 function latestUpdate(group: ProjectGroup): number {
 	return group.rows.reduce((max, row) => Math.max(max, row.task.updatedAt), 0);
+}
+
+function latestTaskActivity(task: Task): number {
+	return task.repos.reduce(
+		(latest, repo) => Math.max(latest, repo.lastCommitAt),
+		task.updatedAt,
+	);
 }
 
 export function buildMenuModel(state: GlobalState): MenuModel {
@@ -90,28 +93,33 @@ export function buildMenuModel(state: GlobalState): MenuModel {
 
 export function buildBoardModel(state: GlobalState): BoardModel {
 	const cards: BoardCard[] = [];
+	const otherTasks: OtherTaskCard[] = [];
 	for (const project of state.projects) {
 		for (const task of project.tasks) {
-			const stage = taskStage(task);
-			if (stage === undefined) continue;
+			const result = deriveStage(task);
+			if (result.stage === undefined) {
+				otherTasks.push({ project: project.name, root: project.root, task });
+				continue;
+			}
 			cards.push({
 				project: project.name,
 				root: project.root,
 				task,
-				stage,
+				stage: result.stage,
 				blocked: taskStatus(task) === "blocked",
+				derived: result.derived,
 			});
 		}
 	}
 
 	return {
-		columns: STAGE_COLUMNS.map(({ stage, label }) => ({
-			stage,
-			label,
-			cards: cards
-				.filter((card) => card.stage === stage)
-				.sort((left, right) => right.task.updatedAt - left.task.updatedAt),
-		})),
+		cards: cards.sort(
+			(left, right) =>
+				latestTaskActivity(right.task) - latestTaskActivity(left.task),
+		),
+		otherTasks: otherTasks.sort(
+			(left, right) => right.task.updatedAt - left.task.updatedAt,
+		),
 	};
 }
 

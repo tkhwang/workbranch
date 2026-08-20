@@ -33,7 +33,16 @@
       ],
       "notiCount": 1,
       "repos": [
-        { "name": "backend", "branch": "feature/feat-login", "dirty": false }
+        {
+          "name": "backend",
+          "branch": "feature/feat-login",
+          "dirty": false,
+          "ahead": 2,
+          "behind": 0,
+          "changedFiles": 0,
+          "lastCommitSubject": "wire login API",
+          "lastCommitAt": 1760000000
+        }
       ]
     }
   ]
