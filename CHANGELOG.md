@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.18.0](https://github.com/tkhwang/workbranch/compare/v2.17.0...v2.18.0) (2026-08-22)
+
+
+### Features
+
+* **companion:** rename board to matrix for task view ([2bd0b0f](https://github.com/tkhwang/workbranch/commit/2bd0b0f6214647568d36532c2c4a719fd48d5bd1))
+* **companion:** rename board to matrix for task view ([02de85c](https://github.com/tkhwang/workbranch/commit/02de85cfcbe8fb4bf9e7f927fe022602083afc0b))
+
+
+### Bug Fixes
+
+* **ui:** export othertaskrow and update tests ([dbfa7f0](https://github.com/tkhwang/workbranch/commit/dbfa7f075aeca8950d423a9dd703b82569a78bf5))
+
 ## [2.17.0](https://github.com/tkhwang/workbranch/compare/v2.16.0...v2.17.0) (2026-08-20)
 
 
