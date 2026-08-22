@@ -1,5 +1,5 @@
-import type { GlobalState, Task, TaskStage } from "../domain/model";
-import { activePlan, deriveStage, taskStatus } from "../domain/model";
+import type { GlobalState, MatrixColumn, Task } from "../domain/model";
+import { matrixPlacement, taskStatus } from "../domain/model";
 
 export type TaskRow = {
 	readonly project: string;
@@ -28,24 +28,31 @@ export type MenuModel = {
 	readonly errors: GlobalState["errors"];
 };
 
-export type BoardCard = {
+export type MatrixRow = {
 	readonly project: string;
 	readonly root: string;
 	readonly task: Task;
-	readonly stage: TaskStage;
+	readonly column: MatrixColumn;
 	readonly blocked: boolean;
 	readonly derived: boolean;
 };
 
-export type OtherTaskCard = {
+export type MatrixLane = {
+	readonly project: string;
+	readonly root: string;
+	readonly rows: readonly MatrixRow[];
+};
+
+export type OtherRow = {
 	readonly project: string;
 	readonly root: string;
 	readonly task: Task;
 };
 
-export type BoardModel = {
-	readonly cards: readonly BoardCard[];
-	readonly otherTasks: readonly OtherTaskCard[];
+export type MatrixModel = {
+	readonly lanes: readonly MatrixLane[];
+	readonly others: readonly OtherRow[];
+	readonly activeCount: number;
 };
 
 function latestUpdate(group: ProjectGroup): number {
@@ -91,38 +98,58 @@ export function buildMenuModel(state: GlobalState): MenuModel {
 	};
 }
 
-export function buildBoardModel(state: GlobalState): BoardModel {
-	const cards: BoardCard[] = [];
-	const otherTasks: OtherTaskCard[] = [];
-	for (const project of state.projects) {
-		for (const task of project.tasks) {
-			const result = deriveStage(task);
-			if (result.stage === undefined) {
-				otherTasks.push({ project: project.name, root: project.root, task });
-				continue;
-			}
-			cards.push({
-				project: project.name,
-				root: project.root,
-				task,
-				stage: result.stage,
-				blocked: taskStatus(task) === "blocked",
-				derived: result.derived,
-			});
-		}
-	}
+const MATRIX_COLUMN_ORDER: Record<MatrixColumn, number> = {
+	execution: 0,
+	review: 1,
+	plan: 2,
+};
 
-	return {
-		cards: cards.sort(
-			(left, right) =>
-				latestTaskActivity(right.task) - latestTaskActivity(left.task),
-		),
-		otherTasks: otherTasks.sort(
-			(left, right) => right.task.updatedAt - left.task.updatedAt,
-		),
-	};
+function latestLaneActivity(lane: MatrixLane): number {
+	return lane.rows.reduce(
+		(latest, row) => Math.max(latest, latestTaskActivity(row.task)),
+		0,
+	);
 }
 
-export function currentItem(task: Task): string {
-	return activePlan(task)?.currentItem ?? "";
+export function buildMatrixModel(state: GlobalState): MatrixModel {
+	const others: OtherRow[] = [];
+	const lanes = state.projects
+		.map((project) => {
+			const rows: MatrixRow[] = [];
+			for (const task of project.tasks) {
+				const placement = matrixPlacement(task);
+				if (placement === undefined) {
+					others.push({ project: project.name, root: project.root, task });
+					continue;
+				}
+				rows.push({
+					project: project.name,
+					root: project.root,
+					task,
+					...placement,
+				});
+			}
+			return {
+				project: project.name,
+				root: project.root,
+				rows: rows.sort(
+					(left, right) =>
+						MATRIX_COLUMN_ORDER[left.column] -
+							MATRIX_COLUMN_ORDER[right.column] ||
+						latestTaskActivity(right.task) - latestTaskActivity(left.task),
+				),
+			};
+		})
+		.filter((lane) => lane.rows.length > 0)
+		.sort(
+			(left, right) => latestLaneActivity(right) - latestLaneActivity(left),
+		);
+
+	return {
+		lanes,
+		others: others.sort(
+			(left, right) => right.task.updatedAt - left.task.updatedAt,
+		),
+		activeCount: lanes.reduce((count, lane) => count + lane.rows.length, 0),
+	};
 }

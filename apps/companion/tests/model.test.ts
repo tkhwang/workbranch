@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildBoardModel } from "../src/application/state";
+import { buildMatrixModel } from "../src/application/state";
 import type { GlobalState, PlanStatus, Task } from "../src/domain/model";
 import {
 	activePlan,
-	deriveStage,
+	matrixPlacement,
 	taskProgress,
-	taskStage,
 	taskStatus,
 } from "../src/domain/model";
 
@@ -93,44 +92,62 @@ describe("activePlan", () => {
 	});
 });
 
-describe("taskStage", () => {
+describe("matrixPlacement", () => {
 	it.each([
-		["todo", undefined],
 		["planning", "plan"],
 		["in-progress", "execution"],
 		["review", "review"],
-		["done", undefined],
-	] as const)("maps %s to %s", (status, stage) => {
-		expect(taskStage(taskWithStatus(status, status, 1))).toBe(stage);
-	});
-
-	it("treats blocked as an execution-only pause", () => {
-		expect(taskStage(taskWithStatus("blocked", "blocked", 1))).toBe(
-			"execution",
-		);
-	});
-
-	it.each([
-		["todo", DIRTY_REPO, "execution", true],
-		["done", AHEAD_REPO, "execution", true],
-		[
-			"todo",
-			{ ...DIRTY_REPO, dirty: false, changedFiles: 0 },
-			undefined,
-			false,
-		],
-		["done", { ...AHEAD_REPO, ahead: 0 }, undefined, false],
-		["review", DIRTY_REPO, "review", false],
-	] as const)("derives %s with repository evidence as %s", (status, repo, stage, derived) => {
-		expect(deriveStage(taskWithStatus(status, status, 1, 0, [repo]))).toEqual({
-			stage,
-			derived,
+	] as const)("places %s in the %s column", (status, column) => {
+		expect(matrixPlacement(taskWithStatus(status, status, 1))).toEqual({
+			column,
+			blocked: false,
+			derived: false,
 		});
+	});
+
+	it("returns no placement for clean todo and done tasks", () => {
+		expect(matrixPlacement(taskWithStatus("todo", "todo", 1))).toBeUndefined();
+		expect(matrixPlacement(taskWithStatus("done", "done", 1))).toBeUndefined();
+		expect(
+			matrixPlacement(
+				taskWithStatus("todo", "todo", 1, 0, [
+					{ ...DIRTY_REPO, dirty: false, changedFiles: 0 },
+				]),
+			),
+		).toBeUndefined();
+		expect(
+			matrixPlacement(
+				taskWithStatus("done", "done", 1, 0, [{ ...AHEAD_REPO, ahead: 0 }]),
+			),
+		).toBeUndefined();
+	});
+
+	it("keeps declared review in place despite repository activity", () => {
+		expect(
+			matrixPlacement(taskWithStatus("review", "review", 1, 0, [DIRTY_REPO])),
+		).toEqual({ column: "review", blocked: false, derived: false });
+	});
+
+	it("places blocked in execution with the blocked flag", () => {
+		expect(matrixPlacement(taskWithStatus("blocked", "blocked", 1))).toEqual({
+			column: "execution",
+			blocked: true,
+			derived: false,
+		});
+	});
+
+	it("derives execution placement from repository evidence", () => {
+		expect(
+			matrixPlacement(taskWithStatus("todo", "todo", 1, 0, [DIRTY_REPO])),
+		).toEqual({ column: "execution", blocked: false, derived: true });
+		expect(
+			matrixPlacement(taskWithStatus("done", "done", 1, 0, [AHEAD_REPO])),
+		).toEqual({ column: "execution", blocked: false, derived: true });
 	});
 });
 
-describe("buildBoardModel", () => {
-	it("sorts active lifecycle cards by recency with other tasks retained", () => {
+describe("buildMatrixModel", () => {
+	it("orders lane rows execution → review → plan → todo → done, then by recency", () => {
 		const state: GlobalState = {
 			projects: [
 				{
@@ -141,49 +158,47 @@ describe("buildBoardModel", () => {
 						taskWithStatus("planning-new", "planning", 40, 3),
 						taskWithStatus("blocked", "blocked", 30),
 						taskWithStatus("done-active", "done", 100, 0, [DIRTY_REPO]),
-					],
-				},
-				{
-					name: "beta",
-					root: "/tmp/beta",
-					tasks: [
 						taskWithStatus("executing", "in-progress", 80),
 						taskWithStatus("reviewing", "review", 70),
+						taskWithStatus("done-clean", "done", 5),
 					],
 				},
 			],
 			errors: [],
 		};
 
-		const board = buildBoardModel(state);
+		const matrix = buildMatrixModel(state);
 
-		expect(board.cards.map((card) => card.task.name)).toEqual([
+		expect(matrix.lanes).toHaveLength(1);
+		expect(matrix.activeCount).toBe(5);
+		expect(matrix.lanes[0]?.rows.map((row) => row.task.name)).toEqual([
 			"done-active",
 			"executing",
+			"blocked",
 			"reviewing",
 			"planning-new",
-			"blocked",
 		]);
-		expect(board.cards[0]).toMatchObject({
+		expect(matrix.others.map((other) => other.task.name)).toEqual([
+			"todo-old",
+			"done-clean",
+		]);
+		expect(matrix.lanes[0]?.rows[0]).toMatchObject({
 			project: "alpha",
 			root: "/tmp/alpha",
-			stage: "execution",
+			column: "execution",
 			derived: true,
 		});
-		expect(board.cards[2]?.stage).toBe("review");
-		expect(board.cards[3]).toMatchObject({
-			stage: "plan",
-			blocked: false,
-			derived: false,
+		expect(matrix.lanes[0]?.rows[2]).toMatchObject({
+			column: "execution",
+			blocked: true,
+		});
+		expect(matrix.lanes[0]?.rows[4]).toMatchObject({
+			column: "plan",
 			task: { notiCount: 3 },
 		});
-		expect(board.cards[4]?.blocked).toBe(true);
-		expect(board.otherTasks.map((card) => card.task.name)).toEqual([
-			"todo-old",
-		]);
 	});
 
-	it("sorts lifecycle cards by the latest task or repository activity", () => {
+	it("orders lanes by the latest task or repository activity", () => {
 		const recentRepositoryActivity = {
 			...DIRTY_REPO,
 			dirty: false,
@@ -193,24 +208,26 @@ describe("buildBoardModel", () => {
 		const state: GlobalState = {
 			projects: [
 				{
+					name: "beta",
+					root: "/tmp/beta",
+					tasks: [taskWithStatus("recent-brief", "in-progress", 200)],
+				},
+				{
 					name: "alpha",
 					root: "/tmp/alpha",
 					tasks: [
 						taskWithStatus("recent-repository", "planning", 10, 0, [
 							recentRepositoryActivity,
 						]),
-						taskWithStatus("recent-brief", "in-progress", 200),
 					],
 				},
+				{ name: "empty", root: "/tmp/empty", tasks: [] },
 			],
 			errors: [],
 		};
 
-		const board = buildBoardModel(state);
+		const matrix = buildMatrixModel(state);
 
-		expect(board.cards.map((card) => card.task.name)).toEqual([
-			"recent-repository",
-			"recent-brief",
-		]);
+		expect(matrix.lanes.map((lane) => lane.project)).toEqual(["alpha", "beta"]);
 	});
 });
