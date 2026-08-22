@@ -290,7 +290,7 @@ export function DetailPanel({
 	);
 }
 
-function OtherTaskRow({
+export function OtherTaskRow({
 	other,
 	onOpenIde,
 }: {

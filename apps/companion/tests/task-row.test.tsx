@@ -7,6 +7,7 @@ import type { GlobalState, Task } from "../src/domain/model";
 import {
 	DetailPanel,
 	MatrixTaskRow,
+	OtherTaskRow,
 	StageBoard,
 	selectedMatrixRow,
 } from "../src/ui/StageBoard";
@@ -450,17 +451,24 @@ describe("StageBoard", () => {
 	});
 
 	it("opens OTHER tasks in the IDE on keyboard activation", () => {
+		expect(renderBoard()).toContain('aria-label="open todo-task in IDE"');
+
 		const calls: string[] = [];
-		const html = renderToStaticMarkup(
-			<StageBoard
-				matrix={buildMatrixModel(state)}
-				nowSeconds={3_600}
-				onOpenIde={(root, task) => calls.push(`${root}:${task.name}`)}
-				onSelect={() => undefined}
-				selectedKey={undefined}
-			/>,
+		const element = OtherTaskRow({
+			onOpenIde: (root, task) => calls.push(`${root}:${task.name}`),
+			other: { project: "acme", root: "/tmp/acme", task: todoTask },
+		});
+		const button = collectButtonProps(element).find(
+			(candidate) => candidate["aria-label"] === "open todo-task in IDE",
 		);
-		expect(html).toContain('aria-label="open todo-task in IDE"');
+
+		// a pointer single click must not launch; keyboard activation (detail 0) does
+		button?.onClick?.({ detail: 1 });
+		expect(calls).toEqual([]);
+		button?.onClick?.({ detail: 0 });
+		expect(calls).toEqual(["/tmp/acme:todo-task"]);
+		button?.onDoubleClick?.();
+		expect(calls).toEqual(["/tmp/acme:todo-task", "/tmp/acme:todo-task"]);
 	});
 
 	it("does not render dirty zero for a mixed-version legacy CLI payload", () => {

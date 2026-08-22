@@ -147,7 +147,7 @@ describe("matrixPlacement", () => {
 });
 
 describe("buildMatrixModel", () => {
-	it("orders lane rows execution → review → plan → todo → done, then by recency", () => {
+	it("orders lane rows execution → review → plan, then by recency", () => {
 		const state: GlobalState = {
 			projects: [
 				{
