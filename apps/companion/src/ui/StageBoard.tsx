@@ -1,28 +1,30 @@
 import { Fragment } from "react";
-import type {
-	BoardCard,
-	BoardModel,
-	OtherTaskCard,
-} from "../application/state";
+import type { MatrixModel, MatrixRow, OtherRow } from "../application/state";
 import {
 	activePlan,
+	MATRIX_COLUMNS,
+	type MatrixColumn,
 	type Repo,
 	type Task,
-	type TaskStage,
 	taskProgress,
+	taskStatus,
 } from "../domain/model";
+import { StatusToken } from "./StatusToken";
 import { useCurrentEpochSeconds } from "./useCurrentEpochSeconds";
 
-export type StageCardOpenIde = (root: string, task: Task) => void;
+export type StageOpenIde = (root: string, task: Task) => void;
 
-const LIFECYCLE_STAGES: readonly {
-	readonly stage: TaskStage;
-	readonly label: string;
-}[] = [
-	{ stage: "plan", label: "PLAN" },
-	{ stage: "execution", label: "EXECUTION" },
-	{ stage: "review", label: "REVIEW" },
-];
+const COLUMN_LABELS: Record<MatrixColumn, string> = {
+	plan: "PLAN",
+	execution: "EXEC",
+	review: "REVIEW",
+};
+
+const MATRIX_HEADER = MATRIX_COLUMNS.map((column, index) => ({
+	column,
+	index: `0${index + 1}`,
+	label: COLUMN_LABELS[column],
+}));
 
 export function formatRelativeTime(
 	timestamp: number,
@@ -48,12 +50,175 @@ function repoFacts(repo: Repo): string {
 	return facts.join(" · ");
 }
 
-function StageRepoActivity({
-	repo,
-	nowSeconds,
+export function matrixRowKey(row: MatrixRow): string {
+	return `${row.root}:${row.task.name}`;
+}
+
+export function selectedMatrixRow(
+	matrix: MatrixModel,
+	selectedKey: string | undefined,
+): MatrixRow | undefined {
+	const rows = matrix.lanes.flatMap((lane) => lane.rows);
+	return rows.find((row) => matrixRowKey(row) === selectedKey) ?? rows[0];
+}
+
+function currentStepText(task: Task): string {
+	const plan = activePlan(task);
+	if (plan === undefined) return "";
+	if (plan.currentItem !== "") return plan.currentItem;
+	return plan.title === task.name ? "" : plan.title;
+}
+
+function MatrixHead({
+	activeCount,
+	hasExecution,
 }: {
-	readonly repo: Repo;
+	readonly activeCount: number;
+	readonly hasExecution: boolean;
+}) {
+	return (
+		<div className="stage-matrix-head">
+			<h2 className="stage-matrix-caption">
+				ACTIVE <span className="stage-matrix-count">{activeCount}</span>
+			</h2>
+			{MATRIX_HEADER.map((item) => (
+				<span
+					className="stage-matrix-col"
+					data-hot={
+						item.column === "execution" && hasExecution ? "true" : "false"
+					}
+					key={item.column}
+				>
+					<span className="stage-matrix-col-num">{item.index}</span>
+					<span className="stage-matrix-col-label">{item.label}</span>
+				</span>
+			))}
+		</div>
+	);
+}
+
+function MatrixCell({
+	currentIndex,
+	position,
+	row,
+}: {
+	readonly currentIndex: number;
+	readonly position: number;
+	readonly row: MatrixRow;
+}) {
+	const state =
+		position === currentIndex
+			? "current"
+			: position < currentIndex
+				? "past"
+				: "future";
+	const edge =
+		position === 0
+			? "first"
+			: position === MATRIX_HEADER.length - 1
+				? "last"
+				: "middle";
+	return (
+		<span
+			aria-hidden="true"
+			className="stage-cell"
+			data-cell={state}
+			data-edge={edge}
+		>
+			{state === "current" ? (
+				<span
+					className="stage-node"
+					data-blocked={row.blocked ? "true" : "false"}
+					data-column={row.column}
+				/>
+			) : (
+				<span className="stage-dot" />
+			)}
+		</span>
+	);
+}
+
+export function MatrixTaskRow({
+	onOpenIde,
+	onSelect,
+	row,
+	selected,
+}: {
+	readonly onOpenIde: StageOpenIde;
+	readonly onSelect: () => void;
+	readonly row: MatrixRow;
+	readonly selected: boolean;
+}) {
+	const progress = taskProgress(row.task);
+	const currentIndex = MATRIX_HEADER.findIndex(
+		(item) => item.column === row.column,
+	);
+	return (
+		<article
+			className="stage-matrix-row"
+			data-blocked={row.blocked ? "true" : "false"}
+			data-column={row.column}
+			data-derived={row.derived ? "true" : "false"}
+			data-selected={selected ? "true" : "false"}
+		>
+			<button
+				aria-label={`${row.task.name}, ${COLUMN_LABELS[row.column]}${row.blocked ? ", blocked" : ""}, show details`}
+				aria-pressed={selected}
+				className="stage-matrix-line"
+				onClick={(event) => {
+					if (event.detail > 2) return;
+					onSelect();
+				}}
+				onDoubleClick={() => onOpenIde(row.root, row.task)}
+				onKeyDown={(event) => {
+					if (event.key !== "Enter") return;
+					if (!event.metaKey && !event.ctrlKey) return;
+					event.preventDefault();
+					onOpenIde(row.root, row.task);
+				}}
+				title={`Double-click or ⌘Enter to open ${row.task.name} in IDE`}
+				type="button"
+			>
+				<span className="stage-matrix-left">
+					<span className="stage-task-name" title={row.task.name}>
+						{row.task.name}
+					</span>
+					{row.blocked ? (
+						<span className="stage-task-blocked">BLOCKED</span>
+					) : null}
+					{row.derived ? (
+						<span className="stage-task-derived">DERIVED</span>
+					) : null}
+					{progress.total > 0 ? (
+						<span className="stage-task-progress">
+							{progress.done}/{progress.total}
+						</span>
+					) : null}
+					{row.task.notiCount > 0 ? (
+						<span className="stage-task-notification">
+							+{row.task.notiCount}
+						</span>
+					) : null}
+				</span>
+				{MATRIX_HEADER.map((item, position) => (
+					<MatrixCell
+						currentIndex={currentIndex}
+						key={item.column}
+						position={position}
+						row={row}
+					/>
+				))}
+			</button>
+		</article>
+	);
+}
+
+function DetailRepo({
+	nowSeconds,
+	repo,
+}: {
 	readonly nowSeconds: number;
+	readonly repo: Repo;
 }) {
 	const relativeTime = formatRelativeTime(repo.lastCommitAt, nowSeconds);
 	const commitContext =
@@ -61,223 +226,198 @@ function StageRepoActivity({
 			? ""
 			: `${repo.lastCommitSubject}${relativeTime === "" ? "" : ` · ${relativeTime}`}`;
 	return (
-		<li className="stage-repo-activity">
-			<div className="stage-repo-row">
-				<span className="stage-repo-label">REPO</span>
-				<div className="stage-repo-identity">
-					<span
-						className={`stage-repo-name${repo.dirty ? " stage-repo-dirty" : ""}`}
-					>
-						{repo.name}
-						{repo.dirty ? " ●" : ""}
-					</span>
-					<span className="stage-repo-facts">{repoFacts(repo)}</span>
-				</div>
+		<li className="stage-repo">
+			<div className="stage-repo-head">
+				<span
+					className={`stage-repo-name${repo.dirty ? " stage-repo-dirty" : ""}`}
+				>
+					{repo.name}
+					{repo.dirty ? " ●" : ""}
+				</span>
+				<span className="stage-repo-branch" title={repo.branch}>
+					{repo.branch}
+				</span>
 			</div>
-			<div className="stage-repo-row">
-				<span className="stage-repo-label">BRANCH</span>
-				<div className="stage-repo-detail">
-					<span className="stage-repo-branch" title={repo.branch}>
-						{repo.branch}
-					</span>
-				</div>
-			</div>
-			{commitContext === "" ? null : (
-				<div className="stage-repo-row">
-					<span className="stage-repo-label">COMMIT</span>
+			<div className="stage-repo-meta">
+				<span className="stage-repo-facts">{repoFacts(repo)}</span>
+				{commitContext === "" ? null : (
 					<span className="stage-repo-commit" title={repo.lastCommitSubject}>
 						{commitContext}
 					</span>
-				</div>
-			)}
+				)}
+			</div>
 		</li>
 	);
 }
 
-function StageLifecycle({ stage }: { readonly stage: TaskStage }) {
-	const currentStage = LIFECYCLE_STAGES.find((item) => item.stage === stage);
-	return (
-		<fieldset
-			aria-label={`Current stage: ${currentStage?.label ?? stage}`}
-			className="stage-lifecycle"
-		>
-			<div className="stage-lifecycle-heading">
-				<span className="stage-lifecycle-caption">STAGE</span>
-				<span className="stage-lifecycle-current-label">
-					{currentStage?.label ?? stage}
-				</span>
-			</div>
-			<div className="stage-lifecycle-track">
-				{LIFECYCLE_STAGES.map((item, index) => (
-					<Fragment key={item.stage}>
-						{index === 0 ? null : (
-							<span aria-hidden="true" className="stage-lifecycle-connector" />
-						)}
-						<span
-							className={`stage-lifecycle-stage${item.stage === stage ? " stage-lifecycle-current" : ""}`}
-							data-current={item.stage === stage ? "true" : "false"}
-							data-stage={item.stage}
-						>
-							<span aria-hidden="true" className="stage-lifecycle-node" />
-							<span className="stage-lifecycle-label">{item.label}</span>
-						</span>
-					</Fragment>
-				))}
-			</div>
-		</fieldset>
-	);
-}
-
-export function StageCard({
-	card,
-	nowSeconds = Math.floor(Date.now() / 1000),
-	onOpenIde,
+export function DetailPanel({
+	nowSeconds,
+	row,
 }: {
-	readonly card: BoardCard;
-	readonly nowSeconds?: number;
-	readonly onOpenIde: StageCardOpenIde;
+	readonly nowSeconds: number;
+	readonly row: MatrixRow;
 }) {
-	const plan = activePlan(card.task);
-	const progress = taskProgress(card.task);
+	const stepText = currentStepText(row.task);
 	return (
-		<article
-			className="stage-task-row"
-			data-blocked={card.blocked ? "true" : "false"}
-			data-derived={card.derived ? "true" : "false"}
+		<section
+			aria-label={`${row.task.name} detail`}
+			className="stage-detail-panel"
+			data-blocked={row.blocked ? "true" : "false"}
 		>
-			<button
-				aria-label={`open ${card.task.name} in IDE`}
-				className="stage-task-open"
-				onClick={(event) => {
-					if (event.detail !== 0) return;
-					onOpenIde(card.root, card.task);
-				}}
-				onDoubleClick={() => onOpenIde(card.root, card.task)}
-				title={`Double-click to open ${card.task.name} in IDE`}
-				type="button"
-			/>
-			<StageLifecycle stage={card.stage} />
-			<div className="stage-task-header">
-				<div className="stage-task-heading">
-					<span className="stage-task-project">
-						<span className="stage-task-project-label">PROJECT</span>
-						<span className="stage-task-project-name">{card.project}</span>
-					</span>
-					<div className="stage-task-title-line">
-						<span className="stage-task-name" title={card.task.name}>
-							{card.task.name}
-						</span>
-						{card.derived ? (
-							<span className="stage-task-derived">DERIVED</span>
-						) : null}
-					</div>
-				</div>
-				<div className="stage-task-meta">
-					{card.blocked ? (
-						<span className="stage-task-blocked">BLOCKED</span>
-					) : null}
-					{progress.total > 0 ? (
-						<span className="stage-task-progress">
-							{progress.done}/{progress.total}
-						</span>
-					) : null}
-					{card.task.notiCount > 0 ? (
-						<span className="stage-task-notification">
-							+{card.task.notiCount}
-						</span>
-					) : null}
-				</div>
-			</div>
-			{plan !== undefined && plan.title !== card.task.name ? (
-				<span className="stage-task-plan" title={plan.title}>
-					{plan.title}
+			<div className="stage-detail-head">
+				<span className="stage-detail-caption">DETAIL</span>
+				<span className="stage-detail-task" title={row.task.name}>
+					{row.task.name}
 				</span>
-			) : null}
-			{card.task.repos.length === 0 ? null : (
-				<ul aria-label="repository activity" className="stage-repo-stack">
-					{card.task.repos.map((repo) => (
-						<StageRepoActivity
-							key={repo.name}
-							nowSeconds={nowSeconds}
-							repo={repo}
-						/>
+				{row.derived ? (
+					<span className="stage-task-derived">DERIVED</span>
+				) : null}
+				<StatusToken status={taskStatus(row.task)} />
+			</div>
+			{stepText === "" ? null : (
+				<p className="stage-detail-step" title={stepText}>
+					▸ {stepText}
+				</p>
+			)}
+			{row.task.repos.length === 0 ? null : (
+				<ul aria-label="repository activity" className="stage-detail-repos">
+					{row.task.repos.map((repo) => (
+						<DetailRepo key={repo.name} nowSeconds={nowSeconds} repo={repo} />
 					))}
 				</ul>
 			)}
-		</article>
+		</section>
 	);
 }
 
-function OtherTaskRow({
-	card,
+export function OtherTaskRow({
+	other,
 	onOpenIde,
 }: {
-	readonly card: OtherTaskCard;
-	readonly onOpenIde: StageCardOpenIde;
+	readonly other: OtherRow;
+	readonly onOpenIde: StageOpenIde;
 }) {
 	return (
 		<li className="stage-other-task">
 			<button
-				aria-label={`open ${card.task.name} in IDE`}
+				aria-label={`open ${other.task.name} in IDE`}
 				onClick={(event) => {
 					if (event.detail !== 0) return;
-					onOpenIde(card.root, card.task);
+					onOpenIde(other.root, other.task);
 				}}
-				onDoubleClick={() => onOpenIde(card.root, card.task)}
-				title={`Double-click to open ${card.task.name} in IDE`}
+				onDoubleClick={() => onOpenIde(other.root, other.task)}
+				title={`Double-click to open ${other.task.name} in IDE`}
 				type="button"
 			>
-				<span>{card.task.name}</span>
-				<span>{card.project}</span>
+				<span>{other.task.name}</span>
+				<span>{other.project}</span>
 			</button>
 		</li>
 	);
 }
 
 export function StageBoard({
-	board,
+	matrix,
 	nowSeconds,
 	onOpenIde,
+	onSelect,
+	selectedKey,
 }: {
-	readonly board: BoardModel;
+	readonly matrix: MatrixModel;
 	readonly nowSeconds?: number;
-	readonly onOpenIde: StageCardOpenIde;
+	readonly onOpenIde: StageOpenIde;
+	readonly onSelect: (key: string) => void;
+	readonly selectedKey: string | undefined;
 }) {
 	const currentNowSeconds = useCurrentEpochSeconds(nowSeconds);
+	const hasExecution = matrix.lanes.some((lane) =>
+		lane.rows.some((row) => row.column === "execution"),
+	);
+	const selectedRow = selectedMatrixRow(matrix, selectedKey);
+	const selectedRowKey =
+		selectedRow === undefined ? undefined : matrixRowKey(selectedRow);
 	return (
-		<section className="stage-board" aria-label="Task stage board">
-			<header className="stage-feed-header">
-				<h2 className="stage-feed-label">ACTIVE</h2>
-				<span className="stage-feed-count">{board.cards.length}</span>
-			</header>
-			<div className="stage-feed">
-				{board.cards.map((card) => (
-					<StageCard
-						card={card}
-						key={`${card.root}:${card.task.name}`}
-						nowSeconds={currentNowSeconds}
-						onOpenIde={onOpenIde}
-					/>
-				))}
-			</div>
-			{board.otherTasks.length === 0 ? null : (
+		<section aria-label="Task stage board" className="stage-board">
+			<MatrixHead
+				activeCount={matrix.activeCount}
+				hasExecution={hasExecution}
+			/>
+			{matrix.lanes.map((lane) => (
+				<Fragment key={lane.root}>
+					<h3 className="stage-lane">
+						<span className="stage-lane-label">PROJECT</span>
+						<span className="stage-lane-name">{lane.project}</span>
+					</h3>
+					{lane.rows.map((row) => {
+						const key = matrixRowKey(row);
+						return (
+							<MatrixTaskRow
+								key={key}
+								onOpenIde={onOpenIde}
+								onSelect={() => onSelect(key)}
+								row={row}
+								selected={key === selectedRowKey}
+							/>
+						);
+					})}
+				</Fragment>
+			))}
+			{selectedRow === undefined ? null : (
+				<DetailPanel nowSeconds={currentNowSeconds} row={selectedRow} />
+			)}
+			{matrix.others.length === 0 ? null : (
 				<details className="stage-other">
 					<summary>
 						<span className="stage-other-label">OTHER</span>
-						<span className="stage-other-count">{board.otherTasks.length}</span>
+						<span className="stage-other-count">{matrix.others.length}</span>
 						<span className="stage-other-copy">clean todo / done</span>
 					</summary>
 					<ul className="stage-other-list">
-						{board.otherTasks.map((card) => (
+						{matrix.others.map((other) => (
 							<OtherTaskRow
-								card={card}
-								key={`${card.root}:${card.task.name}`}
+								key={`${other.root}:${other.task.name}`}
 								onOpenIde={onOpenIde}
+								other={other}
 							/>
 						))}
 					</ul>
 				</details>
 			)}
+			<div className="stage-legend">
+				<span className="stage-legend-item">
+					<span
+						className="stage-node"
+						data-blocked="false"
+						data-column="plan"
+					/>
+					PLAN
+				</span>
+				<span className="stage-legend-item">
+					<span
+						className="stage-node"
+						data-blocked="false"
+						data-column="execution"
+					/>
+					IN PROGRESS
+				</span>
+				<span className="stage-legend-item">
+					<span
+						className="stage-node"
+						data-blocked="true"
+						data-column="execution"
+					/>
+					BLOCKED
+				</span>
+				<span className="stage-legend-item">
+					<span
+						className="stage-node"
+						data-blocked="false"
+						data-column="review"
+					/>
+					REVIEW
+				</span>
+				<span className="stage-legend-hint">DBL-CLICK / ⌘⏎ = IDE</span>
+			</div>
 		</section>
 	);
 }

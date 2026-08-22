@@ -8,9 +8,6 @@ export const PLAN_STATUSES = [
 ] as const;
 export type PlanStatus = (typeof PLAN_STATUSES)[number];
 
-export const TASK_STAGES = ["plan", "execution", "review"] as const;
-export type TaskStage = (typeof TASK_STAGES)[number];
-
 export type Step = {
 	readonly text: string;
 	readonly checked: boolean;
@@ -88,43 +85,41 @@ export function taskStatus(task: Task): PlanStatus {
 	return activePlan(task)?.status ?? "todo";
 }
 
-export function taskStage(task: Task): TaskStage | undefined {
-	switch (taskStatus(task)) {
-		case "planning":
-			return "plan";
-		case "in-progress":
-		case "blocked":
-			return "execution";
-		case "review":
-			return "review";
-		case "todo":
-		case "done":
-			return undefined;
-	}
-}
-
-export type DerivedStage = {
-	readonly stage: TaskStage | undefined;
-	readonly derived: boolean;
-};
-
-export function deriveStage(task: Task): DerivedStage {
-	const declared = taskStage(task);
-	if (declared !== undefined) {
-		return { stage: declared, derived: false };
-	}
-	const status = taskStatus(task);
-	const hasActivity = task.repos.some((repo) => repo.dirty || repo.ahead > 0);
-	if ((status === "todo" || status === "done") && hasActivity) {
-		return { stage: "execution", derived: true };
-	}
-	return { stage: undefined, derived: false };
-}
-
 export function taskProgress(task: Task): {
 	readonly done: number;
 	readonly total: number;
 } {
 	const plan = activePlan(task);
 	return { done: plan?.progressDone ?? 0, total: plan?.progressTotal ?? 0 };
+}
+
+export const MATRIX_COLUMNS = ["plan", "execution", "review"] as const;
+export type MatrixColumn = (typeof MATRIX_COLUMNS)[number];
+
+export type MatrixPlacement = {
+	readonly column: MatrixColumn;
+	readonly blocked: boolean;
+	readonly derived: boolean;
+};
+
+function hasRepoActivity(task: Task): boolean {
+	return task.repos.some((repo) => repo.dirty || repo.ahead > 0);
+}
+
+export function matrixPlacement(task: Task): MatrixPlacement | undefined {
+	switch (taskStatus(task)) {
+		case "todo":
+		case "done":
+			return hasRepoActivity(task)
+				? { column: "execution", blocked: false, derived: true }
+				: undefined;
+		case "planning":
+			return { column: "plan", blocked: false, derived: false };
+		case "in-progress":
+			return { column: "execution", blocked: false, derived: false };
+		case "blocked":
+			return { column: "execution", blocked: true, derived: false };
+		case "review":
+			return { column: "review", blocked: false, derived: false };
+	}
 }

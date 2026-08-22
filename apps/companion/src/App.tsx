@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityCalendarView } from "./activity/ActivityCalendarView";
 import { createActivityRefresh } from "./application/activity";
 import {
-	buildBoardModel,
+	buildMatrixModel,
 	buildMenuModel,
 	type MenuModel,
 } from "./application/state";
@@ -61,8 +61,11 @@ export function App() {
 	const [status, setStatus] = useState("Ready");
 	const [visibleError, setVisibleError] = useState<string>();
 	const [currentView, setCurrentView] = useState<CompanionView>("main");
+	const [selectedStageTask, setSelectedStageTask] = useState<
+		string | undefined
+	>(undefined);
 	const model: MenuModel = buildMenuModel(state);
-	const board = buildBoardModel(state);
+	const matrix = buildMatrixModel(state);
 	const tauriRuntimeAvailable = isTauri();
 	const refreshWithActivity = useMemo(
 		() =>
@@ -207,8 +210,10 @@ export function App() {
 			{currentView === "main" ? (
 				<section className="view-panel" aria-label="Main View">
 					<StageBoard
-						board={board}
+						matrix={matrix}
 						onOpenIde={(root, task) => void handleTaskAction(root, task, "ide")}
+						onSelect={setSelectedStageTask}
+						selectedKey={selectedStageTask}
 					/>
 					{model.groups.length === 0 ? (
 						<p className="empty">No workbranch tasks registered.</p>

@@ -1,7 +1,7 @@
 import type { EffectCallback } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { BoardModel } from "../src/application/state";
+import type { MatrixModel } from "../src/application/state";
 import { StageBoard } from "../src/ui/StageBoard";
 
 const effectCleanups = vi.hoisted((): Array<() => void> => []);
@@ -17,7 +17,7 @@ vi.mock("react", async (importOriginal) => {
 	};
 });
 
-const EMPTY_BOARD: BoardModel = { cards: [], otherTasks: [] };
+const EMPTY_MATRIX: MatrixModel = { lanes: [], others: [], activeCount: 0 };
 
 afterEach(() => {
 	for (const cleanup of effectCleanups.splice(0)) cleanup();
@@ -34,7 +34,12 @@ describe("StageBoard relative time clock", () => {
 		});
 
 		renderToStaticMarkup(
-			<StageBoard board={EMPTY_BOARD} onOpenIde={() => undefined} />,
+			<StageBoard
+				matrix={EMPTY_MATRIX}
+				onOpenIde={() => undefined}
+				onSelect={() => undefined}
+				selectedKey={undefined}
+			/>,
 		);
 
 		expect(vi.getTimerCount()).toBe(1);

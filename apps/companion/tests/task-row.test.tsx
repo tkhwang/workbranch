@@ -2,9 +2,15 @@ import { readFileSync } from "node:fs";
 import { Children, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { type BoardCard, buildBoardModel } from "../src/application/state";
+import { buildMatrixModel, type MatrixRow } from "../src/application/state";
 import type { GlobalState, Task } from "../src/domain/model";
-import { StageBoard, StageCard } from "../src/ui/StageBoard";
+import {
+	DetailPanel,
+	MatrixTaskRow,
+	OtherTaskRow,
+	StageBoard,
+	selectedMatrixRow,
+} from "../src/ui/StageBoard";
 import {
 	type TaskActionKind,
 	TaskMetaRow,
@@ -14,9 +20,15 @@ import {
 type ButtonProps = {
 	readonly children?: ReactNode;
 	readonly "aria-label"?: string;
+	readonly "aria-expanded"?: boolean;
 	readonly onClick?: (event: { readonly detail: number }) => void;
 	readonly onDoubleClick?: () => void;
-	readonly onKeyDown?: unknown;
+	readonly onKeyDown?: (event: {
+		readonly key: string;
+		readonly metaKey: boolean;
+		readonly ctrlKey: boolean;
+		readonly preventDefault: () => void;
+	}) => void;
 };
 
 type ActionCall = {
@@ -179,21 +191,21 @@ const state: GlobalState = {
 	errors: [],
 };
 
-const planningCard: BoardCard = {
+const planningRow: MatrixRow = {
 	blocked: false,
+	column: "plan",
 	derived: false,
 	project: "acme",
 	root: "/tmp/acme",
-	stage: "plan",
 	task: planningTask,
 };
 
-const legacyDirtyCard: BoardCard = {
+const legacyDirtyRow: MatrixRow = {
 	blocked: false,
+	column: "execution",
 	derived: false,
 	project: "legacy-project",
 	root: "/tmp/legacy",
-	stage: "execution",
 	task: {
 		...executionTask,
 		name: "legacy-task",
@@ -213,6 +225,34 @@ const legacyDirtyCard: BoardCard = {
 	},
 };
 
+function renderBoard(selectedKey?: string): string {
+	return renderToStaticMarkup(
+		<StageBoard
+			matrix={buildMatrixModel(state)}
+			nowSeconds={3_600}
+			onOpenIde={() => undefined}
+			onSelect={() => undefined}
+			selectedKey={selectedKey}
+		/>,
+	);
+}
+
+function planningRowButton(
+	openCalls: string[],
+	selectCalls: number[],
+): ButtonProps | undefined {
+	const element = MatrixTaskRow({
+		onOpenIde: (root, task) => openCalls.push(`${root}:${task.name}`),
+		onSelect: () => selectCalls.push(1),
+		row: planningRow,
+		selected: false,
+	});
+	return collectButtonProps(element).find(
+		(candidate) =>
+			candidate["aria-label"] === "planning-task, PLAN, show details",
+	);
+}
+
 function renderTaskMetaRow(
 	task: Task,
 	theme: "claude" | "codex" = "claude",
@@ -228,235 +268,269 @@ function renderTaskMetaRow(
 }
 
 describe("StageBoard", () => {
-	it("renders the full lifecycle with the current stage on every task", () => {
-		const html = renderToStaticMarkup(
-			<StageBoard
-				board={buildBoardModel(state)}
-				nowSeconds={3_600}
-				onOpenIde={() => undefined}
-			/>,
-		);
+	it("renders the numbered three-stage header with a hot execution column", () => {
+		const html = renderBoard();
 
-		expect(html).not.toContain('class="stage-section-header"');
-		expect(html.match(/class="stage-lifecycle"/g)).toHaveLength(6);
-		expect(html.match(/class="stage-lifecycle-heading"/g)).toHaveLength(6);
-		expect(html.match(/class="stage-lifecycle-caption">STAGE/g)).toHaveLength(
-			6,
-		);
-		expect(
-			html.match(/class="stage-lifecycle-current-label">PLAN/g),
-		).toHaveLength(2);
-		expect(
-			html.match(/class="stage-lifecycle-current-label">EXECUTION/g),
-		).toHaveLength(3);
-		expect(
-			html.match(/class="stage-lifecycle-current-label">REVIEW/g),
-		).toHaveLength(1);
-		expect(html.match(/class="stage-lifecycle-node"/g)).toHaveLength(18);
-		expect(html.match(/class="stage-lifecycle-connector"/g)).toHaveLength(12);
-		expect(html.match(/data-current="true" data-stage="plan"/g)).toHaveLength(
-			2,
-		);
-		expect(
-			html.match(/data-current="true" data-stage="execution"/g),
-		).toHaveLength(3);
-		expect(html.match(/data-current="true" data-stage="review"/g)).toHaveLength(
-			1,
-		);
-		expect(html).not.toContain("[PLAN]");
-		expect(html).not.toContain("[EXECUTION]");
-		expect(html).not.toContain("[REVIEW]");
-		expect(html).toContain("PLAN");
-		expect(html).toContain("EXECUTION");
-		expect(html).toContain("REVIEW");
+		expect(html).toContain('aria-label="Task stage board"');
+		expect(html).toContain('class="stage-matrix-caption">ACTIVE');
+		expect(html).toContain('class="stage-matrix-count">6</span>');
+		expect(html).toContain('class="stage-matrix-col-num">01</span>');
+		expect(html).toContain('class="stage-matrix-col-num">03</span>');
+		expect(html).not.toContain('class="stage-matrix-col-num">04');
+		expect(html).toContain('class="stage-matrix-col-label">PLAN</span>');
+		expect(html).toContain('class="stage-matrix-col-label">EXEC</span>');
+		expect(html).toContain('class="stage-matrix-col-label">REVIEW</span>');
+		expect(html).not.toContain('class="stage-matrix-col-label">TODO');
+		expect(html).not.toContain('class="stage-matrix-col-label">DONE');
+		expect(html.match(/data-hot="true"/g)).toHaveLength(1);
+		expect(html).not.toContain("<fieldset");
+		expect(html).not.toContain("<svg");
+		expect(html).not.toContain("aria-expanded");
 	});
 
-	it("retains clean todo and done tasks in an OTHER disclosure", () => {
-		const html = renderToStaticMarkup(
-			<StageBoard
-				board={buildBoardModel(state)}
-				nowSeconds={3_600}
-				onOpenIde={() => undefined}
-			/>,
-		);
+	it("places active tasks on the matrix grouped by project lane", () => {
+		const html = renderBoard();
 
-		expect(html).toContain('class="stage-other"');
-		expect(html).toContain('class="stage-other-label">OTHER</span>');
-		expect(html).toContain('class="stage-other-count">2</span>');
-		expect(html).toContain("todo-task");
-		expect(html).toContain("no-plan-task");
-		expect(html).toContain("done-task");
+		expect(html).toContain('class="stage-lane-label">PROJECT</span>');
+		expect(html).toContain('class="stage-lane-name">acme</span>');
+		expect(html.match(/class="stage-matrix-row"/g)).toHaveLength(6);
+		expect(html.match(/data-cell="current"/g)).toHaveLength(6);
+		const order = [
+			"done-task",
+			"blocked-task",
+			"generated-task-with-a-very-long-name",
+			"feat-update-0617-part2",
+			"fresh-task",
+			"planning-task",
+		].map((name) => html.indexOf(`title="${name}"`));
+		expect(order.every((position) => position >= 0)).toBe(true);
+		expect([...order].sort((left, right) => left - right)).toEqual(order);
+	});
+
+	it("marks current stage nodes by column with blocked and derived cues", () => {
+		const html = renderBoard();
+
+		expect(html.match(/article[^>]*data-column="execution"/g)).toHaveLength(3);
+		expect(html).toContain(
+			'class="stage-node" data-blocked="true" data-column="execution"',
+		);
+		expect(html.match(/article[^>]*data-column="review"/g)).toHaveLength(1);
+		expect(html.match(/article[^>]*data-column="plan"/g)).toHaveLength(2);
 		expect(html).toContain('class="stage-task-derived">DERIVED</span>');
+		expect(html).toContain('class="stage-task-blocked">BLOCKED</span>');
 	});
 
-	it("keeps OTHER task launchers on the double-click interaction contract", () => {
-		const html = renderToStaticMarkup(
-			<StageBoard
-				board={buildBoardModel(state)}
-				nowSeconds={3_600}
-				onOpenIde={() => undefined}
-			/>,
-		);
+	it("shows the most active task in the detail panel by default", () => {
+		const html = renderBoard();
 
-		expect(html).toContain('title="Double-click to open todo-task in IDE"');
-		expect(html).toContain('title="Double-click to open done-task in IDE"');
-	});
-
-	it("renders a native IDE launcher over each active task row", () => {
-		const html = renderToStaticMarkup(
-			<StageBoard
-				board={buildBoardModel(state)}
-				nowSeconds={3_600}
-				onOpenIde={() => undefined}
-			/>,
-		);
-
-		expect(html.match(/class="stage-task-open"/g)).toHaveLength(6);
-		expect(html).toContain('type="button"');
-		expect(html).toContain('aria-label="open planning-task in IDE"');
-	});
-
-	it("opens the task in the IDE on pointer double-click", () => {
-		const calls: string[] = [];
-		const element = StageCard({
-			card: planningCard,
-			nowSeconds: 3_600,
-			onOpenIde: (root, task) => calls.push(`${root}:${task.name}`),
-		});
-		const button = collectButtonProps(element).find(
-			(candidate) => candidate["aria-label"] === "open planning-task in IDE",
-		);
-
-		button?.onDoubleClick?.();
-
-		expect(calls).toEqual(["/tmp/acme:planning-task"]);
-	});
-
-	it("uses native click activation without opening on pointer clicks", () => {
-		const calls: string[] = [];
-		const element = StageCard({
-			card: planningCard,
-			nowSeconds: 3_600,
-			onOpenIde: (root, task) => calls.push(`${root}:${task.name}`),
-		});
-		const button = collectButtonProps(element).find(
-			(candidate) => candidate["aria-label"] === "open planning-task in IDE",
-		);
-
-		button?.onClick?.({ detail: 0 });
-		button?.onClick?.({ detail: 1 });
-		button?.onClick?.({ detail: 2 });
-
-		expect(calls).toEqual(["/tmp/acme:planning-task"]);
-		expect(button?.onKeyDown).toBeUndefined();
-	});
-
-	it("renders repository branch facts and last commit context", () => {
-		const html = renderToStaticMarkup(
-			<StageBoard
-				board={buildBoardModel(state)}
-				nowSeconds={3_600}
-				onOpenIde={() => undefined}
-			/>,
-		);
-
+		expect(html.match(/aria-pressed="true"/g)).toHaveLength(1);
+		expect(html.match(/class="stage-detail-panel"/g)).toHaveLength(1);
+		expect(html).toContain('class="stage-detail-caption">DETAIL</span>');
+		expect(html).toContain('class="stage-detail-task" title="done-task"');
+		expect(html).toContain('data-status="done"');
+		expect(html).toContain("▸ Review screenshot");
 		expect(html).toContain(
 			'class="stage-repo-name stage-repo-dirty">workbranch',
 		);
-		expect(html).toContain('class="stage-repo-label">REPO</span>');
-		expect(html).toContain('class="stage-repo-label">BRANCH</span>');
-		expect(html).toContain('class="stage-repo-label">COMMIT</span>');
 		expect(html).toContain(
 			'class="stage-repo-branch" title="feat/update-0617">feat/update-0617</span>',
 		);
 		expect(html).toContain(
 			'class="stage-repo-facts">DIRTY 7 FILES · AHEAD 2</span>',
 		);
-		expect(html).toContain("implement companion activity feed · 1m");
 		expect(html).toContain('class="stage-repo-facts">CLEAN · BEHIND 1</span>');
+		expect(html).toContain("implement companion activity feed · 1m");
 		expect(html).toContain('title="implement companion activity feed"');
+	});
+
+	it("shows the selected task in the detail panel", () => {
+		const html = renderBoard("/tmp/acme:planning-task");
+
+		expect(html).toContain('class="stage-detail-task" title="planning-task"');
+		expect(html).toContain('data-status="planning"');
+		expect(html).toContain("▸ Implement change");
+		expect(html.match(/class="stage-detail-panel"/g)).toHaveLength(1);
+	});
+
+	it("falls back to the first row when the selected key is stale", () => {
+		const matrix = buildMatrixModel(state);
+
+		expect(selectedMatrixRow(matrix, undefined)?.task.name).toBe("done-task");
+		expect(selectedMatrixRow(matrix, "/tmp/acme:gone")?.task.name).toBe(
+			"done-task",
+		);
+		expect(
+			selectedMatrixRow(matrix, "/tmp/acme:planning-task")?.task.name,
+		).toBe("planning-task");
+		expect(
+			selectedMatrixRow({ lanes: [], others: [], activeCount: 0 }, undefined),
+		).toBeUndefined();
+	});
+
+	it("retains clean todo and done tasks in an OTHER disclosure", () => {
+		const html = renderBoard();
+
+		expect(html).toContain('class="stage-other"');
+		expect(html).toContain('class="stage-other-label">OTHER</span>');
+		expect(html).toContain('class="stage-other-count">2</span>');
+		expect(html).toContain("todo-task");
+		expect(html).toContain("no-plan-task");
+		expect(html).toContain('title="Double-click to open todo-task in IDE"');
+	});
+
+	it("keeps IDE hints on matrix rows", () => {
+		const html = renderBoard();
+
+		expect(html).toContain(
+			'title="Double-click or ⌘Enter to open done-task in IDE"',
+		);
+		expect(html).toContain(
+			'title="Double-click or ⌘Enter to open planning-task in IDE"',
+		);
+	});
+
+	it("opens the task in the IDE on double-click without selecting twice mattering", () => {
+		const openCalls: string[] = [];
+		const selectCalls: number[] = [];
+		const button = planningRowButton(openCalls, selectCalls);
+
+		// a real double-click delivers click(detail 1), click(detail 2), dblclick
+		button?.onClick?.({ detail: 1 });
+		button?.onClick?.({ detail: 2 });
+		button?.onDoubleClick?.();
+
+		expect(openCalls).toEqual(["/tmp/acme:planning-task"]);
+		// selection is idempotent, so re-selecting the same row is harmless
+		expect(selectCalls).toHaveLength(2);
+	});
+
+	it("selects on single click and keyboard activation", () => {
+		const openCalls: string[] = [];
+		const selectCalls: number[] = [];
+		const button = planningRowButton(openCalls, selectCalls);
+
+		button?.onClick?.({ detail: 0 });
+		button?.onClick?.({ detail: 1 });
+		button?.onClick?.({ detail: 3 });
+
+		expect(selectCalls).toHaveLength(2);
+		expect(openCalls).toEqual([]);
+	});
+
+	it("opens the IDE from the keyboard with cmd/ctrl+enter", () => {
+		const openCalls: string[] = [];
+		const selectCalls: number[] = [];
+		const button = planningRowButton(openCalls, selectCalls);
+
+		button?.onKeyDown?.({
+			key: "Enter",
+			metaKey: false,
+			ctrlKey: false,
+			preventDefault: () => undefined,
+		});
+		expect(openCalls).toEqual([]);
+
+		button?.onKeyDown?.({
+			key: "Enter",
+			metaKey: true,
+			ctrlKey: false,
+			preventDefault: () => undefined,
+		});
+		button?.onKeyDown?.({
+			key: "Enter",
+			metaKey: false,
+			ctrlKey: true,
+			preventDefault: () => undefined,
+		});
+
+		expect(openCalls).toEqual([
+			"/tmp/acme:planning-task",
+			"/tmp/acme:planning-task",
+		]);
+		expect(selectCalls).toEqual([]);
+	});
+
+	it("opens OTHER tasks in the IDE on keyboard activation", () => {
+		expect(renderBoard()).toContain('aria-label="open todo-task in IDE"');
+
+		const calls: string[] = [];
+		const element = OtherTaskRow({
+			onOpenIde: (root, task) => calls.push(`${root}:${task.name}`),
+			other: { project: "acme", root: "/tmp/acme", task: todoTask },
+		});
+		const button = collectButtonProps(element).find(
+			(candidate) => candidate["aria-label"] === "open todo-task in IDE",
+		);
+
+		// a pointer single click must not launch; keyboard activation (detail 0) does
+		button?.onClick?.({ detail: 1 });
+		expect(calls).toEqual([]);
+		button?.onClick?.({ detail: 0 });
+		expect(calls).toEqual(["/tmp/acme:todo-task"]);
+		button?.onDoubleClick?.();
+		expect(calls).toEqual(["/tmp/acme:todo-task", "/tmp/acme:todo-task"]);
 	});
 
 	it("does not render dirty zero for a mixed-version legacy CLI payload", () => {
 		const html = renderToStaticMarkup(
-			<StageCard
-				card={legacyDirtyCard}
-				nowSeconds={3_600}
-				onOpenIde={() => undefined}
-			/>,
+			<DetailPanel nowSeconds={3_600} row={legacyDirtyRow} />,
 		);
 
 		expect(html).toContain('class="stage-repo-facts">DIRTY</span>');
 		expect(html).not.toContain("DIRTY 0");
 	});
 
-	it("keeps task, plan, blocked, progress, and notification metadata", () => {
-		const html = renderToStaticMarkup(
-			<StageBoard
-				board={buildBoardModel(state)}
-				nowSeconds={3_600}
-				onOpenIde={() => undefined}
-			/>,
-		);
+	it("uses the shared three-column grid and node color contract", () => {
+		const css = readFileSync("src/styles/stage-board.css", "utf8");
 
-		expect(html).toContain('class="stage-task-project-label">PROJECT</span>');
-		expect(html).toContain('class="stage-task-project-name">acme</span>');
-		expect(html).toContain('class="stage-task-blocked">BLOCKED</span>');
-		expect(html).toContain('class="stage-task-progress">0/2</span>');
-		expect(html).toContain('class="stage-task-notification"');
-		expect(html).toContain("+2");
-		expect(html).toContain('class="stage-task-plan" title="Generated Plan"');
+		expect(css).toMatch(
+			/\.stage-board\s*\{[^}]*--stage-grid:\s*minmax\(0, 1fr\) repeat\(3, 48px\)/s,
+		);
+		expect(css).toMatch(
+			/\.stage-matrix-head\s*\{[^}]*grid-template-columns:\s*var\(--stage-grid\)/s,
+		);
+		expect(css).toMatch(
+			/\.stage-matrix-line\s*\{[^}]*grid-template-columns:\s*var\(--stage-grid\)[^}]*min-width:\s*0/s,
+		);
+		expect(css).toMatch(
+			/\.stage-node\[data-column="execution"\]\s*\{[^}]*background:\s*var\(--emphasis\)[^}]*box-shadow:\s*0 0 0 3px var\(--emphasis-soft\)/s,
+		);
+		expect(css).toMatch(
+			/\.stage-node\[data-column="execution"\]\[data-blocked="true"\]\s*\{[^}]*background:\s*var\(--blocked\)/s,
+		);
+		expect(css).toMatch(
+			/\.stage-node\[data-column="plan"\]\s*\{[^}]*background:\s*transparent[^}]*border:\s*2px solid var\(--accent\)/s,
+		);
+		expect(css).toMatch(
+			/\.stage-node\[data-column="review"\]\s*\{[^}]*background:\s*var\(--review\)/s,
+		);
+		expect(css).not.toMatch(/\.stage-node\[data-column="(?:todo|done)"\]/);
+		expect(css).toMatch(
+			/\.stage-matrix-row\[data-selected="true"\] \.stage-matrix-line\s*\{[^}]*background:\s*var\(--task-selected-summary-bg\)/s,
+		);
+		expect(css).toMatch(
+			/\.stage-matrix-line:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--accent\)[^}]*outline-offset:\s*-2px/s,
+		);
 	});
 
-	it("uses a full-width grouped feed CSS contract", () => {
+	it("frames the detail panel as a separate zone below the matrix", () => {
 		const css = readFileSync("src/styles/stage-board.css", "utf8");
-		const boardRule = css.match(/\.stage-board\s*\{([^}]*)\}/s);
-		const rowRule = css.match(/\.stage-task-row\s*\{([^}]*)\}/s);
-		const branchRule = css.match(/\.stage-repo-branch\s*\{([^}]*)\}/s);
-		const headingRule = css.match(/\.stage-task-heading\s*\{([^}]*)\}/s);
 
-		expect(boardRule?.[1]).toMatch(/display:\s*grid/);
-		expect(boardRule?.[1]).not.toMatch(/grid-template-columns:\s*repeat\(3/);
-		expect(css).toMatch(/\.stage-feed\s*\{[^}]*min-width:\s*0/s);
-		expect(rowRule?.[1]).toMatch(/position:\s*relative/);
-		expect(rowRule?.[1]).toMatch(/min-width:\s*0/);
-		expect(headingRule?.[1]).toMatch(/display:\s*grid/);
-		expect(branchRule?.[1]).toMatch(/text-overflow:\s*ellipsis/);
-		expect(branchRule?.[1]).toMatch(/display:\s*block/);
 		expect(css).toMatch(
-			/\.stage-repo-row\s*\{[^}]*grid-template-columns:\s*48px minmax\(0, 1fr\)/s,
+			/\.stage-detail-panel\s*\{[^}]*background:\s*var\(--surface-1\)[^}]*border:\s*1px solid var\(--line\)[^}]*border-left:\s*2px solid var\(--accent\)/s,
 		);
 		expect(css).toMatch(
-			/\.stage-lifecycle\s*\{[^}]*background:\s*var\(--surface-1\)[^}]*border:\s*1px solid var\(--line-strong\)[^}]*border-radius:\s*4px/s,
-		);
-		expect(css).toMatch(/\.stage-lifecycle\s*\{[^}]*padding:\s*6px 8px 7px/s);
-		expect(css).toMatch(
-			/\.stage-lifecycle-track\s*\{[^}]*grid-template-columns:\s*auto 1fr auto 1fr auto/s,
+			/\.stage-detail-panel\[data-blocked="true"\]\s*\{[^}]*border-left-color:\s*var\(--blocked\)/s,
 		);
 		expect(css).toMatch(
-			/\.stage-lifecycle-stage\s*\{[^}]*color:\s*var\(--muted\)/s,
+			/\.stage-repo-branch\s*\{[^}]*overflow:\s*hidden[^}]*text-overflow:\s*ellipsis/s,
 		);
 		expect(css).toMatch(
-			/\.stage-lifecycle-node\s*\{[^}]*border-radius:\s*50%/s,
-		);
-		expect(css).toMatch(
-			/\.stage-lifecycle-current \.stage-lifecycle-node\s*\{[^}]*background:\s*var\(--emphasis\)[^}]*box-shadow:\s*0 0 0 3px var\(--emphasis-soft\)/s,
-		);
-		expect(css).toMatch(
-			/\.stage-task-project-label\s*\{[^}]*color:\s*var\(--muted\)/s,
-		);
-		expect(css).toMatch(/\.stage-repo-label\s*\{[^}]*color:\s*var\(--muted\)/s);
-		expect(css).toMatch(
-			/\.stage-task-open:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--accent\)[^}]*outline-offset:\s*-2px/s,
+			/\.stage-detail-step\s*\{[^}]*text-overflow:\s*ellipsis/s,
 		);
 		expect(css).toMatch(
 			/\.stage-other\s*\{[^}]*border-top:\s*1px solid var\(--line\)/s,
 		);
-	});
-
-	it("frames the feed as the primary Main surface", () => {
-		const css = readFileSync("src/styles/stage-board.css", "utf8");
-
 		expect(css).toMatch(
 			/\.stage-board\s*\{[^}]*border:\s*1px solid var\(--line-strong\)/s,
 		);

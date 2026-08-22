@@ -91,8 +91,8 @@ describe("App shell settings wiring", () => {
 		expect(html).not.toContain("<footer");
 		expect(html).toContain('aria-label="Companion views"');
 		expect(html).toContain('aria-label="Task stage board"');
-		expect(html).toContain('class="stage-feed-label">ACTIVE</h2>');
-		expect(html).toContain('class="stage-feed"');
+		expect(html).toContain('class="stage-matrix-caption">ACTIVE');
+		expect(html).toContain('class="stage-matrix-col-num">01');
 		expect(html).toContain(">Main</button>");
 		expect(html).toContain(">Activity</button>");
 		expect(html).toContain(">Settings</button>");
@@ -305,10 +305,11 @@ describe("App shell settings wiring", () => {
 	it("keeps the stage board framed and width-safe at the native boundary", () => {
 		const css = readCssContract("src/style.css");
 
-		expect(css).not.toMatch(/\.stage-board\s*\{[^}]*repeat\(3/s);
-		expect(css).toMatch(/\.stage-feed\s*\{[^}]*min-width:\s*0/s);
 		expect(css).toMatch(
-			/\.stage-task-row\s*\{[^}]*background:\s*var\(--surface-2\)[^}]*min-width:\s*0/s,
+			/\.stage-board\s*\{[^}]*--stage-grid:\s*minmax\(0, 1fr\) repeat\(3, 48px\)/s,
+		);
+		expect(css).toMatch(
+			/\.stage-matrix-line\s*\{[^}]*grid-template-columns:\s*var\(--stage-grid\)[^}]*min-width:\s*0/s,
 		);
 		expect(css).toMatch(
 			/\.stage-board\s*\{[^}]*border:\s*1px solid var\(--line-strong\)[^}]*border-top:\s*2px solid var\(--emphasis\)/s,
@@ -338,7 +339,7 @@ describe("App shell settings wiring", () => {
 		const css = readCssContract("src/style.css");
 
 		expect(css).toMatch(
-			/\.stage-task-row\[data-blocked="true"\]\s*\{[^}]*box-shadow:\s*inset 3px 0 0 var\(--blocked\)/s,
+			/\.stage-matrix-row\[data-blocked="true"\]\s*\{[^}]*box-shadow:\s*inset 3px 0 0 var\(--blocked\)/s,
 		);
 		expect(css).toMatch(
 			/\.stage-task-blocked\s*\{[^}]*color:\s*var\(--blocked\)/s,
@@ -393,10 +394,10 @@ describe("App shell settings wiring", () => {
 			/\.agent-control\s*\{[^}]*font-size:\s*16px/s,
 			/\.terminal-panel-heading\s*\{[^}]*font-size:\s*11px/s,
 			/\.status-token\s*\{[^}]*font-size:\s*11px/s,
-			/\.stage-feed-label,\s*\.stage-feed-count\s*\{[^}]*font-size:\s*10px/s,
-			/\.stage-lifecycle-caption,\s*\.stage-lifecycle-current-label\s*\{[^}]*font-size:\s*10px/s,
-			/\.stage-lifecycle-label\s*\{[^}]*font-size:\s*10px/s,
-			/\.stage-task-project-label,\s*\.stage-task-project-name\s*\{[^}]*font-size:\s*10px/s,
+			/\.stage-matrix-caption\s*\{[^}]*font-size:\s*10px/s,
+			/\.stage-matrix-col-num\s*\{[^}]*font-size:\s*10px/s,
+			/\.stage-matrix-col-label\s*\{[^}]*font-size:\s*10px/s,
+			/\.stage-lane\s*\{[^}]*font-size:\s*10px/s,
 			/\.stage-task-name\s*\{[^}]*font-size:\s*11px/s,
 			/\.stage-task-blocked,\s*\.stage-task-progress,\s*\.stage-task-notification\s*\{[^}]*font-size:\s*10px/s,
 			/\.task-name\s*\{[^}]*font-size:\s*13px/s,
