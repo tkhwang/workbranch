@@ -29,22 +29,34 @@ function readCssContract(path: string, visited = new Set<string>()): string {
 }
 
 describe("App shell settings wiring", () => {
-	it("pins the native Companion window to the 460px product boundary", () => {
+	it("opens wide while preserving the 460px compact boundary", () => {
 		const config = JSON.parse(
 			readFileSync("src-tauri/tauri.conf.json", "utf8"),
 		) as {
 			readonly app: {
 				readonly windows: readonly {
 					readonly width: number;
+					readonly height: number;
 					readonly minWidth?: number;
+					readonly resizable: boolean;
 				}[];
 			};
 		};
 
 		expect(config.app.windows[0]).toMatchObject({
-			width: 460,
+			width: 720,
+			height: 760,
 			minWidth: 460,
+			resizable: true,
 		});
+	});
+
+	it("uses MainViewModel and RepositoryQueue without the legacy ProjectGroup", () => {
+		const appSource = readFileSync("src/App.tsx", "utf8");
+
+		expect(appSource).toContain("buildMainViewModel");
+		expect(appSource).toContain("<RepositoryQueue");
+		expect(appSource).not.toContain("ProjectGroup");
 	});
 
 	it("advances the activity reload token after successful app refreshes", () => {
@@ -90,8 +102,8 @@ describe("App shell settings wiring", () => {
 		expect(html).toContain(">Ready</span>");
 		expect(html).not.toContain("<footer");
 		expect(html).toContain('aria-label="Companion views"');
-		expect(html).toContain('aria-label="Task stage board"');
-		expect(html).toContain('class="stage-matrix-caption">ACTIVE');
+		expect(html).toContain('aria-label="Worktree status matrix"');
+		expect(html).toContain('class="stage-matrix-caption">WORKTREE STATUS');
 		expect(html).toContain('class="stage-matrix-col-num">01');
 		expect(html).toContain(">Main</button>");
 		expect(html).toContain(">Activity</button>");
@@ -306,7 +318,7 @@ describe("App shell settings wiring", () => {
 		const css = readCssContract("src/style.css");
 
 		expect(css).toMatch(
-			/\.stage-board\s*\{[^}]*--stage-grid:\s*minmax\(0, 1fr\) repeat\(3, 48px\)/s,
+			/@media \(max-width: 520px\)\s*\{[\s\S]*?\.stage-board\s*\{[^}]*--stage-grid:\s*minmax\(0, 1fr\) repeat\(3, 58px\)/s,
 		);
 		expect(css).toMatch(
 			/\.stage-matrix-line\s*\{[^}]*grid-template-columns:\s*var\(--stage-grid\)[^}]*min-width:\s*0/s,
@@ -318,15 +330,20 @@ describe("App shell settings wiring", () => {
 		expect(css).not.toContain("--shadow-card");
 	});
 
-	it("stacks full-width repository metadata above full-width launch actions", () => {
+	it("uses a wide repository grid with a compact stacked fallback", () => {
 		const css = readCssContract("src/style.css");
 
 		expect(css).toMatch(
-			/\.task-meta-secondary\s*\{[^}]*display:\s*grid[^}]*width:\s*100%/s,
+			/\.task-meta-header\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:[^}]*minmax\(190px, 1\.25fr\)[^}]*minmax\(170px, 1fr\)[^}]*minmax\(150px, 0\.75fr\)/s,
 		);
-		expect(css).toMatch(/\.repo-chips\s*\{[^}]*width:\s*100%/s);
+		expect(css).toMatch(
+			/\.repo-activity-row\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:[^}]*minmax\(180px, 1\.05fr\)[^}]*max-content[^}]*minmax\(220px, 1\.25fr\)/s,
+		);
 		expect(css).toMatch(
 			/\.task-actions\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)[^}]*width:\s*100%/s,
+		);
+		expect(css).toMatch(
+			/@media \(max-width: 520px\)\s*\{[\s\S]*?\.task-meta-header\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/s,
 		);
 		expect(css).toMatch(/\.task-actions\s*\{[^}]*overflow:\s*hidden/s);
 		expect(css).toMatch(/\.task-action\s*\{[^}]*display:\s*inline-flex/s);
@@ -397,9 +414,9 @@ describe("App shell settings wiring", () => {
 			/\.stage-matrix-caption\s*\{[^}]*font-size:\s*10px/s,
 			/\.stage-matrix-col-num\s*\{[^}]*font-size:\s*10px/s,
 			/\.stage-matrix-col-label\s*\{[^}]*font-size:\s*10px/s,
-			/\.stage-lane\s*\{[^}]*font-size:\s*10px/s,
+			/\.stage-project-name\s*\{[^}]*font-size:\s*10px/s,
 			/\.stage-task-name\s*\{[^}]*font-size:\s*11px/s,
-			/\.stage-task-blocked,\s*\.stage-task-progress,\s*\.stage-task-notification\s*\{[^}]*font-size:\s*10px/s,
+			/\.stage-task-derived,\s*\.stage-task-blocked,\s*\.stage-task-progress,\s*\.stage-task-notification\s*\{[^}]*font-size:\s*10px/s,
 			/\.task-name\s*\{[^}]*font-size:\s*13px/s,
 			/\.repo-name\s*\{[^}]*font-size:\s*11px/s,
 			/\.repo-branch-name\s*\{[^}]*font-size:\s*11px/s,

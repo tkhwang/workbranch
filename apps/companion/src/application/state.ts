@@ -1,18 +1,5 @@
-import type { GlobalState, MatrixColumn, Task } from "../domain/model";
+import type { GlobalState, Repo, Task } from "../domain/model";
 import { matrixPlacement, taskStatus } from "../domain/model";
-
-export type TaskRow = {
-	readonly project: string;
-	readonly root: string;
-	readonly task: Task;
-	readonly expanded: boolean;
-};
-
-export type ProjectGroup = {
-	readonly project: string;
-	readonly root: string;
-	readonly rows: readonly TaskRow[];
-};
 
 export type MenuSummary = {
 	readonly projectCount: number;
@@ -24,40 +11,30 @@ export type MenuSummary = {
 
 export type MenuModel = {
 	readonly summary: MenuSummary;
-	readonly groups: readonly ProjectGroup[];
 	readonly errors: GlobalState["errors"];
 };
 
-export type MatrixRow = {
+export type MainRole = "plan" | "execution" | "review" | "idle";
+
+export type MainTaskRow = {
+	readonly key: string;
 	readonly project: string;
 	readonly root: string;
 	readonly task: Task;
-	readonly column: MatrixColumn;
+	readonly repos: readonly Repo[];
+	readonly role: MainRole;
 	readonly blocked: boolean;
 	readonly derived: boolean;
+	readonly latestActivityAt: number;
 };
 
-export type MatrixLane = {
-	readonly project: string;
-	readonly root: string;
-	readonly rows: readonly MatrixRow[];
-};
-
-export type OtherRow = {
-	readonly project: string;
-	readonly root: string;
-	readonly task: Task;
-};
-
-export type MatrixModel = {
-	readonly lanes: readonly MatrixLane[];
-	readonly others: readonly OtherRow[];
+export type MainViewModel = {
+	readonly matrixRows: readonly MainTaskRow[];
+	readonly repositoryRows: readonly MainTaskRow[];
 	readonly activeCount: number;
+	readonly idleCount: number;
+	readonly repositoryCount: number;
 };
-
-function latestUpdate(group: ProjectGroup): number {
-	return group.rows.reduce((max, row) => Math.max(max, row.task.updatedAt), 0);
-}
 
 function latestTaskActivity(task: Task): number {
 	return task.repos.reduce(
@@ -66,90 +43,102 @@ function latestTaskActivity(task: Task): number {
 	);
 }
 
-export function buildMenuModel(state: GlobalState): MenuModel {
-	const groups = state.projects
-		.map((project) => ({
-			project: project.name,
-			root: project.root,
-			rows: project.tasks
-				.map((task) => ({
-					project: project.name,
-					root: project.root,
-					task,
-					expanded: true,
-				}))
-				.sort((left, right) => right.task.updatedAt - left.task.updatedAt),
-		}))
-		.filter((group) => group.rows.length > 0)
-		.sort((left, right) => latestUpdate(right) - latestUpdate(left));
+export function mainTaskKey(root: string, taskName: string): string {
+	return `${root}:${taskName}`;
+}
 
-	const rows = groups.flatMap((group) => group.rows);
+function roleForTask(task: Task): {
+	readonly role: MainRole;
+	readonly blocked: boolean;
+	readonly derived: boolean;
+} {
+	const placement = matrixPlacement(task);
+	if (placement === undefined) {
+		return { role: "idle", blocked: false, derived: false };
+	}
 	return {
-		summary: {
-			projectCount: groups.length,
-			taskCount: rows.length,
-			active: rows.filter((row) => taskStatus(row.task) === "in-progress")
-				.length,
-			blocked: rows.filter((row) => taskStatus(row.task) === "blocked").length,
-			notifications: rows.reduce((count, row) => count + row.task.notiCount, 0),
-		},
-		groups,
-		errors: state.errors,
+		role: placement.column,
+		blocked: placement.blocked,
+		derived: placement.derived,
 	};
 }
 
-const MATRIX_COLUMN_ORDER: Record<MatrixColumn, number> = {
-	execution: 0,
-	review: 1,
-	plan: 2,
-};
-
-function latestLaneActivity(lane: MatrixLane): number {
-	return lane.rows.reduce(
-		(latest, row) => Math.max(latest, latestTaskActivity(row.task)),
-		0,
-	);
+function mainPriority(role: MainRole, blocked: boolean): number {
+	if (role === "review") return 0;
+	if (blocked) return 1;
+	if (role === "execution") return 2;
+	if (role === "plan") return 3;
+	return 4;
 }
 
-export function buildMatrixModel(state: GlobalState): MatrixModel {
-	const others: OtherRow[] = [];
-	const lanes = state.projects
-		.map((project) => {
-			const rows: MatrixRow[] = [];
-			for (const task of project.tasks) {
-				const placement = matrixPlacement(task);
-				if (placement === undefined) {
-					others.push({ project: project.name, root: project.root, task });
-					continue;
-				}
-				rows.push({
+function orderedRepos(repos: readonly Repo[]): readonly Repo[] {
+	return repos
+		.map((repo, index) => ({ index, repo }))
+		.sort(
+			(left, right) =>
+				Number(right.repo.dirty) - Number(left.repo.dirty) ||
+				Number(right.repo.ahead > 0) - Number(left.repo.ahead > 0) ||
+				right.repo.lastCommitAt - left.repo.lastCommitAt ||
+				left.index - right.index,
+		)
+		.map(({ repo }) => repo);
+}
+
+export function buildMainViewModel(state: GlobalState): MainViewModel {
+	const rows = state.projects.flatMap((project, projectIndex) =>
+		project.tasks.map((task, taskIndex) => {
+			const placement = roleForTask(task);
+			return {
+				index: taskIndex,
+				projectIndex,
+				row: {
+					key: mainTaskKey(project.root, task.name),
 					project: project.name,
 					root: project.root,
 					task,
+					repos: orderedRepos(task.repos),
 					...placement,
-				});
-			}
-			return {
-				project: project.name,
-				root: project.root,
-				rows: rows.sort(
-					(left, right) =>
-						MATRIX_COLUMN_ORDER[left.column] -
-							MATRIX_COLUMN_ORDER[right.column] ||
-						latestTaskActivity(right.task) - latestTaskActivity(left.task),
-				),
+					latestActivityAt: latestTaskActivity(task),
+				} satisfies MainTaskRow,
 			};
-		})
-		.filter((lane) => lane.rows.length > 0)
+		}),
+	);
+	const matrixRows = rows
+		.filter(({ row }) => row.role !== "idle")
 		.sort(
-			(left, right) => latestLaneActivity(right) - latestLaneActivity(left),
-		);
+			(left, right) =>
+				mainPriority(left.row.role, left.row.blocked) -
+					mainPriority(right.row.role, right.row.blocked) ||
+				right.row.latestActivityAt - left.row.latestActivityAt ||
+				left.projectIndex - right.projectIndex ||
+				left.index - right.index,
+		)
+		.map(({ row }) => row);
+	const repositoryRows = matrixRows.filter((row) => row.repos.length > 0);
 
 	return {
-		lanes,
-		others: others.sort(
-			(left, right) => right.task.updatedAt - left.task.updatedAt,
+		matrixRows,
+		repositoryRows,
+		activeCount: matrixRows.length,
+		idleCount: rows.length - matrixRows.length,
+		repositoryCount: repositoryRows.reduce(
+			(count, row) => count + row.repos.length,
+			0,
 		),
-		activeCount: lanes.reduce((count, lane) => count + lane.rows.length, 0),
+	};
+}
+
+export function buildMenuModel(state: GlobalState): MenuModel {
+	const projects = state.projects.filter((project) => project.tasks.length > 0);
+	const tasks = projects.flatMap((project) => project.tasks);
+	return {
+		summary: {
+			projectCount: projects.length,
+			taskCount: tasks.length,
+			active: tasks.filter((task) => taskStatus(task) === "in-progress").length,
+			blocked: tasks.filter((task) => taskStatus(task) === "blocked").length,
+			notifications: tasks.reduce((count, task) => count + task.notiCount, 0),
+		},
+		errors: state.errors,
 	};
 }

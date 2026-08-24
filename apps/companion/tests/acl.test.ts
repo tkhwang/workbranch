@@ -111,10 +111,9 @@ describe("ACL", () => {
 		expect(model.summary.taskCount).toBe(1);
 		expect(model.summary.active).toBe(1);
 		expect(model.summary.notifications).toBe(2);
-		expect(model.groups[0]?.rows[0]?.expanded).toBe(true);
 	});
 
-	it("groups non-empty projects by their latest task update", () => {
+	it("rolls up non-empty projects without retaining presentation groups", () => {
 		const multiProjectDocument: WorkbranchListGlobalDocument = {
 			schemaVersion: 1,
 			projects: [
@@ -196,17 +195,7 @@ describe("ACL", () => {
 		expect(model.summary.active).toBe(1);
 		expect(model.summary.blocked).toBe(1);
 		expect(model.summary.notifications).toBe(3);
-		expect(model.groups.map((group) => group.project)).toEqual([
-			"beta",
-			"alpha",
-		]);
-		expect(model.groups[1]?.rows.map((row) => row.task.name)).toEqual([
-			"alpha-new",
-			"alpha-old",
-		]);
-		expect(
-			model.groups.flatMap((group) => group.rows).map((row) => row.expanded),
-		).toEqual([true, true, true]);
+		expect(model).not.toHaveProperty("groups");
 	});
 });
 

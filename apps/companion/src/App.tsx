@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityCalendarView } from "./activity/ActivityCalendarView";
 import { createActivityRefresh } from "./application/activity";
 import {
-	buildMatrixModel,
+	buildMainViewModel,
 	buildMenuModel,
 	type MenuModel,
 } from "./application/state";
@@ -23,7 +23,7 @@ import {
 import { startWorkspaceMonitor } from "./infrastructure/workspaceMonitor";
 import { AgentHeader } from "./ui/AgentHeader";
 import { AgentTabs, type CompanionView } from "./ui/AgentTabs";
-import { ProjectGroup } from "./ui/ProjectGroup";
+import { RepositoryQueue } from "./ui/RepositoryQueue";
 import { SettingsView } from "./ui/SettingsView";
 import { StageBoard } from "./ui/StageBoard";
 import { StatusAlert } from "./ui/StatusAlert";
@@ -65,7 +65,7 @@ export function App() {
 		string | undefined
 	>(undefined);
 	const model: MenuModel = buildMenuModel(state);
-	const matrix = buildMatrixModel(state);
+	const main = buildMainViewModel(state);
 	const tauriRuntimeAvailable = isTauri();
 	const refreshWithActivity = useMemo(
 		() =>
@@ -210,24 +210,27 @@ export function App() {
 			{currentView === "main" ? (
 				<section className="view-panel" aria-label="Main View">
 					<StageBoard
-						matrix={matrix}
+						activeCount={main.activeCount}
+						idleCount={main.idleCount}
 						onOpenIde={(root, task) => void handleTaskAction(root, task, "ide")}
 						onSelect={setSelectedStageTask}
+						rows={main.matrixRows}
 						selectedKey={selectedStageTask}
 					/>
-					{model.groups.length === 0 ? (
+					<RepositoryQueue
+						onAction={(root, task, kind) =>
+							void handleTaskAction(root, task, kind)
+						}
+						rows={main.repositoryRows}
+						selectedKey={selectedStageTask}
+						theme={activeTheme}
+					/>
+					{model.summary.taskCount === 0 ? (
 						<p className="empty">No workbranch tasks registered.</p>
 					) : null}
-					{model.groups.map((group) => (
-						<ProjectGroup
-							key={group.root}
-							group={group}
-							theme={activeTheme}
-							onAction={(root, task, kind) =>
-								void handleTaskAction(root, task, kind)
-							}
-						/>
-					))}
+					{model.summary.taskCount > 0 && main.repositoryRows.length === 0 ? (
+						<p className="empty">No active repositories.</p>
+					) : null}
 				</section>
 			) : null}
 			{currentView === "activity" ? (
