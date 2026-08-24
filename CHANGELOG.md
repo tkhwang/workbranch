@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.19.0](https://github.com/tkhwang/workbranch/compare/v2.18.0...v2.19.0) (2026-08-24)
+
+
+### Features
+
+* **design:** update UI ([b937412](https://github.com/tkhwang/workbranch/commit/b9374122a60d1b248693d85b8dc2cb05c53fda79))
+* **design:** update UI ([5877cd7](https://github.com/tkhwang/workbranch/commit/5877cd7a3afeb747f13c2ecf6d384e0e12360448))
+
+
+### Bug Fixes
+
+* **companion:** refine responsive repository controls ([bacc034](https://github.com/tkhwang/workbranch/commit/bacc034884dc698d76d3b8513a57ba51c439189d))
+
 ## [2.18.0](https://github.com/tkhwang/workbranch/compare/v2.17.0...v2.18.0) (2026-08-22)
 
 
