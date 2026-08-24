@@ -1,7 +1,30 @@
-.project-group {
+.repository-queue {
+	display: grid;
+	gap: 8px;
 	margin-bottom: 10px;
+	min-width: 0;
 }
 
-.project-group:last-child {
-	margin-bottom: 0;
+.repository-queue-heading {
+	align-items: center;
+	color: var(--muted);
+	display: flex;
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	min-width: 0;
+}
+
+.repository-queue-heading::after {
+	background: var(--line);
+	content: "";
+	flex: 1 1 auto;
+	height: 1px;
+	margin-left: 9px;
+}
+
+.repository-queue-list {
+	display: grid;
+	gap: 7px;
+	min-width: 0;
 }

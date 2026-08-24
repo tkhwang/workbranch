@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildMatrixModel } from "../src/application/state";
+import { buildMainViewModel } from "../src/application/state";
 import type { GlobalState, PlanStatus, Task } from "../src/domain/model";
 import {
 	activePlan,
@@ -146,88 +146,127 @@ describe("matrixPlacement", () => {
 	});
 });
 
-describe("buildMatrixModel", () => {
-	it("orders lane rows execution → review → plan, then by recency", () => {
+describe("buildMainViewModel", () => {
+	it("orders active tasks by attention and excludes clean inactive tasks", () => {
+		const reviewRepos: Task["repos"] = [
+			{
+				...DIRTY_REPO,
+				name: "old-clean-repo",
+				dirty: false,
+				changedFiles: 0,
+				lastCommitAt: 10,
+			},
+			{
+				...DIRTY_REPO,
+				name: "ahead-repo",
+				dirty: false,
+				ahead: 2,
+				changedFiles: 0,
+				lastCommitAt: 40,
+			},
+			{
+				...DIRTY_REPO,
+				name: "dirty-repo",
+				lastCommitAt: 30,
+			},
+			{
+				...DIRTY_REPO,
+				name: "recent-clean-repo",
+				dirty: false,
+				changedFiles: 0,
+				lastCommitAt: 90,
+			},
+		];
 		const state: GlobalState = {
 			projects: [
 				{
 					name: "alpha",
 					root: "/tmp/alpha",
 					tasks: [
-						taskWithStatus("todo-old", "todo", 10),
-						taskWithStatus("planning-new", "planning", 40, 3),
-						taskWithStatus("blocked", "blocked", 30),
-						taskWithStatus("done-active", "done", 100, 0, [DIRTY_REPO]),
-						taskWithStatus("executing", "in-progress", 80),
-						taskWithStatus("reviewing", "review", 70),
-						taskWithStatus("done-clean", "done", 5),
+						taskWithStatus("execution-task", "in-progress", 80, 0, [
+							DIRTY_REPO,
+						]),
+						taskWithStatus("clean-todo", "todo", 200, 0, [
+							{ ...DIRTY_REPO, dirty: false, changedFiles: 0 },
+						]),
+						taskWithStatus("review-task", "review", 70, 0, reviewRepos),
+						taskWithStatus("planning-task", "planning", 40, 0, [
+							{ ...DIRTY_REPO, dirty: false, changedFiles: 0 },
+						]),
+						taskWithStatus("planning-no-repo", "planning", 35),
 					],
 				},
-			],
-			errors: [],
-		};
-
-		const matrix = buildMatrixModel(state);
-
-		expect(matrix.lanes).toHaveLength(1);
-		expect(matrix.activeCount).toBe(5);
-		expect(matrix.lanes[0]?.rows.map((row) => row.task.name)).toEqual([
-			"done-active",
-			"executing",
-			"blocked",
-			"reviewing",
-			"planning-new",
-		]);
-		expect(matrix.others.map((other) => other.task.name)).toEqual([
-			"todo-old",
-			"done-clean",
-		]);
-		expect(matrix.lanes[0]?.rows[0]).toMatchObject({
-			project: "alpha",
-			root: "/tmp/alpha",
-			column: "execution",
-			derived: true,
-		});
-		expect(matrix.lanes[0]?.rows[2]).toMatchObject({
-			column: "execution",
-			blocked: true,
-		});
-		expect(matrix.lanes[0]?.rows[4]).toMatchObject({
-			column: "plan",
-			task: { notiCount: 3 },
-		});
-	});
-
-	it("orders lanes by the latest task or repository activity", () => {
-		const recentRepositoryActivity = {
-			...DIRTY_REPO,
-			dirty: false,
-			changedFiles: 0,
-			lastCommitAt: 300,
-		};
-		const state: GlobalState = {
-			projects: [
 				{
 					name: "beta",
 					root: "/tmp/beta",
-					tasks: [taskWithStatus("recent-brief", "in-progress", 200)],
-				},
-				{
-					name: "alpha",
-					root: "/tmp/alpha",
 					tasks: [
-						taskWithStatus("recent-repository", "planning", 10, 0, [
-							recentRepositoryActivity,
+						taskWithStatus("blocked-task", "blocked", 300, 0, [DIRTY_REPO]),
+						taskWithStatus("dirty-done-task", "done", 120, 0, [DIRTY_REPO]),
+						taskWithStatus("clean-done", "done", 400, 0, [
+							{ ...DIRTY_REPO, dirty: false, changedFiles: 0 },
 						]),
 					],
 				},
-				{ name: "empty", root: "/tmp/empty", tasks: [] },
 			],
 			errors: [],
 		};
 
-		const matrix = buildMatrixModel(state);
+		const main = buildMainViewModel(state);
 
-		expect(matrix.lanes.map((lane) => lane.project)).toEqual(["alpha", "beta"]);
+		expect(main.matrixRows.map((row) => row.task.name)).toEqual([
+			"review-task",
+			"blocked-task",
+			"dirty-done-task",
+			"execution-task",
+			"planning-task",
+			"planning-no-repo",
+		]);
+		expect(main.repositoryRows.map((row) => row.task.name)).toEqual([
+			"review-task",
+			"blocked-task",
+			"dirty-done-task",
+			"execution-task",
+			"planning-task",
+		]);
+		expect(main.repositoryRows[0]?.repos.map((repo) => repo.name)).toEqual([
+			"dirty-repo",
+			"ahead-repo",
+			"recent-clean-repo",
+			"old-clean-repo",
+		]);
+		expect(main.activeCount).toBe(6);
+		expect(main.idleCount).toBe(2);
+		expect(main.repositoryCount).toBe(8);
+	});
+
+	it("keeps stable wire order when task and repository evidence tie", () => {
+		const tiedRepos: Task["repos"] = [
+			{ ...DIRTY_REPO, name: "first", lastCommitAt: 50 },
+			{ ...DIRTY_REPO, name: "second", lastCommitAt: 50 },
+		];
+		const state: GlobalState = {
+			projects: [
+				{
+					name: "alpha",
+					root: "/tmp/alpha",
+					tasks: [
+						taskWithStatus("first-task", "in-progress", 50, 0, tiedRepos),
+						taskWithStatus("second-task", "in-progress", 50, 0, [DIRTY_REPO]),
+					],
+				},
+			],
+			errors: [],
+		};
+
+		const main = buildMainViewModel(state);
+
+		expect(main.matrixRows.map((row) => row.task.name)).toEqual([
+			"first-task",
+			"second-task",
+		]);
+		expect(main.repositoryRows[0]?.repos.map((repo) => repo.name)).toEqual([
+			"first",
+			"second",
+		]);
 	});
 });

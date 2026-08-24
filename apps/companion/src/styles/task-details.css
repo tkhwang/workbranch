@@ -1,16 +1,13 @@
 .task-meta-row {
 	background: var(--surface-1);
 	border: 1px solid var(--line);
-	border-radius: 4px;
+	border-radius: 5px;
 	display: grid;
-	gap: 7px;
-	margin-bottom: 6px;
+	gap: 9px;
+	max-width: 100%;
 	min-width: 0;
-	padding: 7px 8px;
-}
-
-.task-meta-row:last-child {
-	margin-bottom: 0;
+	overflow: hidden;
+	padding: 9px 10px;
 }
 
 .task-meta-row:hover {
@@ -18,7 +15,42 @@
 	border-color: var(--line-strong);
 }
 
-.task-meta-primary,
+.task-meta-row.task-review {
+	box-shadow: inset 3px 0 0 var(--review);
+}
+
+.task-meta-row.task-blocked {
+	box-shadow: inset 3px 0 0 var(--blocked);
+}
+
+.task-meta-row.task-in-progress {
+	box-shadow: inset 3px 0 0 var(--emphasis);
+}
+
+.task-meta-row[data-highlighted="true"] {
+	background: var(--task-selected-summary-bg);
+	border-color: var(--accent);
+	box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.task-meta-header {
+	align-items: center;
+	display: grid;
+	gap: 10px;
+	grid-template-columns:
+		minmax(170px, 1.25fr) minmax(140px, 1fr)
+		minmax(190px, 0.75fr);
+	min-width: 0;
+	width: 100%;
+}
+
+.task-meta-primary {
+	align-items: center;
+	display: flex;
+	gap: 7px;
+	min-width: 0;
+}
+
 .task-meta-primary .prompt-line {
 	min-width: 0;
 	width: 100%;
@@ -40,33 +72,63 @@
 	white-space: nowrap;
 }
 
-.task-meta-secondary {
-	align-items: stretch;
-	display: grid;
-	gap: 7px;
-	min-width: 0;
-	width: 100%;
+.task-progress-summary {
+	background: var(--surface-3);
+	border-radius: 999px;
+	color: var(--muted);
+	flex: none;
+	font-size: 10px;
+	font-variant-numeric: tabular-nums;
+	padding: 2px 6px;
 }
 
-.repo-chips {
+.task-current-work {
 	display: grid;
-	gap: 5px;
-	grid-template-columns: minmax(0, 1fr);
+	gap: 3px;
+	min-width: 0;
+}
+
+.task-current-label {
+	color: var(--faint);
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+}
+
+.task-current-work > span:last-child {
+	color: var(--muted);
+	font-size: 11px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.repo-activity-list {
+	border-top: 1px solid var(--line);
+	display: grid;
+	gap: 6px;
 	list-style: none;
 	margin: 0;
 	min-width: 0;
-	padding: 0;
-	width: 100%;
+	padding: 8px 0 0;
 }
 
-.repo-pair {
-	align-items: center;
+.repo-activity-row {
+	align-items: baseline;
 	display: grid;
-	gap: 5px;
-	grid-template-columns: fit-content(50%) minmax(0, 1fr);
-	max-width: 100%;
+	gap: 9px;
+	grid-template-columns:
+		minmax(180px, 1.05fr) max-content
+		minmax(220px, 1.25fr);
 	min-width: 0;
-	width: 100%;
+}
+
+.repo-identity {
+	align-items: baseline;
+	display: grid;
+	gap: 7px;
+	grid-template-columns: fit-content(48%) minmax(0, 1fr);
+	min-width: 0;
 }
 
 .repo-name {
@@ -74,6 +136,7 @@
 	color: var(--muted);
 	display: inline-flex;
 	font-size: 11px;
+	font-weight: 600;
 	gap: 4px;
 	min-width: 0;
 	overflow: hidden;
@@ -83,14 +146,11 @@
 
 .repo-branch-name {
 	color: var(--muted);
-	display: block;
 	font-size: 11px;
 	min-width: 0;
 	overflow: hidden;
-	text-align: right;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	width: 100%;
 }
 
 .repo-dirty,
@@ -101,6 +161,24 @@
 .repo-dot {
 	flex: 0 0 auto;
 	font-size: 10px;
+}
+
+.repo-facts {
+	color: var(--muted);
+	font-size: 10px;
+	font-variant-numeric: tabular-nums;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.repo-commit {
+	color: var(--faint);
+	font-size: 10px;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .error,
@@ -120,4 +198,22 @@
 	border: 1px dashed var(--line-strong);
 	color: var(--muted);
 	text-align: center;
+}
+
+@media (max-width: 620px) {
+	.task-meta-header {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.task-current-work {
+		padding-left: 17px;
+	}
+
+	.repo-activity-row {
+		grid-template-columns: minmax(0, 1fr) max-content;
+	}
+
+	.repo-commit {
+		grid-column: 1 / -1;
+	}
 }
