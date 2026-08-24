@@ -71,7 +71,7 @@
 - Spacing/layout rhythm: compact terminal rhythm, 8px grid, row-first grouping, prompt markers, and thin rules. Main, Activity, and Settings use the same expanded agent header so switching tabs does not shift the content vertically.
 - Shape/radius/elevation: agent headers use a restrained `6px` radius from the Brainless reference. Stage columns, cards, panels, and rows use square or near-square corners, flat tonal separation, and hairline borders. The bottom navigation may use a pill radius and one restrained shadow to separate it from scrolling content. Do not use card hover lift, gradient, or decorative shadows elsewhere.
 - Motion: 120ms press/reveal feedback only; respect reduced motion.
-- Imagery/iconography: status state uses quiet color dots with accessible labels; avoid status checkmark glyphs in task headers. Stage cards use terse text cues for blocked, progress, and notifications. No decorative illustration.
+- Imagery/iconography: inactive stage positions use quiet dots, while each row's current stage uses a 14px semantic node with a surface separation border and a wider state-colored halo so its position is unmistakable without relying on text alone. Avoid status checkmark glyphs in task headers. Stage cards use terse text cues for blocked, progress, and notifications. No decorative illustration.
 
 ## Components
 - Existing components to reuse: action buttons, `TerminalPanel`, `PromptLine`, `StatusToken`, activity calendar behavior, and settings preference controls.
@@ -106,7 +106,7 @@
 
 ## Responsive behavior
 - Supported breakpoints/devices: the native menu popover opens at 720×760, remains resizable, and cannot resize below 460px wide.
-- Layout adaptations: the shared expanded header keeps its internal columns consistent on every tab. At 720px, matrix identity plus three stage columns and repository identity/current-work/actions use their wide grid. At 520px and below, matrix stage tracks return to compact fixed widths while repository facts, current work, and actions stack without horizontal overflow. Task and repository identity use `min-width: 0`; long task, branch, and last-commit strings ellipsize with complete values in `title`/accessibility data.
+- Layout adaptations: the shared expanded header keeps its internal columns consistent on every tab. At 720px, matrix identity plus three stage columns and repository identity/current-work/actions use their wide grid. At 620px and below, repository facts, current work, and actions stack before their wide-track minimums can overflow; at 520px and below, matrix stage tracks also return to compact fixed widths. Task and repository identity use `min-width: 0`; long task, repo, branch, and last-commit strings ellipsize with complete values in `title`/accessibility data.
 - Touch/hover differences: hover is enhancement only; core state is visible without hover. Pointer single-click selects/navigates, pointer double-click opens the task in the IDE, and command/control-enter provides an explicit keyboard IDE shortcut while native activation preserves selection access.
 
 ## Interaction states

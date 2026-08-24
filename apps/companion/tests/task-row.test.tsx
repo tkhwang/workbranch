@@ -241,10 +241,22 @@ describe("StageBoard", () => {
 			/\.stage-board\s*\{[^}]*--stage-grid:\s*minmax\(220px, 1\.7fr\) repeat\(3, minmax\(82px, 0\.62fr\)\)/s,
 		);
 		expect(css).toMatch(
-			/@media \(max-width: 520px\)\s*\{[\s\S]*?\.stage-board\s*\{[^}]*--stage-grid:\s*minmax\(0, 1fr\) repeat\(3, 58px\)/s,
+			/@media \(max-width: 520px\)\s*\{[\s\S]*?\.stage-board\s*\{[^}]*--stage-grid:\s*minmax\(0, 1fr\) repeat\(3, 56px\)/s,
 		);
 		expect(css).not.toContain(".stage-detail-panel");
 		expect(css).not.toContain(".stage-other");
+	});
+
+	it("makes the current stage node visually dominant over inactive dots", () => {
+		const css = readFileSync("src/styles/stage-board.css", "utf8");
+
+		expect(css).toMatch(
+			/\.stage-node\s*\{[^}]*border:\s*2px solid var\(--surface-0\)[^}]*height:\s*14px[^}]*width:\s*14px/s,
+		);
+		expect(css).toMatch(
+			/\.stage-node\[data-column="execution"\]\s*\{[^}]*box-shadow:\s*0 0 0 2px var\(--surface-0\),\s*0 0 0 5px var\(--emphasis-soft\)/s,
+		);
+		expect(css).toMatch(/\.stage-dot\s*\{[^}]*height:\s*4px[^}]*width:\s*4px/s);
 	});
 });
 

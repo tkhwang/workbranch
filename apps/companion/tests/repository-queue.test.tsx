@@ -128,6 +128,7 @@ describe("RepositoryQueue", () => {
 		);
 
 		expect(html).toContain("DIRTY 7 FILES · AHEAD 2");
+		expect(html).toContain('class="repo-name repo-dirty" title="frontend"');
 		expect(html).toContain("CLEAN · BEHIND 1");
 		expect(html).toContain(
 			"last commit: implement companion activity feed · 1m",

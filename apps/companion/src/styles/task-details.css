@@ -4,7 +4,9 @@
 	border-radius: 5px;
 	display: grid;
 	gap: 9px;
+	max-width: 100%;
 	min-width: 0;
+	overflow: hidden;
 	padding: 9px 10px;
 }
 
@@ -36,9 +38,10 @@
 	display: grid;
 	gap: 10px;
 	grid-template-columns:
-		minmax(190px, 1.25fr) minmax(170px, 1fr)
-		minmax(150px, 0.75fr);
+		minmax(170px, 1.25fr) minmax(140px, 1fr)
+		minmax(190px, 0.75fr);
 	min-width: 0;
+	width: 100%;
 }
 
 .task-meta-primary {
@@ -164,6 +167,8 @@
 	color: var(--muted);
 	font-size: 10px;
 	font-variant-numeric: tabular-nums;
+	overflow: hidden;
+	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 
@@ -195,7 +200,7 @@
 	text-align: center;
 }
 
-@media (max-width: 520px) {
+@media (max-width: 620px) {
 	.task-meta-header {
 		grid-template-columns: minmax(0, 1fr);
 	}

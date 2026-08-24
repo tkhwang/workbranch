@@ -101,7 +101,10 @@ function RepoActivityRow({
 	return (
 		<li className="repo-activity-row">
 			<div className="repo-identity">
-				<span className={`repo-name${repo.dirty ? " repo-dirty" : ""}`}>
+				<span
+					className={`repo-name${repo.dirty ? " repo-dirty" : ""}`}
+					title={repo.name}
+				>
 					{repo.name}
 					{repo.dirty ? (
 						<span aria-label="dirty" className="repo-dot" role="img">

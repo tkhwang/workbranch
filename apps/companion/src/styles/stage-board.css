@@ -226,32 +226,40 @@
 }
 
 .stage-node {
+	border: 2px solid var(--surface-0);
 	border-radius: 50%;
-	height: 11px;
+	height: 14px;
 	position: relative;
-	width: 11px;
+	width: 14px;
 	z-index: 1;
 }
 
 .stage-node[data-column="execution"] {
 	background: var(--emphasis);
-	box-shadow: 0 0 0 3px var(--emphasis-soft);
+	box-shadow:
+		0 0 0 2px var(--surface-0),
+		0 0 0 5px var(--emphasis-soft);
 }
 
 .stage-node[data-column="execution"][data-blocked="true"] {
 	background: var(--blocked);
-	box-shadow: 0 0 0 3px var(--blocked-soft);
+	box-shadow:
+		0 0 0 2px var(--surface-0),
+		0 0 0 5px var(--blocked-soft);
 }
 
 .stage-node[data-column="plan"] {
-	background: transparent;
-	border: 2px solid var(--accent);
-	box-shadow: 0 0 0 3px var(--accent-soft);
+	background: var(--accent);
+	box-shadow:
+		0 0 0 2px var(--surface-0),
+		0 0 0 5px var(--accent-soft);
 }
 
 .stage-node[data-column="review"] {
 	background: var(--review);
-	box-shadow: 0 0 0 3px var(--review-soft);
+	box-shadow:
+		0 0 0 2px var(--surface-0),
+		0 0 0 5px var(--review-soft);
 }
 
 .stage-idle-count {
@@ -264,7 +272,7 @@
 
 @media (max-width: 520px) {
 	.stage-board {
-		--stage-grid: minmax(0, 1fr) repeat(3, 58px);
+		--stage-grid: minmax(0, 1fr) repeat(3, 56px);
 	}
 
 	.stage-matrix-col-label {

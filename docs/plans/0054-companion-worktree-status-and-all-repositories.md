@@ -40,7 +40,7 @@
 - [x] native menu bar window 크기
   - Impact: matrix/repository 정보 밀도, 작은 화면 fallback, Activity/Settings 회귀 범위.
   - Current evidence: 현재 window는 `460×680`, `minWidth: 460`, `resizable: true`이고 기존 CSS/test가 460px 무overflow를 보장한다. 새 4열 matrix + repo queue는 더 넓은 primary width가 필요하다.
-  - Recommended default: initial `720×760`, `minWidth: 460`, `resizable: true`, 520px 이하 compact layout.
+  - Recommended default: initial `720×760`, `minWidth: 460`, `resizable: true`, repository cards 620px 이하 / matrix 520px 이하 compact layout.
   - Status: resolved — 사용자 선택 A. 넓게 시작하되 기존 460px fallback을 보존한다.
 - [x] All Repositories의 task 범위
   - Impact: Main 정보 밀도, matrix/queue 대응 관계, clean todo/done inventory 노출 여부.
@@ -99,7 +99,7 @@ active task card priority는 다음과 같다.
 - min width: `460`
 - height: `760`
 - `720px`에서는 repo fact/current work/action을 3영역 grid로 표시한다.
-- `520px` 이하에서는 task/repo facts 위, current work와 action 아래로 쌓는다.
+- `620px` 이하에서는 task/repo facts 위, current work와 action 아래로 쌓고, matrix stage tracks는 `520px` 이하에서 compact width로 전환한다.
 - Activity/Settings는 동일 window에서 max-width를 사용하며 기능/정보 구조는 변경하지 않는다.
 
 ## 범위 밖
@@ -578,7 +578,7 @@ export function RepositoryQueue({
 - repo rows는 name+branch, facts, last commit을 읽는 3영역 grid.
 - `review`는 `--review`, `blocked`는 `--blocked`, selected는 `--accent` 2px inset rail.
 - selected 외 card opacity를 낮추지 않는다.
-- `@media (max-width: 520px)`에서 current work와 actions가 다음 행으로 내려간다.
+- `@media (max-width: 620px)`에서 current work와 actions가 다음 행으로 내려간다.
 - 긴 task/repo/branch/subject는 `min-width:0`, ellipsis, `title`로 원문 보존.
 
 - [x] **Step 6: green 확인** — RepositoryQueue/TaskRow/App shell 42 tests, typecheck, lint 통과.

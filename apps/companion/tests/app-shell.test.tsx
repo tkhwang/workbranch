@@ -318,7 +318,7 @@ describe("App shell settings wiring", () => {
 		const css = readCssContract("src/style.css");
 
 		expect(css).toMatch(
-			/@media \(max-width: 520px\)\s*\{[\s\S]*?\.stage-board\s*\{[^}]*--stage-grid:\s*minmax\(0, 1fr\) repeat\(3, 58px\)/s,
+			/@media \(max-width: 520px\)\s*\{[\s\S]*?\.stage-board\s*\{[^}]*--stage-grid:\s*minmax\(0, 1fr\) repeat\(3, 56px\)/s,
 		);
 		expect(css).toMatch(
 			/\.stage-matrix-line\s*\{[^}]*grid-template-columns:\s*var\(--stage-grid\)[^}]*min-width:\s*0/s,
@@ -334,21 +334,35 @@ describe("App shell settings wiring", () => {
 		const css = readCssContract("src/style.css");
 
 		expect(css).toMatch(
-			/\.task-meta-header\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:[^}]*minmax\(190px, 1\.25fr\)[^}]*minmax\(170px, 1fr\)[^}]*minmax\(150px, 0\.75fr\)/s,
+			/\.task-meta-header\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:[^}]*minmax\(170px, 1\.25fr\)[^}]*minmax\(140px, 1fr\)[^}]*minmax\(190px, 0\.75fr\)/s,
 		);
 		expect(css).toMatch(
 			/\.repo-activity-row\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:[^}]*minmax\(180px, 1\.05fr\)[^}]*max-content[^}]*minmax\(220px, 1\.25fr\)/s,
 		);
 		expect(css).toMatch(
-			/\.task-actions\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)[^}]*width:\s*100%/s,
+			/\.task-actions\s*\{[^}]*display:\s*grid[^}]*grid-column:\s*3[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)[^}]*justify-self:\s*end[^}]*max-width:\s*220px[^}]*min-width:\s*190px[^}]*width:\s*100%/s,
 		);
 		expect(css).toMatch(
-			/@media \(max-width: 520px\)\s*\{[\s\S]*?\.task-meta-header\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/s,
+			/@media \(max-width: 620px\)\s*\{[\s\S]*?\.task-meta-header\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/s,
+		);
+		expect(css).toMatch(
+			/@media \(max-width: 620px\)\s*\{[\s\S]*?\.task-actions\s*\{[^}]*grid-column:\s*1[^}]*justify-self:\s*stretch[^}]*max-width:\s*none[^}]*min-width:\s*0/s,
+		);
+		expect(css).toMatch(
+			/@media \(max-width: 620px\)\s*\{[\s\S]*?\.repo-activity-row\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) max-content/s,
 		);
 		expect(css).toMatch(/\.task-actions\s*\{[^}]*overflow:\s*hidden/s);
 		expect(css).toMatch(/\.task-action\s*\{[^}]*display:\s*inline-flex/s);
 		expect(css).toMatch(/\.task-action\s*\{[^}]*min-width:\s*0/s);
+		expect(css).toMatch(/\.task-action\s*\{[^}]*padding:\s*5px 4px/s);
 		expect(css).toMatch(/\.task-action\s*\{[^}]*width:\s*100%/s);
+		expect(css).toMatch(
+			/\.task-meta-row\s*\{[^}]*max-width:\s*100%[^}]*overflow:\s*hidden/s,
+		);
+		expect(css).toMatch(/\.task-meta-header\s*\{[^}]*width:\s*100%/s);
+		expect(css).toMatch(
+			/\.repo-facts\s*\{[^}]*overflow:\s*hidden[^}]*text-overflow:\s*ellipsis/s,
+		);
 		expect(css).not.toContain(".task-action-separator");
 	});
 
