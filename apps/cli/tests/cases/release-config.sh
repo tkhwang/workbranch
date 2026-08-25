@@ -10,15 +10,19 @@ manifest = json.loads(Path('.release-please-manifest.json').read_text())
 root = cfg['packages']['.']
 companion = cfg['packages']['apps/companion']
 exclude_paths = set(root.get('exclude-paths', []))
-required_recursive_excludes = {
-    'apps/companion/**',
-    'packages/contract/**',
-    'docs/**',
-    '.github/**',
+required_directory_excludes = {
+    'apps/companion',
+    'packages/contract',
+    'docs',
+    '.github',
 }
-missing = sorted(required_recursive_excludes - exclude_paths)
+missing = sorted(required_directory_excludes - exclude_paths)
 if missing:
-    raise SystemExit(f"root package must recursively exclude non-CLI release paths: {missing}")
+    raise SystemExit(f"root package must exclude non-CLI release directories: {missing}")
+
+glob_excludes = sorted(path for path in exclude_paths if '*' in path)
+if glob_excludes:
+    raise SystemExit(f'release-please exclude-paths are literal prefixes, not globs: {glob_excludes}')
 
 extra_files = {item['path'] for item in root.get('extra-files', [])}
 if 'apps/cli/bin/workbranch' not in extra_files:
@@ -49,23 +53,22 @@ if companion_extra_files != expected_companion_extra_files:
     raise SystemExit(f'companion extra-files mismatch: {companion_extra_files}')
 
 sample_companion_only_files = [
-    'apps/companion/src/App.tsx',
-    'packages/contract/src/index.ts',
-    'docs/plans/0027-companion-launch-at-login.md',
-    'DESIGN.md',
-    'README.md',
-    'README.ko.md',
+    ['apps/companion/src/App.tsx'],
+    ['apps/companion/src-tauri/icons/icon.png'],
+    ['packages/contract/src/index.ts'],
+    ['docs/plans/0027-companion-launch-at-login.md'],
+    ['.github/workflows/companion-ci.yml'],
 ]
 
-def is_excluded(path):
-    return (
-        path in exclude_paths
-        or any(pattern.endswith('/**') and path.startswith(pattern[:-3] + '/') for pattern in exclude_paths)
-    )
+def is_relevant(path, prefix):
+    return path.startswith(prefix.rstrip('/') + '/')
 
-not_excluded = [path for path in sample_companion_only_files if not is_excluded(path)]
+def commit_is_excluded(files):
+    return all(any(is_relevant(path, prefix) for prefix in exclude_paths) for path in files)
+
+not_excluded = [files for files in sample_companion_only_files if not commit_is_excluded(files)]
 if not_excluded:
-    raise SystemExit(f"root package would still see companion-only files: {not_excluded}")
+    raise SystemExit(f"root package would still see non-CLI-only commits: {not_excluded}")
 PY
 }
 
