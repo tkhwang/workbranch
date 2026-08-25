@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.19.1](https://github.com/tkhwang/workbranch/compare/v2.19.0...v2.19.1) (2026-08-25)
+
+
+### Bug Fixes
+
+* **release:** correct release-please exclude paths ([63ba2d1](https://github.com/tkhwang/workbranch/commit/63ba2d18ed004b1a8f1e866fef9a00227b0e88c1))
+
 ## [2.19.0](https://github.com/tkhwang/workbranch/compare/v2.18.0...v2.19.0) (2026-08-24)
 
 
