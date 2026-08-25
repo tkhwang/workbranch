@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.20.0](https://github.com/tkhwang/workbranch/compare/v2.19.0...v2.20.0) (2026-08-25)
+
+
+### Features
+
+* **icons:** update companion app icons ([06c70ff](https://github.com/tkhwang/workbranch/commit/06c70ffa17cc712fc63e51972669bfa2d8967161))
+* **icons:** update companion app icons ([b9f0f66](https://github.com/tkhwang/workbranch/commit/b9f0f664e814017cb159402419c41a34a33c5e33))
+
 ## [2.19.0](https://github.com/tkhwang/workbranch/compare/v2.18.0...v2.19.0) (2026-08-24)
 
 
