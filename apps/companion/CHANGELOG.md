@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.17.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.16.0...workbranch-companion-v2.17.0) (2026-08-25)
+
+
+### Features
+
+* **icons:** update companion app icons ([06c70ff](https://github.com/tkhwang/workbranch/commit/06c70ffa17cc712fc63e51972669bfa2d8967161))
+* **icons:** update companion app icons ([b9f0f66](https://github.com/tkhwang/workbranch/commit/b9f0f664e814017cb159402419c41a34a33c5e33))
+
 ## [2.16.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.15.0...workbranch-companion-v2.16.0) (2026-08-24)
 
 
