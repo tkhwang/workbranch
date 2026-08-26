@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.19.2](https://github.com/tkhwang/workbranch/compare/v2.19.1...v2.19.2) (2026-08-26)
+
+
+### Bug Fixes
+
+* **companion:** align stage view review contracts ([33d74e9](https://github.com/tkhwang/workbranch/commit/33d74e9de678810de97fa23b9bd42e6735c457a5))
+
 ## [2.19.1](https://github.com/tkhwang/workbranch/compare/v2.19.0...v2.19.1) (2026-08-25)
 
 
