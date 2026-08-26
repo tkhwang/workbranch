@@ -16,6 +16,8 @@ main[data-theme="claude"] {
 	--task-selected-summary-bg: rgba(192, 202, 245, 0.06);
 	--blocked: #f7768e;
 	--blocked-soft: rgba(247, 118, 142, 0.14);
+	--plan: #7aa2f7;
+	--plan-soft: rgba(122, 162, 247, 0.14);
 	--review: #bb9af7;
 	--review-soft: rgba(187, 154, 247, 0.14);
 	--done: #87d787;
@@ -57,6 +59,8 @@ main[data-theme="codex"] {
 	--task-selected-summary-bg: rgba(237, 237, 237, 0.06);
 	--blocked: #f2a0a0;
 	--blocked-soft: rgba(242, 160, 160, 0.14);
+	--plan: #7aa2f7;
+	--plan-soft: rgba(122, 162, 247, 0.14);
 	--review: #bb9af7;
 	--review-soft: rgba(187, 154, 247, 0.14);
 	--done: #abdfa7;

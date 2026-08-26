@@ -221,14 +221,17 @@ describe("buildMainViewModel", () => {
 			"planning-task",
 			"planning-no-repo",
 		]);
-		expect(main.repositoryRows.map((row) => row.task.name)).toEqual([
-			"review-task",
-			"blocked-task",
-			"dirty-done-task",
-			"execution-task",
-			"planning-task",
+		expect(main.stageGroups.map((group) => group.column)).toEqual([
+			"plan",
+			"execution",
+			"review",
 		]);
-		expect(main.repositoryRows[0]?.repos.map((repo) => repo.name)).toEqual([
+		expect(
+			main.stageGroups
+				.find((group) => group.column === "execution")
+				?.rows.map((row) => row.task.name),
+		).toEqual(["blocked-task", "dirty-done-task", "execution-task"]);
+		expect(main.matrixRows[0]?.repos.map((repo) => repo.name)).toEqual([
 			"dirty-repo",
 			"ahead-repo",
 			"recent-clean-repo",
@@ -236,7 +239,31 @@ describe("buildMainViewModel", () => {
 		]);
 		expect(main.activeCount).toBe(6);
 		expect(main.idleCount).toBe(2);
-		expect(main.repositoryCount).toBe(8);
+		expect("repositoryRows" in main).toBe(false);
+		expect("repositoryCount" in main).toBe(false);
+		expect("unavailableRootCount" in main).toBe(false);
+	});
+
+	it("keeps empty stage groups in lifecycle order", () => {
+		const state: GlobalState = {
+			projects: [
+				{
+					name: "alpha",
+					root: "/tmp/alpha",
+					tasks: [taskWithStatus("planning-task", "planning", 10)],
+				},
+			],
+			errors: [],
+		};
+
+		const groups = buildMainViewModel(state).stageGroups;
+
+		expect(groups.map((group) => group.column)).toEqual([
+			"plan",
+			"execution",
+			"review",
+		]);
+		expect(groups.map((group) => group.rows.length)).toEqual([1, 0, 0]);
 	});
 
 	it("keeps stable wire order when task and repository evidence tie", () => {
@@ -264,9 +291,33 @@ describe("buildMainViewModel", () => {
 			"first-task",
 			"second-task",
 		]);
-		expect(main.repositoryRows[0]?.repos.map((repo) => repo.name)).toEqual([
+		expect(main.matrixRows[0]?.repos.map((repo) => repo.name)).toEqual([
 			"first",
 			"second",
+		]);
+	});
+
+	it("counts unavailable roots without dropping successful task rows", () => {
+		const state: GlobalState = {
+			projects: [
+				{
+					name: "alpha",
+					root: "/tmp/alpha",
+					tasks: [
+						taskWithStatus("planning-task", "planning", 10, 0, [DIRTY_REPO]),
+					],
+				},
+			],
+			errors: [
+				{ root: "/tmp/missing-a", message: "project unavailable" },
+				{ root: "/tmp/missing-b", message: "task root unavailable" },
+			],
+		};
+
+		const main = buildMainViewModel(state);
+
+		expect(main.matrixRows.map((row) => row.task.name)).toEqual([
+			"planning-task",
 		]);
 	});
 });

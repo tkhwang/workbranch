@@ -29,7 +29,7 @@ function readCssContract(path: string, visited = new Set<string>()): string {
 }
 
 describe("App shell settings wiring", () => {
-	it("opens wide while preserving the 460px compact boundary", () => {
+	it("opens at 520px while preserving the 460px compact boundary", () => {
 		const config = JSON.parse(
 			readFileSync("src-tauri/tauri.conf.json", "utf8"),
 		) as {
@@ -44,19 +44,23 @@ describe("App shell settings wiring", () => {
 		};
 
 		expect(config.app.windows[0]).toMatchObject({
-			width: 720,
+			width: 520,
 			height: 760,
 			minWidth: 460,
 			resizable: true,
 		});
 	});
 
-	it("uses MainViewModel and RepositoryQueue without the legacy ProjectGroup", () => {
+	it("uses the stage-grouped MainViewModel and repo notes without legacy queues", () => {
 		const appSource = readFileSync("src/App.tsx", "utf8");
 
 		expect(appSource).toContain("buildMainViewModel");
-		expect(appSource).toContain("<RepositoryQueue");
+		expect(appSource).toContain("<StageBoard");
+		expect(appSource).toContain("useRepoNotes");
+		expect(appSource).toContain("groups={main.stageGroups}");
+		expect(appSource).not.toContain("RepositoryQueue");
 		expect(appSource).not.toContain("ProjectGroup");
+		expect(appSource).toContain("{model.errors.map");
 	});
 
 	it("advances the activity reload token after successful app refreshes", () => {
@@ -102,9 +106,9 @@ describe("App shell settings wiring", () => {
 		expect(html).toContain(">Ready</span>");
 		expect(html).not.toContain("<footer");
 		expect(html).toContain('aria-label="Companion views"');
-		expect(html).toContain('aria-label="Worktree status matrix"');
+		expect(html).toContain('aria-label="Worktree status"');
 		expect(html).toContain('class="stage-matrix-caption">WORKTREE STATUS');
-		expect(html).toContain('class="stage-matrix-col-num">01');
+		expect(html).not.toContain("ALL REPOSITORIES");
 		expect(html).toContain(">Main</button>");
 		expect(html).toContain(">Activity</button>");
 		expect(html).toContain(">Settings</button>");
@@ -318,59 +322,34 @@ describe("App shell settings wiring", () => {
 		const css = readCssContract("src/style.css");
 
 		expect(css).toMatch(
-			/@media \(max-width: 520px\)\s*\{[\s\S]*?\.stage-board\s*\{[^}]*--stage-grid:\s*minmax\(0, 1fr\) repeat\(3, 56px\)/s,
-		);
-		expect(css).toMatch(
-			/\.stage-matrix-line\s*\{[^}]*grid-template-columns:\s*var\(--stage-grid\)[^}]*min-width:\s*0/s,
-		);
-		expect(css).toMatch(
 			/\.stage-board\s*\{[^}]*border:\s*1px solid var\(--line-strong\)[^}]*border-top:\s*2px solid var\(--emphasis\)/s,
 		);
+		expect(css).toMatch(/\.stage-group-head\s*\{[^}]*display:\s*flex/s);
+		expect(css).not.toContain("--stage-grid");
 		expect(css).not.toContain(".current-step-strip");
 		expect(css).not.toContain("--shadow-card");
 	});
 
-	it("uses a wide repository grid with a compact stacked fallback", () => {
+	it("keeps vertical repo facts and notes width-safe at 460px", () => {
 		const css = readCssContract("src/style.css");
 
 		expect(css).toMatch(
-			/\.task-meta-header\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:[^}]*minmax\(170px, 1\.25fr\)[^}]*minmax\(140px, 1fr\)[^}]*minmax\(190px, 0\.75fr\)/s,
+			/\.stage-repo-facts-line\s*\{[^}]*display:\s*grid[^}]*min-width:\s*0/s,
 		);
 		expect(css).toMatch(
-			/\.repo-activity-row\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:[^}]*minmax\(180px, 1\.05fr\)[^}]*max-content[^}]*minmax\(220px, 1\.25fr\)/s,
+			/\.stage-repo-branch,[\s\S]*\.stage-note-line\s*\{[^}]*min-width:\s*0[^}]*text-overflow:\s*ellipsis/s,
 		);
 		expect(css).toMatch(
-			/\.task-actions\s*\{[^}]*display:\s*grid[^}]*grid-column:\s*3[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)[^}]*justify-self:\s*end[^}]*max-width:\s*220px[^}]*min-width:\s*190px[^}]*width:\s*100%/s,
+			/@media \(max-width: 480px\)\s*\{[\s\S]*?\.stage-repo-facts\s*\{[^}]*grid-column:\s*1 \/ 3/s,
 		);
-		expect(css).toMatch(
-			/@media \(max-width: 620px\)\s*\{[\s\S]*?\.task-meta-header\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/s,
-		);
-		expect(css).toMatch(
-			/@media \(max-width: 620px\)\s*\{[\s\S]*?\.task-actions\s*\{[^}]*grid-column:\s*1[^}]*justify-self:\s*stretch[^}]*max-width:\s*none[^}]*min-width:\s*0/s,
-		);
-		expect(css).toMatch(
-			/@media \(max-width: 620px\)\s*\{[\s\S]*?\.repo-activity-row\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) max-content/s,
-		);
-		expect(css).toMatch(/\.task-actions\s*\{[^}]*overflow:\s*hidden/s);
-		expect(css).toMatch(/\.task-action\s*\{[^}]*display:\s*inline-flex/s);
-		expect(css).toMatch(/\.task-action\s*\{[^}]*min-width:\s*0/s);
-		expect(css).toMatch(/\.task-action\s*\{[^}]*padding:\s*5px 4px/s);
-		expect(css).toMatch(/\.task-action\s*\{[^}]*width:\s*100%/s);
-		expect(css).toMatch(
-			/\.task-meta-row\s*\{[^}]*max-width:\s*100%[^}]*overflow:\s*hidden/s,
-		);
-		expect(css).toMatch(/\.task-meta-header\s*\{[^}]*width:\s*100%/s);
-		expect(css).toMatch(
-			/\.repo-facts\s*\{[^}]*overflow:\s*hidden[^}]*text-overflow:\s*ellipsis/s,
-		);
-		expect(css).not.toContain(".task-action-separator");
+		expect(css).toMatch(/\.stage-note-editor textarea\s*\{[^}]*width:\s*100%/s);
 	});
 
 	it("uses semantic stage-task cues instead of checklist detail chrome", () => {
 		const css = readCssContract("src/style.css");
 
 		expect(css).toMatch(
-			/\.stage-matrix-row\[data-blocked="true"\]\s*\{[^}]*box-shadow:\s*inset 3px 0 0 var\(--blocked\)/s,
+			/\.stage-task-block\[data-blocked="true"\]\s*\{[^}]*box-shadow:\s*inset 3px 0 0 var\(--blocked\)/s,
 		);
 		expect(css).toMatch(
 			/\.stage-task-blocked\s*\{[^}]*color:\s*var\(--blocked\)/s,
@@ -382,14 +361,14 @@ describe("App shell settings wiring", () => {
 		expect(css).not.toContain(".steps");
 	});
 
-	it("truncates grouped-feed and detail task names with full titles in markup", () => {
+	it("truncates grouped task and repo identities", () => {
 		const css = readCssContract("src/style.css");
 
 		expect(css).toMatch(
 			/\.stage-task-name\s*\{[^}]*overflow:\s*hidden[^}]*text-overflow:\s*ellipsis[^}]*white-space:\s*nowrap/s,
 		);
 		expect(css).toMatch(
-			/\.task-name\s*\{[^}]*overflow:\s*hidden[^}]*text-overflow:\s*ellipsis[^}]*white-space:\s*nowrap/s,
+			/\.stage-repo-branch,[\s\S]*text-overflow:\s*ellipsis/s,
 		);
 	});
 
@@ -410,7 +389,9 @@ describe("App shell settings wiring", () => {
 			/\.font-preview-label\s*\{[^}]*color:\s*var\(--muted\)/s,
 		);
 		expect(css).toMatch(/\.cal-hour-label\s*\{[^}]*color:\s*var\(--muted\)/s);
-		expect(css).toMatch(/\.repo-branch-name\s*\{[^}]*color:\s*var\(--muted\)/s);
+		expect(css).toMatch(
+			/\.stage-repo-branch\s*\{[^}]*color:\s*var\(--faint\)/s,
+		);
 	});
 
 	it("keeps companion typography at the exact legible fixed-dark scale", () => {
@@ -426,15 +407,16 @@ describe("App shell settings wiring", () => {
 			/\.terminal-panel-heading\s*\{[^}]*font-size:\s*11px/s,
 			/\.status-token\s*\{[^}]*font-size:\s*11px/s,
 			/\.stage-matrix-caption\s*\{[^}]*font-size:\s*10px/s,
-			/\.stage-matrix-col-num\s*\{[^}]*font-size:\s*10px/s,
-			/\.stage-matrix-col-label\s*\{[^}]*font-size:\s*10px/s,
-			/\.stage-project-name\s*\{[^}]*font-size:\s*10px/s,
+			/\.stage-group-num\s*\{[^}]*font-size:\s*10px/s,
+			/\.stage-group-label\s*\{[^}]*font-size:\s*10px/s,
+			/\.stage-group-count\s*\{[^}]*font-size:\s*10px/s,
 			/\.stage-task-name\s*\{[^}]*font-size:\s*11px/s,
 			/\.stage-task-derived,\s*\.stage-task-blocked,\s*\.stage-task-progress,\s*\.stage-task-notification\s*\{[^}]*font-size:\s*10px/s,
-			/\.task-name\s*\{[^}]*font-size:\s*13px/s,
-			/\.repo-name\s*\{[^}]*font-size:\s*11px/s,
-			/\.repo-branch-name\s*\{[^}]*font-size:\s*11px/s,
-			/\.repo-dot\s*\{[^}]*font-size:\s*10px/s,
+			/\.stage-current-line\s*\{[^}]*font-size:\s*11px/s,
+			/\.stage-repo-name\s*\{[^}]*font-size:\s*11px/s,
+			/\.stage-repo-branch\s*\{[^}]*font-size:\s*11px/s,
+			/\.stage-repo-facts,\s*\.stage-repo-commit,\s*\.stage-note-line\s*\{[^}]*font-size:\s*10px/s,
+			/\.stage-note-editor textarea\s*\{[^}]*font-size:\s*10px/s,
 			/\.error,\s*\.empty\s*\{[^}]*font-size:\s*13px/s,
 			/\.task-action\s*\{[^}]*font-size:\s*11px/s,
 			/\.app-error\s*\{[^}]*font-size:\s*13px/s,

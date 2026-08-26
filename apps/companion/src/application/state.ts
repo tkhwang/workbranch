@@ -1,5 +1,5 @@
-import type { GlobalState, Repo, Task } from "../domain/model";
-import { matrixPlacement, taskStatus } from "../domain/model";
+import type { GlobalState, MatrixColumn, Repo, Task } from "../domain/model";
+import { MATRIX_COLUMNS, matrixPlacement, taskStatus } from "../domain/model";
 
 export type MenuSummary = {
 	readonly projectCount: number;
@@ -30,10 +30,14 @@ export type MainTaskRow = {
 
 export type MainViewModel = {
 	readonly matrixRows: readonly MainTaskRow[];
-	readonly repositoryRows: readonly MainTaskRow[];
+	readonly stageGroups: readonly MainStageGroup[];
 	readonly activeCount: number;
 	readonly idleCount: number;
-	readonly repositoryCount: number;
+};
+
+export type MainStageGroup = {
+	readonly column: MatrixColumn;
+	readonly rows: readonly MainTaskRow[];
 };
 
 function latestTaskActivity(task: Task): number {
@@ -114,17 +118,16 @@ export function buildMainViewModel(state: GlobalState): MainViewModel {
 				left.index - right.index,
 		)
 		.map(({ row }) => row);
-	const repositoryRows = matrixRows.filter((row) => row.repos.length > 0);
+	const stageGroups = MATRIX_COLUMNS.map((column) => ({
+		column,
+		rows: matrixRows.filter((row) => row.role === column),
+	}));
 
 	return {
 		matrixRows,
-		repositoryRows,
+		stageGroups,
 		activeCount: matrixRows.length,
 		idleCount: rows.length - matrixRows.length,
-		repositoryCount: repositoryRows.reduce(
-			(count, row) => count + row.repos.length,
-			0,
-		),
 	};
 }
 

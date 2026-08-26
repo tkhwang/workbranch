@@ -8,6 +8,7 @@ import {
 	type MenuModel,
 } from "./application/state";
 import { useCompanionSettings } from "./application/useCompanionSettings";
+import { useRepoNotes } from "./application/useRepoNotes";
 import type { GlobalState, Task } from "./domain/model";
 import {
 	appendActivityEvents,
@@ -23,7 +24,6 @@ import {
 import { startWorkspaceMonitor } from "./infrastructure/workspaceMonitor";
 import { AgentHeader } from "./ui/AgentHeader";
 import { AgentTabs, type CompanionView } from "./ui/AgentTabs";
-import { RepositoryQueue } from "./ui/RepositoryQueue";
 import { SettingsView } from "./ui/SettingsView";
 import { StageBoard } from "./ui/StageBoard";
 import { StatusAlert } from "./ui/StatusAlert";
@@ -100,6 +100,10 @@ export function App() {
 		updateLaunchAtLogin,
 		updatePreferences,
 	} = useCompanionSettings({ onError: showError, onStatus: showStatus });
+	const { notes, saveNote } = useRepoNotes({
+		onError: showError,
+		onStatus: showStatus,
+	});
 	const activeTheme = preferences.theme;
 
 	const applyState = useCallback(
@@ -211,25 +215,21 @@ export function App() {
 				<section className="view-panel" aria-label="Main View">
 					<StageBoard
 						activeCount={main.activeCount}
+						groups={main.stageGroups}
 						idleCount={main.idleCount}
-						onOpenIde={(root, task) => void handleTaskAction(root, task, "ide")}
-						onSelect={setSelectedStageTask}
-						rows={main.matrixRows}
-						selectedKey={selectedStageTask}
-					/>
-					<RepositoryQueue
+						notes={notes}
 						onAction={(root, task, kind) =>
 							void handleTaskAction(root, task, kind)
 						}
-						rows={main.repositoryRows}
+						onSaveNote={(key, text) => void saveNote(key, text)}
+						onSelect={setSelectedStageTask}
 						selectedKey={selectedStageTask}
-						theme={activeTheme}
 					/>
 					{model.summary.taskCount === 0 ? (
 						<p className="empty">No workbranch tasks registered.</p>
 					) : null}
-					{model.summary.taskCount > 0 && main.repositoryRows.length === 0 ? (
-						<p className="empty">No active repositories.</p>
+					{model.summary.taskCount > 0 && main.activeCount === 0 ? (
+						<p className="empty">No active worktrees.</p>
 					) : null}
 				</section>
 			) : null}
