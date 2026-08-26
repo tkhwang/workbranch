@@ -1,5 +1,7 @@
 # 0054 Companion Worktree Status Matrix + All Repositories Implementation Plan
 
+> **Superseded:** The active Companion Main contract moved to the stage-grouped design in [`0055-companion-stage-grouped-main-and-repo-branch-notes.md`](./0055-companion-stage-grouped-main-and-repo-branch-notes.md). This document is retained only as historical implementation and verification evidence; do not reuse its matrix-and-queue architecture for current work.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Before each behavior change use `superpowers:test-driven-development` (red → green → refactor). Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 메뉴바 Companion을 열면 상단에서 조회에 성공한 모든 active worktree의 `PLAN → EXECUTION → REVIEW` 위치를 즉시 파악하고, 하단에서 선택 필터 없이 그 active worktree에 속한 모든 repo/branch의 Git 사실과 기존 configured launcher 진입점을 확인할 수 있게 한다. 일부 configured root 조회가 실패하면 성공한 inventory는 유지하되 `ALL REPOSITORIES` heading에서 incomplete 상태를 즉시 알린다.

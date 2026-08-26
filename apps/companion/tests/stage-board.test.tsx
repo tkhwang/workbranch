@@ -242,4 +242,18 @@ describe("StageBoard", () => {
 			/\.stage-group-head\[data-column="plan"\][\s\S]*var\(--plan\)/,
 		);
 	});
+
+	it("preserves the blocked rail when a blocked task is selected", () => {
+		const css = readFileSync("src/styles/stage-board.css", "utf8");
+
+		expect(css).toMatch(
+			/\.stage-task-block\[data-blocked="true"\]\s*\{[^}]*box-shadow:\s*inset 3px 0 0 var\(--blocked\)/s,
+		);
+		expect(css).toMatch(
+			/\.stage-task-block\[data-selected="true"\]\s*\{[^}]*outline:\s*1px solid var\(--accent\)/s,
+		);
+		expect(css).not.toMatch(
+			/\.stage-task-block\[data-selected="true"\]\s*\{[^}]*box-shadow:/s,
+		);
+	});
 });

@@ -81,7 +81,7 @@
   - `AgentTabs` as an inset floating bottom terminal navigation,
   - shared `TerminalPanel`, `PromptLine`, and `StatusToken` primitives,
   - compact global inventory summary limited to project and task counts,
-  - `StageBoard` as the single Main surface. It renders non-empty vertical `PLAN`, `EXECUTION`, and `REVIEW` groups in lifecycle order; each group contains task blocks with selection, current work, repo/branch Git facts, task actions, and repo/branch notes,
+  - `StageBoard` as the single Main surface. It always renders vertical `PLAN`, `EXECUTION`, and `REVIEW` groups in lifecycle order; empty groups retain their header/rule/count `0`, while non-empty groups contain task blocks with selection, current work, repo/branch Git facts, task actions, and repo/branch notes,
   - top toolbar with icon-only refresh/quit controls and screen-reader-only live status,
   - Settings view preferences panel,
   - Settings preference sections always use the Claude Code `fieldset`/`legend` anatomy in both themes; the selected theme still owns colors and control state,
