@@ -36,7 +36,7 @@
 - Success signals:
   - A user can identify active/blocked work in under three seconds.
   - A user can identify each active task's stage without expanding any row.
-  - A user can identify every repository and branch connected to the active matrix without selecting or filtering a task.
+  - A user can identify every repository and branch directly beneath its task in the lifecycle-ordered stage groups.
   - The popover remains readable at its 460px native minimum width.
 
 ## Personas and jobs
@@ -50,18 +50,18 @@
 
 ## Information architecture
 - Primary navigation: an inset floating terminal tab bar anchored to the viewport bottom with three destinations: Main, Activity, Settings.
-- Core screens: Main stage board and repository metadata list, Activity report, Settings preferences view.
+- Core screens: Main stage-grouped worktree view, Activity report, Settings preferences view.
 - Content hierarchy:
   1. Compact global inventory (`projects · tasks`) and icon-only refresh.
   2. Active view content.
-  3. Main view: a top `WORKTREE STATUS` matrix followed by an `ALL REPOSITORIES` queue. The matrix shows each active task/worktree across `PLAN → EXECUTION → REVIEW`; the queue keeps every repo belonging to those same active tasks visible without selection filtering. Review comes first, then blocked execution, normal execution, and planning.
+  3. Main view: one `WORKTREE STATUS` surface grouped vertically as `01 PLAN → 02 EXECUTION → 03 REVIEW`. The three stage headers are always visible; an empty stage shows count `0` without an empty task row. Each active task appears once beneath its stage header with current work, repo/branch Git facts, task actions, and optional repo/branch notes. Clean todo/done tasks remain only in the `IDLE N` footer.
   4. Activity view: existing day/three-day calendar, session selection, and reload behavior inside the agent shell.
   5. Settings view: launch-at-login, font, and agent theme controls.
   6. Screen-reader live status in the agent shell; routine `Updated`/`Ready` text stays out of the visible header.
 
 ## Design principles
 - Principle 1: Status is a launcher signal, not a paragraph. Use compact dots, counts, and labels.
-- Principle 2: Overview and evidence are separate. The matrix answers where work is now; the repository queue answers which repo/branch and Git facts support that status.
+- Principle 2: Stage and evidence stay together. Each vertical stage group answers where work is now, while its task blocks immediately show current work and repo/branch facts without a duplicate detail surface.
 - Principle 3: Developer metadata should be monospace and subdued until dirty/blocked.
 - Tradeoffs: density is preferred over spaciousness, but tap/click targets remain at least 32px high where practical.
 
@@ -81,8 +81,7 @@
   - `AgentTabs` as an inset floating bottom terminal navigation,
   - shared `TerminalPanel`, `PromptLine`, and `StatusToken` primitives,
   - compact global inventory summary limited to project and task counts,
-  - `StageBoard` as the top worktree navigator. It renders active task/worktree rows in one matrix with `PLAN | EXECUTION | REVIEW` columns. Single click selects and navigates to the matching repository card without filtering; pointer double-click and command/control-enter reuse the existing task IDE launcher,
-  - `RepositoryQueue` as the lower active-repository surface. It globally orders task cards as review, blocked, execution, then plan; renders every repo/branch and observable Git fact for the active matrix set; and scrolls the selected task card into view while keeping every other card visible,
+  - `StageBoard` as the single Main surface. It always renders vertical `PLAN`, `EXECUTION`, and `REVIEW` groups in lifecycle order; empty groups retain their header/rule/count `0`, while non-empty groups contain task blocks with selection, current work, repo/branch Git facts, task actions, and repo/branch notes,
   - top toolbar with icon-only refresh/quit controls and screen-reader-only live status,
   - Settings view preferences panel,
   - Settings preference sections always use the Claude Code `fieldset`/`legend` anatomy in both themes; the selected theme still owns colors and control state,
@@ -90,39 +89,40 @@
   - switch row for launch-at-login,
   - font select row,
   - agent theme segmented control (`Claude Code`, `Codex`) with Claude Code as the default and migration target,
-  - `TaskMetaRow` containing task name/status/current work, a repository activity stack, and one task-level IDE/Terminal/Finder action group. Launcher configuration and path resolution remain CLI-owned: IDE opens configured repo worktrees, while Terminal/Finder use the resolved task root,
-  - Matrix task-row metadata containing project/task identity plus optional derived/blocked, progress, and notification cues. Repository facts live only in the lower queue to avoid duplicate detail.
+  - `StageTaskBlock` containing task name/status/current work, optional derived/blocked/progress/notification cues, one task-level icon-only IDE/Terminal/Finder action group, and its repository rows. IDE uses an editor-window silhouette with a title bar, file sidebar, and code lines; Terminal uses `>_`; Finder uses a folder. Inline SVG icons retain explicit aria-label/title/focus/disabled states. Launcher configuration and path resolution remain CLI-owned: IDE opens configured repo worktrees and is disabled when none exist, while Terminal/Finder use the resolved task root,
+  - `StageRepoRow` containing repo/branch identity, observable Git facts, last-commit relative time, and an inline note editor persisted in `companion-notes.json` by `repo:branch` key.
 - Variants and states: todo, planning, in-progress, review, blocked, done, notification present, dirty repo. In-progress identity uses the compact status marker rather than recoloring the full Task perimeter.
-- Todo/done visibility: todo/done tasks with repo `dirty` or `ahead > 0` derive into EXECUTION and remain visible in both matrix and repository queue. Clean todo/done tasks are inactive and excluded from Main; the matrix may expose only their aggregate `IDLE N` count.
+- Todo/done visibility: todo/done tasks with repo `dirty` or `ahead > 0` derive into EXECUTION and remain visible in that group. Clean todo/done tasks are inactive and excluded from Main; only their aggregate `IDLE N` count appears in the footer.
 - Shared header anatomy: Claude Code and Codex use the same text-only title block: `Workbranch Companion` above `projects · tasks`. The top banner contains no Workbranch mark, product icon, or Claude/Codex prompt prefix; theme identity comes from surrounding color tokens rather than different header geometry. Task metadata rows may retain their theme-specific prompt and action accents.
 - Token/component ownership: `style.css` is the CSS import manifest; `src/styles/base.css`, `themes.css`, `chrome.css`, `stage-board.css`, `task-details.css`, `task-actions.css`, `status-groups.css`, `settings.css`, and `motion.css` own CSS custom properties and component classes by surface.
 
 ## Accessibility
 - Target standard: keyboard-operable popover controls and readable contrast.
-- Keyboard/focus behavior: matrix row and launcher buttons expose clear focus rings. Matrix native activation selects/navigates; command/control-enter opens the configured IDE target.
-- Contrast/readability: matrix status text and repository metadata must pass practical dark-mode contrast; disabled action may be muted but legible.
-- Screen-reader semantics: preserve button `aria-label`s; the matrix is labeled `Worktree status matrix`, each row announces project/task/current stage/blocked state, and selected rows expose `aria-pressed`. The repository queue is labeled `All repositories`, keeps every active repo in the accessibility tree, and marks the navigated task without hiding siblings. Agent tab buttons expose destination labels and `aria-current`; settings controls use associated labels, switch state text, and the agent shell keeps a screen-reader-only `role="status"` region with polite live updates.
+- Keyboard/focus behavior: task selection, launcher, and repo-note controls expose clear focus rings. Native task activation selects in place; command/control-enter opens the configured IDE target only for repo-bearing tasks.
+- Contrast/readability: stage headers, task status text, repository metadata, and note states must pass practical dark-mode contrast; disabled action may be muted but legible.
+- Screen-reader semantics: preserve button `aria-label`s; the grouped surface is labeled `Worktree status`, stage headers expose their text/count, each task selection button announces project/task/stage/blocked state and exposes `aria-pressed`, and every repo note button exposes `aria-expanded` plus its repo/branch target. Agent tab buttons expose destination labels and `aria-current`; settings controls use associated labels, switch state text, and the agent shell keeps a screen-reader-only `role="status"` region with polite live updates.
 - Reduced motion and sensory considerations: disable transform transitions under `prefers-reduced-motion: reduce`.
 
 ## Responsive behavior
-- Supported breakpoints/devices: the native menu popover opens at 720×760, remains resizable, and cannot resize below 460px wide.
-- Layout adaptations: the shared expanded header keeps its internal columns consistent on every tab. At 720px, matrix identity plus three stage columns and repository identity/current-work/actions use their wide grid. At 620px and below, repository facts, current work, and actions stack before their wide-track minimums can overflow; at 520px and below, matrix stage tracks also return to compact fixed widths. Task and repository identity use `min-width: 0`; long task, repo, branch, and last-commit strings ellipsize with complete values in `title`/accessibility data.
-- Touch/hover differences: hover is enhancement only; core state is visible without hover. Pointer single-click selects/navigates, pointer double-click opens the task in the IDE, and command/control-enter provides an explicit keyboard IDE shortcut while native activation preserves selection access.
+- Supported breakpoints/devices: the native menu popover opens at 520×760, remains resizable, and cannot resize below 460px wide.
+- Layout adaptations: the shared expanded header keeps its internal columns consistent on every tab. Stage groups remain vertical at every supported width. Task actions stay compact on the task line where space allows and wrap without horizontal overflow at 460px. Repo/fact/commit/note rows use `min-width: 0`; long task, repo, branch, note, and last-commit strings ellipsize with complete values in `title`/accessibility data.
+- Touch/hover differences: hover is enhancement only; core state is visible without hover. Pointer single-click selects a task. For repo-bearing tasks, pointer double-click opens the task in the IDE and command/control-enter provides the keyboard IDE shortcut. Repo-less tasks remain selection-only.
 
 ## Interaction states
 - Loading: screen-reader live status reports refresh state without adding a visible top-line chip.
 - Empty: concise empty message with setup hint.
-- Error: root-scoped error row with red accent; operation failures such as refresh/action/preference errors also render a visible alert row while routine Ready/Updated statuses stay screen-reader-only.
+- Error: root-scoped error rows preserve partial-global-read details while successfully loaded stage groups remain visible. Operation failures such as refresh/action/preference/note errors also render a visible alert row while routine Ready/Updated statuses stay screen-reader-only.
 - Success: routine `Updated` / `Action complete` messages are not shown as a visible top-line chip; they remain available to assistive tech.
 - Disabled: disabled action has muted text and no press transform.
-- Matrix navigator: pointer single click or native activation selects the task, highlights its lower repository card, and scrolls it into the nearest visible position without filtering. Pointer double-click or command/control-enter opens the configured IDE target. No task is selected by default, and a stale selection does not select the first row implicitly.
+- Stage-grouped task selection: pointer single click or native activation selects the task in place. Pointer double-click or command/control-enter opens the configured IDE target only for repo-bearing tasks. Repo-less tasks expose `NO REPOSITORIES`, disabled IDE, and enabled Terminal/Finder actions. Selection no longer synchronizes to a second surface or calls `scrollIntoView`.
+- Repo note editing: each repo/branch exposes one edit button. Opening autofocuses the textarea; command/control-enter saves, Escape cancels and restores the prior value, blur saves, and saving blank text removes the key. Notes persist in `companion-notes.json` under `repo:branch` and survive task/worktree removal.
 - Theme selection: Settings is the only visible theme switch surface. Selection applies to every view immediately and persists through the existing preference store. Unsupported and legacy theme values migrate to Claude Code.
 - Offline/slow network: not applicable; CLI/local filesystem driven.
 
 ## Content voice
 - Tone: terse, operational, developer-native.
 - Terminology: task, stage, status, project, repo, branch, dirty.
-- Microcopy rules: prefer short row action labels (`IDE`, `Terminal`, `Finder`) over sentences; omit `Copy`/`Memo`/`Noti`/`Clear` row vocabulary because those companion actions are removed, not hidden.
+- Microcopy rules: task actions use icon-only IDE/Terminal/Finder controls with accessible names and tooltips rather than visible text. Omit `Copy`/`Memo`/`Noti`/`Clear` row vocabulary because those companion actions are removed, not hidden.
 
 ## Implementation constraints
 - Framework/styling system: React 18 + plain CSS. Adapt the structure and accessibility behavior of the Brainless Claude and Codex components into local reusable primitives. Do not add Tailwind, shadcn, or a new runtime package.
@@ -130,7 +130,7 @@
 - Performance constraints: no extra runtime package; no animation loops; preserve 0033 responsiveness fixes.
 - Compatibility constraints: CLI, schema v1 wire contract, Tauri command shape, and Rust ports remain unchanged; Companion delegates configured IDE/path behavior to the existing task-level launcher commands.
 - Scope constraints: do not add keyboard shortcuts or display shortcut hints for behavior that does not exist.
-- Test/screenshot expectations: cover both theme variants, the 720px primary and 460px minimum boundaries, matrix selection without filtering, all active repositories, and the Main/Activity/Settings shell contracts with Vitest. Run typecheck, lint, Vite build, Tauri build, then inspect both themes at both widths before final handoff.
+- Test/screenshot expectations: cover both theme variants, the 520px primary and 460px minimum boundaries, lifecycle-ordered stage groups, current work, repo facts, note edit/save/cancel/delete, task selection/actions, and Main/Activity/Settings shell contracts with Vitest. Run typecheck, lint, Vite build, Tauri build, then inspect both themes at both widths before final handoff.
 
 ## Open questions
 - [ ] Whether a later release should restore a light appearance as a separate axis after the two fixed-dark agent themes ship.
@@ -169,3 +169,6 @@
 - 2026-08-20 (repo activity grouped feed): Replaced the narrow three-column StageBoard with full-width vertical PLAN/EXECUTION/REVIEW task-feed sections. Todo/done with `dirty` or `ahead > 0` derive into EXECUTION; clean todo/done remain in `OTHER N`. Each task row shows a two-line repo/branch activity stack with explicit `last commit` context, preserving the native IDE-launch overlay and 460px minimum-width contract.
 - 2026-08-20 (per-task inset lifecycle): Runtime feedback showed that separate PLAN/EXECUTION/REVIEW sections did not explain where an individual task sat in the whole workflow, while a bare stepper still read like ordinary task metadata. After two HTML comparison rounds, the final choice is option B: a bordered inset Stage panel containing a `STAGE · <CURRENT>` header and connected three-node stepper on every task. Repo activity remains outside and full-width below the panel; clean todo/done remain in `OTHER N`.
 - 2026-08-24 (worktree matrix + all repositories): Replaced the per-task inset lifecycle/detail selection with a two-level Main surface. The top `WORKTREE STATUS` matrix uses `PLAN | EXECUTION | REVIEW` ownership (`AI/Human | AI | Human`) to locate every active task; the lower `ALL REPOSITORIES` queue shows every repo belonging to those same active tasks and never filters siblings on selection. Matrix selection only highlights and scrolls to the matching task card. Queue priority is review, blocked, execution, then plan; clean todo/done are excluded, while dirty/ahead todo/done derive into execution. Task actions reuse configured CLI launchers. The native window opens at 720×760, remains resizable, and preserves a 460px compact fallback.
+- 2026-08-26 (repo-less navigator completion): Kept every active matrix task in the lower queue, including tasks with zero repositories. Repo-less cards render `NO REPOSITORIES`, preserve selection/highlight/nearest-scroll, disable IDE and matrix IDE shortcuts, and keep task-root Terminal/Finder actions enabled.
+- 2026-08-26 (partial global inventory): Kept successfully loaded task/repository rows visible when one or more configured roots fail, while marking the queue heading `INCOMPLETE — N ROOT(S) UNAVAILABLE`. Missing repository counts are never inferred, and existing root-scoped error details remain visible.
+- 2026-08-26 (stage-grouped main + repo/branch notes): Replaced the 3-column matrix and separate repository queue with one vertical `01 PLAN → 02 EXECUTION → 03 REVIEW` surface. Each active task appears once with current work, repo/branch Git facts, actions, and frontend-owned inline repo notes stored in `companion-notes.json` by `repo:branch`. The native window opens at 520×760 with a 460px minimum.

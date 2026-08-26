@@ -4,8 +4,6 @@
 @import "./styles/agent-shell.css";
 @import "./styles/stage-board.css";
 @import "./styles/task-details.css";
-@import "./styles/task-actions.css";
-@import "./styles/status-groups.css";
 @import "./styles/settings.css";
 @import "./styles/motion.css";
 @import "./activity/activity-calendar.css";

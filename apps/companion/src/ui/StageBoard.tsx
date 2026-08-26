@@ -1,213 +1,381 @@
-import type { MainRole, MainTaskRow } from "../application/state";
+import { useEffect, useRef, useState } from "react";
+import { type RepoNotes, repoNoteKey } from "../application/notes";
+import type { MainStageGroup, MainTaskRow } from "../application/state";
+import type { MatrixColumn, Repo } from "../domain/model";
+import { taskProgress, taskStatus } from "../domain/model";
+import { StatusToken } from "./StatusToken";
 import {
-	MATRIX_COLUMNS,
-	type MatrixColumn,
-	type Task,
-	taskProgress,
-} from "../domain/model";
+	currentWorkText,
+	formatRelativeTime,
+	repoFacts,
+	type TaskActionHandler,
+	type TaskActionKind,
+	taskActionsFor,
+} from "./TaskRow";
+import { useCurrentEpochSeconds } from "./useCurrentEpochSeconds";
 
-export type StageOpenIde = (root: string, task: Task) => void;
+function TaskActionIcon({ kind }: { readonly kind: TaskActionKind }) {
+	const common = {
+		"aria-hidden": true,
+		className: "task-action-icon",
+		"data-action-icon": kind,
+		fill: "none",
+		stroke: "currentColor",
+		strokeLinecap: "round",
+		strokeLinejoin: "round",
+		strokeWidth: 1.6,
+		viewBox: "0 0 20 20",
+	} as const;
+	switch (kind) {
+		case "ide":
+			return (
+				<svg {...common}>
+					<title>IDE / Editor</title>
+					<rect height="15" rx="2" width="16" x="2" y="2.5" />
+					<path d="M2 6h16" />
+					<path d="M6.5 6v11.5" />
+					<path d="M9 9h5" />
+					<path d="M9 12h4" />
+					<path d="M9 15h6" />
+				</svg>
+			);
+		case "terminal":
+			return (
+				<svg {...common}>
+					<title>Terminal</title>
+					<rect height="14" rx="2" width="16" x="2" y="3" />
+					<path d="m5 7 3 3-3 3" />
+					<path d="M10 13h4" />
+				</svg>
+			);
+		case "finder":
+			return (
+				<svg {...common}>
+					<title>Finder</title>
+					<path d="M2.5 6.5h5l1.6 2h8.4v7.5h-15z" />
+					<path d="M2.5 6.5V5h6l1.5 1.5" />
+				</svg>
+			);
+	}
+}
 
-const COLUMN_LABELS: Record<MatrixColumn, string> = {
+const STAGE_LABELS: Record<MatrixColumn, string> = {
 	plan: "PLAN",
 	execution: "EXECUTION",
 	review: "REVIEW",
 };
 
-const MATRIX_HEADER = MATRIX_COLUMNS.map((column, index) => ({
+const STAGE_NUMBERS: Record<MatrixColumn, string> = {
+	plan: "01",
+	execution: "02",
+	review: "03",
+};
+
+function StageGroupHead({
 	column,
-	index: `0${index + 1}`,
-	label: COLUMN_LABELS[column],
-}));
-
-function matrixColumn(role: MainRole): MatrixColumn | undefined {
-	switch (role) {
-		case "plan":
-		case "execution":
-		case "review":
-			return role;
-		case "idle":
-			return undefined;
-	}
-}
-
-function MatrixHead({
-	activeCount,
-	hasExecution,
+	count,
 }: {
-	readonly activeCount: number;
-	readonly hasExecution: boolean;
+	readonly column: MatrixColumn;
+	readonly count: number;
 }) {
 	return (
-		<div className="stage-matrix-head">
-			<h2 className="stage-matrix-caption">
-				WORKTREE STATUS{" "}
-				<span className="stage-matrix-count">{activeCount}</span>
-			</h2>
-			{MATRIX_HEADER.map((item) => (
+		<header className="stage-group-head" data-column={column}>
+			<span className="stage-group-num">{STAGE_NUMBERS[column]}</span>
+			<span className="stage-group-label">{STAGE_LABELS[column]}</span>
+			<span aria-hidden="true" className="stage-group-rule" />
+			<span className="stage-group-count">{count}</span>
+		</header>
+	);
+}
+
+function StageRepoRow({
+	note,
+	nowSeconds,
+	onSaveNote,
+	repo,
+}: {
+	readonly note: string | undefined;
+	readonly nowSeconds: number;
+	readonly onSaveNote: (key: string, text: string) => void;
+	readonly repo: Repo;
+}) {
+	const key = repoNoteKey(repo.name, repo.branch);
+	const [editing, setEditing] = useState(false);
+	const [draft, setDraft] = useState(note ?? "");
+	const textareaRef = useRef<HTMLTextAreaElement>(null);
+	const relativeTime = formatRelativeTime(repo.lastCommitAt, nowSeconds);
+	const commit =
+		repo.lastCommitSubject === ""
+			? ""
+			: "last commit: " +
+				repo.lastCommitSubject +
+				(relativeTime === "" ? "" : " · " + relativeTime);
+
+	const saveAndClose = (): void => {
+		onSaveNote(key, draft);
+		setEditing(false);
+	};
+
+	useEffect(() => {
+		if (editing) textareaRef.current?.focus();
+	}, [editing]);
+
+	return (
+		<div className="stage-repo-row">
+			<div className="stage-repo-facts-line">
 				<span
-					className="stage-matrix-col"
-					data-hot={
-						item.column === "execution" && hasExecution ? "true" : "false"
+					className={
+						repo.dirty
+							? "stage-repo-name stage-repo-name-dirty"
+							: "stage-repo-name"
 					}
-					key={item.column}
+					title={repo.name}
 				>
-					<span className="stage-matrix-col-num">{item.index}</span>
-					<span className="stage-matrix-col-label">{item.label}</span>
+					{repo.name}
+					{repo.dirty ? (
+						<span aria-label="dirty" className="stage-repo-dot" role="img">
+							●
+						</span>
+					) : null}
 				</span>
-			))}
+				<span className="stage-repo-branch" title={repo.branch}>
+					{repo.branch}
+				</span>
+				<span className="stage-repo-facts">{repoFacts(repo)}</span>
+				<button
+					aria-expanded={editing}
+					aria-label={"edit note for " + repo.name + " " + repo.branch}
+					className="stage-note-button"
+					data-has-note={note === undefined ? "false" : "true"}
+					onClick={() => {
+						setDraft(note ?? "");
+						setEditing(true);
+					}}
+					type="button"
+				>
+					✎
+				</button>
+			</div>
+			{commit === "" ? null : (
+				<div className="stage-repo-commit" title={repo.lastCommitSubject}>
+					{commit}
+				</div>
+			)}
+			{editing ? (
+				<div className="stage-note-editor">
+					<textarea
+						aria-label={"note for " + repo.name + " " + repo.branch}
+						onBlur={saveAndClose}
+						onChange={(event) => setDraft(event.currentTarget.value)}
+						onKeyDown={(event) => {
+							if (event.key === "Escape") {
+								event.preventDefault();
+								setDraft(note ?? "");
+								setEditing(false);
+								return;
+							}
+							if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+								event.preventDefault();
+								saveAndClose();
+							}
+						}}
+						value={draft}
+						ref={textareaRef}
+					/>
+					<span>⌘Enter 저장 · Esc 취소 · 비우고 저장하면 삭제</span>
+				</div>
+			) : note === undefined ? null : (
+				<div className="stage-note-line" title={note}>
+					✎ {note}
+				</div>
+			)}
 		</div>
 	);
 }
 
-function MatrixCell({
-	currentIndex,
-	position,
-	row,
-}: {
-	readonly currentIndex: number;
-	readonly position: number;
-	readonly row: MainTaskRow;
-}) {
-	const state =
-		position === currentIndex
-			? "current"
-			: position < currentIndex
-				? "past"
-				: "future";
-	const edge =
-		position === 0
-			? "first"
-			: position === MATRIX_HEADER.length - 1
-				? "last"
-				: "middle";
-	const column = matrixColumn(row.role);
-	return (
-		<span
-			aria-hidden="true"
-			className="stage-cell"
-			data-cell={state}
-			data-edge={edge}
-		>
-			{state === "current" && column !== undefined ? (
-				<span
-					className="stage-node"
-					data-blocked={row.blocked ? "true" : "false"}
-					data-column={column}
-				/>
-			) : (
-				<span className="stage-dot" />
-			)}
-		</span>
-	);
-}
-
-export function MatrixTaskRow({
-	onOpenIde,
+export function StageTaskBlock({
+	notes,
+	nowSeconds,
+	onAction,
+	onSaveNote,
 	onSelect,
 	row,
 	selected,
 }: {
-	readonly onOpenIde: StageOpenIde;
+	readonly notes: RepoNotes;
+	readonly nowSeconds: number;
+	readonly onAction: TaskActionHandler;
+	readonly onSaveNote: (key: string, text: string) => void;
 	readonly onSelect: () => void;
 	readonly row: MainTaskRow;
 	readonly selected: boolean;
 }) {
-	const column = matrixColumn(row.role);
-	if (column === undefined) return null;
+	const canOpenIde = row.repos.length > 0;
 	const progress = taskProgress(row.task);
-	const currentIndex = MATRIX_COLUMNS.indexOf(column);
-	const stateLabel = `${COLUMN_LABELS[column]}${row.blocked ? ", blocked" : ""}`;
+	const status = taskStatus(row.task);
+	const currentWork = currentWorkText(row.task);
+	const stage = row.role === "idle" ? "plan" : row.role;
+	const stateLabel = STAGE_LABELS[stage] + (row.blocked ? ", blocked" : "");
+
+	const openIde = (): void => {
+		if (canOpenIde) onAction(row.root, row.task, "ide");
+	};
+
 	return (
 		<article
-			className="stage-matrix-row"
+			className="stage-task-block"
 			data-blocked={row.blocked ? "true" : "false"}
-			data-column={column}
 			data-derived={row.derived ? "true" : "false"}
 			data-selected={selected ? "true" : "false"}
 		>
-			<button
-				aria-label={`${row.project}, ${row.task.name}, ${stateLabel}, select; double-click or command-enter to open in IDE`}
-				aria-pressed={selected}
-				className="stage-matrix-line"
-				onClick={(event) => {
-					if (event.detail > 2) return;
-					onSelect();
-				}}
-				onDoubleClick={() => onOpenIde(row.root, row.task)}
-				onKeyDown={(event) => {
-					if (event.key !== "Enter") return;
-					if (!event.metaKey && !event.ctrlKey) return;
-					event.preventDefault();
-					onOpenIde(row.root, row.task);
-				}}
-				title={`Select ${row.task.name}; double-click or ⌘Enter to open in IDE`}
-				type="button"
-			>
-				<span className="stage-matrix-identity">
-					<span className="stage-matrix-left">
-						<span className="stage-task-name" title={row.task.name}>
-							{row.task.name}
-						</span>
-						{row.blocked ? (
-							<span className="stage-task-blocked">BLOCKED</span>
-						) : null}
-						{row.derived ? (
-							<span className="stage-task-derived">DERIVED</span>
-						) : null}
-						{progress.total > 0 ? (
-							<span className="stage-task-progress">
-								{progress.done}/{progress.total}
-							</span>
-						) : null}
-						{row.task.notiCount > 0 ? (
-							<span className="stage-task-notification">
-								+{row.task.notiCount}
-							</span>
-						) : null}
+			<div className="stage-task-line">
+				<button
+					aria-label={
+						row.project +
+						", " +
+						row.task.name +
+						", " +
+						stateLabel +
+						", select" +
+						(canOpenIde
+							? "; double-click or command-enter to open in IDE"
+							: "; no repositories available for IDE")
+					}
+					aria-pressed={selected}
+					className="stage-task-select"
+					onClick={(event) => {
+						if (event.detail > 2) return;
+						onSelect();
+					}}
+					onDoubleClick={openIde}
+					onKeyDown={(event) => {
+						if (!canOpenIde || event.key !== "Enter") return;
+						if (!event.metaKey && !event.ctrlKey) return;
+						event.preventDefault();
+						openIde();
+					}}
+					type="button"
+				>
+					<span aria-hidden="true" className="stage-task-prompt">
+						›
 					</span>
-					<span className="stage-project-name">{row.project}</span>
-				</span>
-				{MATRIX_HEADER.map((item, position) => (
-					<MatrixCell
-						currentIndex={currentIndex}
-						key={item.column}
-						position={position}
-						row={row}
-					/>
-				))}
-			</button>
+					<span className="stage-task-name" title={row.task.name}>
+						{row.task.name}
+					</span>
+					<StatusToken status={status} />
+					{row.blocked ? (
+						<span className="stage-task-blocked">BLOCKED</span>
+					) : null}
+					{row.derived ? (
+						<span className="stage-task-derived">DERIVED</span>
+					) : null}
+					{progress.total > 0 ? (
+						<span className="stage-task-progress">
+							{progress.done}/{progress.total}
+						</span>
+					) : null}
+					{row.task.notiCount > 0 ? (
+						<span className="stage-task-notification">
+							+{row.task.notiCount}
+						</span>
+					) : null}
+				</button>
+				<div className="stage-actions">
+					{taskActionsFor(row.task).map((action) => (
+						<button
+							aria-label={action.ariaLabel}
+							className="task-action"
+							disabled={action.disabled}
+							key={action.kind}
+							onClick={() => onAction(row.root, row.task, action.kind)}
+							title={action.kind === "ide" ? "IDE / Editor" : action.label}
+							type="button"
+						>
+							<TaskActionIcon kind={action.kind} />
+						</button>
+					))}
+				</div>
+			</div>
+			{currentWork === "" ? null : (
+				<div className="stage-current-line">
+					<span aria-hidden="true">└</span>
+					<span title={currentWork}>{currentWork}</span>
+				</div>
+			)}
+			{row.repos.length === 0 ? (
+				<div className="stage-repo-empty">NO REPOSITORIES</div>
+			) : (
+				<div className="stage-repo-list">
+					{row.repos.map((repo) => {
+						const key = repoNoteKey(repo.name, repo.branch);
+						return (
+							<StageRepoRow
+								key={key}
+								note={notes[key]}
+								nowSeconds={nowSeconds}
+								onSaveNote={onSaveNote}
+								repo={repo}
+							/>
+						);
+					})}
+				</div>
+			)}
 		</article>
 	);
 }
 
+export type StageBoardProps = {
+	readonly activeCount: number;
+	readonly groups: readonly MainStageGroup[];
+	readonly idleCount: number;
+	readonly notes: RepoNotes;
+	readonly nowSeconds?: number;
+	readonly onAction: TaskActionHandler;
+	readonly onSaveNote: (key: string, text: string) => void;
+	readonly onSelect: (key: string) => void;
+	readonly selectedKey: string | undefined;
+};
+
 export function StageBoard({
 	activeCount,
+	groups,
 	idleCount,
-	onOpenIde,
+	notes,
+	nowSeconds,
+	onAction,
+	onSaveNote,
 	onSelect,
-	rows,
 	selectedKey,
-}: {
-	readonly activeCount: number;
-	readonly idleCount: number;
-	readonly onOpenIde: StageOpenIde;
-	readonly onSelect: (key: string) => void;
-	readonly rows: readonly MainTaskRow[];
-	readonly selectedKey: string | undefined;
-}) {
-	const hasExecution = rows.some((row) => row.role === "execution");
+}: StageBoardProps) {
+	const currentNowSeconds = useCurrentEpochSeconds(nowSeconds);
 	return (
-		<section aria-label="Worktree status matrix" className="stage-board">
-			<MatrixHead activeCount={activeCount} hasExecution={hasExecution} />
-			{rows.map((row) => (
-				<MatrixTaskRow
-					key={row.key}
-					onOpenIde={onOpenIde}
-					onSelect={() => onSelect(row.key)}
-					row={row}
-					selected={row.key === selectedKey}
-				/>
+		<section aria-label="Worktree status" className="stage-board">
+			<h2 className="stage-matrix-caption">
+				WORKTREE STATUS{" "}
+				<span className="stage-matrix-count">{activeCount}</span>
+			</h2>
+			{groups.map((group) => (
+				<section
+					className="stage-group"
+					data-column={group.column}
+					key={group.column}
+				>
+					<StageGroupHead column={group.column} count={group.rows.length} />
+					<div className="stage-group-list">
+						{group.rows.map((row) => (
+							<StageTaskBlock
+								key={row.key}
+								notes={notes}
+								nowSeconds={currentNowSeconds}
+								onAction={onAction}
+								onSaveNote={onSaveNote}
+								onSelect={() => onSelect(row.key)}
+								row={row}
+								selected={row.key === selectedKey}
+							/>
+						))}
+					</div>
+				</section>
 			))}
 			{idleCount > 0 ? (
 				<span className="stage-idle-count">IDLE {idleCount} · inactive</span>

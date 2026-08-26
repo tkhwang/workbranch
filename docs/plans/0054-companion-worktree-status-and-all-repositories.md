@@ -1,10 +1,12 @@
 # 0054 Companion Worktree Status Matrix + All Repositories Implementation Plan
 
+> **Superseded:** The active Companion Main contract moved to the stage-grouped design in [`0055-companion-stage-grouped-main-and-repo-branch-notes.md`](./0055-companion-stage-grouped-main-and-repo-branch-notes.md). This document is retained only as historical implementation and verification evidence; do not reuse its matrix-and-queue architecture for current work.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Before each behavior change use `superpowers:test-driven-development` (red → green → refactor). Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 메뉴바 Companion을 열면 상단에서 모든 active worktree의 `PLAN → EXECUTION → REVIEW` 위치를 즉시 파악하고, 하단에서 선택 필터 없이 그 active worktree에 속한 모든 repo/branch의 Git 사실과 기존 configured launcher 진입점을 확인할 수 있게 한다.
+**Goal:** 메뉴바 Companion을 열면 상단에서 조회에 성공한 모든 active worktree의 `PLAN → EXECUTION → REVIEW` 위치를 즉시 파악하고, 하단에서 선택 필터 없이 그 active worktree에 속한 모든 repo/branch의 Git 사실과 기존 configured launcher 진입점을 확인할 수 있게 한다. 일부 configured root 조회가 실패하면 성공한 inventory는 유지하되 `ALL REPOSITORIES` heading에서 incomplete 상태를 즉시 알린다.
 
-**Architecture:** 기존 CLI `list --global --json`과 Companion domain model을 그대로 source of truth로 사용한다. `application/state.ts`가 task lifecycle과 repo activity를 하나의 `MainViewModel`로 정규화하고, 상단 `StageBoard`는 active task matrix를, 하단 `RepositoryQueue`는 동일한 active set 중 repo가 있는 task를 전역 우선순위로 렌더링한다. Matrix 선택은 하단을 필터링하지 않고 대응 task를 강조하고 화면 안으로 이동시킨다.
+**Architecture:** 기존 CLI `list --global --json`과 Companion domain model을 그대로 source of truth로 사용한다. `application/state.ts`가 task lifecycle, repo activity, unavailable root count를 하나의 `MainViewModel`로 정규화하고, 상단 `StageBoard`는 active task matrix를, 하단 `RepositoryQueue`는 동일한 active set의 모든 task card를 전역 우선순위로 렌더링한다. Repo가 없는 active task도 `NO REPOSITORIES` card로 남겨 matrix 선택의 highlight/scroll 목적지가 항상 존재하게 한다. 일부 root가 실패하면 `ALL REPOSITORIES <N> · INCOMPLETE — <M> ROOT(S) UNAVAILABLE`를 queue heading에 표시하고 기존 root별 상세 오류도 유지한다. Matrix 선택은 하단을 필터링하지 않고 대응 task를 강조하고 화면 안으로 이동시킨다.
 
 **Tech Stack:** Tauri v2, React 18, TypeScript strict mode, plain CSS, Vitest + `renderToStaticMarkup`, Biome, pnpm.
 
@@ -16,9 +18,10 @@
 2. `EXECUTION` 단계는 AI가 담당하므로 해당 worktree와 연결된 repo/branch를 확인한다.
 3. Review 단계는 사람이 코드를 확인해야 하므로 가장 높은 attention priority로 표시한다.
 4. 상단 matrix는 전체 위치를 빠르게 읽는 navigator다.
-5. 하단은 선택한 task만 보여주는 detail panel이 아니라 **상단 active matrix 전체 task의 모든 repo 정보**를 항상 유지한다.
+5. 하단은 선택한 task만 보여주는 detail panel이 아니라 **상단 active matrix 전체 task card와 그 task의 모든 repo 정보**를 항상 유지한다. Repo가 없는 active task도 `NO REPOSITORIES` card로 유지한다.
 6. 상단 task를 선택하면 하단의 대응 task card만 강조하고 첫 repo 위치로 scroll한다. 다른 repo는 숨기지 않는다.
 7. 코드 확인/실행은 기존 task-level `IDE | Terminal | Finder` action을 재사용하며 launcher command와 path resolution은 `workbranch config`/CLI가 소유한다.
+8. 일부 configured root 조회가 실패하면 성공한 task/repo는 계속 표시하고, queue heading에서 incomplete 상태와 실패 root 수를 즉시 확인한다. 기존 root별 상세 오류도 유지한다.
 
 ## Decision Gates
 
@@ -45,8 +48,28 @@
 - [x] All Repositories의 task 범위
   - Impact: Main 정보 밀도, matrix/queue 대응 관계, clean todo/done inventory 노출 여부.
   - Current evidence: 현재 matrix는 planning/execution/review와 Git evidence로 derived execution인 task만 active로 취급한다. 사용자가 요청한 범위는 “위의 모든 repo”였다.
-  - Recommended default: 상단 matrix active task의 모든 repo만 하단에 표시하고 clean todo/done은 제외.
-  - Status: resolved — 사용자 선택 A. queue와 matrix의 task set을 일치시키며 clean inactive inventory는 Main에 렌더링하지 않는다.
+  - Recommended default: 상단 matrix의 모든 active task card와 그 task의 모든 repo를 하단에 표시하고 clean todo/done은 제외.
+  - Status: resolved — 사용자 선택 A. queue와 matrix의 task set을 일치시키며 clean inactive inventory는 Main에 렌더링하지 않는다. Repo-less active task의 세부 동작은 아래 navigator 목적지 결정으로 보완한다.
+- [x] repo 없는 active task의 navigator 목적지
+  - Impact: matrix/queue 대응 관계, selection highlight/scroll, launcher availability.
+  - Current evidence: schema v1의 `repos`는 빈 배열을 허용하고, 기존 model fixture도 planning no-repo task를 matrix에는 포함하지만 queue에서는 제외한다. CLI `ide <task>`는 repo loop가 0회이면 아무 target도 열지 않고 성공하며, `terminal <task>`와 `finder <task>`는 task root를 연다.
+  - Recommended default: repo-less active task도 하단 `NO REPOSITORIES` card로 렌더링하고 selection 목적지를 보존한다. IDE는 disabled, Terminal/Finder는 enabled로 표시한다.
+  - Status: resolved — 사용자 선택 A. matrix의 모든 active task에 대응하는 하단 card를 유지한다.
+- [x] partial global error의 Main 표시
+  - Impact: `ALL REPOSITORIES` 완전성 의미, 부분 성공 UX, error acceptance.
+  - Current evidence: schema v1은 정상 `projects[]`와 실패 `errors[]`를 동시에 반환할 수 있고, 현재 App은 성공한 repo count와 root별 오류를 서로 떨어진 위치에 렌더링한다. 기존 acceptance는 렌더된 repo 합계만 검증해 configured root 전체의 완전성을 보장하지 않는다.
+  - Recommended default: 성공한 inventory는 유지하고 queue heading에 `INCOMPLETE — <N> ROOT(S) UNAVAILABLE`를 표시하며 기존 root별 상세 오류도 유지한다.
+  - Status: resolved — 사용자 선택 A. 부분 성공을 전체 성공처럼 보이지 않게 한다.
+- [x] relative-time 자동 갱신의 test boundary
+  - Impact: 시간 경과 UI의 회귀 보호 수준, test dependency/runtime 범위.
+  - Current evidence: `useCurrentEpochSeconds`는 60초 interval에서 state를 갱신하지만 기존 test는 timer 등록만 확인하고, 계획의 “timer tick 후 relative time 갱신” 완료 주장을 직접 증명하지 않는다.
+  - Recommended default: 기존 `repository-queue.test.tsx`에서 fake timer가 hook state setter에 새 epoch를 전달하는지와 서로 다른 `nowSeconds`가 `1m → 2m` markup을 만드는지를 분리 검증한다. 새 dependency/file은 추가하지 않는다.
+  - Status: resolved — 사용자 선택 A. React rerender 자체는 framework contract로 두고 product-owned 두 경계를 결정적으로 검증한다.
+- [x] follow-up visual QA evidence 경로
+  - Impact: 실제 화면 검증의 재현성, repository binary artifact 범위, 완료 증거.
+  - Current evidence: 기존 Companion 계획은 `/tmp/workbranch-companion-*/` capture와 manifest 경로를 계획에 기록하며, repository 내부에는 `docs/evidence/**` 관례가 없다. 기존 0054 visual PASS 문구에는 artifact 경로가 없다.
+  - Recommended default: `/tmp/workbranch-companion-0054-followup/`에 Claude/Codex × 720/460 capture, `manifest.json`, 두 reviewer 결과를 저장하고 계획에 정확한 경로를 기록한다.
+  - Status: resolved — 사용자 선택 A. repository에 binary evidence directory를 추가하지 않는다.
 
 ## 결정 사항
 
@@ -75,6 +98,8 @@
 
 repo 내부 순서는 `dirty` → `ahead > 0` → 최신 `lastCommitAt` → 원래 wire 순서다. 이는 “지금 코드 확인 가능성이 높은 repo”를 위로 올리되 Git facts 이상을 추측하지 않는다.
 
+Repo가 0개인 active task도 하단 task card를 렌더링하고 repo list 자리에 `NO REPOSITORIES`를 표시한다. 이 card는 status/current work/progress와 task-root 기반 Terminal/Finder action을 유지한다. IDE action과 matrix double-click/`⌘Enter`는 disabled 처리해 아무 target도 열지 않는 성공을 사용자-visible 성공으로 오해하지 않게 한다.
+
 ### D3. 하단 전역 정렬은 사람 attention 우선이다
 
 active task card priority는 다음과 같다.
@@ -89,9 +114,10 @@ active task card priority는 다음과 같다.
 ### D4. 상단 선택은 navigator이며 필터가 아니다
 
 - matrix row single click / native button activation: 해당 task를 선택, 하단 task card 강조, `scrollIntoView({ block: "nearest" })`.
-- matrix row pointer double-click / `⌘Enter` 또는 `Ctrl+Enter`: 기존 IDE launch.
+- repo-bearing matrix row pointer double-click / `⌘Enter` 또는 `Ctrl+Enter`: 기존 IDE launch. Repo-less row는 selection만 제공한다.
 - 선택 전에는 하단에 강조 항목이 없다. stale key는 자동으로 첫 task를 선택하지 않는다.
 - 선택 후에도 repository card count와 DOM row count는 변하지 않는다.
+- repo가 없는 active task도 `NO REPOSITORIES` card가 selection/highlight/scroll 목적지가 된다.
 
 ### D5. 메뉴바 window는 넓게 열되 기존 compact fallback을 보존한다
 
@@ -101,6 +127,40 @@ active task card priority는 다음과 같다.
 - `720px`에서는 repo fact/current work/action을 3영역 grid로 표시한다.
 - `620px` 이하에서는 task/repo facts 위, current work와 action 아래로 쌓고, matrix stage tracks는 `520px` 이하에서 compact width로 전환한다.
 - Activity/Settings는 동일 window에서 max-width를 사용하며 기능/정보 구조는 변경하지 않는다.
+
+### D6. `ALL REPOSITORIES`는 partial data 여부를 heading에서 말한다
+
+- `errors.length === 0`: `ALL REPOSITORIES <repoCount>`.
+- `errors.length > 0`: `ALL REPOSITORIES <repoCount> · INCOMPLETE — <errorCount> ROOT(S) UNAVAILABLE`.
+- `<repoCount>`는 성공적으로 읽은 active task의 실제 repo 합계이며 실패 root의 repo 수를 추측하지 않는다.
+- 성공한 matrix/queue rows는 그대로 유지하고 partial error 때문에 전체 Main을 empty/error state로 대체하지 않는다.
+- 기존 root별 `<root>: <message>` 상세 오류를 유지한다.
+- incomplete cue는 시각적으로 heading에 인접하고 accessibility tree에서도 heading text로 읽힌다.
+
+### D7. Relative-time refresh는 두 product-owned 경계로 검증한다
+
+- clock boundary: fake system time과 fake timer를 사용해 60초 tick이 `setCurrentNow(nextEpochSeconds)`를 호출하는지 검증한다.
+- rendering boundary: 동일 repo를 `nowSeconds=3_600`과 `nowSeconds=3_660`으로 각각 렌더링해 `1m`과 `2m` markup을 검증한다.
+- interval 등록 수와 cleanup도 기존 contract대로 유지한다.
+- React renderer의 내부 rerender 동작을 검증하기 위한 `jsdom`, Testing Library, `react-test-renderer`는 추가하지 않는다.
+- 두 경계를 통과하면 product code가 소유하는 timer 값 전달과 relative-time formatting은 보호된다. 실제 React state rerender는 React framework contract로 둔다.
+
+### D8. Follow-up visual evidence는 승인된 `/tmp` 경로와 manifest로 묶는다
+
+- evidence root: `/tmp/workbranch-companion-0054-followup/`.
+- required captures:
+  - `claude-720.png`
+  - `claude-460.png`
+  - `codex-720.png`
+  - `codex-460.png`
+- required metadata/reviews:
+  - `manifest.json`
+  - `visual-integrity.json`
+  - `visual-fidelity.json`
+- deterministic fixture는 repo-bearing review/execution task, repo-less planning task, partial global errors 2개, 긴 repo/branch/commit 문자열을 한 화면에 포함한다.
+- 각 capture는 repo-less task가 선택된 상태로 `NO REPOSITORIES` highlight, disabled IDE, enabled Terminal/Finder, `INCOMPLETE — 2 ROOTS UNAVAILABLE`를 함께 보여야 한다.
+- manifest는 capture path, logical width/height, theme, fixture identity, selected task key, rendered task/repo count, unavailable root count, horizontal overflow 결과, capture timestamp를 기록한다.
+- 계획의 완료 evidence에는 위 exact paths와 두 reviewer PASS를 기록한다. `/tmp` artifact가 없거나 manifest와 capture가 불일치하면 visual gate는 미완료다.
 
 ## 범위 밖
 
@@ -115,19 +175,19 @@ active task card priority는 다음과 같다.
 
 ```text
 DESIGN.md                                      # 새 Main 정보 구조, 폭, 정렬, interaction 계약
-apps/companion/src/application/state.ts       # MainViewModel, task priority, repo ordering, stable task key
+apps/companion/src/application/state.ts       # MainViewModel, task priority, repo ordering, unavailable root count, stable task key
 apps/companion/src/ui/StageBoard.tsx           # 상단 active matrix 전용; selected-only Detail/OTHER 제거
-apps/companion/src/ui/RepositoryQueue.tsx      # 신규: active repository-bearing task + scroll/highlight orchestration
+apps/companion/src/ui/RepositoryQueue.tsx      # 신규: all active task cards + incomplete cue + scroll/highlight orchestration
 apps/companion/src/ui/TaskRow.tsx              # repo activity facts, current work, task actions, highlighted state
 apps/companion/src/App.tsx                     # buildMainViewModel, selection wiring, ProjectGroup 제거
 apps/companion/src/styles/stage-board.css      # wide matrix + selected navigator state
 apps/companion/src/styles/task-details.css     # all-repository card/repo grid + compact fallback
 apps/companion/src/styles/status-groups.css    # RepositoryQueue section ownership; legacy project-group 제거
 apps/companion/src-tauri/tauri.conf.json       # 720×760 initial, 460 min width
-apps/companion/tests/model.test.ts             # view-model inclusion/order/count contracts
+apps/companion/tests/model.test.ts             # view-model inclusion/order/repo/error count contracts
 apps/companion/tests/task-row.test.tsx         # matrix + all repository rendering/interaction contracts
 apps/companion/tests/app-shell.test.tsx        # CSS/window contract
-apps/companion/tests/repository-queue.test.tsx # 신규: scroll/highlight/all-visible contract
+apps/companion/tests/repository-queue.test.tsx # 신규: scroll/highlight/all-visible/partial-error contract
 
 # 제거
 apps/companion/src/ui/ProjectGroup.tsx
@@ -147,7 +207,7 @@ apps/companion/tests/stage-board-clock.test.tsx
 `## Direction revision` 끝에 다음 결정을 추가한다.
 
 ```markdown
-- 2026-08-24 (worktree matrix + all repositories): Main은 상단 `WORKTREE STATUS` matrix와 하단 `ALL REPOSITORIES` queue의 2단 구조다. Matrix는 `PLAN | EXECUTION | REVIEW` lifecycle 위치를 task/worktree 단위로 압축하고, 하단은 선택과 무관하게 matrix active task 중 repository-bearing task와 그 모든 repo/branch activity facts를 유지한다. Matrix 선택은 필터가 아니라 하단 task highlight + nearest scroll이다. 하단은 `REVIEW → BLOCKED → EXECUTION → PLAN` 순서이며 task 안 repo는 dirty/ahead/latest-commit evidence 순으로 배치한다. clean todo/done은 Main inventory에 포함하지 않는다. task actions는 기존 `IDE | Terminal | Finder`만 유지한다. 초기 native window는 720×760, 최소 폭은 460이다.
+- 2026-08-24 (worktree matrix + all repositories): Main은 상단 `WORKTREE STATUS` matrix와 하단 `ALL REPOSITORIES` queue의 2단 구조다. Matrix는 `PLAN | EXECUTION | REVIEW` lifecycle 위치를 task/worktree 단위로 압축하고, 하단은 선택과 무관하게 matrix의 모든 active task card와 그 repo/branch activity facts를 유지한다. Repo-less active task도 `NO REPOSITORIES` card로 남긴다. Matrix 선택은 필터가 아니라 하단 task highlight + nearest scroll이다. 하단은 `REVIEW → BLOCKED → EXECUTION → PLAN` 순서이며 task 안 repo는 dirty/ahead/latest-commit evidence 순으로 배치한다. clean todo/done은 Main inventory에 포함하지 않는다. task actions는 기존 `IDE | Terminal | Finder`만 유지하되 repo-less task의 IDE는 disabled다. 초기 native window는 720×760, 최소 폭은 460이다.
 ```
 
 - [x] **Step 2: 기존 모순을 현재형 섹션에서 교정한다**
@@ -308,7 +368,7 @@ function mainPriority(
 }
 ```
 
-`matrixRows`는 `role !== "idle"`만 포함한다. `repositoryRows`는 `matrixRows` 중 repo가 하나 이상인 task만 포함하므로 clean todo/done은 repo가 있어도 제외된다. 각 `repos`는 복사본을 stable sort하고 원본 `Task.repos`는 mutate하지 않는다. blocked priority는 execution보다 먼저 적용한다. no-repo fixture는 `planning`으로 만들어 matrix에는 남지만 repositoryRows에는 빠지는 경계를 검증한다.
+`matrixRows`는 `role !== "idle"`만 포함한다. 이 Task의 기존 구현은 `repositoryRows`를 `matrixRows` 중 repo가 하나 이상인 task로 제한했지만, 2026-08-26 Decision 1에서 이 filter가 superseded되었다. 현재 contract는 Task 7과 같이 repo-less active task도 `repositoryRows`에 유지한다. 각 `repos`는 복사본을 stable sort하고 원본 `Task.repos`는 mutate하지 않는다. blocked priority는 execution보다 먼저 적용한다.
 
 - [x] **Step 4: model tests를 green으로 만든다** — Companion 156 tests 및 typecheck 통과.
 
@@ -411,7 +471,7 @@ type StageBoardProps = {
 
 @media (max-width: 520px) {
 	.stage-board {
-		--stage-grid: minmax(0, 1fr) repeat(3, 58px);
+		--stage-grid: minmax(0, 1fr) repeat(3, 56px);
 	}
 }
 ```
@@ -485,7 +545,7 @@ expect(html).toContain("last commit: implement companion activity feed · 1m");
 expect(html).toContain("Review screenshot");
 ```
 
-기존 `stage-board-clock.test.tsx`의 fake timer contract도 이 파일로 옮긴다. `RepositoryQueue`가 initial render의 `nowSeconds`를 즉시 사용하고 timer tick 후 relative time을 갱신하는지 검증한 뒤 old test file을 삭제한다.
+기존 `stage-board-clock.test.tsx`의 fake timer contract도 이 파일로 옮긴다. 이 Task의 기존 구현은 interval 등록만 검증했으며 timer tick 이후 값 전달/markup 변화까지 검증했다는 완료 주장은 2026-08-26 review에서 superseded되었다. 현재 relative-time test contract는 Task 9에서 완성한다.
 
 - [x] **Step 2: red 확인** — RepositoryQueue skeleton에서 content/scroll/clock 4 tests FAIL.
 
@@ -665,7 +725,7 @@ const main = buildMainViewModel(state);
 />
 ```
 
-`buildMenuModel`은 header summary/errors만 반환하도록 줄이고 `ProjectGroup` type/`groups` 계산을 삭제한다. repository가 없는 active task도 matrix에는 남고, repository queue가 비면 `No repositories registered.` empty state를 렌더링한다.
+`buildMenuModel`은 header summary/errors만 반환하도록 줄이고 `ProjectGroup` type/`groups` 계산을 삭제한다. 이 Task의 기존 구현은 repository가 없는 active task를 matrix에만 남겼지만, 2026-08-26 Decision 1에서 superseded되었다. 현재 contract는 Task 7과 같이 repo-less active task도 queue card로 유지한다.
 
 - [x] **Step 4: window config를 바꾼다**
 
@@ -778,7 +838,7 @@ Acceptance:
 - matrix pointer double-click과 `⌘Enter`가 IDE를 연다.
 - bottom tabs 위 reserved clearance와 scroll로 마지막 repository row/action까지 도달할 수 있다.
 
-- [x] **Step 5: compact fallback을 검증한다** — 460×760 native capture, 58px stage tracks, all-repo cards, Claude/Codex themes 확인.
+- [x] **Step 5: compact fallback을 검증한다** — 460×760 native capture, 56px stage tracks, all-repo cards, Claude/Codex themes 확인.
 
 Window를 `460×760`으로 줄이고 두 theme에서 확인한다.
 
@@ -789,7 +849,7 @@ Acceptance:
 - 32px action target과 keyboard focus ring이 유지된다.
 - Activity/Settings tab도 460px에서 기존 기능을 유지한다.
 
-- [x] **Step 6: 최종 diff 검증** — `git diff --check` 통과, debug/QA temporary artifact 정리, 독립 visual integrity/visual fidelity reviewer PASS.
+- [x] **Step 6: 최초 구현 당시 최종 diff 검증** — `git diff --check` 통과, debug/QA temporary artifact 정리, 독립 visual integrity/visual fidelity reviewer PASS로 기록되었다. 2026-08-26 review에서 exact capture/reviewer path가 없어 재검증할 수 없음을 확인했으며, 이 visual 완료 주장은 Task 10과 재개방된 완료 기준이 supersede한다.
 
 Run:
 
@@ -811,13 +871,301 @@ git commit -m "fix(companion): polish worktree repository overview"
 
 ---
 
+### Task 7: repo-less active task의 navigator contract를 완성한다
+
+**Files:**
+- Modify: `DESIGN.md`
+- Modify: `apps/companion/src/application/state.ts`
+- Modify: `apps/companion/src/ui/StageBoard.tsx`
+- Modify: `apps/companion/src/ui/TaskRow.tsx`
+- Modify: `apps/companion/tests/model.test.ts`
+- Modify: `apps/companion/tests/task-row.test.tsx`
+- Modify: `apps/companion/tests/repository-queue.test.tsx`
+
+- [x] **Step 1: repo-less selection/action contract를 failing test로 고정한다** — 기존 filter/IDE behavior로 6 tests가 의도대로 FAIL한 뒤 production 변경을 시작했다.
+
+planning 상태이고 `repos: []`인 task를 구성해 다음을 단언한다.
+
+```ts
+expect(main.matrixRows.some((row) => row.task.name === "no-repo-task")).toBe(true);
+expect(main.repositoryRows.some((row) => row.task.name === "no-repo-task")).toBe(true);
+```
+
+`RepositoryQueue` rendering/interaction assertions:
+
+```ts
+expect(html).toContain("NO REPOSITORIES");
+expect(html).toContain('data-repository-task="/tmp/acme:no-repo-task"');
+expect(html).toContain('aria-current="true"');
+expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest" });
+expect(html).toContain('aria-label="open no-repo-task in IDE" disabled');
+expect(html).not.toContain('aria-label="open no-repo-task in terminal" disabled');
+expect(html).not.toContain('aria-label="open no-repo-task in Finder" disabled');
+```
+
+`MatrixTaskRow`에서는 repo-less row의 double-click/`⌘Enter`/`Ctrl+Enter`가 `onOpenIde`를 호출하지 않는지 검증한다. Single click selection은 repo-bearing row와 동일하게 유지한다.
+
+- [x] **Step 2: MainViewModel과 task card를 최소 변경한다** — 모든 active row를 queue에 유지하고 `NO REPOSITORIES`, IDE-disabled, selection-only matrix shortcut을 구현했으며 `DESIGN.md`를 동기화했다.
+
+- `repositoryRows`는 repository-bearing subset이 아니라 `matrixRows`와 동일한 active task-card set을 유지한다.
+- `repositoryCount`는 계속 실제 repo 개수 합계이므로 repo-less card가 count를 증가시키지 않는다.
+- `TaskMetaRow`는 `repos.length === 0`이면 repo list 대신 `NO REPOSITORIES` empty cue를 렌더링한다.
+- `taskActionsFor(task)`는 `task.repos.length === 0`일 때 IDE만 disabled로 반환하고 Terminal/Finder는 enabled를 유지한다.
+- `MatrixTaskRow`는 repo-less row의 IDE shortcut을 실행하지 않으며 accessible label/title에서 IDE shortcut을 제공한다고 말하지 않는다.
+- `DESIGN.md`의 current contract와 Direction revision에 repo-less `NO REPOSITORIES` card, IDE disabled, Terminal/Finder enabled 규칙을 반영한다.
+- CLI, JSON schema, contract DTO, ACL, Rust command는 변경하지 않는다.
+
+- [x] **Step 3: targeted green과 actual interaction을 검증한다** — model/task-row/repository-queue 3 files, 27 tests PASS; typecheck PASS; lint exit 0(기존 parseContract info diagnostics만 유지).
+
+Run:
+
+```bash
+pnpm --filter @workbranch/companion exec vitest run \
+  tests/model.test.ts \
+  tests/task-row.test.tsx \
+  tests/repository-queue.test.tsx
+pnpm --filter @workbranch/companion typecheck
+pnpm --filter @workbranch/companion lint
+```
+
+Acceptance:
+
+- repo-less planning task가 matrix와 queue 양쪽에 한 번씩 보인다.
+- matrix single click은 `NO REPOSITORIES` card를 강조하고 nearest 위치로 이동한다.
+- repo-bearing task/repo count/정렬은 이전과 동일하다.
+- repo-less task에서 IDE는 disabled이고 Terminal/Finder는 task root를 연다.
+- selection 전후 card/repo DOM count는 변하지 않는다.
+
+---
+
+### Task 8: partial global error를 queue completeness에 연결한다
+
+**Files:**
+- Modify: `DESIGN.md`
+- Modify: `apps/companion/src/application/state.ts`
+- Modify: `apps/companion/src/App.tsx`
+- Modify: `apps/companion/src/ui/RepositoryQueue.tsx`
+- Modify: `apps/companion/tests/model.test.ts`
+- Modify: `apps/companion/tests/repository-queue.test.tsx`
+- Modify: `apps/companion/tests/app-shell.test.tsx`
+
+- [x] **Step 1: partial-error contract를 failing test로 고정한다** — unavailable count/model, queue heading/aria, App wiring assertions가 기존 구현에서 3 tests로 의도대로 FAIL했다.
+
+`projects`와 `errors`가 동시에 있는 state를 구성해 다음을 단언한다.
+
+```ts
+const main = buildMainViewModel({
+  projects: [successfulProject],
+  errors: [
+    { root: "/tmp/missing-a", message: "not inside a workbranch project" },
+    { root: "/tmp/missing-b", message: "task root unavailable" },
+  ],
+});
+
+expect(main.unavailableRootCount).toBe(2);
+```
+
+`RepositoryQueue`는 `unavailableRootCount={2}`일 때 다음을 렌더링한다.
+
+```ts
+expect(html).toContain("ALL REPOSITORIES 4");
+expect(html).toContain("INCOMPLETE — 2 ROOTS UNAVAILABLE");
+expect(html).toContain('aria-label="All repositories, incomplete, 2 roots unavailable"');
+```
+
+`unavailableRootCount={0}`에서는 `INCOMPLETE`와 `UNAVAILABLE` 문구가 없어야 한다. `App` source/markup test는 `main.unavailableRootCount`가 queue에 전달되고 기존 `model.errors.map(...)` 상세 오류가 남는지 함께 검증한다.
+
+- [x] **Step 2: MainViewModel과 queue heading을 최소 변경한다** — `unavailableRootCount`, incomplete cue/aria label, App wiring을 추가하고 성공 rows와 상세 root errors를 유지했으며 `DESIGN.md`를 동기화했다.
+
+- `MainViewModel`에 `readonly unavailableRootCount: number`를 추가하고 `state.errors.length`로 설정한다.
+- `RepositoryQueueProps`에 `readonly unavailableRootCount: number`를 추가한다.
+- queue heading은 repo count와 incomplete cue를 한 문맥으로 렌더링하되 실패 root의 repo 수를 추측하지 않는다.
+- `App.tsx`는 `unavailableRootCount={main.unavailableRootCount}`를 전달한다.
+- 기존 root별 상세 오류 rendering은 삭제하거나 숨기지 않는다.
+- `DESIGN.md`의 information architecture, error states, accessibility contract에 partial inventory 표현을 반영한다.
+- CLI, schema, DTO, ACL, Rust command는 변경하지 않는다.
+
+- [x] **Step 3: partial success actual behavior와 regression을 검증한다** — model/repository-queue/app-shell 3 files, 45 tests PASS; typecheck PASS; lint exit 0(기존 parseContract info diagnostics만 유지).
+
+Run:
+
+```bash
+pnpm --filter @workbranch/companion exec vitest run \
+  tests/model.test.ts \
+  tests/repository-queue.test.tsx \
+  tests/app-shell.test.tsx
+pnpm --filter @workbranch/companion typecheck
+pnpm --filter @workbranch/companion lint
+```
+
+Acceptance:
+
+- 정상 project의 matrix/task/repo 수와 action은 error 유무로 변하지 않는다.
+- error가 1개 이상이면 `ALL REPOSITORIES` heading에서 incomplete와 정확한 failed-root count를 읽을 수 있다.
+- failed root의 repository count는 추측하거나 총합에 더하지 않는다.
+- root별 상세 오류는 그대로 확인할 수 있다.
+- error가 0개면 기존 heading shape를 유지한다.
+
+---
+
+### Task 9: relative-time tick과 rendering 경계를 실제로 검증한다
+
+**Files:**
+- Modify: `apps/companion/tests/repository-queue.test.tsx`
+
+- [x] **Step 1: timer가 새 epoch를 state setter에 전달하는지 검증한다** — fake system time/timer가 60초 뒤 epoch seconds를 state setter에 전달하는 test PASS.
+
+기존 hoisted React mock에 `useState` setter spy를 추가하고 fake system time/fake timer로 다음을 단언한다.
+
+```ts
+vi.useFakeTimers();
+vi.setSystemTime(new Date("2026-08-26T00:00:00Z"));
+
+renderToStaticMarkup(
+  <RepositoryQueue
+    onAction={() => undefined}
+    rows={main.repositoryRows}
+    selectedKey={undefined}
+    theme="claude"
+    unavailableRootCount={0}
+  />,
+);
+
+vi.setSystemTime(new Date("2026-08-26T00:01:00Z"));
+vi.advanceTimersByTime(60_000);
+
+expect(setCurrentNow).toHaveBeenCalledWith(
+  Math.floor(new Date("2026-08-26T00:01:00Z").getTime() / 1_000),
+);
+```
+
+기존 `vi.getTimerCount() === 1` assertion과 cleanup은 유지한다. React mock은 이 test file에서 `useCurrentEpochSeconds`가 사용하는 state setter만 관찰하며 production code를 변경하지 않는다.
+
+- [x] **Step 2: 전달된 시간이 relative-time markup을 바꾸는지 검증한다** — 동일 fixture의 fixed `nowSeconds`가 `1m → 2m` markup을 만드는 test PASS.
+
+동일 fixture를 fixed time으로 두 번 static render한다.
+
+```ts
+const oneMinute = renderQueue({ nowSeconds: 3_600 });
+const twoMinutes = renderQueue({ nowSeconds: 3_660 });
+
+expect(oneMinute).toContain("last commit: implement companion activity feed · 1m");
+expect(twoMinutes).toContain("last commit: implement companion activity feed · 2m");
+```
+
+`lastCommitAt <= 0`은 relative-time suffix를 만들지 않는 기존 boundary도 유지한다.
+
+- [x] **Step 3: focused/full regression을 검증한다** — repository-queue 7 tests PASS; Companion 15 files/152 tests PASS; typecheck PASS; lint exit 0(기존 parseContract info diagnostics만 유지).
+
+Run:
+
+```bash
+pnpm --filter @workbranch/companion exec vitest run tests/repository-queue.test.tsx
+pnpm --filter @workbranch/companion test
+pnpm --filter @workbranch/companion typecheck
+pnpm --filter @workbranch/companion lint
+```
+
+Acceptance:
+
+- 60초 timer tick이 새 epoch seconds를 hook state setter에 전달한다.
+- fixed `nowSeconds` 변화가 relative-time markup을 결정적으로 변경한다.
+- 새 test dependency, test environment, test file을 추가하지 않는다.
+- interval cleanup과 기존 all-visible/highlight/partial-error assertions가 유지된다.
+
+---
+
+### Task 10: follow-up native visual evidence를 재현 가능하게 남긴다
+
+**Artifacts:**
+- Create: `/tmp/workbranch-companion-0054-followup/claude-720.png`
+- Create: `/tmp/workbranch-companion-0054-followup/claude-460.png`
+- Create: `/tmp/workbranch-companion-0054-followup/codex-720.png`
+- Create: `/tmp/workbranch-companion-0054-followup/codex-460.png`
+- Create: `/tmp/workbranch-companion-0054-followup/manifest.json`
+- Create: `/tmp/workbranch-companion-0054-followup/visual-integrity.json`
+- Create: `/tmp/workbranch-companion-0054-followup/visual-fidelity.json`
+- Modify: `docs/plans/0054-companion-worktree-status-and-all-repositories.md` only to append actual evidence paths/results after verification
+
+- [x] **Step 1: deterministic follow-up fixture와 capture manifest를 준비한다** — CJK/long-string, repo-less task, 2 partial errors fixture와 SHA-256 manifest를 `/tmp/workbranch-companion-0054-followup/`에 생성했다.
+
+Fixture requirements:
+
+```text
+review task: multi-repo, dirty/ahead, long commit subject
+execution task: normal repo-bearing task
+planning task: repos=[]
+global errors: 2 unavailable roots
+selected task: repo-less planning task
+themes: claude, codex
+logical sizes: 720×760, 460×760
+```
+
+Capture 전에 `/tmp/workbranch-companion-0054-followup/`를 새로 만들고 stale artifact를 재사용하지 않는다. `manifest.json`에는 각 capture의 filename, SHA-256, logical size, theme, fixture id, selected key, task-card count, repo count, unavailable-root count, `scrollWidth <= clientWidth` 결과, timestamp를 기록한다.
+
+- [x] **Step 2: 실제 native/Vite surface에서 4개 capture를 만든다** — Browser backend가 없어 production components/CSS deterministic Vite harness를 Chrome Stable CDP로 구동했다. Claude/Codex × 720/460 fresh captures에서 selected repo-less card, focus, incomplete cue, CJK ellipsis, no horizontal overflow를 확인했다.
+
+각 theme/width에서 repo-less row를 single click해 대응 `NO REPOSITORIES` card가 highlight/nearest scroll 되는 상태를 capture한다. 다음을 실제 화면에서 확인한다.
+
+- `ALL REPOSITORIES <N> · INCOMPLETE — 2 ROOTS UNAVAILABLE`가 heading에서 잘리지 않는다.
+- repo-less card의 IDE는 disabled, Terminal/Finder는 enabled다.
+- repo-bearing task/repo cards와 상세 root errors가 유지된다.
+- 720px과 460px 모두 horizontal overflow가 없다.
+- 460px에서 stage labels, no-repo cue, incomplete cue, action focus ring이 읽힌다.
+- Claude/Codex theme identity와 selected/highlight contrast가 유지된다.
+
+- [x] **Step 3: 두 visual reviewer 결과를 artifact로 저장한다** — initial review가 fixed-tab clearance와 missing `·` separator를 발견해 scroll-margin/test 및 heading contract를 수정·재캡처했다. 최종 `visual-integrity.json`과 independent `visual-fidelity.json`은 모두 PASS다.
+
+`omo:visual-qa` 또는 동등한 dual-review 절차로 다음 두 lens를 분리한다.
+
+- `visual-integrity.json`: design-system/functional/accessibility/responsive verdict.
+- `visual-fidelity.json`: capture/manifest 일치, CJK/ellipsis/clipping, selected/incomplete/no-repo state fidelity verdict.
+
+각 JSON은 `verdict`, inspected capture paths, findings, unresolved risks를 포함한다. 두 verdict 모두 `PASS`여야 한다.
+
+- [x] **Step 4: exact evidence를 계획에 기록하고 final gates를 재실행한다** — Companion 15 files/152 tests, typecheck, lint exit 0, Vite build, Rust 23 tests, Tauri release app bundle, `git diff --check` PASS.
+
+Run:
+
+```bash
+pnpm --filter @workbranch/companion test
+pnpm --filter @workbranch/companion typecheck
+pnpm --filter @workbranch/companion lint
+pnpm --filter @workbranch/companion build
+cargo test --manifest-path apps/companion/src-tauri/Cargo.toml
+pnpm --filter @workbranch/companion tauri build
+git diff --check
+```
+
+Acceptance:
+
+- manifest의 모든 file path가 존재하고 SHA-256이 실제 capture와 일치한다.
+- 4개 capture가 current source/build에서 새로 생성되었다.
+- 두 reviewer JSON verdict가 모두 `PASS`다.
+- 계획에 exact evidence root, manifest, capture, reviewer path와 verification 결과를 append한다.
+- repository에는 screenshot/evidence binary를 추가하지 않는다.
+
+---
+
 ## 완료 기준
 
 - [x] 상단은 task/worktree 단위 `PLAN | EXECUTION | REVIEW` matrix다.
-- [x] 하단은 selection과 무관하게 matrix active task 중 repository-bearing task와 그 모든 repo를 표시하며 clean todo/done은 제외한다.
+- [x] 하단은 selection과 무관하게 matrix의 모든 active task card와 그 task의 모든 repo를 표시하며, repo-less active task는 `NO REPOSITORIES` card로 유지하고 clean todo/done은 제외한다.
 - [x] Review가 가장 먼저, Blocked가 다음, Execution이 그 다음으로 보인다.
-- [x] matrix 선택은 highlight + scroll만 수행하고 filtering하지 않는다.
+- [x] matrix 선택은 repo 유무와 관계없이 대응 task card를 highlight + scroll하고 filtering하지 않는다.
 - [x] repo/branch/Git facts/last commit/current work가 실제 contract 데이터와 일치한다.
-- [x] 실행 동작은 기존 `IDE | Terminal | Finder`와 matrix IDE shortcut만 사용하며 path/config resolution은 Companion이 복제하지 않고 CLI에 위임한다.
-- [x] 720×760 primary와 460px compact fallback이 두 theme에서 실제로 검증된다.
-- [x] targeted/full tests, typecheck, lint, web build, Rust tests, Tauri release build, `git diff --check`가 모두 통과한다.
+- [x] partial global error가 있으면 성공한 inventory를 유지하면서 queue heading에 incomplete와 failed-root count를 표시하고 기존 상세 오류를 보존한다.
+- [x] 60초 timer tick이 새 epoch를 state에 전달하고 해당 시간이 relative-time markup을 변경하는 두 경계가 새 dependency 없이 검증된다.
+- [x] 실행 동작은 기존 `IDE | Terminal | Finder`만 사용하고 repo-less task의 IDE/matrix IDE shortcut은 disabled이며, path/config resolution은 Companion이 복제하지 않고 CLI에 위임한다.
+- [x] 720×760 primary와 460px compact fallback이 두 theme에서 `/tmp/workbranch-companion-0054-followup/`의 fresh capture/manifest와 dual-review PASS로 검증된다.
+- [x] Task 7-10 targeted tests를 포함한 full tests, typecheck, lint, web build, Rust tests, Tauri release build, `git diff --check`가 모두 통과한다.
+
+## 2026-08-26 Follow-up evidence
+
+- Evidence root: `/tmp/workbranch-companion-0054-followup/`
+- Manifest: `/tmp/workbranch-companion-0054-followup/manifest.json`
+- Captures: `claude-720.png`, `claude-460.png`, `codex-720.png`, `codex-460.png`
+- Reviews: `visual-integrity.json` PASS, `visual-fidelity.json` PASS
+- Automated proof: Companion 15 files/152 tests PASS; typecheck PASS; lint exit 0 with pre-existing `parseContract.ts` info diagnostics; Vite build PASS; Rust 23 tests PASS; Tauri release bundle PASS; `git diff --check` PASS.
+- Visual fix loop: first 460px capture exposed fixed-tab overlap with the selected repo-less card, so `.task-meta-row` gained `scroll-margin-block-end: var(--floating-tabs-content-clearance)` plus regression coverage. Integrity review then found the missing `·` separator; markup/test/captures were refreshed. Final manifest records `bottomContentClearAtMaxScroll: true` and no horizontal overflow for all four captures.
+- Environment note: no Browser backend was available, so visual captures used production components/CSS through a deterministic Vite harness in Chrome Stable CDP. The actual Tauri release application was built successfully but not screenshot-driven in this session.

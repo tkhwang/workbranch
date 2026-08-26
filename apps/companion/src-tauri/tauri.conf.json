@@ -1,41 +1,39 @@
 {
-  "$schema": "https://schema.tauri.app/config/2",
-  "productName": "WorkbranchCompanion",
-  "version": "2.17.0",
-  "identifier": "dev.tkhwang.workbranch.companion",
-  "build": {
-    "beforeDevCommand": "pnpm dev",
-    "beforeBuildCommand": "pnpm build",
-    "devUrl": "http://localhost:5173",
-    "frontendDist": "../dist"
-  },
-  "app": {
-    "withGlobalTauri": false,
-    "windows": [
-      {
-        "title": "Workbranch Companion",
-        "width": 720,
-        "minWidth": 460,
-        "height": 760,
-        "resizable": true,
-        "visible": false,
-        "skipTaskbar": true,
-        "alwaysOnTop": true
-      }
-    ],
-    "security": {
-      "csp": null
-    }
-  },
-  "bundle": {
-    "active": true,
-    "targets": "app",
-    "category": "DeveloperTool",
-    "macOS": {
-      "minimumSystemVersion": "13.0"
-    },
-    "icon": [
-      "icons/icon.icns"
-    ]
-  }
+	"$schema": "https://schema.tauri.app/config/2",
+	"productName": "WorkbranchCompanion",
+	"version": "2.17.0",
+	"identifier": "dev.tkhwang.workbranch.companion",
+	"build": {
+		"beforeDevCommand": "pnpm dev",
+		"beforeBuildCommand": "pnpm build",
+		"devUrl": "http://localhost:5173",
+		"frontendDist": "../dist"
+	},
+	"app": {
+		"withGlobalTauri": false,
+		"windows": [
+			{
+				"title": "Workbranch Companion",
+				"width": 520,
+				"minWidth": 460,
+				"height": 760,
+				"resizable": true,
+				"visible": false,
+				"skipTaskbar": true,
+				"alwaysOnTop": true
+			}
+		],
+		"security": {
+			"csp": null
+		}
+	},
+	"bundle": {
+		"active": true,
+		"targets": "app",
+		"category": "DeveloperTool",
+		"macOS": {
+			"minimumSystemVersion": "13.0"
+		},
+		"icon": ["icons/icon.icns"]
+	}
 }
