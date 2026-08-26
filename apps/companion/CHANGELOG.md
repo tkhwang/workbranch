@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.17.1](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.17.0...workbranch-companion-v2.17.1) (2026-08-26)
+
+
+### Bug Fixes
+
+* **companion:** align stage view review contracts ([33d74e9](https://github.com/tkhwang/workbranch/commit/33d74e9de678810de97fa23b9bd42e6735c457a5))
+* **companion:** preserve concurrent note updates ([f65f8ad](https://github.com/tkhwang/workbranch/commit/f65f8ad319d3af88d5d5bc9a411f43f6f925e6c1))
+
 ## [2.17.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.16.0...workbranch-companion-v2.17.0) (2026-08-25)
 
 
