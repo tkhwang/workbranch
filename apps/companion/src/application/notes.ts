@@ -40,12 +40,31 @@ export function applyNoteUpdate(
 	);
 }
 
-export function shouldRestoreFailedNoteUpdate(
+export function mergeLoadedRepoNotes(
+	loaded: RepoNotes,
 	current: RepoNotes,
+	editedKeys: ReadonlySet<string>,
+): RepoNotes {
+	const merged: Record<string, string> = { ...loaded };
+	for (const key of editedKeys) {
+		const value = current[key];
+		if (value === undefined) delete merged[key];
+		else merged[key] = value;
+	}
+	return merged;
+}
+
+export function restoreFailedNoteUpdate(
+	current: RepoNotes,
+	previous: RepoNotes,
 	attempted: RepoNotes,
 	key: string,
-): boolean {
-	return current[key] === attempted[key];
+): RepoNotes {
+	if (current[key] !== attempted[key]) return current;
+	const previousValue = previous[key];
+	return previousValue === undefined
+		? applyNoteUpdate(current, key, "")
+		: { ...current, [key]: previousValue };
 }
 
 export async function loadCompanionNoteStore(): Promise<CompanionNoteStore> {

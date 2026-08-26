@@ -4,9 +4,10 @@ import {
 	applyNoteUpdate,
 	type CompanionNoteStore,
 	loadCompanionNoteStore,
+	mergeLoadedRepoNotes,
 	type RepoNotes,
 	readRepoNotes,
-	shouldRestoreFailedNoteUpdate,
+	restoreFailedNoteUpdate,
 	writeRepoNote,
 } from "./notes";
 import { enqueuePreferenceSave } from "./preferences";
@@ -28,6 +29,9 @@ export function useRepoNotes({
 	const [notes, setNotes] = useState<RepoNotes>({});
 	const [noteStore, setNoteStore] = useState<CompanionNoteStore>();
 	const saveQueue = useRef<Promise<void>>(Promise.resolve());
+	const notesRef = useRef<RepoNotes>({});
+	const editedKeysRef = useRef<Set<string>>(new Set());
+	const storePromiseRef = useRef<Promise<CompanionNoteStore>>();
 	const tauriRuntimeAvailable = isTauri();
 
 	useEffect(() => {
@@ -35,11 +39,21 @@ export function useRepoNotes({
 		let cancelled = false;
 		async function loadNotes(): Promise<void> {
 			try {
-				const store = await loadCompanionNoteStore();
+				const storePromise = loadCompanionNoteStore();
+				storePromiseRef.current = storePromise;
+				const store = await storePromise;
 				const loaded = await readRepoNotes(store);
 				if (cancelled) return;
 				setNoteStore(store);
-				setNotes(loaded);
+				setNotes((current) => {
+					const merged = mergeLoadedRepoNotes(
+						loaded,
+						current,
+						editedKeysRef.current,
+					);
+					notesRef.current = merged;
+					return merged;
+				});
 			} catch (error) {
 				if (!cancelled) onError(error);
 			}
@@ -56,11 +70,16 @@ export function useRepoNotes({
 				onStatus("Tauri runtime unavailable");
 				return;
 			}
-			const previous = notes;
-			const attempted = applyNoteUpdate(notes, key, text);
+			const previous = notesRef.current;
+			const attempted = applyNoteUpdate(previous, key, text);
+			editedKeysRef.current.add(key);
+			notesRef.current = attempted;
 			setNotes(attempted);
 			const save = enqueuePreferenceSave(saveQueue.current, async () => {
-				const store = noteStore ?? (await loadCompanionNoteStore());
+				const pendingStore =
+					storePromiseRef.current ?? loadCompanionNoteStore();
+				storePromiseRef.current = pendingStore;
+				const store = noteStore ?? (await pendingStore);
 				setNoteStore(store);
 				await writeRepoNote(store, key, text);
 			});
@@ -69,15 +88,20 @@ export function useRepoNotes({
 				await save;
 				onStatus(attempted[key] === undefined ? "Note removed" : "Note saved");
 			} catch (error) {
-				setNotes((current) =>
-					shouldRestoreFailedNoteUpdate(current, attempted, key)
-						? previous
-						: current,
-				);
+				setNotes((current) => {
+					const restored = restoreFailedNoteUpdate(
+						current,
+						previous,
+						attempted,
+						key,
+					);
+					notesRef.current = restored;
+					return restored;
+				});
 				onError(error);
 			}
 		},
-		[noteStore, notes, onError, onStatus, tauriRuntimeAvailable],
+		[noteStore, onError, onStatus, tauriRuntimeAvailable],
 	);
 
 	return { notes, saveNote };

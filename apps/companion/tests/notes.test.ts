@@ -4,10 +4,11 @@ import {
 	COMPANION_NOTES_STORE_FILE,
 	type CompanionNoteStore,
 	loadCompanionNoteStore,
+	mergeLoadedRepoNotes,
 	readRepoNotes,
 	repoNoteKey,
+	restoreFailedNoteUpdate,
 	sanitizeRepoNotes,
-	shouldRestoreFailedNoteUpdate,
 	writeRepoNote,
 } from "../src/application/notes";
 
@@ -70,21 +71,36 @@ describe("repo notes", () => {
 		expect(original).toEqual({ "a:b": "old" });
 	});
 
-	it("restores a failed optimistic update only when that key is unchanged", () => {
+	it("merges a delayed load without overwriting optimistic edits", () => {
 		expect(
-			shouldRestoreFailedNoteUpdate(
-				{ "a:b": "attempted" },
-				{ "a:b": "attempted" },
+			mergeLoadedRepoNotes(
+				{ "a:b": "stored", "c:d": "stored other", "e:f": "stored delete" },
+				{ "a:b": "optimistic", "c:d": "new local" },
+				new Set(["a:b", "c:d", "e:f"]),
+			),
+		).toEqual({
+			"a:b": "optimistic",
+			"c:d": "new local",
+		});
+	});
+
+	it("rolls back only the failed key and preserves newer edits", () => {
+		expect(
+			restoreFailedNoteUpdate(
+				{ "a:b": "attempted", "c:d": "newer" },
+				{ "a:b": "old", "c:d": "before" },
+				{ "a:b": "attempted", "c:d": "before" },
 				"a:b",
 			),
-		).toBe(true);
+		).toEqual({ "a:b": "old", "c:d": "newer" });
 		expect(
-			shouldRestoreFailedNoteUpdate(
-				{ "a:b": "newer" },
-				{ "a:b": "attempted" },
+			restoreFailedNoteUpdate(
+				{ "a:b": "newest", "c:d": "newer" },
+				{ "a:b": "old", "c:d": "before" },
+				{ "a:b": "attempted", "c:d": "before" },
 				"a:b",
 			),
-		).toBe(false);
+		).toEqual({ "a:b": "newest", "c:d": "newer" });
 	});
 
 	it("loads the dedicated note store without autosave", async () => {
