@@ -236,6 +236,46 @@ assert login["memoTitle"] == "Authentication hardening slice", login
 assert login["currentItem"] == "implement session expiry guard", login'
 }
 
+test_list_json_plan_summary() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  cat > "$project/login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
+# Login hardening
+status: in-progress
+
+Tighten session expiry and audit logging
+
+- [x] inspect current auth flow
+- [ ] implement session expiry guard
+
+Trailing note after checklist
+EOF_BRIEF
+
+  out=$(run_expect_success "$WORKBRANCH" list --json)
+  printf '%s' "$out" | python3 -c 'import json,sys
+login=json.load(sys.stdin)["tasks"][0]
+plan=login["plans"][0]
+assert plan["summary"] == "Tighten session expiry and audit logging", plan
+assert plan["currentItem"] == "implement session expiry guard", plan'
+}
+
+test_list_json_plan_summary_absent_is_empty() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  out=$(run_expect_success "$WORKBRANCH" list --json)
+  printf '%s' "$out" | python3 -c 'import json,sys
+login=json.load(sys.stdin)["tasks"][0]
+plan=login["plans"][0]
+assert plan["summary"] == "", plan'
+}
+
 test_list_json_currentItem_escaped() {
   new_fixture
   project="$FIXTURE_PROJECT"
@@ -373,7 +413,7 @@ EOF_EMPTY
   out=$(run_expect_success "$WORKBRANCH" list --json)
   printf '%s' "$out" | python3 -c 'import json,sys
 login=json.load(sys.stdin)["tasks"][0]
-assert login["plans"] == [{"title":"Empty work","index":0,"status":"review","progressDone":0,"progressTotal":0,"currentItem":"","items":[]}], login
+assert login["plans"] == [{"title":"Empty work","index":0,"status":"review","progressDone":0,"progressTotal":0,"currentItem":"","summary":"","items":[]}], login
 assert login["progressDone"] == 0 and login["progressTotal"] == 0, login
 assert login["status"] == "review", login
 assert login["currentItem"] == "", login'

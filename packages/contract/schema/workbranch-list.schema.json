@@ -46,6 +46,7 @@
         "progressDone": { "type": "integer", "minimum": 0 },
         "progressTotal": { "type": "integer", "minimum": 0 },
         "currentItem": { "type": "string" },
+        "summary": { "type": "string" },
         "items": { "type": "array", "items": { "$ref": "#/$defs/checklistItem" } }
       }
     },

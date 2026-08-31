@@ -11,6 +11,7 @@ export type WorkbranchPlan = {
 	readonly progressDone: number;
 	readonly progressTotal: number;
 	readonly currentItem: string;
+	readonly summary?: string;
 	readonly items: readonly WorkbranchChecklistItem[];
 };
 

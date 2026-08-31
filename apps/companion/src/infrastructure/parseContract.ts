@@ -65,6 +65,7 @@ function isPlan(value: unknown): value is WorkbranchPlan {
 		isNonNegativeInteger(value["progressDone"]) &&
 		isNonNegativeInteger(value["progressTotal"]) &&
 		isString(value["currentItem"]) &&
+		isOptionalString(value["summary"]) &&
 		Array.isArray(value["items"]) &&
 		value["items"].every(isChecklistItem)
 	);

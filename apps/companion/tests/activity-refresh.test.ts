@@ -10,6 +10,7 @@ const BASELINE_PLAN: Plan = {
 	progressDone: 0,
 	progressTotal: 2,
 	currentItem: "Implement API",
+	summary: "",
 	steps: [
 		{
 			text: "Backend",

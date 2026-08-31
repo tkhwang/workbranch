@@ -21,6 +21,7 @@ function mapPlan(
 		progressDone: dto.progressDone,
 		progressTotal: dto.progressTotal,
 		currentItem: dto.currentItem,
+		summary: dto.summary ?? "",
 	};
 }
 
@@ -42,6 +43,7 @@ function legacyPlan(
 		progressDone: task.progressDone,
 		progressTotal: task.progressTotal,
 		currentItem: task.currentItem,
+		summary: "",
 	};
 }
 

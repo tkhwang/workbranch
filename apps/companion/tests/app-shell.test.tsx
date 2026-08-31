@@ -58,6 +58,7 @@ describe("App shell settings wiring", () => {
 		expect(appSource).toContain("<StageBoard");
 		expect(appSource).toContain("useRepoNotes");
 		expect(appSource).toContain("groups={main.stageGroups}");
+		expect(appSource).toContain("idleRows={main.idleRows}");
 		expect(appSource).not.toContain("RepositoryQueue");
 		expect(appSource).not.toContain("ProjectGroup");
 		expect(appSource).toContain("{model.errors.map");

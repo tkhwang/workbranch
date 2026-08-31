@@ -31,6 +31,7 @@ export type MainTaskRow = {
 export type MainViewModel = {
 	readonly matrixRows: readonly MainTaskRow[];
 	readonly stageGroups: readonly MainStageGroup[];
+	readonly idleRows: readonly MainTaskRow[];
 	readonly activeCount: number;
 	readonly idleCount: number;
 };
@@ -122,12 +123,22 @@ export function buildMainViewModel(state: GlobalState): MainViewModel {
 		column,
 		rows: matrixRows.filter((row) => row.role === column),
 	}));
+	const idleRows = rows
+		.filter(({ row }) => row.role === "idle")
+		.sort(
+			(left, right) =>
+				right.row.latestActivityAt - left.row.latestActivityAt ||
+				left.projectIndex - right.projectIndex ||
+				left.index - right.index,
+		)
+		.map(({ row }) => row);
 
 	return {
 		matrixRows,
 		stageGroups,
+		idleRows,
 		activeCount: matrixRows.length,
-		idleCount: rows.length - matrixRows.length,
+		idleCount: idleRows.length,
 	};
 }
 

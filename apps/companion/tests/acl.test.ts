@@ -105,6 +105,56 @@ describe("ACL", () => {
 		});
 	});
 
+	it("carries the plan summary and defaults it to empty when the CLI omits it", () => {
+		const project = document.projects.at(0);
+		const task = project?.tasks.at(0);
+		if (project === undefined || task === undefined) {
+			throw new Error("test fixture requires one project task");
+		}
+		const summaryDocument: WorkbranchListGlobalDocument = {
+			...document,
+			projects: [
+				{
+					...project,
+					tasks: [
+						{
+							...task,
+							plans: [
+								{
+									title: "Backend",
+									index: 0,
+									status: "in-progress",
+									progressDone: 0,
+									progressTotal: 0,
+									currentItem: "",
+									summary: "Tighten session expiry and audit logging",
+									items: [],
+								},
+								{
+									title: "Frontend",
+									index: 1,
+									status: "todo",
+									progressDone: 0,
+									progressTotal: 0,
+									currentItem: "",
+									items: [],
+								},
+							],
+						},
+					],
+				},
+			],
+		};
+
+		const parsed = parseGlobalDocument(JSON.stringify(summaryDocument));
+		const plans = mapGlobalDocumentToState(parsed).projects[0]?.tasks[0]?.plans;
+
+		expect(plans?.[0]?.summary).toBe(
+			"Tighten session expiry and audit logging",
+		);
+		expect(plans?.[1]?.summary).toBe("");
+	});
+
 	it("builds a compact menu rollup", () => {
 		const model = buildMenuModel(mapGlobalDocumentToState(document));
 		expect(model.summary.projectCount).toBe(1);

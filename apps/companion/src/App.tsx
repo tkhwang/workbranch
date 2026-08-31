@@ -217,6 +217,7 @@ export function App() {
 						activeCount={main.activeCount}
 						groups={main.stageGroups}
 						idleCount={main.idleCount}
+						idleRows={main.idleRows}
 						notes={notes}
 						onAction={(root, task, kind) =>
 							void handleTaskAction(root, task, kind)

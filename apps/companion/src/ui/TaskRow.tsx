@@ -75,5 +75,6 @@ export function currentWorkText(task: Task): string {
 	const plan = activePlan(task);
 	if (plan === undefined) return "";
 	if (plan.currentItem !== "") return plan.currentItem;
+	if (plan.summary !== "") return plan.summary;
 	return plan.title === task.name ? "" : plan.title;
 }

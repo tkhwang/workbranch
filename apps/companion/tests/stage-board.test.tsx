@@ -4,8 +4,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { type RepoNotes, repoNoteKey } from "../src/application/notes";
 import { buildMainViewModel } from "../src/application/state";
-import type { GlobalState, Repo, Task } from "../src/domain/model";
+import type { GlobalState, Plan, Repo, Task } from "../src/domain/model";
 import { StageBoard, StageTaskBlock } from "../src/ui/StageBoard";
+import { currentWorkText } from "../src/ui/TaskRow";
 
 type ButtonProps = {
 	readonly "aria-label"?: string;
@@ -73,6 +74,7 @@ function task(
 				progressDone: status === "review" ? 3 : 1,
 				progressTotal: 4,
 				currentItem: `${name} current work`,
+				summary: "",
 				steps: [],
 			},
 		],
@@ -102,12 +104,33 @@ const notes: RepoNotes = {
 	[repoNoteKey(dirtyRepo.name, dirtyRepo.branch)]: "rebase 전에 충돌 확인",
 };
 
+const currentWorkPlan: Plan = {
+	title: "Implementation plan",
+	index: 0,
+	status: "in-progress",
+	steps: [],
+	progressDone: 0,
+	progressTotal: 0,
+	currentItem: "",
+	summary: "Brief summary",
+};
+
+const currentWorkTask: Task = {
+	name: "feat-current-work",
+	path: "/tmp/acme/feat-current-work",
+	notiCount: 0,
+	updatedAt: 10,
+	repos: [],
+	plans: [currentWorkPlan],
+};
+
 function renderBoard(selectedKey?: string): string {
 	return renderToStaticMarkup(
 		<StageBoard
 			activeCount={main.activeCount}
 			groups={main.stageGroups}
 			idleCount={main.idleCount}
+			idleRows={main.idleRows}
 			notes={notes}
 			nowSeconds={3_600}
 			onAction={() => undefined}
@@ -119,11 +142,45 @@ function renderBoard(selectedKey?: string): string {
 }
 
 describe("StageBoard", () => {
+	it("uses current item, summary, and distinct plan title in precedence order", () => {
+		expect(
+			currentWorkText({
+				...currentWorkTask,
+				plans: [
+					{
+						...currentWorkPlan,
+						currentItem: "Current checklist item",
+					},
+				],
+			}),
+		).toBe("Current checklist item");
+		expect(currentWorkText(currentWorkTask)).toBe("Brief summary");
+		expect(
+			currentWorkText({
+				...currentWorkTask,
+				plans: [{ ...currentWorkPlan, summary: "" }],
+			}),
+		).toBe("Implementation plan");
+		expect(
+			currentWorkText({
+				...currentWorkTask,
+				plans: [
+					{
+						...currentWorkPlan,
+						title: currentWorkTask.name,
+						summary: "",
+					},
+				],
+			}),
+		).toBe("");
+	});
+
 	it("renders one vertical lifecycle-grouped worktree surface", () => {
 		const html = renderBoard();
 		const plan = html.indexOf(">PLAN<");
 		const execution = html.indexOf(">EXECUTION<");
 		const review = html.indexOf(">REVIEW<");
+		const idle = html.indexOf(">IDLE<");
 
 		expect(html).toContain('aria-label="Worktree status"');
 		expect(html).toContain("WORKTREE STATUS");
@@ -131,10 +188,16 @@ describe("StageBoard", () => {
 		expect(plan).toBeGreaterThan(0);
 		expect(execution).toBeGreaterThan(plan);
 		expect(review).toBeGreaterThan(execution);
+		expect(idle).toBeGreaterThan(review);
 		expect(html.indexOf("blocked-task")).toBeLessThan(
 			html.indexOf("execution-task"),
 		);
-		expect(html).toContain("IDLE 1 · inactive");
+		expect(html).toContain('data-column="idle"');
+		expect(html).toContain(">–<");
+		expect(html).toContain("clean-done");
+		expect(html).toContain("docs @ feat/update-ui-0824");
+		expect(html).toContain('aria-label="open clean-done in terminal"');
+		expect(html).not.toContain("IDLE 1 · inactive");
 		expect(html).not.toContain("ALL REPOSITORIES");
 	});
 
@@ -154,6 +217,7 @@ describe("StageBoard", () => {
 				activeCount={planOnly.activeCount}
 				groups={planOnly.stageGroups}
 				idleCount={planOnly.idleCount}
+				idleRows={planOnly.idleRows}
 				notes={{}}
 				nowSeconds={3_600}
 				onAction={() => undefined}
@@ -167,6 +231,7 @@ describe("StageBoard", () => {
 		expect(html).toContain('data-column="plan"');
 		expect(html).toContain('data-column="execution"');
 		expect(html).toContain('data-column="review"');
+		expect(html).not.toContain('data-column="idle"');
 		expect(html.match(/class="stage-group-count">0/g)).toHaveLength(2);
 	});
 
@@ -175,9 +240,12 @@ describe("StageBoard", () => {
 
 		expect(html).toContain("execution-task current work");
 		expect(html).toContain("DIRTY 7 FILES · AHEAD 2");
+		expect(html).not.toMatch(/>last commit: /);
+		expect(html).toContain('data-icon="commit"');
 		expect(html).toContain(
-			"last commit: implement companion activity feed · 1m",
+			'title="last commit: implement companion activity feed"',
 		);
+		expect(html).toContain("implement companion activity feed · 1m");
 		expect(html).toContain("rebase 전에 충돌 확인");
 		expect(html).toContain(
 			'aria-label="edit note for workbranch feat/update-ui-0824"',
