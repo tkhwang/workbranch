@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.18.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.17.1...workbranch-companion-v2.18.0) (2026-08-31)
+
+
+### Features
+
+* **task:** add one-line summary for tasks ([a11b666](https://github.com/tkhwang/workbranch/commit/a11b666e6499cdd31bb055cd5fee7d1db8032b47))
+* **task:** add one-line summary for tasks ([c1cae7d](https://github.com/tkhwang/workbranch/commit/c1cae7d54499223f371ef3385abdbbc55918e3aa))
+
+
+### Bug Fixes
+
+* **task:** address PR review feedback ([54771b1](https://github.com/tkhwang/workbranch/commit/54771b14ef475057f5e0d0c15bb964a5de2aa21a))
+
 ## [2.17.1](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.17.0...workbranch-companion-v2.17.1) (2026-08-26)
 
 
