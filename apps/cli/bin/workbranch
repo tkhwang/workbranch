@@ -1438,6 +1438,7 @@ task_plan_reset() {
   TASK_PLAN_TOTAL=()
   TASK_PLAN_CURRENT=()
   TASK_PLAN_SUMMARIES=()
+  TASK_PLAN_STATUS_SEEN=()
   TASK_PLAN_STATUSES=()
   TASK_ITEM_PLAN_INDEXES=()
   TASK_ITEM_TEXTS=()
@@ -1454,6 +1455,7 @@ task_plan_add() {
   TASK_PLAN_TOTAL[$index]=0
   TASK_PLAN_CURRENT[$index]=''
   TASK_PLAN_SUMMARIES[$index]=''
+  TASK_PLAN_STATUS_SEEN[$index]=0
   TASK_PLAN_STATUSES[$index]=''
   TASK_PLAN_ADDED_INDEX=$index
   TASK_PLAN_COUNT=$((TASK_PLAN_COUNT + 1))
@@ -1490,12 +1492,15 @@ task_load_plans() {
       status_value=${BASH_REMATCH[1]}
       status_value=$(printf '%s' "$status_value" | tr '[:upper:]' '[:lower:]')
       case "$status_value" in
-        todo|planning|in-progress|review|blocked|done) TASK_PLAN_STATUSES[$current_plan]=$status_value ;;
+        todo|planning|in-progress|review|blocked|done)
+          TASK_PLAN_STATUSES[$current_plan]=$status_value
+          TASK_PLAN_STATUS_SEEN[$current_plan]=1
+          ;;
         *) TASK_PLAN_STATUSES[$current_plan]='' ;;
       esac
       continue
     fi
-    if [ "$current_plan" -ge 0 ] && [ -z "${TASK_PLAN_SUMMARIES[$current_plan]:-}" ] && [ "${TASK_PLAN_TOTAL[$current_plan]:-0}" -eq 0 ] \
+    if [ "$current_plan" -ge 0 ] && [ "${TASK_PLAN_STATUS_SEEN[$current_plan]:-0}" -eq 1 ] && [ -z "${TASK_PLAN_SUMMARIES[$current_plan]:-}" ] && [ "${TASK_PLAN_TOTAL[$current_plan]:-0}" -eq 0 ] \
       && [[ ! $line =~ ^[[:space:]]*- ]] && [[ $line =~ [^[:space:]] ]]; then
       summary_text=${line%$'\r'}
       summary_text=$(printf '%s' "$summary_text" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')

@@ -168,7 +168,7 @@ function StageRepoRow({
 			</div>
 			{commit === "" ? null : (
 				<div
-					aria-label="last commit"
+					aria-label={"last commit: " + commit}
 					className="stage-repo-commit"
 					role="note"
 					title={"last commit: " + repo.lastCommitSubject}

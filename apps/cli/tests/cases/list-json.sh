@@ -276,6 +276,29 @@ plan=login["plans"][0]
 assert plan["summary"] == "", plan'
 }
 
+test_list_json_plan_summary_requires_status_before_capture() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  cat > "$project/login/TASK-WORKBRANCH.md" <<'EOF_BRIEF'
+# Login hardening
+Introductory context is not the current-work summary.
+
+status: in-progress
+
+Tighten session expiry and audit logging
+
+- [ ] implement session expiry guard
+EOF_BRIEF
+
+  out=$(run_expect_success "$WORKBRANCH" list --json)
+  printf '%s' "$out" | python3 -c 'import json,sys
+plan=json.load(sys.stdin)["tasks"][0]["plans"][0]
+assert plan["summary"] == "Tighten session expiry and audit logging", plan'
+}
+
 test_list_json_currentItem_escaped() {
   new_fixture
   project="$FIXTURE_PROJECT"
