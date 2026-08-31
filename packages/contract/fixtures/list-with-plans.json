@@ -25,6 +25,7 @@
           "progressDone": 1,
           "progressTotal": 2,
           "currentItem": "wire API",
+          "summary": "Harden authentication flow",
           "items": [
             { "text": "Backend", "checked": true, "depth": 0 },
             { "text": "wire API", "checked": false, "depth": 1 }

@@ -96,6 +96,15 @@
 	color: var(--review);
 }
 
+.stage-group-head[data-column="idle"] .stage-group-num {
+	background: var(--surface-3);
+	color: var(--faint);
+}
+
+.stage-group-head[data-column="idle"] .stage-group-label {
+	color: var(--faint);
+}
+
 .stage-group-list {
 	display: grid;
 	min-width: 0;
@@ -152,10 +161,16 @@
 
 .stage-task-select:focus-visible,
 .stage-note-button:focus-visible,
-.stage-note-editor textarea:focus-visible,
-.stage-actions .task-action:focus-visible {
+.stage-note-editor textarea:focus-visible {
 	outline: 2px solid var(--accent);
 	outline-offset: 1px;
+}
+
+.stage-actions .task-action:focus-visible {
+	background: var(--button-bg-hover);
+	color: var(--accent-strong);
+	outline: 2px solid var(--accent);
+	outline-offset: -2px;
 }
 
 .stage-task-prompt {
@@ -350,8 +365,24 @@
 }
 
 .stage-repo-commit {
+	align-items: center;
 	color: var(--faint);
+	display: flex;
+	gap: 5px;
 	padding-left: 2px;
+}
+
+.stage-repo-commit-icon {
+	flex: none;
+	height: 13px;
+	width: 13px;
+}
+
+.stage-repo-commit > span {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .stage-repo-empty {
@@ -413,12 +444,58 @@
 	font-size: 10px;
 }
 
-.stage-idle-count {
+.stage-idle-row {
+	align-items: center;
+	border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+	display: grid;
+	font-size: 11px;
+	gap: 7px;
+	grid-template-columns: 10px minmax(0, max-content) auto minmax(0, 1fr) auto 76px;
+	min-width: 0;
+	opacity: 0.78;
+	padding: 6px 2px;
+}
+
+.stage-idle-prompt {
+	color: var(--faint);
+	font-weight: 700;
+}
+
+.stage-idle-task,
+.stage-idle-repo {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.stage-idle-task {
+	font-weight: 500;
+}
+
+.stage-idle-repo,
+.stage-idle-time {
 	color: var(--faint);
 	font-size: 10px;
-	letter-spacing: 0.04em;
-	padding: 8px 2px 0;
+}
+
+.stage-idle-time {
+	font-variant-numeric: tabular-nums;
 	text-align: right;
+}
+
+.stage-idle-actions {
+	width: 76px;
+}
+
+.stage-idle-actions .task-action {
+	min-height: 24px;
+	padding: 2px;
+}
+
+.stage-idle-actions .task-action-icon {
+	height: 12px;
+	width: 12px;
 }
 
 @media (max-width: 480px) {
@@ -432,6 +509,10 @@
 
 	.stage-actions {
 		width: 102px;
+	}
+
+	.stage-idle-actions {
+		width: 76px;
 	}
 
 	.stage-task-select {

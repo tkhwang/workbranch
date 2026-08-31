@@ -23,6 +23,7 @@ const completedMultiPlanTask: Task = {
 			progressDone: 1,
 			progressTotal: 1,
 			currentItem: "",
+			summary: "",
 		},
 		{
 			title: "Latest completed plan",
@@ -32,6 +33,7 @@ const completedMultiPlanTask: Task = {
 			progressDone: 3,
 			progressTotal: 3,
 			currentItem: "",
+			summary: "",
 		},
 	],
 };
@@ -58,6 +60,7 @@ function taskWithStatus(
 				progressDone: status === "done" ? 1 : 0,
 				progressTotal: 1,
 				currentItem: "",
+				summary: "",
 			},
 		],
 	};
@@ -239,6 +242,10 @@ describe("buildMainViewModel", () => {
 		]);
 		expect(main.activeCount).toBe(6);
 		expect(main.idleCount).toBe(2);
+		expect(main.idleRows.map((row) => row.task.name)).toEqual([
+			"clean-done",
+			"clean-todo",
+		]);
 		expect("repositoryRows" in main).toBe(false);
 		expect("repositoryCount" in main).toBe(false);
 		expect("unavailableRootCount" in main).toBe(false);
@@ -297,6 +304,35 @@ describe("buildMainViewModel", () => {
 		]);
 	});
 
+	it("keeps stable project and task wire order when idle activity ties", () => {
+		const state: GlobalState = {
+			projects: [
+				{
+					name: "alpha",
+					root: "/tmp/alpha",
+					tasks: [
+						taskWithStatus("alpha-first", "todo", 50),
+						taskWithStatus("alpha-second", "done", 50),
+					],
+				},
+				{
+					name: "beta",
+					root: "/tmp/beta",
+					tasks: [taskWithStatus("beta-first", "todo", 50)],
+				},
+			],
+			errors: [],
+		};
+
+		const main = buildMainViewModel(state);
+
+		expect(main.idleRows.map((row) => row.task.name)).toEqual([
+			"alpha-first",
+			"alpha-second",
+			"beta-first",
+		]);
+	});
+
 	it("counts unavailable roots without dropping successful task rows", () => {
 		const state: GlobalState = {
 			projects: [
@@ -305,6 +341,7 @@ describe("buildMainViewModel", () => {
 					root: "/tmp/alpha",
 					tasks: [
 						taskWithStatus("planning-task", "planning", 10, 0, [DIRTY_REPO]),
+						taskWithStatus("idle-task", "todo", 20),
 					],
 				},
 			],
@@ -319,5 +356,7 @@ describe("buildMainViewModel", () => {
 		expect(main.matrixRows.map((row) => row.task.name)).toEqual([
 			"planning-task",
 		]);
+		expect(main.idleRows.map((row) => row.task.name)).toEqual(["idle-task"]);
+		expect(main.idleCount).toBe(1);
 	});
 });

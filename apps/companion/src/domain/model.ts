@@ -23,6 +23,7 @@ export type Plan = {
 	readonly progressDone: number;
 	readonly progressTotal: number;
 	readonly currentItem: string;
+	readonly summary: string;
 };
 
 export type Repo = {

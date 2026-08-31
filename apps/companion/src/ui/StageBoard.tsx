@@ -88,6 +88,17 @@ function StageGroupHead({
 	);
 }
 
+function IdleGroupHead({ count }: { readonly count: number }) {
+	return (
+		<header className="stage-group-head" data-column="idle">
+			<span className="stage-group-num">–</span>
+			<span className="stage-group-label">IDLE</span>
+			<span aria-hidden="true" className="stage-group-rule" />
+			<span className="stage-group-count">{count}</span>
+		</header>
+	);
+}
+
 function StageRepoRow({
 	note,
 	nowSeconds,
@@ -107,8 +118,7 @@ function StageRepoRow({
 	const commit =
 		repo.lastCommitSubject === ""
 			? ""
-			: "last commit: " +
-				repo.lastCommitSubject +
+			: repo.lastCommitSubject +
 				(relativeTime === "" ? "" : " · " + relativeTime);
 
 	const saveAndClose = (): void => {
@@ -157,8 +167,26 @@ function StageRepoRow({
 				</button>
 			</div>
 			{commit === "" ? null : (
-				<div className="stage-repo-commit" title={repo.lastCommitSubject}>
-					{commit}
+				<div
+					aria-label={"last commit: " + commit}
+					className="stage-repo-commit"
+					role="note"
+					title={"last commit: " + repo.lastCommitSubject}
+				>
+					<svg
+						aria-hidden="true"
+						className="stage-repo-commit-icon"
+						data-icon="commit"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="1.6"
+						viewBox="0 0 20 20"
+					>
+						<circle cx="10" cy="10" r="3.2" />
+						<path d="M1.5 10h5.3" />
+						<path d="M13.2 10h5.3" />
+					</svg>
+					<span>{commit}</span>
 				</div>
 			)}
 			{editing ? (
@@ -324,10 +352,63 @@ export function StageTaskBlock({
 	);
 }
 
+function IdleTaskRow({
+	nowSeconds,
+	onAction,
+	row,
+}: {
+	readonly nowSeconds: number;
+	readonly onAction: TaskActionHandler;
+	readonly row: MainTaskRow;
+}) {
+	const firstRepo = row.repos.at(0);
+	const additionalRepoCount = Math.max(0, row.repos.length - 1);
+	const repoText =
+		firstRepo === undefined
+			? ""
+			: firstRepo.name +
+				" @ " +
+				firstRepo.branch +
+				(additionalRepoCount === 0 ? "" : " +" + additionalRepoCount);
+	const relativeTime = formatRelativeTime(row.latestActivityAt, nowSeconds);
+
+	return (
+		<div className="stage-idle-row">
+			<span aria-hidden="true" className="stage-idle-prompt">
+				›
+			</span>
+			<span className="stage-idle-task" title={row.task.name}>
+				{row.task.name}
+			</span>
+			<StatusToken status={taskStatus(row.task)} />
+			<span className="stage-idle-repo" title={repoText}>
+				{repoText}
+			</span>
+			<span className="stage-idle-time">{relativeTime}</span>
+			<div className="stage-actions stage-idle-actions">
+				{taskActionsFor(row.task).map((action) => (
+					<button
+						aria-label={action.ariaLabel}
+						className="task-action"
+						disabled={action.disabled}
+						key={action.kind}
+						onClick={() => onAction(row.root, row.task, action.kind)}
+						title={action.kind === "ide" ? "IDE / Editor" : action.label}
+						type="button"
+					>
+						<TaskActionIcon kind={action.kind} />
+					</button>
+				))}
+			</div>
+		</div>
+	);
+}
+
 export type StageBoardProps = {
 	readonly activeCount: number;
 	readonly groups: readonly MainStageGroup[];
 	readonly idleCount: number;
+	readonly idleRows: readonly MainTaskRow[];
 	readonly notes: RepoNotes;
 	readonly nowSeconds?: number;
 	readonly onAction: TaskActionHandler;
@@ -340,6 +421,7 @@ export function StageBoard({
 	activeCount,
 	groups,
 	idleCount,
+	idleRows,
 	notes,
 	nowSeconds,
 	onAction,
@@ -377,8 +459,20 @@ export function StageBoard({
 					</div>
 				</section>
 			))}
-			{idleCount > 0 ? (
-				<span className="stage-idle-count">IDLE {idleCount} · inactive</span>
+			{idleRows.length > 0 ? (
+				<section className="stage-group stage-idle-group" data-column="idle">
+					<IdleGroupHead count={idleCount} />
+					<div className="stage-group-list">
+						{idleRows.map((row) => (
+							<IdleTaskRow
+								key={row.key}
+								nowSeconds={currentNowSeconds}
+								onAction={onAction}
+								row={row}
+							/>
+						))}
+					</div>
+				</section>
 			) : null}
 		</section>
 	);
