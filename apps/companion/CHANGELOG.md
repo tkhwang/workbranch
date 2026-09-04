@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.19.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.18.0...workbranch-companion-v2.19.0) (2026-09-04)
+
+
+### Features
+
+* **preferences:** add font size adjustment ([53f09cd](https://github.com/tkhwang/workbranch/commit/53f09cdac13d96113a17050840b6f3cb8e39ee14))
+* **preferences:** add font size adjustment ([e5ccbe6](https://github.com/tkhwang/workbranch/commit/e5ccbe65ad4f82c8f07a450673116baaaca17dc8))
+
 ## [2.18.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.17.1...workbranch-companion-v2.18.0) (2026-08-31)
 
 
