@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.21.0](https://github.com/tkhwang/workbranch/compare/v2.20.0...v2.21.0) (2026-09-04)
+
+
+### Features
+
+* **task:** add one-line summary for tasks ([a11b666](https://github.com/tkhwang/workbranch/commit/a11b666e6499cdd31bb055cd5fee7d1db8032b47))
+* **task:** add one-line summary for tasks ([c1cae7d](https://github.com/tkhwang/workbranch/commit/c1cae7d54499223f371ef3385abdbbc55918e3aa))
+
+
+### Bug Fixes
+
+* **companion:** align stage view review contracts ([33d74e9](https://github.com/tkhwang/workbranch/commit/33d74e9de678810de97fa23b9bd42e6735c457a5))
+* **release:** revert accidental version bump ([8c145d4](https://github.com/tkhwang/workbranch/commit/8c145d470cba9a785f9b01c876008f52ea4a876c))
+* **task:** address PR review feedback ([54771b1](https://github.com/tkhwang/workbranch/commit/54771b14ef475057f5e0d0c15bb964a5de2aa21a))
+
 ## [2.20.0](https://github.com/tkhwang/workbranch/compare/v2.19.1...v2.20.0) (2026-08-31)
 
 
