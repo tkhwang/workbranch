@@ -1,7 +1,9 @@
 import type { CompanionPreferences } from "../application/preferences";
 import {
 	COMPANION_FONT_OPTIONS,
+	COMPANION_FONT_SIZE_OPTIONS,
 	isCompanionFont,
+	isCompanionFontSize,
 } from "../application/preferences";
 import { AgentThemePicker } from "./AgentThemePicker";
 import { TerminalPanel } from "./TerminalPanel";
@@ -26,6 +28,10 @@ export function SettingsPanel({
 	);
 	const fontFamily = fontOption?.cssFamily ?? preferences.font;
 	const fontName = fontOption?.label ?? preferences.font;
+	const fontSizeOption = COMPANION_FONT_SIZE_OPTIONS.find(
+		(candidate) => candidate.value === preferences.fontSize,
+	);
+	const fontSizeName = fontSizeOption?.label ?? preferences.fontSize;
 
 	return (
 		<section className="settings-panel" aria-label="Settings">
@@ -82,6 +88,44 @@ export function SettingsPanel({
 					<span>1234567890 · RUN 1 · 21/21</span>
 				</div>
 				<p className="settings-hint">Current font: {fontName}</p>
+			</TerminalPanel>
+			<TerminalPanel
+				anatomy="claude"
+				label="Text Size"
+				theme={preferences.theme}
+			>
+				<div className="settings-row settings-row-select">
+					<label htmlFor="companion-font-size">Text Size</label>
+					<select
+						id="companion-font-size"
+						onChange={(event) => {
+							const nextFontSize = event.currentTarget.value;
+							if (isCompanionFontSize(nextFontSize)) {
+								onPreferencesChange({
+									...preferences,
+									fontSize: nextFontSize,
+								});
+							}
+						}}
+						value={preferences.fontSize}
+					>
+						{COMPANION_FONT_SIZE_OPTIONS.map((option) => (
+							<option key={option.value} value={option.value}>
+								{option.label}
+							</option>
+						))}
+					</select>
+				</div>
+				<div className="font-preview">
+					<span className="font-preview-label">Preview · {fontSizeName}</span>
+					<code>workbranch feat/update-0619</code>
+					<span className="font-preview-meta">
+						ci: build signed macOS DMGs · 11d
+					</span>
+				</div>
+				<p className="settings-hint">
+					Scales every text size in Main, Activity, and Settings.
+				</p>
 			</TerminalPanel>
 			<TerminalPanel anatomy="claude" label="Theme" theme={preferences.theme}>
 				<AgentThemePicker

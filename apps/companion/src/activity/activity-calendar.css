@@ -34,7 +34,7 @@
 
 .cal-title {
 	color: var(--text);
-	font-size: 14px;
+	font-size: var(--fs-ui);
 	font-weight: 700;
 	line-height: 1;
 	min-width: 108px;
@@ -45,7 +45,7 @@
 .cal-today-button,
 .cal-mode-button,
 .cal-chip {
-	font-size: 12px;
+	font-size: var(--fs-body);
 	min-height: 28px;
 	padding: 5px 8px;
 }
@@ -135,7 +135,7 @@
 
 .cal-hour-label {
 	color: var(--muted);
-	font-size: 11px;
+	font-size: var(--fs-label);
 	line-height: 1;
 	padding-top: 1px;
 	text-align: right;
@@ -160,7 +160,7 @@
 	background: var(--surface-1);
 	border-bottom: 1px solid var(--line);
 	color: var(--muted);
-	font-size: 11px;
+	font-size: var(--fs-meta);
 	font-weight: 700;
 	line-height: 1;
 	padding: 5px 7px;
@@ -254,32 +254,32 @@
 }
 
 .cal-block-task {
-	font-size: 12px;
+	font-size: var(--fs-body);
 	font-weight: 700;
 }
 
 .cal-block-time {
 	color: var(--text);
-	font-size: 11px;
+	font-size: var(--fs-meta);
 	font-variant-numeric: tabular-nums;
 	opacity: 0.82;
 }
 
 .cal-block-plan {
 	color: var(--muted);
-	font-size: 10px;
+	font-size: var(--fs-label);
 }
 
 .cal-timeline[data-mode="day"]
 	.cal-session[data-width="narrow"]
 	.cal-block-task {
-	font-size: 11px;
+	font-size: var(--fs-meta);
 }
 
 .cal-timeline[data-mode="day"]
 	.cal-session[data-width="narrow"]
 	.cal-block-time {
-	font-size: 10px;
+	font-size: var(--fs-label);
 }
 
 .cal-detail {
@@ -292,13 +292,13 @@
 }
 
 .cal-detail strong {
-	font-size: 13px;
+	font-size: var(--fs-body);
 }
 
 .cal-detail span,
 .cal-detail li {
 	color: var(--muted);
-	font-size: 11px;
+	font-size: var(--fs-meta);
 }
 
 .cal-detail ul {

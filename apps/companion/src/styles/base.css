@@ -22,12 +22,18 @@ main {
 		monospace;
 	--floating-tabs-bottom: 10px;
 	--floating-tabs-content-clearance: 64px;
-	--floating-tabs-font-size: 12px;
+	--floating-tabs-font-size: var(--fs-ui);
 	--floating-tabs-height: 36px;
 	--floating-tabs-inset: 12px;
 	--floating-tabs-radius: 999px;
 	--floating-tabs-shadow: 0 8px 24px rgba(0, 0, 0, 0.46);
-	--progress-pill-font-size: 11px;
+	--font-scale: 1;
+	--fs-body: calc(13px * var(--font-scale));
+	--fs-label: calc(11px * var(--font-scale));
+	--fs-meta: calc(12px * var(--font-scale));
+	--fs-title: calc(16px * var(--font-scale));
+	--fs-ui: calc(14px * var(--font-scale));
+	--progress-pill-font-size: var(--fs-label);
 	--progress-pill-padding: 3px 6px;
 	--progress-pill-radius: 999px;
 	--task-selected-accent-width: 2px;
@@ -37,6 +43,7 @@ main {
 	display: flex;
 	flex-direction: column;
 	font-family: var(--app-font-family);
+	font-size: var(--fs-body);
 	max-width: 100%;
 	min-height: 100vh;
 	padding: 12px;

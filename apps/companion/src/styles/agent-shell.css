@@ -12,7 +12,7 @@
 
 .terminal-panel legend {
 	color: var(--emphasis);
-	font-size: 11px;
+	font-size: var(--fs-label);
 	font-weight: 700;
 	letter-spacing: 0.08em;
 	padding: 0 5px;
@@ -35,13 +35,13 @@
 
 .agent-header h1 {
 	color: var(--text);
-	font-size: 15px;
+	font-size: var(--fs-title);
 	line-height: 1.25;
 }
 
 .agent-inventory {
 	color: var(--muted);
-	font-size: 11px;
+	font-size: var(--fs-body);
 }
 
 .agent-controls {
@@ -56,7 +56,7 @@
 	align-items: center;
 	color: var(--muted);
 	display: inline-flex;
-	font-size: 16px;
+	font-size: var(--fs-title);
 	justify-content: center;
 	min-width: 32px;
 	padding: 4px;
@@ -118,7 +118,7 @@
 .terminal-panel-heading {
 	border-bottom: 1px solid var(--line);
 	color: var(--emphasis);
-	font-size: 11px;
+	font-size: var(--fs-label);
 	letter-spacing: 0.08em;
 	margin: -2px 0 8px;
 	padding-bottom: 6px;
@@ -152,7 +152,7 @@
 	align-items: center;
 	color: var(--muted);
 	display: inline-flex;
-	font-size: 11px;
+	font-size: var(--fs-body);
 	gap: 5px;
 }
 
@@ -202,7 +202,7 @@
 	}
 
 	.agent-header h1 {
-		font-size: 13px;
+		font-size: var(--fs-ui);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;

@@ -202,7 +202,11 @@ export function App() {
 	}, [applyState, refreshWithActivity, showError, tauriRuntimeAvailable]);
 
 	return (
-		<main data-font={preferences.font} data-theme={activeTheme}>
+		<main
+			data-font={preferences.font}
+			data-font-size={preferences.fontSize}
+			data-theme={activeTheme}
+		>
 			<AgentHeader
 				theme={activeTheme}
 				summary={model.summary}

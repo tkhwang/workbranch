@@ -8,6 +8,7 @@ button,
 select,
 input {
 	font: inherit;
+	font-size: var(--fs-ui);
 }
 
 button,
@@ -52,7 +53,7 @@ summary:focus-visible {
 	border: 1px solid var(--blocked);
 	border-radius: 6px;
 	color: var(--blocked);
-	font-size: 13px;
+	font-size: var(--fs-ui);
 	font-weight: 600;
 	margin-bottom: 10px;
 	padding: 8px 10px;

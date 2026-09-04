@@ -23,8 +23,18 @@ const COMPANION_FONT_VALUES = [
 
 export type CompanionFont = (typeof COMPANION_FONT_VALUES)[number];
 
+const COMPANION_FONT_SIZE_VALUES = [
+	"small",
+	"medium",
+	"large",
+	"extra-large",
+] as const;
+
+export type CompanionFontSize = (typeof COMPANION_FONT_SIZE_VALUES)[number];
+
 export type CompanionPreferences = {
 	readonly font: CompanionFont;
+	readonly fontSize: CompanionFontSize;
 	readonly theme: CompanionTheme;
 };
 
@@ -34,6 +44,11 @@ export type CompanionFontOption = {
 	readonly cssFamily: string;
 };
 
+export type CompanionFontSizeOption = {
+	readonly value: CompanionFontSize;
+	readonly label: string;
+};
+
 export type PreferenceSanitizationResult = {
 	readonly preferences: CompanionPreferences;
 	readonly sanitized: boolean;
@@ -41,6 +56,7 @@ export type PreferenceSanitizationResult = {
 
 export type PreferenceStoreEntries = {
 	readonly font: CompanionFont;
+	readonly fontSize: CompanionFontSize;
 	readonly theme: CompanionTheme;
 };
 
@@ -52,6 +68,7 @@ export type CompanionPreferenceStore = {
 
 export const DEFAULT_COMPANION_PREFERENCES: CompanionPreferences = {
 	font: "system-mono",
+	fontSize: "medium",
 	theme: "claude",
 };
 
@@ -86,6 +103,29 @@ export const COMPANION_FONT_OPTIONS: readonly CompanionFontOption[] = [
 	},
 ];
 
+// Each value drives main[data-font-size="..."] in styles/themes.css, which
+// owns the matching --font-scale step.
+export const COMPANION_FONT_SIZE_OPTIONS: readonly CompanionFontSizeOption[] = [
+	{ value: "small", label: "Small" },
+	{ value: "medium", label: "Medium" },
+	{ value: "large", label: "Large" },
+	{ value: "extra-large", label: "Extra Large" },
+];
+
+export function isCompanionFontSize(
+	value: unknown,
+): value is CompanionFontSize {
+	switch (value) {
+		case "small":
+		case "medium":
+		case "large":
+		case "extra-large":
+			return true;
+		default:
+			return false;
+	}
+}
+
 export function isCompanionFont(value: unknown): value is CompanionFont {
 	switch (value) {
 		case "system-mono":
@@ -101,6 +141,7 @@ export function isCompanionFont(value: unknown): value is CompanionFont {
 
 export function sanitizeCompanionPreferences(input: {
 	readonly font?: unknown;
+	readonly fontSize?: unknown;
 	readonly theme?: unknown;
 	readonly themeFamily?: unknown;
 	readonly themeMode?: unknown;
@@ -108,14 +149,20 @@ export function sanitizeCompanionPreferences(input: {
 	const font = isCompanionFont(input.font)
 		? input.font
 		: DEFAULT_COMPANION_PREFERENCES.font;
+	const fontSize = isCompanionFontSize(input.fontSize)
+		? input.fontSize
+		: DEFAULT_COMPANION_PREFERENCES.fontSize;
 	const theme = isCompanionTheme(input.theme)
 		? input.theme
 		: isCompanionTheme(input.themeFamily)
 			? input.themeFamily
 			: DEFAULT_COMPANION_PREFERENCES.theme;
 	return {
-		preferences: { font, theme },
-		sanitized: font !== input.font || theme !== input.theme,
+		preferences: { font, fontSize, theme },
+		sanitized:
+			font !== input.font ||
+			fontSize !== input.fontSize ||
+			theme !== input.theme,
 	};
 }
 
@@ -123,7 +170,11 @@ export function shouldRestoreFailedPreferenceUpdate(
 	current: CompanionPreferences,
 	attempted: CompanionPreferences,
 ): boolean {
-	return current.font === attempted.font && current.theme === attempted.theme;
+	return (
+		current.font === attempted.font &&
+		current.fontSize === attempted.fontSize &&
+		current.theme === attempted.theme
+	);
 }
 
 export type PreferenceSaveOperation = () => Promise<void>;
@@ -140,6 +191,7 @@ export function preferencesToStoreEntries(
 ): PreferenceStoreEntries {
 	return {
 		font: preferences.font,
+		fontSize: preferences.fontSize,
 		theme: preferences.theme,
 	};
 }
@@ -156,6 +208,7 @@ export async function readCompanionPreferences(
 ): Promise<PreferenceSanitizationResult> {
 	return sanitizeCompanionPreferences({
 		font: await store.get<unknown>("font"),
+		fontSize: await store.get<unknown>("fontSize"),
 		theme: await store.get<unknown>("theme"),
 		themeFamily: await store.get<unknown>("themeFamily"),
 		themeMode: await store.get<unknown>("themeMode"),
@@ -168,6 +221,7 @@ export async function writeCompanionPreferences(
 ): Promise<void> {
 	const entries = preferencesToStoreEntries(preferences);
 	await store.set("font", entries.font);
+	await store.set("fontSize", entries.fontSize);
 	await store.set("theme", entries.theme);
 	await store.save();
 }
