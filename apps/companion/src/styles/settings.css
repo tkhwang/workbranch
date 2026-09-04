@@ -13,14 +13,14 @@
 
 .settings-panel h2 {
 	color: var(--text);
-	font-size: 14px;
+	font-size: var(--fs-title);
 	font-weight: 700;
 }
 
 .settings-panel p,
 .settings-hint {
 	color: var(--muted);
-	font-size: 11px;
+	font-size: var(--fs-meta);
 }
 
 .settings-row {
@@ -32,7 +32,7 @@
 
 .settings-row label {
 	color: var(--text);
-	font-size: 12px;
+	font-size: var(--fs-ui);
 }
 
 .settings-row input[type="checkbox"] {
@@ -57,7 +57,7 @@
 .settings-row-select::after {
 	color: var(--faint);
 	content: "⌄";
-	font-size: 12px;
+	font-size: var(--fs-ui);
 	pointer-events: none;
 	position: absolute;
 	right: 10px;
@@ -71,7 +71,7 @@
 	border-radius: 4px;
 	color: var(--text);
 	display: grid;
-	font-size: 12px;
+	font-size: var(--fs-body);
 	gap: 5px;
 	line-height: 1.45;
 	margin-top: 8px;
@@ -85,7 +85,12 @@
 
 .font-preview-label {
 	color: var(--muted);
-	font-size: 10px;
+	font-size: var(--fs-label);
+}
+
+.font-preview-meta {
+	color: var(--faint);
+	font-size: var(--fs-meta);
 }
 
 .agent-theme-picker {
@@ -101,7 +106,7 @@
 	border: 0;
 	border-radius: 0;
 	color: var(--muted);
-	font-size: 11px;
+	font-size: var(--fs-body);
 	font-weight: 700;
 }
 

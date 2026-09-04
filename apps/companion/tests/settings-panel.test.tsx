@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type {
 	CompanionFont,
+	CompanionFontSize,
 	CompanionPreferences,
 	CompanionTheme,
 } from "../src/application/preferences";
@@ -70,6 +71,7 @@ function findThemePicker(node: ReactNode): ThemePickerProps | undefined {
 
 const preferences: CompanionPreferences = {
 	font: "system-mono",
+	fontSize: "medium",
 	theme: "claude",
 };
 
@@ -100,12 +102,15 @@ describe("SettingsPanel", () => {
 		expect(html).toContain("<fieldset");
 		expect(html).toContain("<legend>Startup</legend>");
 		expect(html).toContain("<legend>Font</legend>");
+		expect(html).toContain("<legend>Text Size</legend>");
 		expect(html).toContain("<legend>Theme</legend>");
 		expect(html).toContain('for="launch-at-login"');
 		expect(html).toContain('for="companion-font"');
+		expect(html).toContain('for="companion-font-size"');
 		expect(html).toContain("Open at Login");
 		expect(html).toContain("System Mono");
 		expect(html).toContain("JetBrains Mono");
+		expect(html).toContain("Extra Large");
 		expect(html).toContain("Claude Code");
 		expect(html).toContain("Codex");
 		expect(html.match(/<button/g)).toHaveLength(2);
@@ -117,7 +122,7 @@ describe("SettingsPanel", () => {
 
 	it("renders Codex settings with Claude fieldset sections", () => {
 		const html = renderSettingsPanel({
-			currentPreferences: { font: "menlo", theme: "codex" },
+			currentPreferences: { font: "menlo", fontSize: "medium", theme: "codex" },
 		});
 
 		expect(html).toContain('data-terminal-panel="codex"');
@@ -125,6 +130,7 @@ describe("SettingsPanel", () => {
 		expect(html).toContain("<fieldset");
 		expect(html).toContain("<legend>Startup</legend>");
 		expect(html).toContain("<legend>Font</legend>");
+		expect(html).toContain("<legend>Text Size</legend>");
 		expect(html).toContain("<legend>Theme</legend>");
 		expect(html).not.toContain('class="terminal-panel-heading"');
 		expect(html).toContain('aria-label="Use Codex theme"');
@@ -133,13 +139,28 @@ describe("SettingsPanel", () => {
 
 	it("shows the selected font in a live preview sample", () => {
 		const html = renderSettingsPanel({
-			currentPreferences: { font: "menlo", theme: "claude" },
+			currentPreferences: {
+				font: "menlo",
+				fontSize: "medium",
+				theme: "claude",
+			},
 		});
 
 		expect(html).toContain('class="font-preview"');
 		expect(html).toContain("font-family:Menlo");
 		expect(html).toContain("workbranch feat/update-0619");
 		expect(html).toContain("1234567890");
+	});
+
+	it("previews the smallest scaled copy alongside the selected text size", () => {
+		const html = renderSettingsPanel({
+			currentPreferences: { font: "menlo", fontSize: "large", theme: "claude" },
+		});
+
+		expect(html).toContain("Preview · Large");
+		expect(html).toContain('class="font-preview-meta"');
+		expect(html).toContain("ci: build signed macOS DMGs · 11d");
+		expect(html).toContain('value="large"');
 	});
 
 	it("disables launch-at-login while its state is loading", () => {
@@ -150,7 +171,7 @@ describe("SettingsPanel", () => {
 		expect(html).toContain("Checking login item state");
 	});
 
-	it("delegates launch, font, and theme updates to app-shell callbacks", () => {
+	it("delegates launch, font, size, and theme updates to app-shell callbacks", () => {
 		const launchCalls: boolean[] = [];
 		const preferenceCalls: CompanionPreferences[] = [];
 		const element = SettingsPanel({
@@ -167,8 +188,10 @@ describe("SettingsPanel", () => {
 		const launchToggle = collectByType<InputProps>(element, "input").find(
 			(input) => input.id === "launch-at-login",
 		);
-		const fontSelect = collectByType<SelectProps>(element, "select").find(
-			(select) => select.id === "companion-font",
+		const selects = collectByType<SelectProps>(element, "select");
+		const fontSelect = selects.find((select) => select.id === "companion-font");
+		const fontSizeSelect = selects.find(
+			(select) => select.id === "companion-font-size",
 		);
 		const themePicker = findThemePicker(element);
 
@@ -176,12 +199,36 @@ describe("SettingsPanel", () => {
 		fontSelect?.onChange?.({
 			currentTarget: { value: "menlo" satisfies CompanionFont },
 		});
+		fontSizeSelect?.onChange?.({
+			currentTarget: { value: "large" satisfies CompanionFontSize },
+		});
 		themePicker?.onChange("codex");
 
 		expect(launchCalls).toEqual([true]);
 		expect(preferenceCalls).toEqual([
-			{ font: "menlo", theme: "claude" },
-			{ font: "system-mono", theme: "codex" },
+			{ font: "menlo", fontSize: "medium", theme: "claude" },
+			{ font: "system-mono", fontSize: "large", theme: "claude" },
+			{ font: "system-mono", fontSize: "medium", theme: "codex" },
 		]);
+	});
+
+	it("ignores a text size the preference contract does not know", () => {
+		const preferenceCalls: CompanionPreferences[] = [];
+		const element = SettingsPanel({
+			preferences,
+			launchAtLogin: false,
+			launchAtLoginLoading: false,
+			onLaunchAtLoginChange: () => undefined,
+			onPreferencesChange: (next) => {
+				preferenceCalls.push(next);
+			},
+		});
+		const fontSizeSelect = collectByType<SelectProps>(element, "select").find(
+			(select) => select.id === "companion-font-size",
+		);
+
+		fontSizeSelect?.onChange?.({ currentTarget: { value: "gigantic" } });
+
+		expect(preferenceCalls).toEqual([]);
 	});
 });

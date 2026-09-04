@@ -13,7 +13,7 @@
 .stage-matrix-caption {
 	border-bottom: 1px solid var(--line);
 	color: var(--accent);
-	font-size: 10px;
+	font-size: var(--fs-label);
 	font-weight: 700;
 	letter-spacing: 0.04em;
 	margin: 0;
@@ -45,13 +45,13 @@
 
 .stage-group-num {
 	border-radius: 999px;
-	font-size: 10px;
+	font-size: var(--fs-label);
 	font-weight: 700;
 	padding: 1px 7px;
 }
 
 .stage-group-label {
-	font-size: 10px;
+	font-size: var(--fs-label);
 	font-weight: 700;
 	letter-spacing: 0.08em;
 }
@@ -65,7 +65,7 @@
 
 .stage-group-count {
 	color: var(--faint);
-	font-size: 10px;
+	font-size: var(--fs-label);
 	font-variant-numeric: tabular-nums;
 }
 
@@ -176,11 +176,12 @@
 .stage-task-prompt {
 	color: var(--accent);
 	flex: none;
+	font-size: var(--fs-body);
 	font-weight: 700;
 }
 
 .stage-task-name {
-	font-size: 11px;
+	font-size: var(--fs-body);
 	font-weight: 600;
 	min-width: 0;
 	overflow: hidden;
@@ -194,7 +195,7 @@
 .stage-task-notification {
 	border-radius: 999px;
 	flex: none;
-	font-size: 10px;
+	font-size: var(--fs-label);
 	padding: 0 5px;
 }
 
@@ -237,7 +238,7 @@
 	border-radius: 0;
 	color: var(--accent);
 	display: inline-flex;
-	font-size: 11px;
+	font-size: var(--fs-body);
 	justify-content: center;
 	min-height: 30px;
 	min-width: 0;
@@ -276,7 +277,7 @@
 	align-items: baseline;
 	color: var(--muted);
 	display: grid;
-	font-size: 11px;
+	font-size: var(--fs-body);
 	gap: 6px;
 	grid-template-columns: 10px minmax(0, 1fr);
 	margin-left: 16px;
@@ -332,7 +333,7 @@
 	align-items: center;
 	color: var(--muted);
 	display: inline-flex;
-	font-size: 11px;
+	font-size: var(--fs-body);
 	font-weight: 600;
 	gap: 4px;
 }
@@ -344,18 +345,18 @@
 
 .stage-repo-dot {
 	flex: none;
-	font-size: 10px;
+	font-size: var(--fs-label);
 }
 
 .stage-repo-branch {
 	color: var(--faint);
-	font-size: 11px;
+	font-size: var(--fs-body);
 }
 
 .stage-repo-facts,
 .stage-repo-commit,
 .stage-note-line {
-	font-size: 10px;
+	font-size: var(--fs-meta);
 }
 
 .stage-repo-facts {
@@ -388,7 +389,7 @@
 .stage-repo-empty {
 	border-top: 1px solid var(--line);
 	color: var(--faint);
-	font-size: 10px;
+	font-size: var(--fs-label);
 	font-weight: 700;
 	letter-spacing: 0.08em;
 	margin-left: 16px;
@@ -400,7 +401,7 @@
 	border: 0;
 	border-radius: 3px;
 	color: var(--faint);
-	font-size: 11px;
+	font-size: var(--fs-body);
 	min-height: 28px;
 	min-width: 28px;
 	padding: 2px;
@@ -432,7 +433,7 @@
 	border-radius: 4px;
 	color: var(--text);
 	font: inherit;
-	font-size: 10px;
+	font-size: var(--fs-meta);
 	min-height: 40px;
 	padding: 6px;
 	resize: vertical;
@@ -441,14 +442,14 @@
 
 .stage-note-editor > span {
 	color: var(--faint);
-	font-size: 10px;
+	font-size: var(--fs-meta);
 }
 
 .stage-idle-row {
 	align-items: center;
 	border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
 	display: grid;
-	font-size: 11px;
+	font-size: var(--fs-body);
 	gap: 7px;
 	grid-template-columns: 10px minmax(0, max-content) auto minmax(0, 1fr) auto 76px;
 	min-width: 0;
@@ -476,7 +477,7 @@
 .stage-idle-repo,
 .stage-idle-time {
 	color: var(--faint);
-	font-size: 10px;
+	font-size: var(--fs-meta);
 }
 
 .stage-idle-time {

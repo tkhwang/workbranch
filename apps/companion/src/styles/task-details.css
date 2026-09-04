@@ -1,7 +1,7 @@
 .error,
 .empty {
 	border-radius: 4px;
-	font-size: 13px;
+	font-size: var(--fs-ui);
 	padding: 8px;
 }
 

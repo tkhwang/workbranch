@@ -7,7 +7,7 @@ main[data-theme="claude"] {
 	--line-strong: #625952;
 	--text: #c0caf5;
 	--muted: #9aa5ce;
-	--faint: #767c99;
+	--faint: #8a91b3;
 	--accent: #cd694a;
 	--accent-strong: #e08567;
 	--accent-soft: rgba(205, 105, 74, 0.14);
@@ -50,7 +50,7 @@ main[data-theme="codex"] {
 	--line-strong: #60606a;
 	--text: #ededed;
 	--muted: #a8a8ad;
-	--faint: #6b6b70;
+	--faint: #96969d;
 	--accent: #5cc2e0;
 	--accent-strong: #8bdcf2;
 	--accent-soft: rgba(92, 194, 224, 0.14);
@@ -82,6 +82,22 @@ main[data-theme="codex"] {
 	--cal-bg-4: rgba(167, 167, 167, 0.18);
 	--cal-bg-5: rgba(242, 160, 160, 0.18);
 	--cal-bg-6: rgba(187, 154, 247, 0.18);
+}
+
+main[data-font-size="small"] {
+	--font-scale: 0.92;
+}
+
+main[data-font-size="medium"] {
+	--font-scale: 1;
+}
+
+main[data-font-size="large"] {
+	--font-scale: 1.15;
+}
+
+main[data-font-size="extra-large"] {
+	--font-scale: 1.3;
 }
 
 main[data-font="sf-mono"] {

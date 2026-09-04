@@ -3,6 +3,7 @@ import { load } from "@tauri-apps/plugin-store";
 import { describe, expect, it, vi } from "vitest";
 import {
 	COMPANION_FONT_OPTIONS,
+	COMPANION_FONT_SIZE_OPTIONS,
 	COMPANION_PREFERENCES_STORE_FILE,
 	COMPANION_THEME_OPTIONS,
 	type CompanionPreferenceStore,
@@ -18,9 +19,10 @@ import {
 vi.mock("@tauri-apps/plugin-store", () => ({ load: vi.fn() }));
 
 describe("companion preferences", () => {
-	it("defaults to the Claude Code theme with system-mono", () => {
+	it("defaults to the Claude Code theme with medium system-mono", () => {
 		expect(DEFAULT_COMPANION_PREFERENCES).toEqual({
 			font: "system-mono",
+			fontSize: "medium",
 			theme: "claude",
 		});
 	});
@@ -29,6 +31,7 @@ describe("companion preferences", () => {
 		expect(
 			sanitizeCompanionPreferences({
 				font: "comic-sans",
+				fontSize: "gigantic",
 				theme: "rainbow",
 			}),
 		).toEqual({
@@ -45,7 +48,16 @@ describe("companion preferences", () => {
 				themeMode: "light",
 			}),
 		).toEqual({
-			preferences: { font: "menlo", theme: "claude" },
+			preferences: { font: "menlo", fontSize: "medium", theme: "claude" },
+			sanitized: true,
+		});
+	});
+
+	it("backfills medium on stores written before Text Size existed", () => {
+		expect(
+			sanitizeCompanionPreferences({ font: "menlo", theme: "codex" }),
+		).toEqual({
+			preferences: { font: "menlo", fontSize: "medium", theme: "codex" },
 			sanitized: true,
 		});
 	});
@@ -69,8 +81,14 @@ describe("companion preferences", () => {
 		] as const;
 
 		for (const theme of legacyThemes) {
-			expect(sanitizeCompanionPreferences({ font: "monaco", theme })).toEqual({
-				preferences: { font: "monaco", theme: "claude" },
+			expect(
+				sanitizeCompanionPreferences({
+					font: "monaco",
+					fontSize: "medium",
+					theme,
+				}),
+			).toEqual({
+				preferences: { font: "monaco", fontSize: "medium", theme: "claude" },
 				sanitized: true,
 			});
 		}
@@ -78,11 +96,25 @@ describe("companion preferences", () => {
 
 	it("preserves a valid Codex theme without sanitization", () => {
 		expect(
-			sanitizeCompanionPreferences({ font: "menlo", theme: "codex" }),
+			sanitizeCompanionPreferences({
+				font: "menlo",
+				fontSize: "large",
+				theme: "codex",
+			}),
 		).toEqual({
-			preferences: { font: "menlo", theme: "codex" },
+			preferences: { font: "menlo", fontSize: "large", theme: "codex" },
 			sanitized: false,
 		});
+	});
+
+	it("exposes four text sizes ordered from smallest to largest", () => {
+		expect(COMPANION_FONT_SIZE_OPTIONS).toEqual([
+			{ value: "small", label: "Small" },
+			{ value: "medium", label: "Medium" },
+			{ value: "large", label: "Large" },
+			{ value: "extra-large", label: "Extra Large" },
+		]);
+		expect(DEFAULT_COMPANION_PREFERENCES.fontSize).toBe("medium");
 	});
 
 	it("exposes only Claude Code and Codex themes", () => {
@@ -108,12 +140,24 @@ describe("companion preferences", () => {
 	});
 
 	it("restores a failed optimistic update only while it is current", () => {
-		const failedAttempt = { font: "menlo", theme: "claude" } as const;
-		const newerCurrent = { font: "menlo", theme: "codex" } as const;
+		const failedAttempt = {
+			font: "menlo",
+			fontSize: "medium",
+			theme: "claude",
+		} as const;
+		const newerCurrent = {
+			font: "menlo",
+			fontSize: "medium",
+			theme: "codex",
+		} as const;
+		const newerSize = { ...failedAttempt, fontSize: "large" } as const;
 
 		expect(
 			shouldRestoreFailedPreferenceUpdate(newerCurrent, failedAttempt),
 		).toBe(false);
+		expect(shouldRestoreFailedPreferenceUpdate(newerSize, failedAttempt)).toBe(
+			false,
+		);
 		expect(
 			shouldRestoreFailedPreferenceUpdate(failedAttempt, failedAttempt),
 		).toBe(true);
@@ -144,17 +188,22 @@ describe("companion preferences", () => {
 		expect(writes).toEqual(["font", "theme"]);
 	});
 
-	it("serializes only font and theme store keys", () => {
+	it("serializes only font, fontSize, and theme store keys", () => {
 		const entries = preferencesToStoreEntries({
 			font: "menlo",
+			fontSize: "large",
 			theme: "codex",
 		});
 
-		expect(entries).toEqual({ font: "menlo", theme: "codex" });
-		expect(Object.keys(entries)).toEqual(["font", "theme"]);
+		expect(entries).toEqual({
+			font: "menlo",
+			fontSize: "large",
+			theme: "codex",
+		});
+		expect(Object.keys(entries)).toEqual(["font", "fontSize", "theme"]);
 	});
 
-	it("writes only font and theme to the preference store", async () => {
+	it("writes font, fontSize, and theme to the preference store", async () => {
 		const writes: Array<readonly [string, unknown]> = [];
 		let saveCount = 0;
 		const store: CompanionPreferenceStore = {
@@ -169,11 +218,13 @@ describe("companion preferences", () => {
 
 		await writeCompanionPreferences(store, {
 			font: "sf-mono",
+			fontSize: "extra-large",
 			theme: "claude",
 		});
 
 		expect(writes).toEqual([
 			["font", "sf-mono"],
+			["fontSize", "extra-large"],
 			["theme", "claude"],
 		]);
 		expect(saveCount).toBe(1);

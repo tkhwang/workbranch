@@ -97,6 +97,7 @@ describe("App shell settings wiring", () => {
 		// Then the settings-capable shell contract is present before effects run
 		expect(html).toContain('data-theme="claude"');
 		expect(html).toContain('data-font="system-mono"');
+		expect(html).toContain('data-font-size="medium"');
 		expect(html).toContain('data-agent-header="claude"');
 		expect(html).toContain("<h1>Workbranch Companion</h1>");
 		expect(html).not.toContain("<fieldset");
@@ -297,7 +298,7 @@ describe("App shell settings wiring", () => {
 			/@media \(max-width: 400px\)\s*\{[\s\S]*?\.agent-header-row\s*\{[^}]*flex-wrap:\s*nowrap/s,
 		);
 		expect(css).toMatch(
-			/@media \(max-width: 400px\)\s*\{[\s\S]*?\.agent-header h1\s*\{[^}]*font-size:\s*13px[^}]*text-overflow:\s*ellipsis[^}]*white-space:\s*nowrap/s,
+			/@media \(max-width: 400px\)\s*\{[\s\S]*?\.agent-header h1\s*\{[^}]*font-size:\s*var\(--fs-ui\)[^}]*text-overflow:\s*ellipsis[^}]*white-space:\s*nowrap/s,
 		);
 	});
 
@@ -379,8 +380,10 @@ describe("App shell settings wiring", () => {
 		expect(css).toContain("--muted: #9aa5ce");
 		expect(css).toContain("--muted: #a8a8ad");
 		expect(css).not.toContain("--muted: #949494");
-		expect(css).toContain("--faint: #767c99");
-		expect(css).toContain("--faint: #6b6b70");
+		expect(css).toContain("--faint: #8a91b3");
+		expect(css).toContain("--faint: #96969d");
+		expect(css).not.toContain("--faint: #767c99");
+		expect(css).not.toContain("--faint: #6b6b70");
 		expect(css).not.toContain("--faint: #626262");
 		expect(css).not.toContain("--faint: #5d5d5d");
 		expect(css).toMatch(
@@ -395,61 +398,109 @@ describe("App shell settings wiring", () => {
 		);
 	});
 
-	it("keeps companion typography at the exact legible fixed-dark scale", () => {
-		// Given the approved one-pixel typography map
+	it("routes every typographic selector through the scaled size tokens", () => {
+		// Given the role-named type scale that --font-scale multiplies
 		// When every production selector in the map is inspected
 		const css = readCssContract("src/style.css");
 		const expectedTypographyRules = [
-			/main\s*\{[^}]*--floating-tabs-font-size:\s*12px/s,
-			/\.terminal-panel legend\s*\{[^}]*font-size:\s*11px/s,
-			/\.agent-header h1\s*\{[^}]*font-size:\s*15px/s,
-			/\.agent-inventory\s*\{[^}]*font-size:\s*11px/s,
-			/\.agent-control\s*\{[^}]*font-size:\s*16px/s,
-			/\.terminal-panel-heading\s*\{[^}]*font-size:\s*11px/s,
-			/\.status-token\s*\{[^}]*font-size:\s*11px/s,
-			/\.stage-matrix-caption\s*\{[^}]*font-size:\s*10px/s,
-			/\.stage-group-num\s*\{[^}]*font-size:\s*10px/s,
-			/\.stage-group-label\s*\{[^}]*font-size:\s*10px/s,
-			/\.stage-group-count\s*\{[^}]*font-size:\s*10px/s,
-			/\.stage-task-name\s*\{[^}]*font-size:\s*11px/s,
-			/\.stage-task-derived,\s*\.stage-task-blocked,\s*\.stage-task-progress,\s*\.stage-task-notification\s*\{[^}]*font-size:\s*10px/s,
-			/\.stage-current-line\s*\{[^}]*font-size:\s*11px/s,
-			/\.stage-repo-name\s*\{[^}]*font-size:\s*11px/s,
-			/\.stage-repo-branch\s*\{[^}]*font-size:\s*11px/s,
-			/\.stage-repo-facts,\s*\.stage-repo-commit,\s*\.stage-note-line\s*\{[^}]*font-size:\s*10px/s,
-			/\.stage-note-editor textarea\s*\{[^}]*font-size:\s*10px/s,
-			/\.error,\s*\.empty\s*\{[^}]*font-size:\s*13px/s,
-			/\.task-action\s*\{[^}]*font-size:\s*11px/s,
-			/\.app-error\s*\{[^}]*font-size:\s*13px/s,
-			/\.settings-panel h2\s*\{[^}]*font-size:\s*14px/s,
-			/\.settings-panel p,\s*\.settings-hint\s*\{[^}]*font-size:\s*11px/s,
-			/\.settings-row label\s*\{[^}]*font-size:\s*12px/s,
-			/\.settings-row-select::after\s*\{[^}]*font-size:\s*12px/s,
-			/\.font-preview\s*\{[^}]*font-size:\s*12px/s,
-			/\.font-preview-label\s*\{[^}]*font-size:\s*10px/s,
-			/\.agent-theme-button\s*\{[^}]*font-size:\s*11px/s,
-			/\.cal-title\s*\{[^}]*font-size:\s*14px/s,
-			/\.cal-nav-button,\s*\.cal-today-button,\s*\.cal-mode-button,\s*\.cal-chip\s*\{[^}]*font-size:\s*12px/s,
-			/\.cal-hour-label\s*\{[^}]*font-size:\s*11px/s,
-			/\.cal-day-heading\s*\{[^}]*font-size:\s*11px/s,
-			/\.cal-block-task\s*\{[^}]*font-size:\s*12px/s,
-			/\.cal-block-time\s*\{[^}]*font-size:\s*11px/s,
-			/\.cal-block-plan\s*\{[^}]*font-size:\s*10px/s,
-			/\.cal-timeline\[data-mode="day"\]\s*\.cal-session\[data-width="narrow"\]\s*\.cal-block-task\s*\{[^}]*font-size:\s*11px/s,
-			/\.cal-timeline\[data-mode="day"\]\s*\.cal-session\[data-width="narrow"\]\s*\.cal-block-time\s*\{[^}]*font-size:\s*10px/s,
-			/\.cal-detail strong\s*\{[^}]*font-size:\s*13px/s,
-			/\.cal-detail span,\s*\.cal-detail li\s*\{[^}]*font-size:\s*11px/s,
+			/main\s*\{[^}]*font-size:\s*var\(--fs-body\)/s,
+			/button,\s*select,\s*input\s*\{[^}]*font-size:\s*var\(--fs-ui\)/s,
+			/\.stage-task-prompt\s*\{[^}]*font-size:\s*var\(--fs-body\)/s,
+			/main\s*\{[^}]*--floating-tabs-font-size:\s*var\(--fs-ui\)/s,
+			/main\s*\{[^}]*--progress-pill-font-size:\s*var\(--fs-label\)/s,
+			/\.terminal-panel legend\s*\{[^}]*font-size:\s*var\(--fs-label\)/s,
+			/\.agent-header h1\s*\{[^}]*font-size:\s*var\(--fs-title\)/s,
+			/\.agent-inventory\s*\{[^}]*font-size:\s*var\(--fs-body\)/s,
+			/\.agent-control\s*\{[^}]*font-size:\s*var\(--fs-title\)/s,
+			/\.terminal-panel-heading\s*\{[^}]*font-size:\s*var\(--fs-label\)/s,
+			/\.status-token\s*\{[^}]*font-size:\s*var\(--fs-body\)/s,
+			/\.stage-matrix-caption\s*\{[^}]*font-size:\s*var\(--fs-label\)/s,
+			/\.stage-group-num\s*\{[^}]*font-size:\s*var\(--fs-label\)/s,
+			/\.stage-group-label\s*\{[^}]*font-size:\s*var\(--fs-label\)/s,
+			/\.stage-group-count\s*\{[^}]*font-size:\s*var\(--fs-label\)/s,
+			/\.stage-task-name\s*\{[^}]*font-size:\s*var\(--fs-body\)/s,
+			/\.stage-task-derived,\s*\.stage-task-blocked,\s*\.stage-task-progress,\s*\.stage-task-notification\s*\{[^}]*font-size:\s*var\(--fs-label\)/s,
+			/\.stage-current-line\s*\{[^}]*font-size:\s*var\(--fs-body\)/s,
+			/\.stage-repo-name\s*\{[^}]*font-size:\s*var\(--fs-body\)/s,
+			/\.stage-repo-branch\s*\{[^}]*font-size:\s*var\(--fs-body\)/s,
+			/\.stage-repo-facts,\s*\.stage-repo-commit,\s*\.stage-note-line\s*\{[^}]*font-size:\s*var\(--fs-meta\)/s,
+			/\.stage-note-editor textarea\s*\{[^}]*font-size:\s*var\(--fs-meta\)/s,
+			/\.error,\s*\.empty\s*\{[^}]*font-size:\s*var\(--fs-ui\)/s,
+			/\.task-action\s*\{[^}]*font-size:\s*var\(--fs-body\)/s,
+			/\.app-error\s*\{[^}]*font-size:\s*var\(--fs-ui\)/s,
+			/\.settings-panel h2\s*\{[^}]*font-size:\s*var\(--fs-title\)/s,
+			/\.settings-panel p,\s*\.settings-hint\s*\{[^}]*font-size:\s*var\(--fs-meta\)/s,
+			/\.settings-row label\s*\{[^}]*font-size:\s*var\(--fs-ui\)/s,
+			/\.settings-row-select::after\s*\{[^}]*font-size:\s*var\(--fs-ui\)/s,
+			/\.font-preview\s*\{[^}]*font-size:\s*var\(--fs-body\)/s,
+			/\.font-preview-label\s*\{[^}]*font-size:\s*var\(--fs-label\)/s,
+			/\.font-preview-meta\s*\{[^}]*font-size:\s*var\(--fs-meta\)/s,
+			/\.agent-theme-button\s*\{[^}]*font-size:\s*var\(--fs-body\)/s,
+			/\.cal-title\s*\{[^}]*font-size:\s*var\(--fs-ui\)/s,
+			/\.cal-nav-button,\s*\.cal-today-button,\s*\.cal-mode-button,\s*\.cal-chip\s*\{[^}]*font-size:\s*var\(--fs-body\)/s,
+			/\.cal-hour-label\s*\{[^}]*font-size:\s*var\(--fs-label\)/s,
+			/\.cal-day-heading\s*\{[^}]*font-size:\s*var\(--fs-meta\)/s,
+			/\.cal-block-task\s*\{[^}]*font-size:\s*var\(--fs-body\)/s,
+			/\.cal-block-time\s*\{[^}]*font-size:\s*var\(--fs-meta\)/s,
+			/\.cal-block-plan\s*\{[^}]*font-size:\s*var\(--fs-label\)/s,
+			/\.cal-timeline\[data-mode="day"\]\s*\.cal-session\[data-width="narrow"\]\s*\.cal-block-task\s*\{[^}]*font-size:\s*var\(--fs-meta\)/s,
+			/\.cal-timeline\[data-mode="day"\]\s*\.cal-session\[data-width="narrow"\]\s*\.cal-block-time\s*\{[^}]*font-size:\s*var\(--fs-label\)/s,
+			/\.cal-detail strong\s*\{[^}]*font-size:\s*var\(--fs-body\)/s,
+			/\.cal-detail span,\s*\.cal-detail li\s*\{[^}]*font-size:\s*var\(--fs-meta\)/s,
 		] as const;
 
-		// Then native smoothing is used and every mapped selector has its final size
+		// Then native smoothing is used and no selector re-hardcodes a pixel size
 		expect(css).not.toContain("-webkit-font-smoothing");
-		const pixelFontSizes = [
-			...css.matchAll(/font-size:\s*(\d+(?:\.\d+)?)px/g),
-		].map(([, size]) => Number(size));
-		expect(pixelFontSizes.every((size) => size >= 10)).toBe(true);
+		expect(css).not.toMatch(/font-size:\s*\d+(?:\.\d+)?px/);
 		for (const rule of expectedTypographyRules) {
 			expect(css).toMatch(rule);
 		}
+	});
+
+	it("scales the whole shell from one --font-scale with medium unscaled", () => {
+		// Given the Text Size contract shared by preferences.ts and themes.css
+		// When the base scale and its four steps are inspected
+		const css = readCssContract("src/style.css");
+		const baseSizes = [
+			/main\s*\{[^}]*--font-scale:\s*1;/s,
+			/--fs-label:\s*calc\(11px \* var\(--font-scale\)\)/,
+			/--fs-meta:\s*calc\(12px \* var\(--font-scale\)\)/,
+			/--fs-body:\s*calc\(13px \* var\(--font-scale\)\)/,
+			/--fs-ui:\s*calc\(14px \* var\(--font-scale\)\)/,
+			/--fs-title:\s*calc\(16px \* var\(--font-scale\)\)/,
+		] as const;
+		const steps = [
+			/main\[data-font-size="small"\]\s*\{[^}]*--font-scale:\s*0\.92/s,
+			/main\[data-font-size="medium"\]\s*\{[^}]*--font-scale:\s*1;/s,
+			/main\[data-font-size="large"\]\s*\{[^}]*--font-scale:\s*1\.15/s,
+			/main\[data-font-size="extra-large"\]\s*\{[^}]*--font-scale:\s*1\.3/s,
+		] as const;
+
+		// Then every step resolves through the same tokens, and none drops below 11px
+		for (const rule of [...baseSizes, ...steps]) {
+			expect(css).toMatch(rule);
+		}
+		const tokenBaseSizes = [
+			...css.matchAll(/--fs-[a-z]+:\s*calc\((\d+)px/g),
+		].map(([, size]) => Number(size));
+		expect(tokenBaseSizes).toHaveLength(5);
+		expect(tokenBaseSizes.every((size) => size >= 11)).toBe(true);
+	});
+
+	it("sizes the shell root so nothing falls back to the 16px user-agent default", () => {
+		// Given text that carries no font-size of its own, such as the task row
+		// prompt glyph and the Settings selects
+		// When the inherited baseline is inspected
+		const css = readCssContract("src/style.css");
+		const mainRule = /main\s*\{([^}]*)\}/s.exec(css);
+
+		// Then main declares a scaled font-size, so every descendant inherits one
+		expect(mainRule?.[1]).toMatch(/font-size:\s*var\(--fs-[a-z]+\)/);
+		expect(mainRule?.[1]).not.toMatch(/font-size:\s*\d/);
+		// And form controls, which reset to `font: inherit`, take an explicit role
+		expect(css).toMatch(
+			/button,\s*select,\s*input\s*\{[^}]*font:\s*inherit;[^}]*font-size:\s*var\(--fs-ui\)/s,
+		);
 	});
 
 	it("keeps theme tokens in the theme contract and calendar fills theme-aware", () => {
