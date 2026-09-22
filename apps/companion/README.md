@@ -8,6 +8,8 @@ The companion is a presentation-first consumer of the CLI JSON contract. It read
 
 The Activity view reads the local append-only activity log and renders project-colored task sessions in day or three-day calendar timelines. It is a navigation/reporting surface only; activity recording still comes from normal Companion refreshes and CLI state changes.
 
+Weekly limit accounts are frontend-owned state in the Tauri store file `companion-limits.json` (next to `companion-preferences.json` and `companion-notes.json`). Each account stores a label and the next reset instant entered from the coding agent's `/usage` output; the Main view derives the current seven-day window from that anchor and never reads actual usage.
+
 ## Development
 
 ```bash

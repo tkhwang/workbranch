@@ -123,3 +123,69 @@
 	background: var(--emphasis-soft);
 	color: var(--emphasis);
 }
+
+/* A size container so account rows fold to two lines by their own width
+   in control ems: narrow popovers and larger text both qualify. */
+.limit-settings-list {
+	container-type: inline-size;
+	display: grid;
+	font-size: var(--fs-ui);
+	gap: 6px;
+	list-style: none;
+	margin: 0 0 8px;
+	padding: 0;
+}
+
+.limit-settings-row {
+	align-items: center;
+	display: grid;
+	gap: 6px;
+	grid-template-columns: minmax(0, 1fr) auto 32px;
+}
+
+.limit-settings-row input[type="text"],
+.limit-settings-row input[type="datetime-local"] {
+	background: var(--button-bg);
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	color: var(--text);
+	color-scheme: dark;
+	min-height: 32px;
+	min-width: 0;
+	padding: 6px 10px;
+}
+
+.limit-settings-remove {
+	min-width: 32px;
+	padding: 4px;
+}
+
+.limit-settings-remove:hover:not(:disabled) {
+	border-color: var(--blocked);
+	color: var(--blocked);
+}
+
+.limit-settings-add {
+	justify-self: start;
+}
+
+.limit-settings-empty {
+	color: var(--faint);
+	font-size: var(--fs-meta);
+	margin: 0 0 8px;
+}
+
+@container (max-width: 30em) {
+	.limit-settings-row {
+		grid-template-columns: minmax(0, 1fr) 32px;
+	}
+
+	.limit-settings-row input[type="datetime-local"] {
+		grid-column: 1;
+		grid-row: 2;
+	}
+
+	.limit-settings-remove {
+		grid-row: 1 / 3;
+	}
+}

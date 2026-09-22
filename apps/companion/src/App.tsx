@@ -8,6 +8,7 @@ import {
 	type MenuModel,
 } from "./application/state";
 import { useCompanionSettings } from "./application/useCompanionSettings";
+import { useLimitAccounts } from "./application/useLimitAccounts";
 import { useRepoNotes } from "./application/useRepoNotes";
 import type { GlobalState, Task } from "./domain/model";
 import {
@@ -28,6 +29,7 @@ import { SettingsView } from "./ui/SettingsView";
 import { StageBoard } from "./ui/StageBoard";
 import { StatusAlert } from "./ui/StatusAlert";
 import type { TaskActionKind } from "./ui/TaskRow";
+import { WeeklyLimitGauge } from "./ui/WeeklyLimitGauge";
 
 const EMPTY_STATE: GlobalState = { projects: [], errors: [] };
 const TAURI_RUNTIME_UNAVAILABLE = "Tauri runtime unavailable";
@@ -101,6 +103,10 @@ export function App() {
 		updatePreferences,
 	} = useCompanionSettings({ onError: showError, onStatus: showStatus });
 	const { notes, saveNote } = useRepoNotes({
+		onError: showError,
+		onStatus: showStatus,
+	});
+	const { accounts, saveAccounts } = useLimitAccounts({
 		onError: showError,
 		onStatus: showStatus,
 	});
@@ -217,6 +223,9 @@ export function App() {
 			<StatusAlert message={visibleError} />
 			{currentView === "main" ? (
 				<section className="view-panel" aria-label="Main View">
+					{accounts.length > 0 ? (
+						<WeeklyLimitGauge accounts={accounts} />
+					) : null}
 					<StageBoard
 						activeCount={main.activeCount}
 						baseRows={main.baseRows}
@@ -253,9 +262,11 @@ export function App() {
 			) : null}
 			{currentView === "settings" ? (
 				<SettingsView
+					accounts={accounts}
 					preferences={preferences}
 					launchAtLogin={launchAtLogin}
 					launchAtLoginLoading={launchAtLoginLoading}
+					onAccountsChange={(next) => void saveAccounts(next)}
 					onLaunchAtLoginChange={(enabled) => void updateLaunchAtLogin(enabled)}
 					onPreferencesChange={(next) => void updatePreferences(next)}
 				/>

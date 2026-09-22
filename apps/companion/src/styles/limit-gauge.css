@@ -1,0 +1,230 @@
+.limit-board {
+	background: var(--surface-1);
+	border: 1px solid var(--line);
+	border-radius: 5px;
+	margin-bottom: 10px;
+	min-width: 0;
+	padding: 0 10px 6px;
+}
+
+.limit-caption {
+	align-items: baseline;
+	border-bottom: 1px solid var(--line);
+	color: var(--muted);
+	display: flex;
+	font-size: var(--fs-label);
+	font-weight: 700;
+	gap: 8px;
+	justify-content: space-between;
+	letter-spacing: 0.04em;
+	margin: 0 0 4px;
+	padding: 8px 0 6px;
+}
+
+.limit-count {
+	color: var(--faint);
+	font-variant-numeric: tabular-nums;
+	font-weight: 400;
+}
+
+/* Month context for the day-number axis labels. */
+.limit-axis-range {
+	color: var(--faint);
+	font-variant-numeric: tabular-nums;
+	font-weight: 400;
+	letter-spacing: 0;
+	white-space: nowrap;
+}
+
+/* The table owns the label | axis | facts columns; the axis header, the
+   list, and every row join it through subgrid so bars stay aligned with
+   the date axis regardless of label or facts width. */
+.limit-table {
+	column-gap: 8px;
+	display: grid;
+	grid-template-columns: minmax(64px, 96px) minmax(0, 1fr) auto;
+	min-width: 0;
+}
+
+.limit-axis-row,
+.limit-list,
+.limit-row {
+	align-items: center;
+	display: grid;
+	grid-column: 1 / -1;
+	grid-template-columns: subgrid;
+	min-width: 0;
+}
+
+.limit-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+/* No vertical padding so the now line continues across rows. */
+.limit-row {
+	padding: 0 2px;
+}
+
+/* A size container so the date labels thin out by the axis' own width,
+   measured in label ems so larger text raises the thresholds too. */
+.limit-axis {
+	border-bottom: 1px solid var(--line);
+	container-type: inline-size;
+	font-size: var(--fs-label);
+	height: 16px;
+	overflow: hidden;
+	position: relative;
+}
+
+.limit-axis-day {
+	color: var(--faint);
+	font-size: var(--fs-label);
+	font-variant-numeric: tabular-nums;
+	line-height: 12px;
+	position: absolute;
+	top: 0;
+	transform: translateX(-50%);
+	white-space: nowrap;
+}
+
+.limit-axis-day[data-edge="start"] {
+	transform: none;
+}
+
+.limit-axis-day[data-edge="end"] {
+	transform: translateX(-100%);
+}
+
+.limit-axis-day[data-today="true"] {
+	color: var(--emphasis);
+	font-weight: 700;
+}
+
+.limit-axis-now {
+	border-bottom: 4px solid var(--emphasis);
+	border-left: 4px solid transparent;
+	border-right: 4px solid transparent;
+	bottom: 0;
+	height: 0;
+	position: absolute;
+	transform: translateX(-50%);
+	width: 0;
+}
+
+.limit-label {
+	color: var(--text);
+	font-size: var(--fs-body);
+	font-weight: 600;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.limit-scale {
+	display: block;
+	height: 24px;
+	min-width: 0;
+	overflow: visible;
+	width: 100%;
+}
+
+.limit-grid {
+	stroke: var(--line);
+	stroke-opacity: 0.7;
+	stroke-width: 1;
+}
+
+.limit-rest {
+	fill: var(--surface-3);
+}
+
+.limit-fill {
+	fill: var(--emphasis-soft);
+}
+
+.limit-row[data-phase="fresh"] .limit-fill {
+	fill: var(--done-soft);
+}
+
+.limit-row[data-phase="soon"] .limit-fill {
+	fill: var(--notify-soft);
+}
+
+.limit-reset-mark {
+	stroke: var(--line-strong);
+	stroke-width: 1;
+}
+
+.limit-row[data-phase="fresh"] .limit-reset-mark {
+	stroke: var(--done);
+}
+
+.limit-row[data-phase="soon"] .limit-reset-mark {
+	stroke: var(--notify);
+}
+
+.limit-now {
+	stroke: var(--emphasis);
+	stroke-width: 1;
+}
+
+.limit-facts {
+	align-items: center;
+	color: var(--muted);
+	display: inline-flex;
+	font-size: var(--fs-meta);
+	font-variant-numeric: tabular-nums;
+	gap: 5px;
+	justify-self: end;
+	white-space: nowrap;
+}
+
+.limit-remaining {
+	color: var(--text);
+	font-weight: 600;
+}
+
+.limit-reset {
+	color: var(--faint);
+}
+
+.limit-token {
+	border-radius: 999px;
+	font-size: var(--fs-label);
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	padding: 0 6px;
+}
+
+.limit-row[data-phase="fresh"] .limit-token {
+	background: var(--done-soft);
+	color: var(--done);
+}
+
+.limit-row[data-phase="soon"] .limit-token {
+	background: var(--notify-soft);
+	color: var(--notify);
+}
+
+@media (max-width: 480px) {
+	.limit-table {
+		grid-template-columns: minmax(48px, 64px) minmax(0, 1fr) auto;
+	}
+}
+
+/* Below ~20px per day only every other date label fits; below ~10px per
+   day only every fourth. Today always stays visible. */
+@container (max-width: 25.5em) {
+	.limit-axis-day[data-tier="2"]:not([data-today="true"]) {
+		display: none;
+	}
+}
+
+@container (max-width: 12.7em) {
+	.limit-axis-day[data-tier="1"]:not([data-today="true"]) {
+		display: none;
+	}
+}
