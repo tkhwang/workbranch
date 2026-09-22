@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.21.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.20.0...workbranch-companion-v2.21.0) (2026-09-22)
+
+
+### Features
+
+* **design:** update design for weekly limit gauge ([5699b28](https://github.com/tkhwang/workbranch/commit/5699b28d1453bc7ed01381ed7412a9e81fa8dc2a))
+* **design:** update design for weekly limit gauge ([cc919e7](https://github.com/tkhwang/workbranch/commit/cc919e77cc0b7ae6da62fbfc0ec238a2c0a384b7))
+
+
+### Bug Fixes
+
+* **companion:** harden weekly limit account persistence ([4d68d84](https://github.com/tkhwang/workbranch/commit/4d68d8403c17fe6f44bf01ec5c3786efdbbdad93))
+
 ## [2.20.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.19.0...workbranch-companion-v2.20.0) (2026-09-08)
 
 
