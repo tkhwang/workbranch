@@ -65,6 +65,27 @@ describe("App shell settings wiring", () => {
 		expect(appSource).toContain("{model.errors.map");
 	});
 
+	it("wires weekly limit accounts above the stage board and into settings", () => {
+		const appSource = readFileSync("src/App.tsx", "utf8");
+
+		expect(appSource).toContain("useLimitAccounts({");
+		expect(appSource).toContain("accounts.length > 0 ?");
+		expect(appSource).toContain("<WeeklyLimitGauge accounts={accounts} />");
+		expect(appSource.indexOf("<WeeklyLimitGauge")).toBeLessThan(
+			appSource.indexOf("<StageBoard"),
+		);
+		expect(appSource.indexOf('aria-label="Main View"')).toBeLessThan(
+			appSource.indexOf("<WeeklyLimitGauge"),
+		);
+		expect(appSource).toContain("accounts={accounts}");
+		expect(appSource).toContain(
+			"onAccountsChange={(next) => void saveAccounts(next)}",
+		);
+		expect(readFileSync("src/style.css", "utf8")).toContain(
+			'@import "./styles/limit-gauge.css";',
+		);
+	});
+
 	it("includes the base repository row and action style contracts", () => {
 		const css = readCssContract("src/style.css");
 

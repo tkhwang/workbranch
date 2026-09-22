@@ -211,10 +211,10 @@ Combined flow shortcuts:
 
 Workbranch Companion is a macOS menu bar app with Main, Activity, and Settings views.
 
-- Main: groups active tasks into PLAN, EXECUTION, and REVIEW columns; each card shows its project, task and Plan title, repos, dirty/blocked state, Step progress, and notifications
+- Main: groups active tasks into PLAN, EXECUTION, and REVIEW columns; each card shows its project, task and Plan title, repos, dirty/blocked state, Step progress, and notifications. An optional Weekly Limits panel above the board shows each configured coding-agent account's current weekly window and the time until its next reset
 - Project details: lists each repo and branch, then provides Finder, IDE, and terminal launch actions
 - Activity: reads `$XDG_STATE_HOME/workbranch/activity.jsonl` (default `~/.local/state/workbranch/activity.jsonl`) and shows day or three-day calendar timelines
-- Settings: controls launch at login, the interface font, and the Claude Code or Codex theme
+- Settings: controls launch at login, the interface font, the Claude Code or Codex theme, and weekly limit accounts (a label plus the next reset date and time from `/usage`)
 
 Companion consumes the task root's `TASK-WORKBRANCH.md`, `.workbranch/notifications.jsonl`, and `workbranch list --global --json` output. It does not run task lifecycle or Git mutation commands.
 

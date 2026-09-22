@@ -211,10 +211,10 @@ Combined flow shortcut:
 
 Workbranch Companion은 Main, Activity, Settings view를 제공하는 macOS menu bar app입니다.
 
-- Main: 진행 중인 task를 PLAN, EXECUTION, REVIEW column으로 분류하고 project, task와 Plan title, repo, dirty/blocked 상태, Step 진행률, 알림을 card에 표시
+- Main: 진행 중인 task를 PLAN, EXECUTION, REVIEW column으로 분류하고 project, task와 Plan title, repo, dirty/blocked 상태, Step 진행률, 알림을 card에 표시. 계정을 등록하면 보드 위 Weekly Limits 패널에서 coding agent 계정별 이번 주 window와 다음 reset까지 남은 시간을 표시
 - Project details: 각 repo와 branch를 표시하고 Finder, IDE, terminal 실행 action 제공
 - Activity: `$XDG_STATE_HOME/workbranch/activity.jsonl`(기본 `~/.local/state/workbranch/activity.jsonl`)을 읽어 하루 또는 3일 calendar timeline 표시
-- Settings: login 시 자동 실행, interface font, Claude Code 또는 Codex theme 설정
+- Settings: login 시 자동 실행, interface font, Claude Code 또는 Codex theme, weekly limit 계정(라벨과 `/usage`에 표시된 다음 reset 날짜·시각) 설정
 
 Companion은 task root의 `TASK-WORKBRANCH.md`, `.workbranch/notifications.jsonl`, `workbranch list --global --json` 출력을 사용합니다. Task lifecycle이나 Git 변경 명령은 실행하지 않습니다.
 
