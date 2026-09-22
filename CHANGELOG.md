@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.24.0](https://github.com/tkhwang/workbranch/compare/v2.23.0...v2.24.0) (2026-09-22)
+
+
+### Features
+
+* **design:** update design for weekly limit gauge ([5699b28](https://github.com/tkhwang/workbranch/commit/5699b28d1453bc7ed01381ed7412a9e81fa8dc2a))
+* **design:** update design for weekly limit gauge ([cc919e7](https://github.com/tkhwang/workbranch/commit/cc919e77cc0b7ae6da62fbfc0ec238a2c0a384b7))
+
 ## [2.23.0](https://github.com/tkhwang/workbranch/compare/v2.22.0...v2.23.0) (2026-09-11)
 
 
