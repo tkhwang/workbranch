@@ -8,6 +8,7 @@ import {
 	limitAccountDisplayLabel,
 	loadCompanionLimitStore,
 	MAX_LIMIT_ACCOUNTS,
+	mergeLoadedLimitAccounts,
 	newLimitAccount,
 	readLimitAccounts,
 	sanitizeLimitAccounts,
@@ -315,6 +316,15 @@ describe("domain/limits", () => {
 			expect(parseDateTimeLocal("2026-02-30T10:00")).toBeUndefined();
 			expect(parseDateTimeLocal("2026-09-24T24:00")).toBeUndefined();
 		});
+
+		it("rejects a wall-clock time that falls into a DST gap", () => {
+			withTimeZone("America/New_York", () => {
+				expect(parseDateTimeLocal("2026-03-08T02:30")).toBeUndefined();
+				expect(parseDateTimeLocal("2026-03-08T03:30")).toBe(
+					localEpoch(2026, 3, 8, 3, 30),
+				);
+			});
+		});
 	});
 });
 
@@ -432,8 +442,41 @@ describe("application/limits", () => {
 				"Account 3",
 			);
 			expect(
-				limitAccountDisplayLabel({ ...account("a"), label: "Work" }, 2),
+				limitAccountDisplayLabel({ ...account("a"), label: "   " }, 2),
+			).toBe("Account 3");
+			expect(
+				limitAccountDisplayLabel({ ...account("a"), label: " Work " }, 2),
 			).toBe("Work");
+		});
+	});
+
+	describe("mergeLoadedLimitAccounts", () => {
+		it("keeps stored rows ahead of accounts added before the store loaded", () => {
+			const loaded = [account("a"), account("b")];
+			const current = [account("c")];
+
+			expect(mergeLoadedLimitAccounts(loaded, current)).toEqual([
+				account("a"),
+				account("b"),
+				account("c"),
+			]);
+			expect(mergeLoadedLimitAccounts(loaded, [])).toEqual(loaded);
+		});
+
+		it("lets the local list win on id and respects the maximum", () => {
+			const edited = { ...account("a", 1_900_000_000), label: "edited" };
+
+			expect(
+				mergeLoadedLimitAccounts([account("a"), account("b")], [edited]),
+			).toEqual([account("b"), edited]);
+			expect(
+				mergeLoadedLimitAccounts(
+					Array.from({ length: MAX_LIMIT_ACCOUNTS }, (_, index) =>
+						account(`id-${index}`),
+					),
+					[account("extra")],
+				),
+			).toHaveLength(MAX_LIMIT_ACCOUNTS);
 		});
 	});
 

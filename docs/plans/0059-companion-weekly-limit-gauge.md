@@ -126,7 +126,8 @@ export type CompanionLimitStore = {
 export function isEpochSeconds(value: unknown): value is number; // Number.isSafeInteger(value) && value > 0
 export function sanitizeLimitAccounts(value: unknown): LimitAccounts;
 export function newLimitAccount(existing: LimitAccounts, now: Date, createId: () => string): LimitAccount;
-export function limitAccountDisplayLabel(account: LimitAccount, index: number): string; // label || `Account ${index + 1}`
+export function limitAccountDisplayLabel(account: LimitAccount, index: number): string; // label.trim() || `Account ${index + 1}` (편집 중 공백만 남은 라벨도 대체)
+export function mergeLoadedLimitAccounts(loaded: LimitAccounts, current: LimitAccounts): LimitAccounts; // store 응답 전 로컬 추가분 병합: loaded(로컬 id 제외) + current, 12개 cap
 export function shouldRestoreFailedAccountsUpdate(current: LimitAccounts, attempted: LimitAccounts): boolean; // current === attempted
 export async function loadCompanionLimitStore(): Promise<CompanionLimitStore>;
 export async function readLimitAccounts(store: CompanionLimitStore): Promise<LimitAccounts>;
@@ -179,7 +180,7 @@ export function limitAxisDays(nowEpochSeconds: number): readonly LimitAxisDay[];
 - `axisRatio`: 선형 절대 시간. `now`는 항상 정확히 `0.5`. window의 `startAt`/`endAt`은 항상 축 안에 있으므로 clamp는 방어용이다.
 - `limitAxisDays`: 축 시작 시각의 로컬 날짜부터 축 끝의 로컬 날짜까지 셀을 만든다. 각 셀의 경계는 `new Date(y, m, d)`(로컬 자정)의 epoch를 `axisRatio`로 변환한 값이며 양 끝은 0/1로 clamp된다. 폭(`endRatio − startRatio`)이 `0.5일 / 14일` 미만이면 `label = ""`, 그 외 라벨은 날짜 숫자(`String(getDate())`). `today`는 `now`의 로컬 날짜와 같은 셀 하나만 참. 월 정보는 `formatMonthDay(now ∓ 7d)`로 캡션이 표시한다.
 - `formatRemaining`: `d > 0 → "{d}d {h}h"`, `h > 0 → "{h}h {m}m"`, `m > 0 → "{m}m"`, 그 외 `"<1m"`. 기존 `TaskRow`의 상대 시간 포맷과 목적이 달라 공유하지 않는다.
-- `parseDateTimeLocal`: `/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/` 형식만 받고 `new Date(y, m − 1, d, h, min)`(로컬)으로 만든 뒤 `Number.isNaN` 검사. 초는 버린다.
+- `parseDateTimeLocal`: `/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/` 형식만 받고 `new Date(y, m − 1, d, h, min)`(로컬)으로 만든 뒤 `Number.isNaN` 검사와 함께 연·월·일·시·분이 입력값 그대로인지 비교한다 — 달력 overflow(`2026-02-30`)뿐 아니라 DST 봄 전환의 존재하지 않는 시각(`America/New_York` `2026-03-08T02:30`)도 `Date`가 보정한 값을 저장하지 않고 거부한다(PR #195 리뷰 반영). 초는 버린다.
 - domain은 application을 import하지 않는다.
 
 ### D3. `useLimitAccounts` hook (`apps/companion/src/application/useLimitAccounts.ts`)
@@ -196,7 +197,8 @@ export function useLimitAccounts(options: {
 ```
 
 - `useCompanionSettings`의 구조를 그대로 따른다: mount 시 `isTauri()`일 때만 store를 열어 `readLimitAccounts`로 초기화, `cancelled` 가드, 실패는 `onError`.
-- `saveAccounts(next)`: `isTauri()`가 아니면 `onStatus("Tauri runtime unavailable")`. optimistic `setAccounts(next)` → `enqueuePreferenceSave`로 `writeLimitAccounts` 직렬화 → 성공 시 `onStatus("Weekly limits updated")`, 실패 시 `shouldRestoreFailedAccountsUpdate(current, next)`가 참일 때만 이전 값으로 복원 후 `onError`.
+- 초기 로드와 로컬 편집의 경합(PR #195 리뷰 반영): effect 시작 시 `accountsRef.current`를 baseline으로 잡고, 응답이 왔을 때 ref가 그대로면 loaded를 적용한다. 그 사이 `saveAccounts`가 실행됐으면(로드 전에는 추가만 가능) `mergeLoadedLimitAccounts(loaded, 로컬)`로 병합해 상태에 반영하고 병합본을 다시 저장해, 앞선 로컬 저장이 디스크의 기존 계정을 덮어쓴 것을 복구한다.
+- `saveAccounts(next)`: `isTauri()`가 아니면 `onStatus("Tauri runtime unavailable")`. optimistic `setAccounts(next)` → `enqueuePreferenceSave`로 `writeLimitAccounts` 직렬화(성공 시 `persistedRef = next`) → 성공 시 `onStatus("Weekly limits updated")`, 실패 시 `shouldRestoreFailedAccountsUpdate(current, next)`가 참일 때만 **마지막으로 디스크에 확인된 목록(`persistedRef`)**으로 복원 후 `onError`(직전 optimistic 값은 저장에 실패했을 수 있으므로 쓰지 않는다 — PR #195 리뷰 반영).
 - store 인스턴스는 `useRef<Promise<CompanionLimitStore>>`로 한 번만 열고 재사용한다(`useRepoNotes`의 `storePromiseRef`와 동일).
 
 ### D4. `WeeklyLimitGauge` (`apps/companion/src/ui/WeeklyLimitGauge.tsx`)
@@ -515,3 +517,13 @@ git diff --check
 - 검증: Companion 17 files / 243 tests PASS(기존 189 + 신규 54: `limits.test.ts` 32, `weekly-limit-gauge.test.tsx` 11, `settings-panel.test.tsx` +10, `app-shell.test.tsx` +1), `tsc --noEmit` PASS, biome 오류·경고 0(info 95, 기존 75 + `process.env["TZ"]` 대괄호·template literal 권고), Vite build PASS, Tauri release bundle PASS, `git diff --check` PASS.
 - 시각 QA: production 컴포넌트를 `renderToStaticMarkup`으로 뽑은 14 capture(Claude/Codex × 520/460 × medium/extra-large × 3/12 계정, Settings 4)에서 subgrid 정렬·막대 50%·지금 선 연속·overflow·라벨 겹침·datetime 잘림 검사 전부 PASS. QA 중 라벨 솎기(오늘 기준 tier + container query), 첫 라벨 셀 `M/D` 폐기 + 캡션 축 범위, 가장자리 라벨 안쪽 앵커, Settings 행 접기 container query를 보완했고 plan D2/D4/D6에 반영했다.
 - 남은 리스크: 축 폭이 좁아(520px에서 ≈180px, extra-large 460px에서 ≈110px) 막대가 작게 보인다 — G6(행에 reset 시각 표시) 선택의 대가이며 라벨은 겹치지 않는다. 사용자가 실제로 좁다고 느끼면 후속으로 460px에서 reset 시각 숨김 또는 facts 축약을 검토한다. `datetime-local` 네이티브 picker의 모양은 WebKit(Tauri)에서 Chrome 캡처와 다를 수 있으므로 Step 5에서 확인한다.
+
+## PR #195 후속 수정 (2026-09-22)
+
+CodeRabbit actionable 4건을 검증해 모두 유효하다고 판단하고 반영했다. CI(Build and test companion, Build/test/lint, GitGuardian)는 첫 커밋에서 이미 통과.
+
+- `limitAccountDisplayLabel`: 편집 중 공백만 남은 라벨(`"   "`)도 `Account N`으로 표시하고 표시값은 trim한다(D1).
+- `parseDateTimeLocal`: DST 봄 전환 gap의 시각(`2026-03-08T02:30` NY)을 `Date` 보정값으로 저장하지 않고 거부한다(D2).
+- `useLimitAccounts` 초기 로드 경합: 로드 전 로컬 편집이 있으면 stale 스냅샷으로 덮지 않고 `mergeLoadedLimitAccounts`로 병합·재저장한다(D3). 리뷰 제안은 "stale apply 건너뛰기"였지만 그것만으로는 로컬 저장이 덮어쓴 디스크의 기존 계정이 사라지므로 병합까지 넣었다.
+- `useLimitAccounts` 실패 복원: 직전 optimistic 값 대신 마지막으로 디스크에 확인된 목록(`persistedRef`)으로 복원한다(D3).
+- 테스트: `limits.test.ts`에 공백 라벨, 병합(순서·id 우선·cap), DST gap 거부 케이스 추가.

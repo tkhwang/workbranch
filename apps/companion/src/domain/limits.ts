@@ -210,11 +210,15 @@ export function parseDateTimeLocal(value: string): number | undefined {
 		return undefined;
 	}
 	const date = new Date(year, month - 1, day, hours, minutes, 0, 0);
+	// Any field that Date normalized away (calendar overflow, or a wall-clock
+	// time inside a DST gap) means the input named no real local instant.
 	if (
 		Number.isNaN(date.getTime()) ||
 		date.getFullYear() !== year ||
 		date.getMonth() !== month - 1 ||
-		date.getDate() !== day
+		date.getDate() !== day ||
+		date.getHours() !== hours ||
+		date.getMinutes() !== minutes
 	) {
 		return undefined;
 	}

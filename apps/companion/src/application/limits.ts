@@ -70,7 +70,23 @@ export function limitAccountDisplayLabel(
 	account: LimitAccount,
 	index: number,
 ): string {
-	return account.label === "" ? `Account ${index + 1}` : account.label;
+	// Labels are only trimmed when the store is read, so an in-progress edit
+	// can hold whitespace; treat that as blank too.
+	const label = account.label.trim();
+	return label === "" ? `Account ${index + 1}` : label;
+}
+
+// A local edit that lands before the store answers can only add accounts, so
+// stored rows come first and the local list wins on id.
+export function mergeLoadedLimitAccounts(
+	loaded: LimitAccounts,
+	current: LimitAccounts,
+): LimitAccounts {
+	const localIds = new Set(current.map((account) => account.id));
+	return [
+		...loaded.filter((account) => !localIds.has(account.id)),
+		...current,
+	].slice(0, MAX_LIMIT_ACCOUNTS);
 }
 
 export function shouldRestoreFailedAccountsUpdate(
