@@ -47,6 +47,7 @@ fn watched_external_metadata_fixture(
     let common_dir = fixture.0.join("target/frontend.git");
     let git_dir = common_dir.join("worktrees/frontend");
     fs::create_dir_all(&repository)?;
+    fs::write(root.join(workspace).join(".workbranch.task"), "")?;
     fs::create_dir_all(common_dir.join("objects"))?;
     fs::create_dir_all(common_dir.join("refs/heads"))?;
     fs::create_dir_all(&git_dir)?;

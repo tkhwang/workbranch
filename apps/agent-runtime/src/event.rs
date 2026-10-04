@@ -9,12 +9,19 @@ use sha2::{Digest, Sha256};
 fn string<'a>(v: &'a Value, key: &str) -> &'a str {
     v.get(key).and_then(Value::as_str).unwrap_or("")
 }
+// Omit URI authority userinfo for every scheme, including database DSNs.
+fn has_uri_credentials(text: &str) -> bool {
+    text.split("://").skip(1).any(|tail| {
+        tail.split(['/', '?', '#', ' ', '\t', '\n', '\r'])
+            .next().unwrap_or_default().contains('@')
+    })
+}
 fn clipped(text: &str, limit: usize) -> String {
     let clean = text.split_whitespace().collect::<Vec<_>>().join(" ");
     let lower = clean.to_lowercase();
     // Conservatively omit the whole excerpt when credential syntax is present.
     // Token-wise replacement can expose quoted or multi-word header values.
-    if [
+    if has_uri_credentials(&clean) || [
         "authorization",
         "bearer ",
         "password",

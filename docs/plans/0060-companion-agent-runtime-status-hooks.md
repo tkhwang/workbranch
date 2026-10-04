@@ -375,3 +375,12 @@ Verification Pending — 구현과 로컬 최종 회귀 검증을 완료했다. 
 - Companion의 외부 Git metadata 감시 대상 탐색에서 brief 존재 조건을 제거하고, project 하위 workspace/repository의 실제 `.git` 구조로 탐색한다.
 - 일반 파일 감시 테스트는 현재 metadata/config를 사용한다. brief가 없는 task의 외부 Git HEAD 변경 감지 회귀 테스트를 추가했다.
 - 검증: 수정 전 회귀 테스트는 Timeout으로 실패하여 누락을 재현했다. 수정 후 Companion native `cargo test --lib` 45개 전부 통과. 운영 코드 검색 결과 남은 파일명 참조는 migration과 task 제거 시 기존 파일 정리뿐이다.
+
+### PR #198 review corrections
+
+- Migration replaces only exact generated EN/KO guidance lines, preserving user-added suffixes.
+- A missing or unsupported Cargo toolchain no longer fails the already-installed Bash CLI; collector failure is reported with hook setup guidance.
+- Excerpts containing URI authority userinfo are omitted for all schemes, including database DSNs and quoted userinfo. This is conservative pattern-based protection, not a guarantee against arbitrary unlabeled secrets.
+- Empty runtime overrides use the home default; a nonempty override works without HOME.
+- External Git watches include the configured base and task directories with `.workbranch.task`, excluding unrelated worktrees without reintroducing a task brief dependency.
+- Validation: runtime 22 tests and Companion native 46 tests passed. Full CLI suite passed; Bash syntax, ShellCheck warning/error checks, runtime Clippy with warnings denied, and diff whitespace checks passed. Independent review found no remaining P1/P2 in this correction.

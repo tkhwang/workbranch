@@ -92,12 +92,12 @@ fn clean_guidance(text: &str) -> String {
             generated = false;
         }
         if generated {
-            if line.starts_with("- Make code changes and run Git commands inside the repo folders;")
+            if line == "- Make code changes and run Git commands inside the repo folders; keep progress in `TASK-WORKBRANCH.md` at the task root."
             {
                 lines.push("- Make code changes and run Git commands inside the repo folders.");
                 continue;
             }
-            if line.starts_with("- 코드 변경과 Git 명령은 repo folder 안에서 수행하고,")
+            if line == "- 코드 변경과 Git 명령은 repo folder 안에서 수행하고, 진행 상황은 task root의 `TASK-WORKBRANCH.md`에 기록합니다."
             {
                 lines.push("- 코드 변경과 Git 명령은 repo folder 안에서 수행합니다.");
                 continue;

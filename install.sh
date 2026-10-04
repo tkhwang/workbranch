@@ -160,7 +160,7 @@ install_runtime() {
   chmod +x "$tmp" && "$tmp" version >/dev/null && mv "$tmp" "$DEST_DIR/workbranch-agent-runtime" || { rm -f "$tmp"; return 1; }
   printf '[+] Installed runtime collector to %s\n' "$DEST_DIR/workbranch-agent-runtime"
 }
-install_runtime || { printf '[-] Error: runtime installation incomplete; rerun installer before enabling hooks\n' >&2; exit 1; }
+install_runtime || { printf '[-] Warning: CLI installed successfully; runtime collector unavailable. Rerun installer with a supported Rust toolchain or install via Homebrew before enabling hooks.\n' >&2; }
 
 
 cat <<USAGE

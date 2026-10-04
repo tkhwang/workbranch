@@ -27,6 +27,7 @@ main() {
   [ -x "$WORKBRANCH" ] || fail "missing executable: $WORKBRANCH"
   git --version >/dev/null || fail "git is required"
 
+  run_test test_installer_keeps_cli_usable_when_runtime_build_unavailable
   run_test test_installer_copies_runtime_collector_from_verified_local_build
   run_test test_grok_trust_requires_explicit_flag_and_matching_source
   run_test test_grok_hooks_use_own_plugin_without_trust_bypass

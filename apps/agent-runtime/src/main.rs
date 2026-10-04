@@ -5,13 +5,11 @@ use std::{
 };
 use workbranch_agent_runtime::{Result, event, migration, store};
 fn runtime_dir() -> Result<PathBuf> {
-    Ok(PathBuf::from(
-        std::env::var_os("WORKBRANCH_RUNTIME_DIR").unwrap_or(
-            PathBuf::from(std::env::var_os("HOME").ok_or("HOME missing")?)
-                .join(".workbranch/runtime")
-                .into_os_string(),
-        ),
-    ))
+    if let Some(path) = std::env::var_os("WORKBRANCH_RUNTIME_DIR").filter(|p| !p.is_empty()) {
+        return Ok(PathBuf::from(path));
+    }
+    Ok(PathBuf::from(std::env::var_os("HOME").ok_or("HOME missing")?)
+        .join(".workbranch/runtime"))
 }
 fn now() -> u64 {
     SystemTime::now()
