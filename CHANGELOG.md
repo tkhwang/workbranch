@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.25.0](https://github.com/tkhwang/workbranch/compare/v2.24.0...v2.25.0) (2026-10-04)
+
+
+### Features
+
+* **agent-runtime:** add initial agent runtime ([19f1689](https://github.com/tkhwang/workbranch/commit/19f16891e2bfe5ad7250eb6d54f5c39ddac76bff))
+* **agent-runtime:** add initial agent runtime ([3a35216](https://github.com/tkhwang/workbranch/commit/3a35216b099d666178cc92ba9c92eec60f5469a4))
+
+
+### Bug Fixes
+
+* **runtime:** address PR review safety and compatibility findings ([0f0eaaf](https://github.com/tkhwang/workbranch/commit/0f0eaafa29b1e64ac5a6999e7150ee451a666800))
+* **runtime:** improve secret redaction test clarity ([afc090a](https://github.com/tkhwang/workbranch/commit/afc090a1429476e56ccecc2fcb0ad2f76b5aa3ba))
+
 ## [2.24.0](https://github.com/tkhwang/workbranch/compare/v2.23.0...v2.24.0) (2026-09-22)
 
 
