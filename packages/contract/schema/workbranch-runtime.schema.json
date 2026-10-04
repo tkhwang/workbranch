@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tkhwang.github.io/workbranch/schema/workbranch-runtime.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "sessions"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "sessions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "workspace",
+          "provider",
+          "sessionId",
+          "agentId",
+          "turnId",
+          "state",
+          "observation",
+          "reason",
+          "prompt",
+          "activity",
+          "response",
+          "outcome",
+          "updatedAt",
+          "stateChangedAt"
+        ],
+        "properties": {
+          "workspace": {
+            "type": "string"
+          },
+          "provider": {
+            "enum": [
+              "claude",
+              "codex",
+              "grok"
+            ]
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "agentId": {
+            "type": "string"
+          },
+          "turnId": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "running",
+              "waiting",
+              "finished",
+              "idle"
+            ]
+          },
+          "observation": {
+            "enum": [
+              "observed",
+              "uncertain",
+              "stale"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "activity": {
+            "type": "string"
+          },
+          "response": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "stateChangedAt": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  }
+}

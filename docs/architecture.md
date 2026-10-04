@@ -30,26 +30,17 @@ A command file owns orchestration:
 
 ## Task root boundary
 
-A task root (`<task>`) is a workbranch metadata/agent workspace outside Git. The actual Git repositories live under `<task>/<repo>`. Workbranch-owned task-root state is limited to the current-Plan `TASK-WORKBRANCH.md`, generated `AGENTS.md`, `.workbranch/` (including Plan archives under `.workbranch/plans/done/`), and `.workbranch.task`; other task-root entries are non-git leftovers. Remove flows first remove repo worktrees and task branches, then known metadata, then list any non-git leftovers and ask once before deleting the remaining task root unless `--force` is used.
+A task root is metadata outside Git; repositories live under `<task>/<repo>`. Generated AGENTS.md describes this boundary but does not require status reporting. `.workbranch.task` identifies the workspace and notifications remain under `.workbranch/`. Legacy briefs and plan archives are removed through explicit runtime migration; Git worktree removal safety checks are unchanged.
 
-`workbranch terminal <task>` opens the task root by default, while `workbranch ide <task>` opens repo worktrees. `PREFERRED_LANGUAGE en|ko` only affects generated task briefs and generated agent guidance; it is not full CLI localization.
+## Runtime and setup boundaries
 
+The Rust collector owns canonical Claude/Codex/Grok observations and embedded SQLite at `~/.workbranch/runtime/state.sqlite3`. Agent hooks invoke it independently of Companion. The CLI exposes Git inventory with list schema 2 and runtime with a separate snapshot schema 1. Companion refreshes runtime without re-running Git; historical activity reports are no longer fed by task briefs.
 
-## Companion activity boundary
-
-Workbranch Companion owns activity-time tracking as local presentation state. The CLI continues to expose task state through `workbranch list --json` and `workbranch list --global --json`; there is no `workbranch report` command. The Tauri/React companion observes second-resolution `updatedAt` increases from `TASK-WORKBRANCH.md`, appends activity events to `~/.local/state/workbranch/activity.jsonl`, and computes today/week/month rollups in TypeScript application logic. Task briefs use `# <plan>` H1 sections with Plan-local `status:` lines. The brief is intended to contain the current Plan; completed Plans are archived by `workbranch done <task>` or confirmed land/finalize/pull prompts into `.workbranch/plans/done/<timestamp>-<slug>.md`. `workbranch list --json` keeps flat task fields for compatibility and exposes `plans[]` with 0-based Plan indexes; the Companion Home view renders only the active Plan while activity events still carry optional `plan` and `planIndex` fields for per-Plan time rows.
-
-The activity log is append-only history. It is not removed by `workbranch prune`, `workbranch remove`, or Companion root self-heal, because deleted repo/task workspaces may still matter for later retrospectives. v1 does not provide activity-log deletion, compression, or rotation; if long-term size becomes a real issue, add an archive/rotation plan that preserves history by default.
+The Companion native setup port locates Homebrew and checks the CLI/collector capability contract even before the CLI is installed. Installation actions accept fixed enum/argv combinations for `tkhwang/tap/workbranch`, with bounded logs, process deadlines and one active setup action per app. Provider connection actions delegate to the CLI and native provider plugin managers without bypassing trust. Onboarding and Settings share one controller. Configuration and fresh event receipt are separate states.
 
 ## Distribution boundary
 
-All install channels use the generated CLI artifact. `apps/cli/bin/workbranch` is canonical for the CLI app and root `bin/workbranch` is kept as the raw-install compatibility artifact:
-
-- direct curl/wget downloads via root `install.sh`
-- root `install.sh` checkout installs
-- Homebrew formula installation from a release tarball
-
-Homebrew can support multi-file runtime payloads through private install directories, but this project intentionally keeps the runtime as one file so all install channels behave the same.
+`apps/cli/bin/workbranch` is generated from CLI sources, with `bin/workbranch` as the compatible raw-install mirror. The CLI and standalone embedded-SQLite collector are distributed together through the installer and Homebrew formula. Companion is a separate Homebrew cask; its onboarding calls Homebrew rather than bundling or overwriting an independently managed CLI. A compatible formula must be published before releasing a Companion that requires it.
 
 ## Optional packaging checks
 

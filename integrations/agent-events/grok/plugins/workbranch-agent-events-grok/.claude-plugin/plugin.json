@@ -1,0 +1,8 @@
+{
+  "name": "workbranch-agent-events-grok",
+  "version": "0.1.0",
+  "description": "Local Workbranch runtime observation for Grok Build",
+  "author": {
+    "name": "workbranch"
+  }
+}

@@ -1,5 +1,4 @@
 import type { BaseRepo, Repo, Task } from "../domain/model";
-import { activePlan } from "../domain/model";
 
 const TASK_ACTION_KINDS = ["ide", "terminal", "finder"] as const;
 
@@ -87,12 +86,4 @@ export function formatRelativeTime(
 	if (elapsed < 60 * 60) return Math.floor(elapsed / 60) + "m";
 	if (elapsed < 24 * 60 * 60) return Math.floor(elapsed / (60 * 60)) + "h";
 	return Math.floor(elapsed / (24 * 60 * 60)) + "d";
-}
-
-export function currentWorkText(task: Task): string {
-	const plan = activePlan(task);
-	if (plan === undefined) return "";
-	if (plan.currentItem !== "") return plan.currentItem;
-	if (plan.summary !== "") return plan.summary;
-	return plan.title === task.name ? "" : plan.title;
 }

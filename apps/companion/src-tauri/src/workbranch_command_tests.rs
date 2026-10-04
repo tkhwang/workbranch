@@ -1,16 +1,6 @@
 use super::*;
 
 #[test]
-fn memo_clear_uses_task_before_clear_flag() {
-    let command = CompanionCommand::MemoClear {
-        task: "login".to_string(),
-    };
-    let args = workbranch_args_for(&command);
-
-    assert_eq!(args, Some(vec!["memo", "login", "--clear"]));
-}
-
-#[test]
 #[cfg(unix)]
 fn workbranch_runner_passes_gui_safe_path() -> Result<(), Box<dyn std::error::Error>> {
     use std::ffi::OsStr;
@@ -49,13 +39,13 @@ printf '%s' "$PATH"
 fn global_list_runs_configured_workbranch_bin() -> Result<(), Box<dyn std::error::Error>> {
     let config_home = configured_workbranch_script(
         r#"[ "$1 $2 $3" = "list --global --json" ] || exit 42
-printf '%s' '{"schemaVersion":1,"projects":[],"errors":[]}'
+printf '%s' '{"schemaVersion":2,"projects":[],"errors":[]}'
 "#,
     )?;
 
     let raw = workbranch_list_global_with_config_home(Some(&config_home))?;
 
-    assert_eq!(raw, r#"{"schemaVersion":1,"projects":[],"errors":[]}"#);
+    assert_eq!(raw, r#"{"schemaVersion":2,"projects":[],"errors":[]}"#);
     Ok(())
 }
 
@@ -64,7 +54,7 @@ printf '%s' '{"schemaVersion":1,"projects":[],"errors":[]}'
 fn global_list_preserves_structured_stdout_on_nonzero_exit()
 -> Result<(), Box<dyn std::error::Error>> {
     let structured =
-        r#"{"schemaVersion":1,"projects":[],"errors":[{"root":"/missing","message":"missing"}]}"#;
+        r#"{"schemaVersion":2,"projects":[],"errors":[{"root":"/missing","message":"missing"}]}"#;
     let config_home = configured_workbranch_script(&format!(
         "printf '%s' '{}'
 printf '%s' 'root failed' >&2

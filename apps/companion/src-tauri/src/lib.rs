@@ -7,6 +7,7 @@ use thiserror::Error;
 
 mod activity_store;
 mod process_env;
+mod setup;
 mod tray;
 mod watch_filter;
 mod watch_roots;
@@ -48,8 +49,6 @@ impl serde::Serialize for CompanionError {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 enum CompanionCommand {
-    Memo { task: String, text: String },
-    MemoClear { task: String },
     NotiClear { task: String },
     Finder { task: String },
     Ide { task: String },
@@ -71,8 +70,6 @@ struct WatchResult {
 
 fn workbranch_args_for(action: &CompanionCommand) -> Option<Vec<&str>> {
     match action {
-        CompanionCommand::Memo { task, text } => Some(vec!["memo", task.as_str(), text.as_str()]),
-        CompanionCommand::MemoClear { task } => Some(vec!["memo", task.as_str(), "--clear"]),
         CompanionCommand::NotiClear { task } => Some(vec!["noti", "clear", task.as_str()]),
         CompanionCommand::Finder { task } => Some(vec!["finder", task.as_str()]),
         CompanionCommand::Ide { task } => Some(vec!["ide", task.as_str()]),
@@ -104,6 +101,41 @@ fn workbranch_list_global_with_config_home(
     let bin = resolve_workbranch_bin(config_home)?;
     let cwd = std::env::var_os("HOME").map_or_else(|| PathBuf::from("/"), PathBuf::from);
     run_workbranch_global_json_stdout(&bin, &["list", "--global", "--json"], &cwd)
+}
+
+#[tauri::command]
+async fn workbranch_runtime() -> Result<String, CompanionError> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let bin = resolve_workbranch_bin(None)?;
+        let cwd = std::env::var_os("HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("/"));
+        run_workbranch_stdout(&bin, &["runtime", "--json"], &cwd)
+    })
+    .await
+    .map_err(|e| std::io::Error::other(e.to_string()))?
+}
+
+#[tauri::command]
+async fn workbranch_migrate(apply: bool) -> Result<RunResult, CompanionError> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let bin = resolve_workbranch_bin(None)?;
+        let cwd = std::env::var_os("HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("/"));
+        run_workbranch(
+            &bin,
+            &[
+                "migrate",
+                "agent-runtime",
+                if apply { "--apply" } else { "--dry-run" },
+                "--global",
+            ],
+            &cwd,
+        )
+    })
+    .await
+    .map_err(|e| std::io::Error::other(e.to_string()))?
 }
 
 #[tauri::command]
@@ -203,7 +235,7 @@ fn is_global_list_document(stdout: &str) -> bool {
     value
         .get("schemaVersion")
         .and_then(serde_json::Value::as_u64)
-        == Some(1)
+        == Some(2)
         && value
             .get("projects")
             .is_some_and(serde_json::Value::is_array)
@@ -270,8 +302,12 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            setup::setup_status,
+            setup::setup_action,
             workbranch_list,
             workbranch_list_global,
+            workbranch_runtime,
+            workbranch_migrate,
             workbranch_run,
             append_activity_events,
             read_activity_events,

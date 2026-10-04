@@ -1,3 +1,5 @@
+# Installer-only fixtures intentionally exercise the Bash surface without downloading release artifacts.
+export WORKBRANCH_SKIP_RUNTIME_INSTALL=1
 # shellcheck shell=bash
 # Sourced by tests/run.sh; uses helpers from tests/lib/helpers.sh.
 find_free_port() {

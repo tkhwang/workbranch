@@ -5,9 +5,13 @@ class Workbranch < Formula
   sha256 "REPLACE_WITH_RELEASE_TARBALL_SHA256"
   license "MIT"
 
+  depends_on "rust" => :build
+
   def install
     system "apps/cli/scripts/build-workbranch.sh"
     bin.install "apps/cli/bin/workbranch"
+    system "cargo", "build", "--release", "--locked", "--manifest-path", "apps/agent-runtime/Cargo.toml"
+    bin.install "apps/agent-runtime/target/release/workbranch-agent-runtime"
   end
 
   test do

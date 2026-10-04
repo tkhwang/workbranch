@@ -1,8 +1,10 @@
+import type { ReactNode } from "react";
 import type { LimitAccounts } from "../application/limits";
 import type { CompanionPreferences } from "../application/preferences";
 import { SettingsPanel } from "./SettingsPanel";
 
 type Props = {
+	readonly connections?: ReactNode;
 	readonly accounts: LimitAccounts;
 	readonly preferences: CompanionPreferences;
 	readonly launchAtLogin: boolean;
@@ -13,6 +15,7 @@ type Props = {
 };
 
 export function SettingsView({
+	connections,
 	accounts,
 	preferences,
 	launchAtLogin,
@@ -23,6 +26,7 @@ export function SettingsView({
 }: Props) {
 	return (
 		<section className="settings-view view-panel" aria-label="Settings View">
+			{connections}
 			<SettingsPanel
 				accounts={accounts}
 				preferences={preferences}

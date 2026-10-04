@@ -43,7 +43,11 @@ fn repository_git_entries(root: &Path) -> Result<Vec<PathBuf>, CompanionError> {
     for entry in fs::read_dir(root)? {
         let entry = entry?;
         let path = entry.path();
-        if path.is_dir() && path.join("TASK-WORKBRANCH.md").is_file() {
+        // Discover repositories by their Git structure, without a task status file.
+        if path.is_dir()
+            && !entry.file_name().to_string_lossy().starts_with('.')
+            && !workspaces.contains(&path)
+        {
             workspaces.push(path);
         }
     }

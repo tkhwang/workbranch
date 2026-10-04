@@ -2,7 +2,7 @@
 
 ## Source of truth
 - Status: Active
-- Last refreshed: 2026-09-07
+- Last refreshed: 2026-10-05
 - Primary product surfaces: Workbranch Companion macOS menu bar popover.
 - Evidence reviewed:
   - `docs/plans/0032-companion-tauri-react-rewrite.md`
@@ -19,14 +19,14 @@
 
 ## Brand
 - Personality: fast, focused, terminal-native, command-line HUD.
-- Trust signals: fast refresh, clear task stage, visible repo dirty/branch state, fixed-width readability, restrained terminal accents.
+- Trust signals: fast refresh, observed agent state and freshness, visible repo dirty/branch state, fixed-width readability, restrained terminal accents.
 - Avoid: marketing hero layouts, oversized cards, large SaaS rows, generic dashboard cards, decorative animation, glossy neon chrome, soft-elevation card stacks, and mixed UI typography that weakens the terminal identity.
 
 ## Product goals
 - Goals:
-  - Show every active worktree task's complete Plan → Execution → Review lifecycle with its current stage visible at a glance.
-  - Make blocked state, progress, and notification counts scannable without opening task details.
-  - Keep repo branch/dirty state visible without competing with task progress.
+  - Show each workspace once with waiting, running, turn-ended and unknown session counts.
+  - Make intervention needs and the latest tool activity scannable without opening session details.
+  - Keep repo branch/dirty state available as supporting details.
   - Keep actions discoverable but visually secondary.
   - Let the user choose a Claude Code or Codex CLI experience that applies to Main, Activity, and Settings.
 - Non-goals:
@@ -36,8 +36,8 @@
   - Reading actual token usage from Claude Code or Codex accounts; the weekly limit gauge is time-based only.
 - Success signals:
   - A user can identify active/blocked work in under three seconds.
-  - A user can identify each active task's stage without expanding any row.
-  - A user can identify every repository and branch directly beneath its task in the lifecycle-ordered stage groups.
+  - A user can identify which workspace needs attention without expanding it.
+  - A user can expand a workspace to inspect its sessions and repository facts.
   - The popover remains readable at its 460px native minimum width.
 
 ## Personas and jobs
@@ -46,23 +46,23 @@
   - Check what is currently in progress.
   - See which repo/branch is dirty.
   - Open task in IDE/terminal/Finder.
-  - Notice notification counts on stage cards without duplicating them in repository metadata rows.
+  - Find the workspace requiring a response and inspect the matching session.
 - Key contexts of use: quick menu bar glance while coding, before switching tasks, during AI-agent execution.
 
 ## Information architecture
 - Primary navigation: an inset floating terminal tab bar anchored to the viewport bottom with three destinations: Main, Activity, Settings.
-- Core screens: Main stage-grouped worktree view, Activity report, Settings preferences view.
+- Core screens: Main runtime-grouped workspace view, Activity report, Settings preferences view.
 - Content hierarchy:
   1. Compact global inventory (`projects · tasks`) and icon-only refresh.
   2. Active view content.
-  3. Main view: an optional `WEEKLY LIMITS` panel (rendered only when at least one coding-agent account is configured) above one `WORKTREE STATUS` surface grouped vertically as `00 BASE → 01 PLAN → 02 EXECUTION → 03 REVIEW`. BASE appears only when base repo data is available, in project/config order, with project prefixes when multiple projects are loaded. The three task stage headers are always visible; an empty stage shows count `0` without an empty task row. Each active task appears once beneath its stage header with current work, repo/branch Git facts, task actions, and optional repo/branch notes. Clean todo/done tasks remain in the compact IDLE section.
+  3. Main view: optional weekly limits, runtime session counts and priority-grouped workspace rows. Expand a workspace for session request/activity/response and Git facts. Base repositories remain in a supporting disclosure.
   4. Activity view: existing day/three-day calendar, session selection, and reload behavior inside the agent shell.
   5. Settings view: launch-at-login, font, text size, agent theme, and weekly limit account controls (label plus next reset `datetime-local`).
   6. Screen-reader live status in the agent shell; routine `Updated`/`Ready` text stays out of the visible header.
 
 ## Design principles
 - Principle 1: Status is a launcher signal, not a paragraph. Use compact dots, counts, and labels.
-- Principle 2: Stage and evidence stay together. Each vertical stage group answers where work is now, while its task blocks immediately show current work and repo/branch facts without a duplicate detail surface.
+- Principle 2: Observed status and its evidence stay together. Never imply a completed task from a finished agent turn.
 - Principle 3: Developer metadata should be monospace and subdued until dirty/blocked.
 - Tradeoffs: density is preferred over spaciousness, but tap/click targets remain at least 32px high where practical.
 
@@ -70,9 +70,9 @@
 - Color: Settings exposes two fixed-dark agent themes. Claude Code uses low-saturation warm-graphite surfaces and neutral warm-gray borders; `#cd694a` remains the identity anchor but is reserved for compact prompt, focus, and active-state signals rather than broad backgrounds. Stage cards use existing neutral surfaces while blocked, review, done, and notification semantics use their existing tokens. `#c0caf5` remains primary terminal text and `#9aa5ce` is the brighter muted text. Codex uses brighter cool-neutral surfaces and borders, `#ededed` for primary text, `#a8a8ad` for muted text, and `#5cc2e0` only for command-like actions and links. Existing Companion, Light, Dark, System, and legacy family values migrate to Claude Code.
 - Typography: the agent shell, navigation, content panels, form controls, task metadata, and activity labels use the user-selected monospace stack. The fixed-dark type scale is raised by one pixel with no production size below `10px`, except that the narrow-width agent header remains `13px`; explicit WebKit antialias smoothing is removed so native rendering controls glyph weight. Weight, contrast, spacing, and rules create hierarchy instead of a sans/mono split.
 - Spacing/layout rhythm: compact terminal rhythm, 8px grid, row-first grouping, prompt markers, and thin rules. Main, Activity, and Settings use the same expanded agent header so switching tabs does not shift the content vertically.
-- Shape/radius/elevation: agent headers use a restrained `6px` radius from the Brainless reference. Stage columns, cards, panels, and rows use square or near-square corners, flat tonal separation, and hairline borders. The bottom navigation may use a pill radius and one restrained shadow to separate it from scrolling content. Do not use card hover lift, gradient, or decorative shadows elsewhere.
+- Shape/radius/elevation: 6px agent headers, 8px runtime task corners, 6px session panels, neutral tonal separation and thin borders. No card lift or decorative gradient.
 - Motion: 120ms press/reveal feedback only; respect reduced motion.
-- Imagery/iconography: inactive stage positions use quiet dots, while each row's current stage uses a 14px semantic node with a surface separation border and a wider state-colored halo so its position is unmistakable without relying on text alone. Avoid status checkmark glyphs in task headers. Stage cards use terse text cues for blocked, progress, and notifications. No decorative illustration.
+- Imagery/iconography: compact state dots with text labels. Use existing IDE/Terminal/Finder icons in session details; no decorative illustrations or task-complete checkmarks.
 
 ## Components
 - Existing components to reuse: action buttons, `TerminalPanel`, `PromptLine`, `StatusToken`, activity calendar behavior, and settings preference controls.
@@ -82,7 +82,7 @@
   - `AgentTabs` as an inset floating bottom terminal navigation,
   - shared `TerminalPanel`, `PromptLine`, and `StatusToken` primitives,
   - compact global inventory summary limited to project and task counts,
-  - `StageBoard` as the single Main surface. It always renders vertical `PLAN`, `EXECUTION`, and `REVIEW` groups in lifecycle order; empty groups retain their header/rule/count `0`, while non-empty groups contain task blocks with selection, current work, repo/branch Git facts, task actions, and repo/branch notes,
+  - `StageBoard` groups workspaces by runtime priority: waiting, running, turn ended, unknown and inactive. Task nodes keep a stable parent/key so grouping updates preserve expanded details and editor state,
   - top toolbar with icon-only refresh/quit controls and screen-reader-only live status,
   - Settings view preferences panel,
   - Settings preference sections always use the Claude Code `fieldset`/`legend` anatomy in both themes; the selected theme still owns colors and control state,
@@ -90,28 +90,27 @@
   - switch row for launch-at-login,
   - font select row,
   - agent theme segmented control (`Claude Code`, `Codex`) with Claude Code as the default and migration target,
-  - `StageTaskBlock` containing task name/status/current work, optional derived/blocked/progress/notification cues, one task-level icon-only IDE/Terminal/Finder action group, and its repository rows. IDE uses an editor-window silhouette with a title bar, file sidebar, and code lines; Terminal uses `>_`; Finder uses a folder. Inline SVG icons retain explicit aria-label/title/focus/disabled states. Launcher configuration and path resolution remain CLI-owned: IDE opens configured repo worktrees and is disabled when none exist, while Terminal/Finder use the resolved task root,
+  - `RuntimeTask` shows request, provider/session counts, latest activity and last observation. Its disclosure contains session-specific excerpts, icon-only CLI launchers and repository note rows,
   - `StageRepoRow` containing repo/branch identity, observable Git facts, last-commit relative time, and an inline note editor persisted in `companion-notes.json` by `repo:branch` key.
   - `BaseRepoRow` inside `StageBoard`, showing base branch, dirty and cached origin/base-branch differences. Quiet dots identify clean rows; notify/blocked tokens identify warning/problem rows. PULL/PUSH/CHECK pills are non-interactive guidance, not execution controls. Dirty + behind is warn/CHECK until clean, then PULL; ahead-only is PUSH, dirty-only has no pill. Missing, mismatch, divergence, missing remote and inspection errors use CHECK. Inspection errors show UNAVAILABLE with a safe reason, never sentinel CLEAN/0 facts, and do not hide healthy sibling repositories or tasks.
   - `WeeklyLimitGauge` above the stage board: a `WEEKLY LIMITS N` caption whose right side names the axis range (`9/15 – 9/29`), a hidden two-week date axis (`now − 7d … now + 7d`, local-midnight cells labelled by day number, today emphasized, labels thinned by axis width) and one row per configured account. Each row is a label, an SVG window bar (last reset → next reset, always half the axis, elapsed part filled, reset marks at both ends) crossed by the fixed centre now line, and `remaining · Day HH:MM` facts with a `FRESH` (first 24h) or `SOON` (last 24h) pill. Columns align through CSS `subgrid`; the panel is absent without accounts.
   - Settings `Weekly Limits` section: one row per account with a label input, a `datetime-local` next-reset input that shows the normalized upcoming reset, and a remove button, plus `+ Add account` (max 12) and a hint that the gauge is time-based.
-- Variants and states: todo, planning, in-progress, review, blocked, done, notification present, dirty repo. In-progress identity uses the compact status marker rather than recoloring the full Task perimeter.
-- Todo/done visibility: todo/done tasks with repo `dirty` or `ahead > 0` derive into EXECUTION and remain visible in that group. Clean todo/done tasks are inactive and excluded from Main; only their aggregate `IDLE N` count appears in the footer.
+- Variants and states: running/waiting/finished/idle with independent observed/uncertain/stale confidence. Unknown or unobserved workspaces remain visible.
 - Shared header anatomy: Claude Code and Codex use the same text-only title block: `Workbranch Companion` above `projects · tasks`. The top banner contains no Workbranch mark, product icon, or Claude/Codex prompt prefix; theme identity comes from surrounding color tokens rather than different header geometry. Task metadata rows may retain their theme-specific prompt and action accents.
 - Token/component ownership: `style.css` is the CSS import manifest; `src/styles/base.css`, `themes.css`, `chrome.css`, `stage-board.css`, `limit-gauge.css`, `task-details.css`, `task-actions.css`, `status-groups.css`, `settings.css`, and `motion.css` own CSS custom properties and component classes by surface.
 
 ## Accessibility
 - Target standard: keyboard-operable popover controls and readable contrast.
-- Keyboard/focus behavior: task selection, launcher, and repo-note controls expose clear focus rings. Native task activation selects in place; command/control-enter opens the configured IDE target only for repo-bearing tasks.
+- Keyboard/focus behavior: native task disclosure and launch controls are keyboard operable. Group changes preserve task component identity and editing state.
 - Contrast/readability: stage headers, task status text, repository metadata, and note states must pass practical dark-mode contrast; disabled action may be muted but legible.
-- Screen-reader semantics: preserve button `aria-label`s; the grouped surface is labeled `Worktree status`, stage headers expose their text/count, each task selection button announces project/task/stage/blocked state and exposes `aria-pressed`, and every repo note button exposes `aria-expanded` plus its repo/branch target. Agent tab buttons expose destination labels and `aria-current`; settings controls use associated labels, switch state text, and the agent shell keeps a screen-reader-only `role="status"` region with polite live updates.
+- Screen-reader semantics: runtime sections have labelled headings; native disclosure buttons expose aria-expanded, launcher controls expose aria-label/title/disabled, and status text conveys meaning independently of color.
 - Reduced motion and sensory considerations: disable transform transitions under `prefers-reduced-motion: reduce`.
 
 ## Responsive behavior
 - Supported breakpoints/devices: the native menu popover opens at 520×760, remains resizable, and cannot resize below 460px wide.
 - Layout adaptations: the shared expanded header keeps its internal columns consistent on every tab. Stage groups remain vertical at every supported width. Task actions stay compact on the task line where space allows and wrap without horizontal overflow at 460px. Repo/fact/commit/note rows use `min-width: 0`; long task, repo, branch, note, and last-commit strings ellipsize with complete values in `title`/accessibility data.
 - Base row facts use a bounded flexible grid track with ellipsis and complete title/aria text. At 480px and below, facts move to a bounded second line; state dots and action pills remain visible. Validate internal row clipping, not just document overflow, including long branch names and the largest font setting.
-- Touch/hover differences: hover is enhancement only; core state is visible without hover. Pointer single-click selects a task. For repo-bearing tasks, pointer double-click opens the task in the IDE and command/control-enter provides the keyboard IDE shortcut. Repo-less tasks remain selection-only.
+- Touch/hover differences: hover is enhancement only; single click toggles task session details. Explicit launcher buttons invoke configured tools.
 
 ## Interaction states
 - Loading: screen-reader live status reports refresh state without adding a visible top-line chip.
@@ -143,7 +142,10 @@
 - [ ] Whether a later release should restore a light appearance as a separate axis after the two fixed-dark agent themes ship.
 
 
+
 ## Direction revision
+- 2026-10-05: Hook-driven runtime groups replace manual brief/stage reporting; see 0060.
+
 - 2026-09-07 (base repo status group): Added compact `00 BASE` above PLAN using the existing stage header and theme tokens. Repo-local inspection errors remain visible without hiding healthy data. Dirty + behind advises CHECK before PULL. Full facts remain accessible while bounded grid tracks prevent silent clipping at 520px/460px.
 - 2026-06-17: Primary reference changed from Linear to Raycast after implementation review. Keep Linear only as a secondary cue for compact status hierarchy; the dominant feel should be a Raycast-like menu command/status popover, not a SaaS issue-list dashboard.
 - 2026-06-18: Primary direction changed from Raycast-like chrome to a terminal/CLI developer HUD for companion settings, fonts, and theme presets. Treat the 2026-06-17 Raycast direction as superseded for shell color, typography, and settings components; keep only the compact status hierarchy lessons. Later on 2026-06-18, navigation changed to view-level bottom tabs: Main, Activity report stub, and Setting, while the top-right header keeps refresh as an icon-only control.
@@ -182,3 +184,19 @@
 - 2026-08-26 (stage-grouped main + repo/branch notes): Replaced the 3-column matrix and separate repository queue with one vertical `01 PLAN → 02 EXECUTION → 03 REVIEW` surface. Each active task appears once with current work, repo/branch Git facts, actions, and frontend-owned inline repo notes stored in `companion-notes.json` by `repo:branch`. The native window opens at 520×760 with a 460px minimum.
 - 2026-08-31 (idle inventory + brief summary): Replaced the aggregate `IDLE N` footer with an always-visible compact IDLE section for every successfully loaded clean todo/done task, preserving repo-bearing IDE and task-root Terminal/Finder actions while disabling IDE for repo-less tasks. Repo commit lines use a git-commit icon plus subject/relative time with tooltip and accessible context. Current work resolves as checklist item, then the one-line brief summary parsed from directly below `status:`, then a distinct Plan title. Newly generated task guidance requires agents to maintain that summary; existing workspaces are not migrated.
 - 2026-09-22 (weekly limit gauge): Added an optional `WEEKLY LIMITS` panel between the agent header and the worktree status board plus a Settings section for weekly-limit accounts. Users record each coding-agent account's next reset from `/usage` as a `datetime-local` anchor stored in `companion-limits.json`; the gauge draws every account's current seven-day window on a shared `now − 7d … now + 7d` axis with a fixed centre now line, remaining time, reset weekday/time, and FRESH/SOON pills. Alternatives rejected in review: a per-account ruler with a moving needle, a today-centred calendar-column axis, and weekday+time input. The gauge is time-based only and never reads actual usage.
+
+
+## Agent runtime surface (0060)
+
+The Main surface uses runtime groups: waiting for you, running, turn ended, unknown, and inactive. A task appears once and shows session counts; expanding it shows provider-specific request/activity/response excerpts with observation time. Unknown/stale observations never masquerade as idle or confirmed running. Turn ended is not task completion.
+
+Compact priority groups show request-first titles, provider/repository identity and current tool activity. Existing monospace size tokens, Claude/Codex themes and 460px minimum width remain. Neutral surfaces and small rounded corners separate groups; warm attention, green execution and amber turn-end dots carry semantic accents. Entire cards are not recolored by state. Task disclosure, focus and selection survive runtime refreshes; command strings are displayed as text. No remote allow/deny controls are introduced.
+
+Git facts, base repositories, repo notes and launchers remain supporting details. Runtime reads have their own coalesced polling path and never trigger a Git refresh. Migration discovery renders the CLI dry-run result and its action invokes the same CLI apply path, reporting errors and retry state. Legacy agent sessions must restart to reload guidance after migration.
+
+
+## Onboarding and Settings connections
+
+The first-run connection panel and Settings share the same two steps: prepare Workbranch CLI/collector through Homebrew, then connect individual agents. Provider rows are Claude Code, Codex and Grok Build; missing agent executables disable connection and explain the prerequisite. Installation progress is visible, with bounded detailed logs in a disclosure. No package or hook configuration is changed merely by viewing the panel.
+
+Configured, disabled, trust-required, first-event waiting and historical receipts are distinct. Only an event newer than the current connection verification baseline earns a receipt confirmation. A successful connect keeps its trust/first-event instructions visible instead of immediately dismissing onboarding. Existing terminal panel anatomy, font tokens, theme colors and 460px minimum width apply.

@@ -4728,6 +4728,7 @@ dependencies = [
 name = "workbranch-companion"
 version = "2.21.0"
 dependencies = [
+ "libc",
  "notify",
  "serde",
  "serde_json",

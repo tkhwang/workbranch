@@ -57,7 +57,6 @@ execute_land_task() {
     repo_log_seen=1
     i=$((i + 1))
   done
-  archive_prompt_current_plan "$task" "$completed_via"
 }
 
 cmd_land() {

@@ -9,7 +9,10 @@ main() {
     config) cmd_config "$@" ;;
     init) cmd_init "$@" ;;
     add) cmd_add "$@" ;;
-    memo) cmd_memo "$@" ;;
+    capabilities) cmd_capabilities "$@" ;;
+    runtime) cmd_runtime "$@" ;;
+    migrate) cmd_migrate "$@" ;;
+    hooks) cmd_hooks "$@" ;;
     noti) cmd_noti "$@" ;;
     list) cmd_list "$@" ;;
     path) cmd_path "$@" ;;
@@ -24,7 +27,6 @@ main() {
     finalize) cmd_finalize "$@" ;;
     push) cmd_push "$@" ;;
     land) cmd_land "$@" ;;
-    done) cmd_done "$@" ;;
     remove) cmd_remove "$@" ;;
     destroy) cmd_destroy "$@" ;;
     prune) cmd_prune "$@" ;;

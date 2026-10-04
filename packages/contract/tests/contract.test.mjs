@@ -163,7 +163,7 @@ test("live CLI list output satisfies contract schema", () => {
 			run(workbranchBin, ["list", "--json"], { cwd: project }),
 		);
 		validateOrThrow(validateList, document);
-		assert.equal(document.schemaVersion, 1);
+		assert.equal(document.schemaVersion, 2);
 		assert.equal(document.tasks[0].name, "feat-login");
 	} finally {
 		rmSync(tmpRoot, { recursive: true, force: true });
@@ -189,10 +189,25 @@ test("live CLI global list output satisfies wrapper schema", () => {
 			}),
 		);
 		validateOrThrow(validateGlobal, document);
-		assert.equal(document.schemaVersion, 1);
+		assert.equal(document.schemaVersion, 2);
 		assert.equal(document.projects.length, 1);
 		assert.equal(document.errors.length, 1);
 	} finally {
 		rmSync(tmpRoot, { recursive: true, force: true });
 	}
+});
+
+test("runtime collector snapshot satisfies its independent schema", () => {
+ const dir=mkdtempSync(join(tmpdir(),"workbranch-runtime-contract-"));
+ try {
+  const workspace=join(dir,"task");mkdirSync(workspace);writeFileSync(join(workspace,".workbranch.task"),"# fixture\n");
+  const collector=join(repoRoot,"apps/agent-runtime/target/debug/workbranch-agent-runtime");
+  const env={...process.env,WORKBRANCH_RUNTIME_DIR:join(dir,"runtime")};
+  execFileSync(collector,["ingest","claude"],{env,input:JSON.stringify({session_id:"contract",hook_event_name:"UserPromptSubmit",cwd:workspace,prompt:"Contract fixture"})});
+  const snapshot=JSON.parse(execFileSync(collector,["snapshot"],{env,encoding:"utf8"}));
+  const ajv=new Ajv2020({allErrors:true});
+  validateOrThrow(ajv.compile(readJson("schema/workbranch-runtime.schema.json")),snapshot);
+  assert.equal(snapshot.sessions.length,1);
+  assert.equal(snapshot.sessions[0].prompt,"Contract fixture");
+ } finally {rmSync(dir,{recursive:true,force:true});}
 });

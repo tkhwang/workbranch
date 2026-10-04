@@ -1,6 +1,10 @@
-import type { WorkbranchChecklistItem } from "@workbranch/contract";
-import type { GlobalState, Plan, Project, Step, Task } from "../domain/model";
-import { taskProgress, taskStatus } from "../domain/model";
+type WorkbranchChecklistItem = {
+	readonly text: string;
+	readonly checked: boolean;
+	readonly depth: number;
+};
+
+import type { GlobalState, Project } from "../domain/model";
 
 export type ActivityEvent = {
 	readonly v: 1;
@@ -68,104 +72,12 @@ function projectsByRoot(projects: readonly Project[]): Map<string, Project> {
 	return new Map(projects.map((project) => [project.root, project]));
 }
 
-function tasksByName(tasks: readonly Task[]): Map<string, Task> {
-	return new Map(tasks.map((task) => [task.name, task]));
-}
-
-function planIdentity(plan: Plan): string {
-	return `${plan.index}\u0000${plan.title}`;
-}
-
-function plansByIdentity(plans: readonly Plan[]): Map<string, Plan> {
-	return new Map(plans.map((plan) => [planIdentity(plan), plan]));
-}
-
-function flattenStepItems(
-	steps: readonly Step[],
-): readonly WorkbranchChecklistItem[] {
-	const items: WorkbranchChecklistItem[] = [];
-	const visit = (step: Step): void => {
-		items.push({ text: step.text, checked: step.checked, depth: step.depth });
-		for (const child of step.children) {
-			visit(child);
-		}
-	};
-	for (const step of steps) {
-		visit(step);
-	}
-	return items;
-}
-
-function planSignature(plan: Plan): string {
-	return JSON.stringify({
-		title: plan.title,
-		index: plan.index,
-		status: plan.status,
-		progressDone: plan.progressDone,
-		progressTotal: plan.progressTotal,
-		currentItem: plan.currentItem,
-		items: flattenStepItems(plan.steps),
-	});
-}
-
-function planChanged(current: Plan, previous: Plan | undefined): boolean {
-	return (
-		previous === undefined || planSignature(current) !== planSignature(previous)
-	);
-}
-
-function activityEventForPlan(
-	project: Project,
-	task: Task,
-	plan: Plan,
-	observedAt: number,
-): ActivityEvent {
-	const progress = taskProgress(task);
-	return {
-		v: 1,
-		editedAt: task.updatedAt,
-		observedAt,
-		root: project.root,
-		project: project.name,
-		task: task.name,
-		plan: plan.title,
-		planIndex: plan.index,
-		planTitle: plan.title,
-		planStatus: plan.status,
-		status: taskStatus(task),
-		taskProgressDone: progress.done,
-		taskProgressTotal: progress.total,
-		progressDone: plan.progressDone,
-		progressTotal: plan.progressTotal,
-		items: flattenStepItems(plan.steps),
-	};
-}
-
 export function activityEventsForRefresh(
-	previousProjects: readonly Project[],
-	nextProjects: readonly Project[],
-	observedAt: number,
+	_previousProjects: readonly Project[],
+	_nextProjects: readonly Project[],
+	_observedAt: number,
 ): readonly ActivityEvent[] {
-	const previousByRoot = projectsByRoot(previousProjects);
-	const events: ActivityEvent[] = [];
-	for (const project of nextProjects) {
-		const previousProject = previousByRoot.get(project.root);
-		if (previousProject === undefined) {
-			continue;
-		}
-		const previousTasks = tasksByName(previousProject.tasks);
-		for (const task of project.tasks) {
-			const previousTask = previousTasks.get(task.name);
-			const previousPlans = plansByIdentity(previousTask?.plans ?? []);
-			for (const plan of task.plans) {
-				const previousPlan = previousPlans.get(planIdentity(plan));
-				if (planChanged(plan, previousPlan)) {
-					events.push(activityEventForPlan(project, task, plan, observedAt));
-				}
-			}
-		}
-	}
-	return events;
+	return [];
 }
 
 export function createActivityRefresh(

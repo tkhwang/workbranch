@@ -47,6 +47,11 @@ fn locate_workbranch(configured: Option<&str>) -> Result<PathBuf, CompanionError
     if let Some(path) = configured {
         candidates.push(PathBuf::from(path));
     }
+    // Development must use the CLI from the same checkout as the app.
+    // An explicit registry override remains authoritative in every build.
+    if cfg!(debug_assertions) {
+        candidates.push(local_workbranch_bin());
+    }
     candidates.push(PathBuf::from("/opt/homebrew/bin/workbranch"));
     candidates.push(PathBuf::from("/usr/local/bin/workbranch"));
     if let Some(home) = std::env::var_os("HOME") {
@@ -82,6 +87,14 @@ mod tests {
     fn locate_workbranch_finds_local_cli_when_available() {
         let found = locate_workbranch(None);
         assert!(found.is_ok(), "expected local workbranch binary: {found:?}");
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    fn development_build_prefers_checkout_cli_over_installed_cli()
+    -> Result<(), Box<dyn std::error::Error>> {
+        assert_eq!(locate_workbranch(None)?, local_workbranch_bin());
+        Ok(())
     }
 
     #[test]

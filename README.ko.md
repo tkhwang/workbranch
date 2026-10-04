@@ -188,12 +188,10 @@ workbranch push                  # local feat/login -> origin/feat/login
 | `workbranch init`           | config 기준으로 base worktree 생성 또는 clone                               |
 | `workbranch add [<task>]`   | task workspace 생성                                                         |
 | `workbranch list [--json]`  | repo와 task workspace 목록 확인; `--json`은 machine-readable 출력           |
-| `workbranch memo [task]`    | `TASK-WORKBRANCH.md` task brief 확인/작성/삭제                              |
 | `workbranch noti ...`       | task notification 추가/목록/삭제                                            |
 | `workbranch status`         | base remote diff, task diff, dirty state 확인                               |
 | `workbranch update [task]`  | local base 기준으로 task의 모든 repo update (pull 없음)                     |
 | `workbranch land <task>`    | task 작업을 local base branch로 fast-forward 반영                           |
-| `workbranch done <task>`    | 현재 Plan을 done 처리하고 archive로 이동                                    |
 | `workbranch push [task]`    | base 또는 task branch push                                                  |
 | `workbranch doctor [--fix]` | project health 진단; safe fix는 stale worktree prune과 brief H1 repair 포함 |
 
@@ -216,7 +214,7 @@ Workbranch Companion은 Main, Activity, Settings view를 제공하는 macOS menu
 - Activity: `$XDG_STATE_HOME/workbranch/activity.jsonl`(기본 `~/.local/state/workbranch/activity.jsonl`)을 읽어 하루 또는 3일 calendar timeline 표시
 - Settings: login 시 자동 실행, interface font, Claude Code 또는 Codex theme, weekly limit 계정(라벨과 `/usage`에 표시된 다음 reset 날짜·시각) 설정
 
-Companion은 task root의 `TASK-WORKBRANCH.md`, `.workbranch/notifications.jsonl`, `workbranch list --global --json` 출력을 사용합니다. Task lifecycle이나 Git 변경 명령은 실행하지 않습니다.
+Companion은 hook 기반 runtime snapshot과 Git 조회 결과를 별도로 사용합니다. `TASK-WORKBRANCH.md` 기록은 필요하지 않습니다. 설치 후 `workbranch hooks install --provider claude` 또는 `--provider codex`를 사용하고 provider의 hook trust를 확인하세요.
 
 설치:
 
@@ -232,3 +230,5 @@ brew install --cask tkhwang/tap/workbranch-companion
 - [Architecture](docs/architecture.md)
 - [Git operations](docs/git-operations.md)
 - [MVP spec](docs/specs/0001-workbranch-mvp.md)
+
+Companion 첫 실행 또는 Settings에서 Homebrew CLI 설치와 Claude·Codex·Grok 연결을 진행할 수 있습니다.

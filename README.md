@@ -24,7 +24,7 @@ The CLI reads shared workbranch project state and runs the task worktree/Git flo
 | When you need to | Use | Role | Install |
 | ---------------- | --- | ---- | ------- |
 | Create, refresh, land, or push task workspaces | `workbranch` CLI | Runs the actual Git/worktree workflow | `brew install tkhwang/tap/workbranch` |
-| Check task stages, Plan progress, repo state, activity timelines, and notifications | Workbranch Companion | Shows workspace state and local activity-log history from the menu bar | `brew install --cask tkhwang/tap/workbranch-companion` |
+| Check agent runtime, latest activity, repository state, and notifications | Workbranch Companion | Shows hook observations and Git facts from the menu bar | `brew install --cask tkhwang/tap/workbranch-companion` |
 
 ## Quick start
 
@@ -188,12 +188,10 @@ workbranch push                  # local feat/login -> origin/feat/login
 | `workbranch init`           | Create or clone base worktrees from config                              |
 | `workbranch add [<task>]`   | Create a task workspace                                                 |
 | `workbranch list [--json]`  | Show repos and task workspaces; `--json` is machine-readable output     |
-| `workbranch memo [task]`    | Show, write, or clear the task brief in `TASK-WORKBRANCH.md`            |
 | `workbranch noti ...`       | Add, list, or clear task notifications                                  |
 | `workbranch status`         | Show base remote diff, task diff, and dirty state                       |
 | `workbranch update [task]`  | Update every repo in the task from local base (no pull)                 |
 | `workbranch land <task>`    | Fast-forward task work into local base branches                         |
-| `workbranch done <task>`    | Mark the current Plan done and archive it                               |
 | `workbranch push [task]`    | Push base or task branches                                              |
 | `workbranch doctor [--fix]` | Diagnose project health; safe fixes include stale worktree pruning and brief H1 repair |
 
@@ -216,7 +214,7 @@ Workbranch Companion is a macOS menu bar app with Main, Activity, and Settings v
 - Activity: reads `$XDG_STATE_HOME/workbranch/activity.jsonl` (default `~/.local/state/workbranch/activity.jsonl`) and shows day or three-day calendar timelines
 - Settings: controls launch at login, the interface font, the Claude Code or Codex theme, and weekly limit accounts (a label plus the next reset date and time from `/usage`)
 
-Companion consumes the task root's `TASK-WORKBRANCH.md`, `.workbranch/notifications.jsonl`, and `workbranch list --global --json` output. It does not run task lifecycle or Git mutation commands.
+Companion reads hook-driven runtime snapshots separately from Git status. No `TASK-WORKBRANCH.md` reporting is required. Install hooks with `workbranch hooks install --provider claude` or `--provider codex`, then review provider hook trust.
 
 Install:
 
@@ -232,3 +230,5 @@ brew install --cask tkhwang/tap/workbranch-companion
 - [Architecture](docs/architecture.md)
 - [Git operations](docs/git-operations.md)
 - [MVP spec](docs/specs/0001-workbranch-mvp.md)
+
+Use Companion onboarding or Settings to install the CLI with Homebrew and connect Claude, Codex or Grok.

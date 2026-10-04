@@ -1,9 +1,7 @@
 import type {
 	WorkbranchBaseRepo,
-	WorkbranchChecklistItem,
 	WorkbranchListDocument,
 	WorkbranchListGlobalDocument,
-	WorkbranchPlan,
 	WorkbranchRepo,
 	WorkbranchTask,
 } from "@workbranch/contract";
@@ -38,17 +36,6 @@ function isInspectionError(
 	);
 }
 
-function isChecklistItem(value: unknown): value is WorkbranchChecklistItem {
-	if (!isRecord(value)) {
-		return false;
-	}
-	return (
-		isString(value["text"]) &&
-		typeof value["checked"] === "boolean" &&
-		isNonNegativeInteger(value["depth"])
-	);
-}
-
 function isRepo(value: unknown): value is WorkbranchRepo {
 	if (!isRecord(value)) {
 		return false;
@@ -65,41 +52,11 @@ function isRepo(value: unknown): value is WorkbranchRepo {
 	);
 }
 
-function isPlan(value: unknown): value is WorkbranchPlan {
-	if (!isRecord(value)) {
-		return false;
-	}
-	return (
-		isString(value["title"]) &&
-		isNonNegativeInteger(value["index"]) &&
-		isString(value["status"]) &&
-		isNonNegativeInteger(value["progressDone"]) &&
-		isNonNegativeInteger(value["progressTotal"]) &&
-		isString(value["currentItem"]) &&
-		isOptionalString(value["summary"]) &&
-		Array.isArray(value["items"]) &&
-		value["items"].every(isChecklistItem)
-	);
-}
-
 function isTask(value: unknown): value is WorkbranchTask {
-	if (!isRecord(value)) {
-		return false;
-	}
+	if (!isRecord(value)) return false;
 	return (
 		isString(value["name"]) &&
 		isString(value["path"]) &&
-		isString(value["memoTitle"]) &&
-		isString(value["planTitle"]) &&
-		isString(value["status"]) &&
-		isNonNegativeInteger(value["progressDone"]) &&
-		isNonNegativeInteger(value["progressTotal"]) &&
-		isString(value["currentItem"]) &&
-		isNonNegativeInteger(value["updatedAt"]) &&
-		Array.isArray(value["items"]) &&
-		value["items"].every(isChecklistItem) &&
-		Array.isArray(value["plans"]) &&
-		value["plans"].every(isPlan) &&
 		isNonNegativeInteger(value["notiCount"]) &&
 		Array.isArray(value["repos"]) &&
 		value["repos"].every(isRepo)
@@ -129,7 +86,7 @@ function isListDocument(value: unknown): value is WorkbranchListDocument {
 		return false;
 	}
 	return (
-		value["schemaVersion"] === 1 &&
+		value["schemaVersion"] === 2 &&
 		isString(value["project"]) &&
 		isString(value["root"]) &&
 		(value["baseRepos"] === undefined ||
@@ -156,7 +113,7 @@ function isGlobalDocument(
 		return false;
 	}
 	return (
-		value["schemaVersion"] === 1 &&
+		value["schemaVersion"] === 2 &&
 		Array.isArray(value["projects"]) &&
 		value["projects"].every(isListDocument) &&
 		Array.isArray(value["errors"]) &&
@@ -166,6 +123,10 @@ function isGlobalDocument(
 
 export function parseGlobalDocument(raw: string): WorkbranchListGlobalDocument {
 	const parsed: unknown = JSON.parse(raw);
+	if (isRecord(parsed) && parsed["schemaVersion"] !== 2)
+		throw new Error(
+			"Update workbranch CLI and Companion together: incompatible schema version",
+		);
 	if (!isGlobalDocument(parsed)) {
 		throw new Error("invalid workbranch global list document");
 	}
@@ -174,8 +135,49 @@ export function parseGlobalDocument(raw: string): WorkbranchListGlobalDocument {
 
 export function parseListDocument(raw: string): WorkbranchListDocument {
 	const parsed: unknown = JSON.parse(raw);
+	if (isRecord(parsed) && parsed["schemaVersion"] !== 2)
+		throw new Error(
+			"Update workbranch CLI and Companion together: incompatible schema version",
+		);
 	if (!isListDocument(parsed)) {
 		throw new Error("invalid workbranch list document");
 	}
 	return parsed;
+}
+
+export function parseRuntimeDocument(
+	raw: string,
+): readonly import("../domain/model").AgentSession[] {
+	const value: unknown = JSON.parse(raw);
+	if (
+		!isRecord(value) ||
+		value["schemaVersion"] !== 1 ||
+		!Array.isArray(value["sessions"])
+	)
+		throw new Error("Update runtime collector: incompatible snapshot");
+	return value["sessions"].map((s: unknown) => {
+		if (
+			!isRecord(s) ||
+			!["claude", "codex", "grok"].includes(String(s["provider"])) ||
+			!["running", "waiting", "finished", "idle"].includes(
+				String(s["state"]),
+			) ||
+			!["observed", "uncertain", "stale"].includes(String(s["observation"])) ||
+			![
+				"workspace",
+				"sessionId",
+				"agentId",
+				"turnId",
+				"reason",
+				"prompt",
+				"activity",
+				"response",
+				"outcome",
+			].every((k) => typeof s[k] === "string") ||
+			!isNonNegativeInteger(s["updatedAt"]) ||
+			!isNonNegativeInteger(s["stateChangedAt"])
+		)
+			throw new Error("Invalid runtime session");
+		return s as unknown as import("../domain/model").AgentSession;
+	});
 }

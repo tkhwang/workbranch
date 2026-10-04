@@ -9,13 +9,11 @@ import type { BaseRepoAction, MatrixColumn, Repo } from "../domain/model";
 import {
 	baseRepoAction,
 	baseRepoHealth,
-	taskProgress,
-	taskStatus,
+	runtimeLabels,
+	sessionKey,
 } from "../domain/model";
-import { StatusToken } from "./StatusToken";
 import {
 	baseRepoFacts,
-	currentWorkText,
 	formatRelativeTime,
 	repoFacts,
 	type TaskActionHandler,
@@ -68,18 +66,6 @@ function TaskActionIcon({ kind }: { readonly kind: TaskActionKind }) {
 			);
 	}
 }
-
-const STAGE_LABELS: Record<MatrixColumn, string> = {
-	plan: "PLAN",
-	execution: "EXECUTION",
-	review: "REVIEW",
-};
-
-const STAGE_NUMBERS: Record<MatrixColumn, string> = {
-	plan: "01",
-	execution: "02",
-	review: "03",
-};
 
 const ACTION_LABELS = {
 	pull: "PULL",
@@ -137,34 +123,6 @@ function BaseRepoRow({ row }: { readonly row: MainBaseRow }) {
 				</span>
 			)}
 		</div>
-	);
-}
-
-function StageGroupHead({
-	column,
-	count,
-}: {
-	readonly column: MatrixColumn;
-	readonly count: number;
-}) {
-	return (
-		<header className="stage-group-head" data-column={column}>
-			<span className="stage-group-num">{STAGE_NUMBERS[column]}</span>
-			<span className="stage-group-label">{STAGE_LABELS[column]}</span>
-			<span aria-hidden="true" className="stage-group-rule" />
-			<span className="stage-group-count">{count}</span>
-		</header>
-	);
-}
-
-function IdleGroupHead({ count }: { readonly count: number }) {
-	return (
-		<header className="stage-group-head" data-column="idle">
-			<span className="stage-group-num">–</span>
-			<span className="stage-group-label">IDLE</span>
-			<span aria-hidden="true" className="stage-group-rule" />
-			<span className="stage-group-count">{count}</span>
-		</header>
 	);
 }
 
@@ -290,280 +248,202 @@ function StageRepoRow({
 	);
 }
 
-export function StageTaskBlock({
-	notes,
-	nowSeconds,
-	onAction,
-	onSaveNote,
-	onSelect,
-	row,
-	selected,
-}: {
-	readonly notes: RepoNotes;
-	readonly nowSeconds: number;
-	readonly onAction: TaskActionHandler;
-	readonly onSaveNote: (key: string, text: string) => void;
-	readonly onSelect: () => void;
-	readonly row: MainTaskRow;
-	readonly selected: boolean;
-}) {
-	const canOpenIde = row.repos.length > 0;
-	const progress = taskProgress(row.task);
-	const status = taskStatus(row.task);
-	const currentWork = currentWorkText(row.task);
-	const stage = row.role === "idle" ? "plan" : row.role;
-	const stateLabel = STAGE_LABELS[stage] + (row.blocked ? ", blocked" : "");
-
-	const openIde = (): void => {
-		if (canOpenIde) onAction(row.root, row.task, "ide");
-	};
-
-	return (
-		<article
-			className="stage-task-block"
-			data-blocked={row.blocked ? "true" : "false"}
-			data-derived={row.derived ? "true" : "false"}
-			data-selected={selected ? "true" : "false"}
-		>
-			<div className="stage-task-line">
-				<button
-					aria-label={
-						row.project +
-						", " +
-						row.task.name +
-						", " +
-						stateLabel +
-						", select" +
-						(canOpenIde
-							? "; double-click or command-enter to open in IDE"
-							: "; no repositories available for IDE")
-					}
-					aria-pressed={selected}
-					className="stage-task-select"
-					onClick={(event) => {
-						if (event.detail > 2) return;
-						onSelect();
-					}}
-					onDoubleClick={openIde}
-					onKeyDown={(event) => {
-						if (!canOpenIde || event.key !== "Enter") return;
-						if (!event.metaKey && !event.ctrlKey) return;
-						event.preventDefault();
-						openIde();
-					}}
-					type="button"
-				>
-					<span aria-hidden="true" className="stage-task-prompt">
-						›
-					</span>
-					<span className="stage-task-name" title={row.task.name}>
-						{row.task.name}
-					</span>
-					<StatusToken status={status} />
-					{row.blocked ? (
-						<span className="stage-task-blocked">BLOCKED</span>
-					) : null}
-					{row.derived ? (
-						<span className="stage-task-derived">DERIVED</span>
-					) : null}
-					{progress.total > 0 ? (
-						<span className="stage-task-progress">
-							{progress.done}/{progress.total}
-						</span>
-					) : null}
-					{row.task.notiCount > 0 ? (
-						<span className="stage-task-notification">
-							+{row.task.notiCount}
-						</span>
-					) : null}
-				</button>
-				<div className="stage-actions">
-					{taskActionsFor(row.task).map((action) => (
-						<button
-							aria-label={action.ariaLabel}
-							className="task-action"
-							disabled={action.disabled}
-							key={action.kind}
-							onClick={() => onAction(row.root, row.task, action.kind)}
-							title={action.kind === "ide" ? "IDE / Editor" : action.label}
-							type="button"
-						>
-							<TaskActionIcon kind={action.kind} />
-						</button>
-					))}
-				</div>
-			</div>
-			{currentWork === "" ? null : (
-				<div className="stage-current-line">
-					<span aria-hidden="true">└</span>
-					<span title={currentWork}>{currentWork}</span>
-				</div>
-			)}
-			{row.repos.length === 0 ? (
-				<div className="stage-repo-empty">NO REPOSITORIES</div>
-			) : (
-				<div className="stage-repo-list">
-					{row.repos.map((repo) => {
-						const key = repoNoteKey(repo.name, repo.branch);
-						return (
-							<StageRepoRow
-								key={key}
-								note={notes[key]}
-								nowSeconds={nowSeconds}
-								onSaveNote={onSaveNote}
-								repo={repo}
-							/>
-						);
-					})}
-				</div>
-			)}
-		</article>
-	);
-}
-
-function IdleTaskRow({
-	nowSeconds,
-	onAction,
-	row,
-}: {
-	readonly nowSeconds: number;
-	readonly onAction: TaskActionHandler;
-	readonly row: MainTaskRow;
-}) {
-	const firstRepo = row.repos.at(0);
-	const additionalRepoCount = Math.max(0, row.repos.length - 1);
-	const repoText =
-		firstRepo === undefined
-			? ""
-			: firstRepo.name +
-				" @ " +
-				firstRepo.branch +
-				(additionalRepoCount === 0 ? "" : " +" + additionalRepoCount);
-	const relativeTime = formatRelativeTime(row.latestActivityAt, nowSeconds);
-
-	return (
-		<div className="stage-idle-row">
-			<span aria-hidden="true" className="stage-idle-prompt">
-				›
-			</span>
-			<span className="stage-idle-task" title={row.task.name}>
-				{row.task.name}
-			</span>
-			<StatusToken status={taskStatus(row.task)} />
-			<span className="stage-idle-repo" title={repoText}>
-				{repoText}
-			</span>
-			<span className="stage-idle-time">{relativeTime}</span>
-			<div className="stage-actions stage-idle-actions">
-				{taskActionsFor(row.task).map((action) => (
-					<button
-						aria-label={action.ariaLabel}
-						className="task-action"
-						disabled={action.disabled}
-						key={action.kind}
-						onClick={() => onAction(row.root, row.task, action.kind)}
-						title={action.kind === "ide" ? "IDE / Editor" : action.label}
-						type="button"
-					>
-						<TaskActionIcon kind={action.kind} />
-					</button>
-				))}
-			</div>
-		</div>
-	);
-}
-
 export type StageBoardProps = {
-	readonly activeCount: number;
 	readonly baseRows: readonly MainBaseRow[];
 	readonly groups: readonly MainStageGroup[];
-	readonly idleCount: number;
 	readonly idleRows: readonly MainTaskRow[];
+	readonly activeCount: number;
+	readonly idleCount: number;
 	readonly notes: RepoNotes;
-	readonly nowSeconds?: number;
-	readonly onAction: TaskActionHandler;
 	readonly onSaveNote: (key: string, text: string) => void;
+	readonly onAction: TaskActionHandler;
 	readonly onSelect: (key: string) => void;
 	readonly selectedKey: string | undefined;
 };
-
-export function StageBoard({
-	activeCount,
-	baseRows,
-	groups,
-	idleCount,
-	idleRows,
-	notes,
-	nowSeconds,
-	onAction,
-	onSaveNote,
-	onSelect,
-	selectedKey,
-}: StageBoardProps) {
-	const currentNowSeconds = useCurrentEpochSeconds(nowSeconds);
+function RuntimeTask({
+	row,
+	props,
+	now,
+}: {
+	readonly row: MainTaskRow;
+	readonly props: StageBoardProps;
+	readonly now: number;
+}) {
+	const [expanded, setExpanded] = useState(false);
+	const lead = row.sessions[0];
+	const counts = (["waiting", "running", "finished"] as const).map((state) => ({
+		state,
+		count: row.sessions.filter(
+			(s) => s.state === state && s.observation === "observed",
+		).length,
+	}));
+	const unknown = row.sessions.filter(
+		(s) => s.observation !== "observed",
+	).length;
 	return (
-		<section aria-label="Worktree status" className="stage-board">
-			<h2 className="stage-matrix-caption">
-				WORKTREE STATUS{" "}
-				<span className="stage-matrix-count">{activeCount}</span>
-			</h2>
-			{baseRows.length === 0 ? null : (
-				<section
-					aria-label="Base repositories"
-					className="stage-group stage-base-group"
-					data-column="base"
-				>
-					<header className="stage-group-head" data-column="base">
-						<span className="stage-group-num">00</span>
-						<span className="stage-group-label">BASE</span>
-						<span aria-hidden="true" className="stage-group-rule" />
-						<span className="stage-group-count">{baseRows.length}</span>
-					</header>
-					{/* biome-ignore lint/a11y/useSemanticElements: The approved contract requires the existing div list container. */}
-					<div className="stage-group-list" role="list">
-						{baseRows.map((row) => (
-							<BaseRepoRow key={row.key} row={row} />
+		<article
+			className="runtime-task"
+			data-state={row.role}
+			data-selected={props.selectedKey === row.key}
+		>
+			<button
+				className="runtime-task-heading"
+				type="button"
+				aria-expanded={expanded}
+				onClick={() => {
+					setExpanded(!expanded);
+					props.onSelect(row.key);
+				}}
+			>
+				<span className="runtime-identity">
+					{row.project} / {row.task.name}
+					<span>{expanded ? "−" : "+"}</span>
+				</span>
+				<strong className="runtime-title">
+					{lead?.prompt || row.task.name}
+				</strong>
+				<span className="runtime-counts">
+					{row.task.notiCount > 0 ? (
+						<span>알림 {row.task.notiCount}</span>
+					) : null}
+					{counts
+						.filter((c) => c.count > 0)
+						.map((c) => (
+							<span key={c.state}>
+								{c.state === "waiting"
+									? "대기"
+									: c.state === "running"
+										? "실행 중"
+										: "턴 종료"}{" "}
+								{c.count}
+							</span>
+						))}
+					{unknown > 0 ? <span>관측 불명 {unknown}</span> : null}
+					{row.sessions.length === 0 ? (
+						<span>아직 수집된 session이 없습니다</span>
+					) : null}
+				</span>
+			</button>
+			{lead ? (
+				<div className="runtime-activity">
+					<span className="runtime-provider">{lead.provider}</span>
+					<span>
+						{lead.observation !== "observed"
+							? "상태 확인 불가"
+							: lead.reason || runtimeLabels[lead.state]}{" "}
+						· {formatRelativeTime(lead.updatedAt, now)} 전
+					</span>
+					<code title={lead.activity}>{lead.activity}</code>
+				</div>
+			) : null}
+			{expanded ? (
+				<div className="runtime-details">
+					{row.sessions.map((s) => (
+						<section
+							className="runtime-session"
+							key={sessionKey(s)}
+							aria-label={`${s.provider} session`}
+						>
+							<header>
+								<b>{s.provider}</b>
+								<span>
+									{s.observation === "observed"
+										? runtimeLabels[s.state]
+										: "상태 확인 불가"}
+									{s.reason ? ` · ${s.reason}` : ""}
+								</span>
+							</header>
+							<small>
+								마지막 관측 {formatRelativeTime(s.updatedAt, now)} 전 ·{" "}
+								{s.sessionId.slice(0, 12)}
+							</small>
+							{s.prompt ? <p>{s.prompt}</p> : null}
+							{s.activity ? <code>{s.activity}</code> : null}
+							{s.response ? (
+								<div className="runtime-response">
+									<small>마지막 응답 · 발췌</small>
+									<p>{s.response}</p>
+								</div>
+							) : null}
+							{s.outcome === "error" || s.outcome === "interrupted" ? (
+								<span className="runtime-outcome">{s.outcome}</span>
+							) : null}
+						</section>
+					))}
+					<div className="stage-actions">
+						{taskActionsFor(row.task).map((action) => (
+							<button
+								key={action.kind}
+								type="button"
+								aria-label={action.ariaLabel}
+								className="task-action"
+								title={action.label}
+								disabled={action.disabled}
+								onClick={() => props.onAction(row.root, row.task, action.kind)}
+							>
+								<TaskActionIcon kind={action.kind} />
+							</button>
 						))}
 					</div>
-				</section>
-			)}
-			{groups.map((group) => (
-				<section
-					className="stage-group"
-					data-column={group.column}
-					key={group.column}
-				>
-					<StageGroupHead column={group.column} count={group.rows.length} />
-					<div className="stage-group-list">
-						{group.rows.map((row) => (
-							<StageTaskBlock
-								key={row.key}
-								notes={notes}
-								nowSeconds={currentNowSeconds}
-								onAction={onAction}
-								onSaveNote={onSaveNote}
-								onSelect={() => onSelect(row.key)}
-								row={row}
-								selected={row.key === selectedKey}
-							/>
-						))}
-					</div>
-				</section>
-			))}
-			{idleRows.length > 0 ? (
-				<section className="stage-group stage-idle-group" data-column="idle">
-					<IdleGroupHead count={idleCount} />
-					<div className="stage-group-list">
-						{idleRows.map((row) => (
-							<IdleTaskRow
-								key={row.key}
-								nowSeconds={currentNowSeconds}
-								onAction={onAction}
-								row={row}
-							/>
-						))}
-					</div>
-				</section>
+					{row.repos.map((repo) => (
+						<StageRepoRow
+							key={repo.name}
+							repo={repo}
+							nowSeconds={now}
+							note={props.notes[repoNoteKey(repo.name, repo.branch)]}
+							onSaveNote={props.onSaveNote}
+						/>
+					))}
+				</div>
+			) : null}
+		</article>
+	);
+}
+export function StageBoard(props: StageBoardProps) {
+	const now = useCurrentEpochSeconds();
+	const sessions = [
+		...props.groups.flatMap((g) => g.rows),
+		...props.idleRows,
+	].flatMap((r) => r.sessions);
+	return (
+		<section className="runtime-board" aria-label="Agent runtime">
+			<div className="runtime-summary">
+				{["waiting", "running", "finished", "unknown"].map((state) => (
+					<span key={state} data-state={state}>
+						{runtimeLabels[state as MatrixColumn]}{" "}
+						<b>
+							{
+								sessions.filter((s) =>
+									state === "unknown"
+										? s.observation !== "observed"
+										: s.observation === "observed" && s.state === state,
+								).length
+							}
+						</b>
+					</span>
+				))}
+			</div>
+			<div className="runtime-group">
+				{[...props.groups, { column: "idle" as const, rows: props.idleRows }]
+					.filter((g) => g.rows.length > 0)
+					.flatMap((group) => [
+						<h2 key={`header:${group.column}`}>
+							<i data-state={group.column} />
+							{runtimeLabels[group.column]}
+							<small>{group.rows.length} workspaces</small>
+						</h2>,
+						...group.rows.map((row) => (
+							<RuntimeTask key={row.key} row={row} props={props} now={now} />
+						)),
+					])}
+			</div>
+			{props.baseRows.length > 0 ? (
+				<details className="runtime-bases">
+					<summary>Base repositories · {props.baseRows.length}</summary>
+					{props.baseRows.map((row) => (
+						<BaseRepoRow key={row.key} row={row} />
+					))}
+				</details>
 			) : null}
 		</section>
 	);

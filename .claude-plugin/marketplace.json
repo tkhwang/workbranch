@@ -1,0 +1,13 @@
+{
+  "name": "workbranch-runtime",
+  "description": "Workbranch agent runtime hooks",
+  "owner": {
+    "name": "workbranch"
+  },
+  "plugins": [
+    {
+      "name": "workbranch-agent-events",
+      "source": "./integrations/agent-events/claude-code/plugins/workbranch-agent-events"
+    }
+  ]
+}

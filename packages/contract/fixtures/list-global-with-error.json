@@ -1,14 +1,17 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "projects": [
     {
-      "schemaVersion": 1,
+      "schemaVersion": 2,
       "project": "fullstack",
       "root": "/tmp/fullstack",
       "tasks": []
     }
   ],
   "errors": [
-    { "root": "/tmp/missing", "message": "not inside a workbranch project" }
+    {
+      "root": "/tmp/missing",
+      "message": "not inside a workbranch project"
+    }
   ]
 }

@@ -1,0 +1,46 @@
+name: Agent runtime release
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: CLI release tag (vX.Y.Z)
+        required: true
+permissions:
+  contents: write
+jobs:
+  runtime:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'v')
+    strategy:
+      matrix:
+        include:
+          - os: macos-14
+            target: aarch64-apple-darwin
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}
+      RUNTIME_TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          persist-credentials: false
+      - name: Build embedded SQLite collector
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal
+          rustup target add --toolchain 1.95.0 "$RUNTIME_TARGET"
+          cargo +1.95.0 test --locked --manifest-path apps/agent-runtime/Cargo.toml
+          cargo +1.95.0 build --locked --release --target "$RUNTIME_TARGET" --manifest-path apps/agent-runtime/Cargo.toml
+          cp "apps/agent-runtime/target/$RUNTIME_TARGET/release/workbranch-agent-runtime" "workbranch-agent-runtime-$RUNTIME_TARGET"
+          shasum -a 256 "workbranch-agent-runtime-$RUNTIME_TARGET" > "workbranch-agent-runtime-$RUNTIME_TARGET.sha256"
+      - name: Upload CLI release artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$RELEASE_TAG" "workbranch-agent-runtime-$RUNTIME_TARGET" "workbranch-agent-runtime-$RUNTIME_TARGET.sha256" --clobber

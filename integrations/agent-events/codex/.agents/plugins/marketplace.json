@@ -1,0 +1,17 @@
+{
+  "name": "workbranch-runtime",
+  "owner": {
+    "name": "workbranch"
+  },
+  "plugins": [
+    {
+      "name": "workbranch-agent-events",
+      "source": "./plugins/workbranch-agent-events",
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

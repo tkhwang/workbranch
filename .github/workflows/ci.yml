@@ -26,6 +26,12 @@ jobs:
       - name: Syntax check
         run: /bin/bash -n bin/workbranch install.sh apps/cli/install.sh apps/cli/bin/workbranch apps/cli/tests/run.sh apps/cli/scripts/build-workbranch.sh
 
+      - name: Build and test runtime collector
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal
+          cargo +1.95.0 test --locked --manifest-path apps/agent-runtime/Cargo.toml
+          cargo +1.95.0 build --locked --manifest-path apps/agent-runtime/Cargo.toml
+
       - name: Run integration tests
         run: apps/cli/tests/run.sh
 

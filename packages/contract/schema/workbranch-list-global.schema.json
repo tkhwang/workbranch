@@ -4,26 +4,43 @@
   "title": "WorkbranchGlobalListDocument",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "projects", "errors"],
+  "required": [
+    "schemaVersion",
+    "projects",
+    "errors"
+  ],
   "properties": {
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": {
+      "const": 2
+    },
     "projects": {
       "type": "array",
-      "items": { "$ref": "workbranch-list.schema.json" }
+      "items": {
+        "$ref": "workbranch-list.schema.json"
+      }
     },
     "errors": {
       "type": "array",
-      "items": { "$ref": "#/$defs/globalError" }
+      "items": {
+        "$ref": "#/$defs/globalError"
+      }
     }
   },
   "$defs": {
     "globalError": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["root", "message"],
+      "required": [
+        "root",
+        "message"
+      ],
       "properties": {
-        "root": { "type": "string" },
-        "message": { "type": "string" }
+        "root": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
       }
     }
   }
