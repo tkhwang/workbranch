@@ -78,24 +78,15 @@ WORKBRANCH_COLOR=always workbranch help # force enhanced display
 
 `workbranch path <task>` and `workbranch path <task> --repo <repo>` remain plain path-only outputs for scripting.
 
-## Task brief and notifications
+## Agent runtime and migration
 
-`workbranch add <task>` creates `<task>/TASK-WORKBRANCH.md` and generated `<task>/AGENTS.md` at the task root, outside repo worktrees. Agents should run from `<task>` by default; code changes and Git commands belong in `<task>/<repo>`. The generated guidance points both locations at the same task brief. Workbranch does not edit repo `.gitignore` for this state. `PREFERRED_LANGUAGE en|ko` controls the generated task brief and agent guidance language; set it with `workbranch config language`.
+`workbranch add` creates workspace guidance and metadata, without a task brief. Agents do not manually report status. A bundled Rust collector writes hook observations to `~/.workbranch/runtime/state.sqlite3` without a DB server, Node, or the sqlite3 CLI. `workbranch runtime --json` reads the latest sessions without refreshing Git. `list --json` uses schema 2; update CLI and Companion together.
 
-The default task brief format is shared by humans, agents, `workbranch list --json`, and companion apps:
+Install one or both providers with `workbranch hooks install --provider claude` / `--provider codex` / `--provider grok`. Review native hook trust and restart agent sessions. `hooks status` delegates to the provider manager; first observed events confirm collection. `hooks uninstall` removes only the selected plugin.
 
-```markdown
-# <task>
-status: todo
-```
+Run `workbranch migrate agent-runtime --dry-run --global` to inspect legacy files/instructions and `--apply --global` to remove them. Companion detects the same migration and runs the CLI when you select migration. Existing `memo`, `done`, and Plan archive prompts are removed. Ordinary repository Plan documents remain independent. Migration does not synthesize runtime state from old briefs.
 
-The first `#` heading names the current Plan; a newly generated brief starts with the task name. The immediately following `status:` line is the source of truth and may be `todo`, `planning`, `in-progress`, `review`, `blocked`, or `done`. Update that line when the task moves through the normal `todo → planning → in-progress → review → done` flow, moving `todo` to `planning` immediately when meaningful work begins, including planning itself. Keep an optional one-line current-work summary directly below `status:` and refresh it when the focus changes. `workbranch list --json` exposes it as `plans[].summary`; the parser reads the first eligible non-empty line after `status:` before any checklist item, otherwise `summary` is empty. `blocked` is an execution-only pause: enter it only from `in-progress` and restore `in-progress` when unblocked. Add checklists, `plan:` metadata, or notes only when the user explicitly requests them.
-
-For compatibility with older briefs, the parser still derives status and progress from Markdown checklist items when an explicit `status:` line is absent: no completed work is `todo`, partial work is `in-progress`, and all items complete is `done`. Completed items count toward `progressDone`, all items count toward `progressTotal`, and the first unchecked item becomes `currentItem`. Schema v1 also retains `memoTitle` as a legacy alias for the first H1, but the Companion domain model does not depend on it.
-
-Use `workbranch memo <task>` to print the task brief, `workbranch memo <task> "text"` to overwrite it, and `workbranch memo <task> --clear` to remove it. From inside a registered task workspace, the task may be omitted only for reading: `workbranch memo` prints the current task brief. Writes and clears require an explicit task argument.
-
-Notifications are append-only JSON Lines at `<task>/.workbranch/notifications.jsonl`. `workbranch noti add <task> "text"` appends one event, `workbranch noti list <task>` prints notification text oldest-first, and `workbranch noti clear <task>` clears the inbox. Companion apps should read `notiCount`, `planTitle`, `status`, `progressDone`, `progressTotal`, `currentItem`, `updatedAt`, and plan-level `summary` from `workbranch list --json` and may call `noti list` / `noti clear` for details and acknowledgement. The current Companion shows `+N` on StageBoard cards only.
+Notifications remain at `<task>/.workbranch/notifications.jsonl`; `noti add|list|clear` and `notiCount` are unchanged.
 
 `workbranch remove <task>` removes task worktrees, local task branches, and known generated task-root state: `TASK-WORKBRANCH.md`, generated `AGENTS.md`, `.workbranch/`, and `.workbranch.task`. Everything else left in the task root, including `.omx/` and `.omc/`, is not git-managed. Normal remove prints those remaining item names and, in an interactive shell, asks once whether to delete the entire task root. No/EOF keeps the task root. `workbranch remove <task> --force` still runs the normal safety preflights, then deletes the task root without prompting.
 
@@ -154,7 +145,7 @@ workbranch path login
 workbranch path login --repo frontend
 ```
 
-`workbranch ide <task>` runs repo-by-repo. `workbranch terminal <task>` opens the task root once so an agent can see `AGENTS.md`, `TASK-WORKBRANCH.md`, and all repos. Use `--repo` when you intentionally want either launcher scoped to one repo.
+`workbranch ide <task>` runs repo-by-repo. `workbranch terminal <task>` opens the task root once so an agent can see `AGENTS.md`, and all repos. Use `--repo` when you intentionally want either launcher scoped to one repo.
 
 ## Setup commands
 
@@ -167,3 +158,17 @@ See the [MVP spec](specs/0001-workbranch-mvp.md) for the config format and setup
 Before changing worktrees, `workbranch` checks for dirty worktrees, wrong branches, rebase state, missing repos, and non-fast-forward Git paths.
 
 When a preflight detects a rebase conflict, diverged pull path, or non-fast-forward land path, it stops before changing the target worktree and prints the manual commands for that exact repo. The guidance may tell you to inspect moved refs with `git fetch` and `git log --left-right`, or to run `workbranch update <task> --repo <repo>` before landing. Resolve the conflict or non-fast-forward state outside `workbranch`, then rerun the original `workbranch` or `workbranch land` command.
+
+
+## Companion installation and agent connections
+
+Install the Companion using `brew install --cask tkhwang/tap/workbranch-companion`. First-run onboarding and Settings share the same installation and connection controls.
+
+Install CLI runs `brew install tkhwang/tap/workbranch` to install both the CLI and collector. Update/repair target that formula only; an existing standalone CLI without a formula is routed through Homebrew installation first. The panel shows the version and actual selected path.
+
+Connect Claude Code, Codex or Grok Build individually. Agent installation and account sign-in are separate. Review native hook trust and restart existing sessions. Configured hooks and observed events are distinct; old receipts do not verify a reconnection. The installation screen works even without a CLI. No installation or connection changes occur before a button is selected.
+
+For direct CLI usage, use `workbranch hooks install --provider claude|codex|grok`. A development checkout selects its local plugin source, or pass `--source <checkout>`. Connecting registers the collector at `~/.workbranch/runtime/hook-collector` so GUI PATH differences do not break hooks. This is automatically managed executable metadata, not an agent-maintained status document.
+
+
+Grok plugin installation requires explicit trust. Companion first shows the source and execution permissions; only selecting Trust and install applies `--trust` to that approved source. CLI users can inspect the target with `workbranch hooks describe --provider grok`, then explicitly run `workbranch hooks install --provider grok --trust` if they trust it. No automatic approval or cross-provider trust is applied.

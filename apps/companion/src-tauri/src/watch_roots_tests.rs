@@ -38,13 +38,16 @@ struct WatchedFixture {
     _watchers: Vec<notify::RecommendedWatcher>,
 }
 
-fn watched_external_metadata_fixture() -> Result<WatchedFixture, Box<dyn std::error::Error>> {
+fn watched_external_metadata_fixture(
+    workspace: &str,
+) -> Result<WatchedFixture, Box<dyn std::error::Error>> {
     let fixture = Fixture::new()?;
     let root = fixture.0.join("project");
-    let repository = root.join("bases/frontend");
+    let repository = root.join(workspace).join("frontend");
     let common_dir = fixture.0.join("target/frontend.git");
     let git_dir = common_dir.join("worktrees/frontend");
     fs::create_dir_all(&repository)?;
+    fs::write(root.join(workspace).join(".workbranch.task"), "")?;
     fs::create_dir_all(common_dir.join("objects"))?;
     fs::create_dir_all(common_dir.join("refs/heads"))?;
     fs::create_dir_all(&git_dir)?;
@@ -78,7 +81,7 @@ fn watched_external_metadata_fixture() -> Result<WatchedFixture, Box<dyn std::er
 #[test]
 fn external_git_dir_change_emits_owning_root() -> Result<(), Box<dyn std::error::Error>> {
     // Given
-    let fixture = watched_external_metadata_fixture()?;
+    let fixture = watched_external_metadata_fixture("bases")?;
 
     // When
     fs::write(fixture.git_dir.join("HEAD"), "ref: refs/heads/next\n")?;
@@ -94,7 +97,7 @@ fn external_git_dir_change_emits_owning_root() -> Result<(), Box<dyn std::error:
 #[test]
 fn external_common_dir_change_emits_owning_root() -> Result<(), Box<dyn std::error::Error>> {
     // Given
-    let fixture = watched_external_metadata_fixture()?;
+    let fixture = watched_external_metadata_fixture("bases")?;
 
     // When
     fs::write(
@@ -128,7 +131,10 @@ fn ordinary_root_change_still_emits_owning_root() -> Result<(), Box<dyn std::err
     })?;
 
     // When
-    fs::write(root.join("TASK-WORKBRANCH.md"), "status: review\n")?;
+    fs::write(
+        root.join(".workbranch.config"),
+        "PROJECT_NAME renamed\nMAIN_WORKTREES_DIR bases\n",
+    )?;
 
     // Then
     assert_eq!(receiver.recv_timeout(Duration::from_secs(3))?, root_label);
@@ -175,4 +181,15 @@ fn newly_discovered_metadata_scope_emits_owning_root_once() {
 
     // Then
     assert_eq!(changed, vec![owner]);
+}
+
+#[test]
+fn task_without_brief_watches_external_git_metadata() -> Result<(), Box<dyn std::error::Error>> {
+    let fixture = watched_external_metadata_fixture("feat-login")?;
+    fs::write(fixture.git_dir.join("HEAD"), "ref: refs/heads/next\n")?;
+    assert_eq!(
+        fixture.receiver.recv_timeout(Duration::from_secs(3))?,
+        fixture.root_label
+    );
+    Ok(())
 }

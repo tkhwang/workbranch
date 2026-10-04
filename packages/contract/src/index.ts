@@ -1,20 +1,3 @@
-export type WorkbranchChecklistItem = {
-	readonly text: string;
-	readonly checked: boolean;
-	readonly depth: number;
-};
-
-export type WorkbranchPlan = {
-	readonly title: string;
-	readonly index: number;
-	readonly status: string;
-	readonly progressDone: number;
-	readonly progressTotal: number;
-	readonly currentItem: string;
-	readonly summary?: string;
-	readonly items: readonly WorkbranchChecklistItem[];
-};
-
 export type WorkbranchRepo = {
 	readonly name: string;
 	readonly branch: string;
@@ -27,19 +10,10 @@ export type WorkbranchRepo = {
 };
 
 export type WorkbranchTask = {
-	readonly name: string;
-	readonly path: string;
-	readonly memoTitle: string;
-	readonly planTitle: string;
-	readonly status: string;
-	readonly progressDone: number;
-	readonly progressTotal: number;
-	readonly currentItem: string;
-	readonly updatedAt: number;
-	readonly items: readonly WorkbranchChecklistItem[];
-	readonly plans: readonly WorkbranchPlan[];
-	readonly notiCount: number;
-	readonly repos: readonly WorkbranchRepo[];
+ readonly name: string;
+ readonly path: string;
+ readonly notiCount: number;
+ readonly repos: readonly WorkbranchRepo[];
 };
 
 export type WorkbranchBaseRepo = {
@@ -56,7 +30,7 @@ export type WorkbranchBaseRepo = {
 };
 
 export type WorkbranchListDocument = {
-	readonly schemaVersion: 1;
+	readonly schemaVersion: 2;
 	readonly project: string;
 	readonly root: string;
 	readonly baseRepos?: readonly WorkbranchBaseRepo[];
@@ -69,7 +43,25 @@ export type WorkbranchGlobalError = {
 };
 
 export type WorkbranchListGlobalDocument = {
-	readonly schemaVersion: 1;
+	readonly schemaVersion: 2;
 	readonly projects: readonly WorkbranchListDocument[];
 	readonly errors: readonly WorkbranchGlobalError[];
 };
+
+export type WorkbranchAgentSession = {
+ readonly workspace: string;
+ readonly provider: "claude" | "codex" | "grok";
+ readonly sessionId: string;
+ readonly agentId: string;
+ readonly turnId: string;
+ readonly state: "running" | "waiting" | "finished" | "idle";
+ readonly observation: "observed" | "uncertain" | "stale";
+ readonly reason: string;
+ readonly prompt: string;
+ readonly activity: string;
+ readonly response: string;
+ readonly updatedAt: number;
+ readonly stateChangedAt: number;
+ readonly outcome: string;
+};
+export type WorkbranchRuntimeDocument = { readonly schemaVersion: 1; readonly sessions: readonly WorkbranchAgentSession[] };

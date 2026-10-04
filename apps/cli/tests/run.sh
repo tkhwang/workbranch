@@ -27,6 +27,12 @@ main() {
   [ -x "$WORKBRANCH" ] || fail "missing executable: $WORKBRANCH"
   git --version >/dev/null || fail "git is required"
 
+  run_test test_installer_keeps_cli_usable_when_runtime_build_unavailable
+  run_test test_installer_copies_runtime_collector_from_verified_local_build
+  run_test test_grok_trust_requires_explicit_flag_and_matching_source
+  run_test test_grok_hooks_use_own_plugin_without_trust_bypass
+  run_test test_hooks_delegate_without_modifying_user_configuration
+  run_test test_runtime_replaces_brief_and_migrates
   run_test test_generated_workbranch_is_up_to_date
   run_test test_run_test_output_uses_status_prefixes
   run_test test_run_expect_helpers_do_not_leak_tty_stdin
@@ -116,17 +122,8 @@ main() {
   run_test test_doctor_reports_registered_task_worktree_on_wrong_branch
   run_test test_doctor_reports_base_branch_drift
   run_test test_doctor_reports_stale_directory_with_remove_hint
-  run_test test_doctor_flags_unparseable_brief
-  run_test test_doctor_brief_false_positive_guards
-  run_test test_doctor_ignores_fenced_brief_examples
-  run_test test_doctor_flags_multi_h2_unparseable_brief
   run_test test_doctor_rejects_unexpected_args_and_flags
   run_test test_doctor_fix_prunes_stale_worktree_registration
-  run_test test_doctor_fix_prepends_h1_heading
-  run_test test_doctor_fix_ignores_fenced_h1_before_repair
-  run_test test_doctor_fix_is_idempotent
-  run_test test_doctor_fix_multi_h2_keeps_manual_follow_up_nonzero
-  run_test test_doctor_fix_h2_status_keeps_manual_follow_up_nonzero
   run_test test_doctor_fix_does_not_delete_stale_task_directory
   run_test test_repo_scope_limits_git_commands_to_one_repo
   run_test test_land_preflight_blocks_all_repos_before_partial_land
@@ -139,16 +136,6 @@ main() {
   run_test test_add_derives_conventional_branch_from_parent_feature_base
   run_test test_add_parent_slug_task_folder_maps_to_parent_prefixed_branch
   run_test test_all_repos_share_parent_feature_base_detects_only_identical_parent_bases
-  run_test test_memo_set_show_clear
-  run_test test_memo_rejects_unknown_task
-  run_test test_memo_resolves_task_from_cwd
-  run_test test_memo_treats_task_argument_as_explicit_inside_task_workspace
-  run_test test_add_creates_task_brief_and_agent_guidance
-  run_test test_task_status_explicit_and_derived
-  run_test test_task_checklist_counts
-  run_test test_task_current_item
-  run_test test_add_agents_md_describes_status_update_protocol
-  run_test test_preferred_language_generates_korean_task_guidance
   run_test test_noti_add_list_clear
   run_test test_noti_escapes_control_characters
   run_test test_noti_rejects_unknown_task
@@ -184,18 +171,6 @@ main() {
   run_test test_list_json_escapes_control_characters
   run_test test_list_json_dirty_flag
   run_test test_list_json_skips_stale_and_partial_task_dirs
-  run_test test_list_json_schema_v1_progress_shape
-  run_test test_list_json_progress_and_status
-  run_test test_list_json_plan_title
-  run_test test_list_json_plan_summary
-  run_test test_list_json_plan_summary_absent_is_empty
-  run_test test_list_json_currentItem_escaped
-  run_test test_list_json_legacy_memo_no_checkboxes
-  run_test test_list_json_includes_checklist_items_depth
-  run_test test_list_json_plan_sections_shape_and_aggregate
-  run_test test_list_json_implicit_and_empty_plans
-  run_test test_list_json_duplicate_plan_titles_keep_distinct_indexes
-  run_test test_list_json_nested_headings_stay_inside_current_plan
   run_test test_list_json_base_repos_shape
   run_test test_list_json_base_repos_remote_diff_and_dirty
   run_test test_list_json_base_repos_missing_worktree_and_remote
@@ -205,15 +180,6 @@ main() {
   run_test test_list_json_base_repo_non_commit_remote_ref_is_read_failure
   run_test test_list_json_base_repo_dangling_symbolic_remote_ref_is_read_failure
   run_test test_list_json_base_repo_git_failures_are_isolated
-  run_test test_current_plan_brief_h1_status_and_active_json_contract
-  run_test test_plan_archive_done_command_archives_active_plan_without_activity_write
-  run_test test_plan_archive_slug_collision_suffix_and_no_plan_error
-  run_test test_remove_deletes_workbranch_state_with_archives_before_leftover_prompt
-  run_test test_land_archive_prompt_yes_archives_and_no_keeps_brief
-  run_test test_land_archive_prompt_eof_keeps_brief
-  run_test test_finalize_archive_prompt_records_finalize
-  run_test test_pull_archive_prompt_requires_all_filtered_repos_merged
-  run_test test_pull_archive_prompt_skips_trivial_ancestor_without_task_commits
   run_test test_list_global_json_projects_and_errors
   run_test test_list_global_uses_stable_launcher_after_changing_directory
   run_test test_list_global_json_all_roots_failure_is_nonzero

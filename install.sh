@@ -126,6 +126,43 @@ fi
 chmod +x "$DEST" || { printf '[-] Error: failed to mark executable: %s\n' "$DEST" >&2; exit 1; }
 printf '[+] Installed workbranch to %s\n' "$DEST"
 
+install_runtime() {
+  [ "${WORKBRANCH_SKIP_RUNTIME_INSTALL:-0}" = "1" ] && return 0
+  local runtime_src target machine system asset version base tmp expected actual
+  runtime_src=${WORKBRANCH_RUNTIME_SOURCE:-}
+  if [ -z "$runtime_src" ] && [ -n "$SCRIPT_DIR" ] && [ -f "$SCRIPT_DIR/apps/agent-runtime/Cargo.toml" ]; then
+    command -v cargo >/dev/null 2>&1 || { printf '[-] Error: source checkout installation requires cargo to build the runtime collector\n' >&2; return 1; }
+    cargo build --release --locked --manifest-path "$SCRIPT_DIR/apps/agent-runtime/Cargo.toml" || return 1
+    runtime_src="$SCRIPT_DIR/apps/agent-runtime/target/release/workbranch-agent-runtime"
+  fi
+  tmp="$DEST_DIR/.workbranch-agent-runtime.$$"
+  if [ -n "$runtime_src" ]; then
+    cp "$runtime_src" "$tmp" || return 1
+  else
+    machine=$(uname -m); system=$(uname -s)
+    case "$machine:$system" in
+      arm64:Darwin|aarch64:Darwin) target=aarch64-apple-darwin ;;
+      x86_64:Darwin) target=x86_64-apple-darwin ;;
+      x86_64:Linux) target=x86_64-unknown-linux-gnu ;;
+      aarch64:Linux|arm64:Linux) target=aarch64-unknown-linux-gnu ;;
+      *) printf '[-] Error: unsupported runtime platform: %s/%s\n' "$system" "$machine" >&2; return 1 ;;
+    esac
+    version=$("$DEST" version); version=${version#workbranch }
+    asset="workbranch-agent-runtime-$target"
+    base="${WORKBRANCH_RELEASE_BASE_URL:-https://github.com/tkhwang/workbranch/releases/download}/v$version"
+    download_file "$base/$asset" > "$tmp" || { rm -f "$tmp"; return 1; }
+    expected=$(download_file "$base/$asset.sha256") || { rm -f "$tmp"; return 1; }
+    expected=${expected%% *}
+    if command -v shasum >/dev/null 2>&1; then actual=$(shasum -a 256 "$tmp"); else actual=$(sha256sum "$tmp"); fi
+    actual=${actual%% *}
+    [ "$expected" = "$actual" ] || { rm -f "$tmp"; printf '[-] Error: runtime checksum mismatch\n' >&2; return 1; }
+  fi
+  chmod +x "$tmp" && "$tmp" version >/dev/null && mv "$tmp" "$DEST_DIR/workbranch-agent-runtime" || { rm -f "$tmp"; return 1; }
+  printf '[+] Installed runtime collector to %s\n' "$DEST_DIR/workbranch-agent-runtime"
+}
+install_runtime || { printf '[-] Warning: CLI installed successfully; runtime collector unavailable. Rerun installer with a supported Rust toolchain or install via Homebrew before enabling hooks.\n' >&2; }
+
+
 cat <<USAGE
 
 [*] Try it now:

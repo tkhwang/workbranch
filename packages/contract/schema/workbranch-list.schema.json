@@ -4,98 +4,159 @@
   "title": "WorkbranchListDocument",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "project", "root", "tasks"],
+  "required": [
+    "schemaVersion",
+    "project",
+    "root",
+    "tasks"
+  ],
   "properties": {
-    "schemaVersion": { "const": 1 },
-    "project": { "type": "string" },
-    "root": { "type": "string" },
+    "schemaVersion": {
+      "const": 2
+    },
+    "project": {
+      "type": "string"
+    },
+    "root": {
+      "type": "string"
+    },
     "baseRepos": {
       "type": "array",
-      "items": { "$ref": "#/$defs/baseRepo" }
+      "items": {
+        "$ref": "#/$defs/baseRepo"
+      }
     },
     "tasks": {
       "type": "array",
-      "items": { "$ref": "#/$defs/task" }
+      "items": {
+        "$ref": "#/$defs/task"
+      }
     }
   },
   "$defs": {
     "task": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "path", "memoTitle", "planTitle", "status", "progressDone", "progressTotal", "currentItem", "updatedAt", "items", "plans", "notiCount", "repos"],
+      "required": [
+        "name",
+        "path",
+        "notiCount",
+        "repos"
+      ],
       "properties": {
-        "name": { "type": "string" },
-        "path": { "type": "string" },
-        "memoTitle": { "type": "string" },
-        "planTitle": { "type": "string" },
-        "status": { "type": "string" },
-        "progressDone": { "type": "integer", "minimum": 0 },
-        "progressTotal": { "type": "integer", "minimum": 0 },
-        "currentItem": { "type": "string" },
-        "updatedAt": { "type": "integer", "minimum": 0 },
-        "items": { "type": "array", "items": { "$ref": "#/$defs/checklistItem" } },
-        "plans": { "type": "array", "items": { "$ref": "#/$defs/plan" } },
-        "notiCount": { "type": "integer", "minimum": 0 },
-        "repos": { "type": "array", "items": { "$ref": "#/$defs/repo" } }
-      }
-    },
-    "plan": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["title", "index", "status", "progressDone", "progressTotal", "currentItem", "items"],
-      "properties": {
-        "title": { "type": "string" },
-        "index": { "type": "integer", "minimum": 0 },
-        "status": { "type": "string" },
-        "progressDone": { "type": "integer", "minimum": 0 },
-        "progressTotal": { "type": "integer", "minimum": 0 },
-        "currentItem": { "type": "string" },
-        "summary": { "type": "string" },
-        "items": { "type": "array", "items": { "$ref": "#/$defs/checklistItem" } }
-      }
-    },
-    "checklistItem": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["text", "checked", "depth"],
-      "properties": {
-        "text": { "type": "string" },
-        "checked": { "type": "boolean" },
-        "depth": { "type": "integer", "minimum": 0 }
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "notiCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "repos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/repo"
+          }
+        }
       }
     },
     "repo": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "branch", "dirty"],
+      "required": [
+        "name",
+        "branch",
+        "dirty"
+      ],
       "properties": {
-        "name": { "type": "string" },
-        "branch": { "type": "string" },
-        "dirty": { "type": "boolean" },
-        "ahead": { "type": "integer", "minimum": 0 },
-        "behind": { "type": "integer", "minimum": 0 },
-        "changedFiles": { "type": "integer", "minimum": 0 },
-        "lastCommitSubject": { "type": "string" },
-        "lastCommitAt": { "type": "integer", "minimum": 0 }
+        "name": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "dirty": {
+          "type": "boolean"
+        },
+        "ahead": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "behind": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "changedFiles": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lastCommitSubject": {
+          "type": "string"
+        },
+        "lastCommitAt": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "baseRepo": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "baseBranch", "branch", "present", "dirty", "changedFiles", "remoteAvailable", "ahead", "behind", "inspectionError"],
+      "required": [
+        "name",
+        "baseBranch",
+        "branch",
+        "present",
+        "dirty",
+        "changedFiles",
+        "remoteAvailable",
+        "ahead",
+        "behind",
+        "inspectionError"
+      ],
       "properties": {
-        "name": { "type": "string" },
-        "baseBranch": { "type": "string" },
-        "branch": { "type": "string" },
-        "present": { "type": "boolean" },
-        "dirty": { "type": "boolean" },
-        "changedFiles": { "type": "integer", "minimum": 0 },
-        "remoteAvailable": { "type": "boolean" },
-        "ahead": { "type": "integer", "minimum": 0 },
-        "behind": { "type": "integer", "minimum": 0 },
+        "name": {
+          "type": "string"
+        },
+        "baseBranch": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "present": {
+          "type": "boolean"
+        },
+        "dirty": {
+          "type": "boolean"
+        },
+        "changedFiles": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "remoteAvailable": {
+          "type": "boolean"
+        },
+        "ahead": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "behind": {
+          "type": "integer",
+          "minimum": 0
+        },
         "inspectionError": {
-          "type": ["string", "null"],
-          "enum": [null, "invalid-worktree", "git-read-failed"]
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            null,
+            "invalid-worktree",
+            "git-read-failed"
+          ]
         }
       }
     }

@@ -60,7 +60,7 @@ Rules:
 - `PROJECT_NAME` must be a safe directory name.
 - `MAIN_WORKTREES_DIR` must be a safe directory name.
 - `BRANCH_PREFIX` is retained for compatibility with explicit task keys that do not use the conventional `type-detail` form. New interactive setup does not ask for it; config writing keeps `BRANCH_PREFIX feature` as an internal compatibility default.
-- `PREFERRED_LANGUAGE` is optional in older configs and defaults to `en`. Current config writing emits `PREFERRED_LANGUAGE en|ko`; it controls generated task briefs and generated agent guidance, not full CLI localization.
+- `PREFERRED_LANGUAGE` is optional in older configs and defaults to `en`. Current config writing emits `PREFERRED_LANGUAGE en|ko`; it controls generated agent guidance, not full CLI localization.
 - `IDE` is optional. It stores one project-level IDE launch command text after the directive.
 - `TERMINAL` is optional. It stores one project-level terminal launch command text after the directive.
 - `TASK_SETUP` is optional. It stores one project-level command text after the directive.
@@ -159,13 +159,13 @@ Tool app launcher commands are macOS-only: `finder`, `ide`, and `terminal`. Tool
 
 ### `workbranch finder <task>` / `workbranch ide <task>` / `workbranch terminal <task>`
 
-`finder` opens the task root folder by default and one repo folder with `--repo <repo>`. `ide` runs the configured command once per matching task repo worktree by default. `terminal` opens the task root once by default so agent sessions can see `AGENTS.md`, `TASK-WORKBRANCH.md`, and every repo. With `--repo <repo>`, both `ide` and `terminal` run only for that repo and append the resolved repo path as the final argument. Tool launchers do not modify repositories.
+`finder` opens the task root folder by default and one repo folder with `--repo <repo>`. `ide` runs the configured command once per matching task repo worktree by default. `terminal` opens the task root once by default so agent sessions can see `AGENTS.md`, and every repo. With `--repo <repo>`, both `ide` and `terminal` run only for that repo and append the resolved repo path as the final argument. Tool launchers do not modify repositories.
 
 Built-in macOS IDE app presets store `open -na <App> --args --new-window` for VS Code-like apps so each matching repo path opens in a separate IDE window instead of being folded into an existing workspace. `IDE open -a Cursor`, `IDE open -a "Antigravity IDE"`, `IDE open -a "Visual Studio Code"`, and `IDE open -a Windsurf` are normalized to the matching `open -na ... --args --new-window` command at launch time. At launch time the VS Code-family presets (Cursor, Antigravity IDE, Windsurf, Visual Studio Code) prefer the CLI bundled in the installed app (`<App>.app/Contents/Resources/app/bin/<cli> --new-window <repo-path>`, found under `/Applications` or `~/Applications`) so an already-open repo window is focused, and activate an already-running IDE with `open -a <App>.app` after the CLI's helper instance exits; the stored `open -na` command runs only when no bundled CLI is found. See `docs/usage.md` and `docs/plans/0058-ide-launcher-focus-existing-window-bundled-cli.md`. Zed remains `open -na Zed` until its CLI contract is verified.
 
 ### `workbranch list` / `workbranch list --json`
 
-Show configured repos, base branches, current branches, and task workspaces. `--json` emits a single machine-readable document with `schemaVersion`, `project`, `root`, an optional project-level `baseRepos` array, and a `tasks` array containing registered task workspaces only. Schema version 1 includes additive task progress fields for companion apps: `planTitle`, `status`, `progressDone`, `progressTotal`, `currentItem`, and `updatedAt`, alongside `notiCount` and `repos`. The required `memoTitle` field remains a legacy wire-compatibility alias for the first H1; new Companion semantic models must not depend on it. `updatedAt` is the task brief mtime as epoch seconds. Stale or partial task-shaped directories are excluded from `tasks` and remain diagnostic concerns for `doctor`/status-style flows.
+Show configured repos, base branches, current branches, and registered task workspaces. JSON schema 2 exposes project/root/baseRepos/tasks; each task contains name/path/notiCount/repos. There are no brief-derived fields or stage/progress fallback. Runtime sessions are read through `workbranch runtime --json` independently of Git status. Stale or partial worktrees remain diagnostic concerns for doctor/status flows.
 
 `baseRepos` reports every configured base repository in configuration order, including missing or unreadable repositories. Older CLI documents may omit the array; Companion normalizes omission to `[]`. Every emitted base row has these ten required fields, as defined in `packages/contract/schema/workbranch-list.schema.json`:
 
@@ -185,17 +185,9 @@ Reads do not fetch. Confirmed missing worktrees use `present:false` and `inspect
 
 Companion counts successfully loaded projects that contribute either task rows or base repository rows; task totals remain task-only. Its PULL/PUSH/CHECK labels are non-interactive guidance based on the cached facts, not execution guarantees. Dirty + behind advises CHECK before PULL; inspection failures advise CHECK.
 
-### `workbranch memo` / `workbranch noti`
+### Notifications and workspace guidance
 
-`workbranch add <task>` creates workbranch-managed task-root state outside repo worktrees: `<task>/TASK-WORKBRANCH.md`, generated `<task>/AGENTS.md`, and `<task>/.workbranch/` as needed. The task root is a non-git workbranch metadata/agent workspace; actual Git repositories live under `<task>/<repo>`. Workbranch does not create repo-local task-state files and does not edit repo `.gitignore`.
-
-The generated task brief contains exactly a task-name H1 and `status: todo` on the next line. The H1 may later be renamed to the current Plan title. Generated guidance requires updating only the `status:` line on stage transitions through `todo → planning → in-progress → review → done`, with meaningful work including planning moving `todo` to `planning` immediately. `blocked` is an execution-only pause entered from `in-progress`; unblocking restores `in-progress`, so schema v1 does not need a second prior-stage field. Checklists, a separated `plan:` line, and notes are optional and are added only when the user explicitly requests them. For older briefs without explicit status, progress may still be derived from checklist items (`todo` for no completed checklist work or no checklist, `in-progress` for partial progress, `done` for all items complete); the first unchecked item is the current item. When `PREFERRED_LANGUAGE ko` is configured, generated AGENTS guidance text uses Korean while preserving machine-readable `status:` values.
-
-`workbranch memo <task>` prints the task brief, `workbranch memo <task> "text"` overwrites it, and `workbranch memo <task> --clear` removes it. From inside a registered task workspace, the task may be omitted only for reading; `workbranch memo` reads the current task. Writes and clears require an explicit task argument.
-
-`workbranch noti add <task> "text"` appends a JSON Lines event with UTC `ts` and `text`; `workbranch noti list <task>` prints notification text oldest-first; `workbranch noti clear <task>` clears the inbox. Missing notification files behave as empty inboxes.
-
-`workbranch remove <task>` deletes workbranch-managed task state after successful worktree/branch removal: `TASK-WORKBRANCH.md`, generated `AGENTS.md`, `.workbranch/`, `.omx/`, and `.omc/`. If unrelated files remain, normal remove reports them and prompts the user to delete the remaining task root in the same command flow. `--force` deletes the task root without prompting after the normal safety preflights pass.
+`workbranch add` creates generated `AGENTS.md`, `.workbranch.task` and the notification inbox outside repository worktrees. Generated guidance explains workspace/repository boundaries and contains no status-reporting protocol. `workbranch noti add|list|clear` remains available. Legacy brief data and guidance are removed by explicit agent-runtime migration; ordinary Git safety preflights remain unchanged.
 
 ### `workbranch status`
 
@@ -444,3 +436,22 @@ If the user declines, print direct-run and manual PATH guidance.
 - `-v`, `--version`, and `version` print the manifest-backed installed CLI version.
 - Dirty worktree checks prevent unsafe operations.
 - Integration tests use temporary local bare remotes.
+
+## Agent runtime observation
+
+Runtime observation is independent of task briefs. `list --json` and its global wrapper use schema 2 with task identity, path, notifications and Git repositories; no plan/status/checklist/brief fields are emitted. `memo`, `done` and archive prompts are removed.
+
+A standalone Rust collector, `workbranch-agent-runtime`, embeds SQLite and stores the latest bounded session content at `~/.workbranch/runtime/state.sqlite3`. Hooks execute it directly, without a daemon or the Companion. `workbranch runtime --json` reads a schema 1 session snapshot without running Git. Session identity includes canonical workspace path, provider, session and optional agent. Only workspace descendants carrying `.workbranch.task` are collected. Input is capped at 1 MiB. Hook failures are silent and do not return permission decisions.
+
+States are running/waiting/finished/idle; finished means a turn ended. Observation is separate (observed/uncertain/stale); 15 minutes without running/waiting events marks it stale, not idle. Latest prompt/activity/response limits are 500/240/2000 characters; arbitrary tool output and transcripts are not stored. Session content expires after seven days. A completion from one tool cannot clear another tool's wait; ambiguous permission correlation is uncertain.
+
+`workbranch migrate agent-runtime --dry-run|--apply [--global]` inventories/removes legacy brief/archive files and generated progress instructions while preserving mixed user/tool instructions, Git worktrees, notifications and runtime data. Companion detects through dry-run and invokes this same CLI upon migration activation. Normal list/refresh does not delete data. Migration must be idempotent and report partial failures; symlinked targets are rejected.
+
+
+## Companion bootstrap and connections
+
+Onboarding and Settings share `setup_status` and fixed `setup_action` operations: install/update/repair CLI through Homebrew, or connect/disconnect one of Claude, Codex and Grok. The native port never depends on an installed CLI to install it. `capabilities --json` advertises list/runtime contracts and providers without querying Git. Setup rechecks capabilities and collector access after installing; a successful package-manager exit alone is not readiness.
+
+Provider configuration and event receipt remain separate. A reconnection resets the verification baseline; earlier observations are historical only. Setup stdout/stderr are bounded, raw command logs appear only in details, duplicate actions are blocked, and process/pipe lifetime share a deadline. Native provider trust is not bypassed.
+
+Grok camelCase hook input is normalized by its own adapter, and Claude-compatible delivery cannot be counted as Claude. Grok Stop can be a continuation gate, so its completion confidence is tentative until an idle notification; StopCancelled remains an interrupted turn. `~/.workbranch/runtime/hook-collector` is an automatically maintained executable locator registered by connect.

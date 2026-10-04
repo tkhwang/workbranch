@@ -21,7 +21,6 @@ const SECOND_STATE: GlobalState = {
 					notiCount: 0,
 					updatedAt: 20,
 					repos: [],
-					plans: [],
 				},
 			],
 			baseRepos: [],

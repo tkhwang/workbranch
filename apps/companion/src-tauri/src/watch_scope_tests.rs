@@ -242,3 +242,20 @@ fn canonical_config_does_not_accept_legacy_aliases() -> Result<(), Box<dyn std::
     }
     Ok(())
 }
+
+#[test]
+fn unrelated_worktree_is_not_watched_until_marked() -> Result<(), Box<dyn std::error::Error>> {
+    let fixture = Fixture::new("unrelated")?;
+    let root = fixture.0.join("project");
+    let repository = root.join("vendor/frontend");
+    let metadata = fixture.0.join("external.git");
+    fs::create_dir_all(&repository)?;
+    write_project_config(&root, "bases")?;
+    write_git_metadata(&metadata, &metadata)?;
+    fs::write(repository.join(".git"), format!("gitdir: {}\n", metadata.display()))?;
+    let roots = [root.to_string_lossy().into_owned()];
+    assert!(!discover_watch_scopes(&roots)?.contains_key(&fs::canonicalize(&metadata)?));
+    fs::write(root.join("vendor/.workbranch.task"), "")?;
+    assert!(discover_watch_scopes(&roots)?.contains_key(&fs::canonicalize(&metadata)?));
+    Ok(())
+}

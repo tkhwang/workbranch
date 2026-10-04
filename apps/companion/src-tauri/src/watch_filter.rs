@@ -68,7 +68,7 @@ mod tests {
     fn keeps_relevant_paths_when_watched_root_parent_is_ignored_name() {
         let root = Path::new("/tmp/target/demo");
         let event_paths = paths(&[
-            "/tmp/target/demo/TASK-WORKBRANCH.md",
+            "/tmp/target/demo/.workbranch/notifications.jsonl",
             "/tmp/target/demo/workbranch/src/lib.rs",
         ]);
 
@@ -82,7 +82,7 @@ mod tests {
     #[test]
     fn keeps_task_metadata_and_worktree_source_paths_relevant() {
         let event_paths = paths(&[
-            "/project/feat-login/TASK-WORKBRANCH.md",
+            "/project/feat-login/.workbranch/notifications.jsonl",
             "/project/feat-login/frontend/src/App.tsx",
         ]);
 
@@ -113,7 +113,7 @@ mod tests {
     fn keeps_mixed_noise_and_relevant_paths_relevant() {
         let event_paths = paths(&[
             "/project/node_modules/pkg/index.js",
-            "/project/feat-login/TASK-WORKBRANCH.md",
+            "/project/feat-login/.workbranch/notifications.jsonl",
         ]);
 
         assert!(event_has_relevant_change(

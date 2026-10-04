@@ -1,3 +1,5 @@
+# Installer-only fixtures intentionally exercise the Bash surface without downloading release artifacts.
+export WORKBRANCH_SKIP_RUNTIME_INSTALL=1
 # shellcheck shell=bash
 # Sourced by tests/run.sh; uses helpers from tests/lib/helpers.sh.
 find_free_port() {
@@ -165,4 +167,22 @@ test_installer_can_add_target_directory_to_zshrc() {
   assert_contains "$out" "Added PATH entry to $TMP_ROOT/home/.zshrc"
   assert_file "$TMP_ROOT/home/.zshrc"
   assert_contains "$(cat "$TMP_ROOT/home/.zshrc")" "export PATH=\"$custom_dir:\$PATH\""
+}
+
+test_installer_keeps_cli_usable_when_runtime_build_unavailable() {
+  TMP_ROOT=$(mktemp -d)
+  mkdir -p "$TMP_ROOT/source/apps/agent-runtime" "$TMP_ROOT/source/bin" "$TMP_ROOT/source/.git" "$TMP_ROOT/fake-bin"
+  cp "$REPO_ROOT/install.sh" "$TMP_ROOT/source/install.sh"
+  cp "$WORKBRANCH" "$TMP_ROOT/source/bin/workbranch"
+  touch "$TMP_ROOT/source/apps/agent-runtime/Cargo.toml"
+  # Missing Cargo and failing/unsupported Cargo must both leave the Bash CLI usable.
+  for mode in missing failing; do
+    if [ "$mode" = failing ]; then
+      printf '#!/bin/sh\nexit 1\n' > "$TMP_ROOT/fake-bin/cargo"
+      chmod +x "$TMP_ROOT/fake-bin/cargo"
+    fi
+    out=$(printf '\nn\n' | HOME="$TMP_ROOT/$mode" SHELL=/bin/zsh PATH="$TMP_ROOT/fake-bin:/usr/bin:/bin" WORKBRANCH_SKIP_RUNTIME_INSTALL=0 bash "$TMP_ROOT/source/install.sh" 2>&1) || return 1
+    assert_contains "$out" 'CLI installed successfully; runtime collector unavailable'
+    "$TMP_ROOT/$mode/.local/bin/workbranch" version >/dev/null || return 1
+  done
 }

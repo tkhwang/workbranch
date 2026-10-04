@@ -14,7 +14,7 @@ cmd_list_json() {
   done
   record_separator=$(printf '\037')
   printf '{'
-  printf '"schemaVersion":1,'
+  printf '"schemaVersion":2,'
   printf '"project":'
   json_string "$PROJECT_NAME"
   printf ',"root":'
@@ -148,33 +148,10 @@ cmd_list_json() {
     else
       printf ','
     fi
-    title=$(task_brief_title "$task")
     printf '{"name":'
     json_string "$task"
     printf ',"path":'
     json_string "$path"
-    printf ',"memoTitle":'
-    json_string "$title"
-    plan_title=$(task_active_plan_title "$task")
-    printf ',"planTitle":'
-    json_string "$plan_title"
-    status=$(task_status "$task")
-    counts=$(task_checklist_counts "$task")
-    progress_done=${counts%% *}
-    progress_total=${counts##* }
-    current_item=$(task_current_item "$task")
-    updated_at=$(task_updated_at "$task")
-    printf ',"status":'
-    json_string "$status"
-    printf ',"progressDone":%s' "$progress_done"
-    printf ',"progressTotal":%s' "$progress_total"
-    printf ',"currentItem":'
-    json_string "$current_item"
-    printf ',"updatedAt":%s' "$updated_at"
-    printf ',"items":'
-    task_checklist_items_json "$task"
-    printf ',"plans":'
-    task_plans_json "$task"
     printf ',"notiCount":%s' "$(noti_count "$task")"
     printf ',"repos":['
     first_repo=1
@@ -321,7 +298,7 @@ workbranch_self_path() {
 
 cmd_list_global_json() {
   local root first_project first_error successes errors out status message self
-  printf '{"schemaVersion":1,"projects":['
+  printf '{"schemaVersion":2,"projects":['
   first_project=1
   first_error=1
   successes=0

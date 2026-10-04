@@ -28,7 +28,7 @@ describe("root refresh", () => {
 	it("maps one local list document through the existing project ACL", async () => {
 		tauri.invoke.mockResolvedValue(
 			JSON.stringify({
-				schemaVersion: 1,
+				schemaVersion: 2,
 				project: "workbranch",
 				root: "/tmp/workbranch",
 				tasks: [],
@@ -161,5 +161,31 @@ describe("runAction", () => {
 		await expect(
 			runAction({ kind: "terminal", task: "missing-task" }, "/tmp/workbranch"),
 		).rejects.toThrow("task not found: missing-task");
+	});
+});
+
+describe("runtime compatibility errors", () => {
+	it("replaces an old CLI usage dump with one actionable message", async () => {
+		const { companionErrorMessage, isCliCompatibilityError } = await import(
+			"../src/infrastructure/tauriClient"
+		);
+		const failure =
+			"command failed with exit 1: Usage: workbranch <command> [args] " +
+			"Workspace: list add done ".repeat(100) +
+			"[-] Error: unknown command: runtime";
+		expect(isCliCompatibilityError(failure)).toBe(true);
+		expect(companionErrorMessage(failure)).toContain("CLI");
+		expect(companionErrorMessage(failure)).not.toContain("Usage:");
+		expect(companionErrorMessage(failure).length).toBeLessThan(180);
+	});
+	it("preserves actionable collector-missing guidance", async () => {
+		const { companionErrorMessage } = await import(
+			"../src/infrastructure/tauriClient"
+		);
+		expect(
+			companionErrorMessage(
+				"Install/update the workbranch runtime collector (workbranch-agent-runtime missing)",
+			),
+		).toContain("수집기");
 	});
 });

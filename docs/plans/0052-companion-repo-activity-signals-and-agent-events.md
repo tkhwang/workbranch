@@ -366,7 +366,9 @@ Slice B 검증 결과(2026-08-20): root payload 전달, root별 coalescing, 서�
 
 ---
 
-### Slice C — agent 이벤트 (hook → `agent.jsonl`)
+### Slice C — agent 이벤트 (0060으로 이관)
+
+> 이 미구현 slice는 0060이 대체한다. 아래 초기 설계는 실행 기준이 아니며, SQLite 중앙 수집과 brief 폐기를 포함한 0060의 현재 계약을 따른다.
 
 > **선행:** Slice A/B 머지 완료 + G3(설치 방식) / G4(보존 정책) 확정. **A/B 없이 머지하지 않는다.**
 >

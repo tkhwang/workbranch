@@ -21,7 +21,7 @@ test_complete_helpers_list_tasks_repos_and_commands() {
   assert_not_contains "$commands" "sync"
   assert_contains "$commands" "doctor"
   assert_contains "$commands" "prune"
-  assert_contains "$commands" "memo"
+  assert_not_contains "$commands" "memo"
   assert_contains "$commands" "noti"
   assert_contains "$commands" "destroy"
   assert_not_contains "$commands" "forget"
@@ -91,7 +91,7 @@ test_completion_bash_completes_tasks_and_repos() {
   assert_contains "${COMPREPLY[*]}" "frontend"
   assert_contains "${COMPREPLY[*]}" "backend"
 
-  COMP_WORDS=(workbranch memo "")
+  COMP_WORDS=(workbranch path "")
   COMP_CWORD=2
   _workbranch
   assert_contains "${COMPREPLY[*]}" "feat-login"
@@ -153,10 +153,10 @@ test_completion_bash_uses_command_specific_flags() {
   assert_contains "${COMPREPLY[*]}" "--json"
   assert_contains "${COMPREPLY[*]}" "--global"
 
-  COMP_WORDS=(workbranch memo --)
+  COMP_WORDS=(workbranch list --)
   COMP_CWORD=2
   _workbranch
-  assert_contains "${COMPREPLY[*]}" "--clear"
+  assert_contains "${COMPREPLY[*]}" "--json"
 }
 
 test_completion_fish_emits_complete_command() {
@@ -170,7 +170,7 @@ test_completion_fish_emits_complete_command() {
   assert_contains "$out" "__workbranch_seen_command list' -l json"
   assert_contains "$out" "__workbranch_seen_command list' -l global"
   assert_contains "$out" "__workbranch_seen_command destroy' -l force"
-  assert_contains "$out" "__workbranch_seen_command memo' -l clear"
+  assert_not_contains "$out" "__workbranch_seen_command memo' -l clear"
   assert_contains "$out" "__workbranch_completing_noti_subcommand' -a 'add list clear"
   assert_contains "$out" "__workbranch_completing_noti_task' -a '(__workbranch_complete_tasks)"
 }

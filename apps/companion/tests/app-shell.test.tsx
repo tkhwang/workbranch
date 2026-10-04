@@ -146,8 +146,8 @@ describe("App shell settings wiring", () => {
 		expect(html).toContain(">Ready</span>");
 		expect(html).not.toContain("<footer");
 		expect(html).toContain('aria-label="Companion views"');
-		expect(html).toContain('aria-label="Worktree status"');
-		expect(html).toContain('class="stage-matrix-caption">WORKTREE STATUS');
+		expect(html).toContain('aria-label="Agent runtime"');
+		expect(html).toContain('class="runtime-summary"');
 		expect(html).not.toContain("ALL REPOSITORIES");
 		expect(html).toContain(">Main</button>");
 		expect(html).toContain(">Activity</button>");

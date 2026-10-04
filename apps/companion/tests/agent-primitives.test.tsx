@@ -119,9 +119,9 @@ describe("agent primitives", () => {
 	});
 
 	it("keeps status text visible alongside its marker", () => {
-		const html = renderToStaticMarkup(<StatusToken status="in-progress" />);
+		const html = renderToStaticMarkup(<StatusToken status="running" />);
 
-		expect(html).toContain("RUN");
+		expect(html).toContain("실행 중");
 		expect(html).toContain('aria-hidden="true"');
 	});
 });

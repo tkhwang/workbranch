@@ -1,0 +1,9 @@
+{
+  "name": "workbranch-agent-events",
+  "version": "0.1.0",
+  "description": "Local Workbranch runtime observation",
+  "hooks": "./hooks/hooks.json",
+  "author": {
+    "name": "workbranch"
+  }
+}

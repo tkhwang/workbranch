@@ -18,10 +18,12 @@ Usage:
   workbranch <command> [args]
 Workspace:
   init              Initialize a workbranch project
+  runtime --json    Read agent runtime without Git refresh
+  migrate agent-runtime --dry-run|--apply [--global]
+  hooks install|status|uninstall|describe --provider claude|codex|grok
   list [--global] [--json]  List configured repos and task workspaces
   add [<task>] [--from <ref>]  Create a task workspace
   remove <task> [--force]  Remove task worktrees, branches, and task-root state
-  done <task>      Mark the current Plan done and archive it
   destroy [--force]  Destroy the current workbranch project
 Git:
   status            Show remote diff, task diff, and dirty state
@@ -67,10 +69,12 @@ usage_enhanced() {
   printf '  workbranch <command> [args]\n'
   section "Workspace"
   printf '  init              Initialize a workbranch project\n'
+  printf '  runtime --json    Read agent runtime\n'
+  printf '  hooks install|status|uninstall|describe --provider claude|codex|grok\n'
+  printf '  migrate agent-runtime --dry-run|--apply [--global]\n'
   printf '  list [--global] [--json]  List configured repos and task workspaces\n'
   printf '  add [<task>] [--from <ref>]  Create a task workspace\n'
   printf '  remove <task> [--force]  Remove task worktrees, branches, and task-root state\n'
-  printf '  done <task>      Mark the current Plan done and archive it\n'
   printf '  destroy [--force]  Destroy the current workbranch project\n'
   section "Git"
   printf '  status            Show remote diff, task diff, and dirty state\n'
