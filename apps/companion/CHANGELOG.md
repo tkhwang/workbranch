@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.22.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.21.0...workbranch-companion-v2.22.0) (2026-10-04)
+
+
+### Features
+
+* **agent-runtime:** add initial agent runtime ([19f1689](https://github.com/tkhwang/workbranch/commit/19f16891e2bfe5ad7250eb6d54f5c39ddac76bff))
+* **agent-runtime:** add initial agent runtime ([3a35216](https://github.com/tkhwang/workbranch/commit/3a35216b099d666178cc92ba9c92eec60f5469a4))
+
+
+### Bug Fixes
+
+* **runtime:** address PR review safety and compatibility findings ([0f0eaaf](https://github.com/tkhwang/workbranch/commit/0f0eaafa29b1e64ac5a6999e7150ee451a666800))
+
 ## [2.21.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.20.0...workbranch-companion-v2.21.0) (2026-09-22)
 
 
