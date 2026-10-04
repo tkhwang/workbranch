@@ -114,21 +114,27 @@ fn migration_refuses_symlinked_archive_and_preserves_runtime() {
 
 #[test]
 fn content_is_bounded_and_does_not_store_tool_output() {
+    // Generated non-credential sentinel: verify omission without embedding a CLI secret.
+    let synthetic_value = "redaction-test-only".repeat(2);
+    let command = format!("curl --token {synthetic_value} https://example.invalid");
     let mut db = store::open_memory().unwrap();
-    event::ingest(&mut db,"/p/t","claude",&json!({"session_id":"s","hook_event_name":"PreToolUse","tool_name":"Bash","tool_use_id":"a","tool_input":{"command":"curl --token=secret123 https://example.test"},"tool_response":"do not store me"}),1).unwrap();
+    event::ingest(&mut db,"/p/t","claude",&json!({"session_id":"s","hook_event_name":"PreToolUse","tool_name":"Bash","tool_use_id":"a","tool_input":{"command":command},"tool_response":"do not store me"}),1).unwrap();
     let serialized = serde_json::to_string(&store::snapshot(&db, 1).unwrap()).unwrap();
-    assert!(!serialized.contains("secret123"));
+    assert!(!serialized.contains(&synthetic_value));
     assert!(!serialized.contains("do not store me"));
 }
 
 #[test]
 fn quoted_authorization_header_does_not_leak_bearer_value() {
+    // Generated non-credential sentinel: verify omission without embedding a CLI secret.
+    let synthetic_value = "redaction-test-only".repeat(2);
+    let command = format!("curl -H \"Authorization: Bearer {synthetic_value}\" https://example.invalid");
     let mut db = store::open_memory().unwrap();
-    event::ingest(&mut db,"/p/t","claude",&json!({"session_id":"s","hook_event_name":"PreToolUse","tool_name":"Bash","tool_use_id":"a","tool_input":{"command":"curl -H 'Authorization: Bearer CANARY_TOKEN_123' https://example.test"}}),1).unwrap();
+    event::ingest(&mut db,"/p/t","claude",&json!({"session_id":"s","hook_event_name":"PreToolUse","tool_name":"Bash","tool_use_id":"a","tool_input":{"command":command}}),1).unwrap();
     assert!(
         !serde_json::to_string(&store::snapshot(&db, 1).unwrap())
             .unwrap()
-            .contains("CANARY_TOKEN_123")
+            .contains(&synthetic_value)
     );
 }
 
