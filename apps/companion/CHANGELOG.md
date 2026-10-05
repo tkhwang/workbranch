@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.25.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.24.0...workbranch-companion-v2.25.0) (2026-10-05)
+
+
+### Features
+
+* **ui:** enhance setup and action feedback ([7c5d1de](https://github.com/tkhwang/workbranch/commit/7c5d1de0452c18c165a488cede1d46ec76e2d293))
+* **ui:** enhance setup and action feedback ([955ce18](https://github.com/tkhwang/workbranch/commit/955ce1892b0910f4824f255e69197cd9f6aceb95))
+
 ## [2.24.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.23.0...workbranch-companion-v2.24.0) (2026-10-05)
 
 
