@@ -8,4 +8,8 @@
 	.task-meta-row:hover {
 		transform: none;
 	}
+
+	.button-spinner {
+		animation: none;
+	}
 }

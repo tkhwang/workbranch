@@ -214,4 +214,14 @@ describe("update panel", () => {
 		});
 		expect(html).toContain("Error: network down");
 	});
+
+	it("shows progress on the button that started the work", () => {
+		const checking = render({ status: outdated, checking: true });
+		expect(checking.match(/aria-busy="true"/g)).toHaveLength(1);
+		expect(checking).toMatch(/aria-busy="true"[^>]*>.*확인 중…<\/button>/);
+		const updating = render({ status: outdated, updating: true });
+		expect(updating.match(/aria-busy="true"/g)).toHaveLength(1);
+		expect(updating).toMatch(/aria-busy="true"[^>]*>.*업데이트 중…<\/button>/);
+		expect(updating).not.toContain("모두 업데이트 후 재시작");
+	});
 });

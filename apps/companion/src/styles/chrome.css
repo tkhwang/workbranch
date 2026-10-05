@@ -28,6 +28,39 @@ select:hover:not(:disabled) {
 	border-color: var(--line-strong);
 }
 
+button:disabled,
+select:disabled {
+	color: var(--faint);
+	cursor: not-allowed;
+	opacity: 0.55;
+}
+
+/* A running action stays legible; only its siblings are muted. */
+button[aria-busy="true"]:disabled {
+	align-items: center;
+	color: var(--text);
+	cursor: progress;
+	display: inline-flex;
+	gap: 6px;
+	opacity: 1;
+}
+
+.button-spinner {
+	animation: button-spin 800ms linear infinite;
+	border: 1.5px solid currentColor;
+	border-radius: 50%;
+	border-right-color: transparent;
+	flex: none;
+	height: 0.9em;
+	width: 0.9em;
+}
+
+@keyframes button-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
 button:focus-visible,
 select:focus-visible,
 input:focus-visible,

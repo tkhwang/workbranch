@@ -36,6 +36,7 @@ import { startWorkspaceMonitor } from "./infrastructure/workspaceMonitor";
 import { AgentHeader } from "./ui/AgentHeader";
 import { AgentTabs, type CompanionView } from "./ui/AgentTabs";
 import { ConnectionsPanel } from "./ui/ConnectionsPanel";
+import { ProgressButton } from "./ui/ProgressButton";
 import { SettingsView } from "./ui/SettingsView";
 import { StageBoard } from "./ui/StageBoard";
 import { StatusAlert } from "./ui/StatusAlert";
@@ -427,13 +428,13 @@ export function App() {
 							{error}
 						</p>
 					))}
-					<button
-						type="button"
-						disabled={migrating}
+					<ProgressButton
+						pending={migrating}
+						pendingLabel="전환 중…"
 						onClick={() => void handleMigration()}
 					>
-						{migrating ? "전환 중…" : "전환 실행"}
-					</button>
+						전환 실행
+					</ProgressButton>
 				</section>
 			) : null}
 			{currentView === "main" ? (

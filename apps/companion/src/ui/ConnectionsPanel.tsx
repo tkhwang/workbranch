@@ -1,12 +1,47 @@
 import { useState } from "react";
-import type { ConnectionState, SetupAction } from "../application/connections";
-import { cliSetupAction, receiptState } from "../application/connections";
+import type {
+	ConnectionState,
+	Provider,
+	SetupAction,
+} from "../application/connections";
+import {
+	cliSetupAction,
+	receiptState,
+	sameSetupAction,
+	setupTarget,
+} from "../application/connections";
 import type { CompanionTheme } from "../application/preferences";
 import type { AgentSession } from "../domain/model";
+import { ProgressButton } from "./ProgressButton";
 import { formatRelativeTime } from "./TaskRow";
 import { TerminalPanel } from "./TerminalPanel";
 
 const names = { claude: "Claude Code", codex: "Codex", grok: "Grok Build" };
+const pendingLabels: Record<SetupAction["kind"], string> = {
+	installCli: "CLI 설치 중…",
+	updateCli: "CLI 업데이트 중…",
+	repairCli: "설치 복구 중…",
+	connectAgent: "연결 중…",
+	disconnectAgent: "연결 해제 중…",
+};
+function SetupOutcome({
+	error,
+	notice,
+}: {
+	readonly error: string | null;
+	readonly notice: string | null;
+}) {
+	return (
+		<>
+			{error ? (
+				<p role="alert" className="error">
+					{error}
+				</p>
+			) : null}
+			{notice ? <p role="status">{notice}</p> : null}
+		</>
+	);
+}
 type Props = {
 	readonly theme: CompanionTheme;
 	readonly state: ConnectionState;
@@ -66,6 +101,14 @@ export function ConnectionsPanel({
 }: Props) {
 	const { status, busy, loading } = state;
 	const [trustSource, setTrustSource] = useState<string | null>(null);
+	const pending = (action: SetupAction) =>
+		busy !== null && sameSetupAction(busy, action);
+	// Results appear beside the button that ran them; check failures stay on top.
+	const outcomeTarget = state.lastAction ? setupTarget(state.lastAction) : null;
+	const outcome = (target: "cli" | Provider) =>
+		outcomeTarget === target ? (
+			<SetupOutcome error={state.error} notice={state.notice} />
+		) : null;
 	const ready = status?.cli.state === "ready";
 	const verified =
 		status?.agents.some(
@@ -90,20 +133,18 @@ export function ConnectionsPanel({
 		>
 			<div className="connections-heading">
 				<p>CLI를 준비하고 사용할 agent를 연결하세요.</p>
-				<button
-					type="button"
-					disabled={loading || busy !== null}
+				<ProgressButton
+					pending={loading}
+					pendingLabel="확인 중…"
+					disabled={busy !== null}
 					onClick={onRefresh}
 				>
-					{loading ? "확인 중…" : "다시 확인"}
-				</button>
+					다시 확인
+				</ProgressButton>
 			</div>
-			{state.error ? (
-				<p role="alert" className="error">
-					{state.error}
-				</p>
+			{outcomeTarget === null ? (
+				<SetupOutcome error={state.error} notice={state.notice} />
 			) : null}
-			{state.notice ? <p role="status">{state.notice}</p> : null}
 			{status ? (
 				<>
 					<section className="connection-step" aria-label="Install CLI">
@@ -119,8 +160,9 @@ export function ConnectionsPanel({
 						</header>
 						<p>{status.cli.message}</p>
 						<div className="connection-actions">
-							<button
-								type="button"
+							<ProgressButton
+								pending={pending({ kind: cliSetupAction(status) })}
+								pendingLabel={pendingLabels[cliSetupAction(status)]}
 								disabled={!status.brewPath || busy !== null}
 								onClick={() =>
 									onAction({
@@ -133,17 +175,19 @@ export function ConnectionsPanel({
 									: cliSetupAction(status) === "repairCli"
 										? "설치 복구"
 										: "CLI 업데이트"}
-							</button>
+							</ProgressButton>
 							{ready && status.formulaInstalled === true ? (
-								<button
-									type="button"
+								<ProgressButton
+									pending={pending({ kind: "repairCli" })}
+									pendingLabel={pendingLabels.repairCli}
 									disabled={!status.brewPath || busy !== null}
 									onClick={() => onAction({ kind: "repairCli" })}
 								>
 									설치 복구
-								</button>
+								</ProgressButton>
 							) : null}
 						</div>
+						{outcome("cli")}
 						{!status.brewPath ? (
 							<p className="settings-hint">
 								Homebrew를 찾지 못했습니다. 설치 또는 실행 경로를 확인하세요.
@@ -220,8 +264,12 @@ export function ConnectionsPanel({
 										</p>
 									) : null}
 									<div className="connection-actions">
-										<button
-											type="button"
+										<ProgressButton
+											pending={pending({
+												kind: "connectAgent",
+												provider: agent.provider,
+											})}
+											pendingLabel={pendingLabels.connectAgent}
 											disabled={disabled || missingTrustTarget}
 											onClick={() => {
 												if (agent.provider === "grok" && agent.installSource) {
@@ -236,11 +284,15 @@ export function ConnectionsPanel({
 											{configured || agent.state === "disabled"
 												? "다시 연결"
 												: "연결"}
-										</button>
+										</ProgressButton>
 										{agent.state !== "notInstalled" &&
 										agent.state !== "disconnected" ? (
-											<button
-												type="button"
+											<ProgressButton
+												pending={pending({
+													kind: "disconnectAgent",
+													provider: agent.provider,
+												})}
+												pendingLabel={pendingLabels.disconnectAgent}
 												disabled={disabled}
 												onClick={() =>
 													onAction({
@@ -250,9 +302,10 @@ export function ConnectionsPanel({
 												}
 											>
 												연결 해제
-											</button>
+											</ProgressButton>
 										) : null}
 									</div>
+									{outcome(agent.provider)}
 									{missingTrustTarget ? (
 										<p className="settings-hint">
 											Grok 설치 대상을 확인하려면 CLI를 업데이트하고 다시

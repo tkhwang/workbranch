@@ -1,8 +1,11 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 import {
+	type ConnectionState,
 	createConnectionController,
+	EMPTY_CONNECTION_STATE,
 	type SetupStatus,
+	sameSetupAction,
 } from "../src/application/connections";
 import { ConnectionsPanel } from "../src/ui/ConnectionsPanel";
 
@@ -42,6 +45,7 @@ it("keeps CLI bootstrap available before a CLI exists", () => {
 				status,
 				loading: false,
 				busy: null,
+				lastAction: null,
 				error: null,
 				logs: "",
 				notice: null,
@@ -212,4 +216,133 @@ it("shows the exact Grok source and executable-plugin permission before approval
 	expect(html).toContain("신뢰하고 설치");
 	expect(html).toContain("취소");
 	expect(approve).not.toHaveBeenCalled();
+});
+
+const readyStatus: SetupStatus = {
+	...status,
+	formulaInstalled: true,
+	cli: { ...status.cli, state: "ready", message: "준비됨" },
+	agents: status.agents.map((agent) =>
+		agent.provider === "codex"
+			? {
+					...agent,
+					executablePath: "/bin/codex",
+					state: "disconnected",
+					message: "연결 필요",
+				}
+			: agent,
+	),
+};
+function renderPanel(state: Partial<ConnectionState>) {
+	return renderToStaticMarkup(
+		<ConnectionsPanel
+			theme="claude"
+			state={{
+				...EMPTY_CONNECTION_STATE,
+				loading: false,
+				status: readyStatus,
+				...state,
+			}}
+			onRefresh={() => {}}
+			onAction={() => {}}
+		/>,
+	);
+}
+function between(html: string, from: string, to: string) {
+	return html.slice(
+		html.indexOf(`<strong>${from}</strong>`),
+		html.indexOf(`<strong>${to}</strong>`),
+	);
+}
+
+it("shows progress only on the button that is running", () => {
+	const action = { kind: "connectAgent", provider: "codex" } as const;
+	const html = renderPanel({ busy: action, lastAction: action });
+	const codex = between(html, "Codex", "Grok Build");
+	expect(html.match(/aria-busy="true"/g)).toHaveLength(1);
+	expect(codex).toContain('aria-busy="true"');
+	expect(codex).toContain("button-spinner");
+	expect(codex).toContain("연결 중…");
+	// Every other action waits, without claiming to run.
+	const claude = between(html, "Claude Code", "Codex");
+	expect(claude).toMatch(/<button[^>]*disabled=""[^>]*>연결<\/button>/);
+	expect(html).not.toContain("확인 중…");
+});
+
+it("labels running CLI steps by what they do", () => {
+	expect(renderPanel({ busy: { kind: "repairCli" } })).toContain(
+		"설치 복구 중…",
+	);
+	expect(renderPanel({ busy: { kind: "updateCli" } })).toContain(
+		"CLI 업데이트 중…",
+	);
+	expect(renderPanel({ loading: true })).toContain("확인 중…");
+});
+
+it("puts an action result beside the button that ran it", () => {
+	const html = renderPanel({
+		lastAction: { kind: "connectAgent", provider: "codex" },
+		error: "연결을 확인하지 못했습니다.",
+	});
+	expect(between(html, "Codex", "Grok Build")).toContain(
+		"연결을 확인하지 못했습니다.",
+	);
+	expect(html.split("연결을 확인하지 못했습니다.")).toHaveLength(2);
+	const cli = renderPanel({
+		lastAction: { kind: "updateCli" },
+		notice: "CLI와 수집기 준비가 완료됐습니다.",
+	});
+	expect(between(cli, "1 · Workbranch CLI", "Claude Code")).toContain(
+		"CLI와 수집기 준비가 완료됐습니다.",
+	);
+});
+
+it("keeps status check failures at the top of the panel", () => {
+	const html = renderPanel({ error: "설치 상태를 확인하지 못했습니다." });
+	expect(html.indexOf("설치 상태를 확인하지 못했습니다.")).toBeLessThan(
+		html.indexOf("1 · Workbranch CLI"),
+	);
+});
+
+it("remembers which action a result belongs to until a check fails", async () => {
+	let current = EMPTY_CONNECTION_STATE;
+	const inspect = vi.fn(async () => readyStatus);
+	const controller = createConnectionController(
+		{
+			inspect,
+			run: async () => ({ exit_code: 1, stdout: "", stderr: "failed" }),
+			subscribe: async () => () => {},
+			id: () => "op",
+		},
+		(value) => {
+			current = value;
+		},
+	);
+	expect(
+		await controller.run({ kind: "connectAgent", provider: "codex" }),
+	).toBe(false);
+	expect(current.lastAction).toEqual({
+		kind: "connectAgent",
+		provider: "codex",
+	});
+	expect(current.error).not.toBeNull();
+	inspect.mockRejectedValueOnce(new Error("offline"));
+	await controller.refresh();
+	expect(current.lastAction).toBeNull();
+	expect(current.error).toContain("설치 상태를 확인하지 못했습니다");
+	controller.dispose();
+});
+
+it("matches a running action to its button regardless of the approved source", () => {
+	const grok = { kind: "connectAgent", provider: "grok" } as const;
+	expect(sameSetupAction({ ...grok, approvedSource: "/reviewed" }, grok)).toBe(
+		true,
+	);
+	expect(
+		sameSetupAction(grok, { kind: "disconnectAgent", provider: "grok" }),
+	).toBe(false);
+	expect(sameSetupAction(grok, { ...grok, provider: "codex" })).toBe(false);
+	expect(sameSetupAction({ kind: "updateCli" }, { kind: "repairCli" })).toBe(
+		false,
+	);
 });
