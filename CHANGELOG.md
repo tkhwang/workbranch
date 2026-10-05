@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.26.0](https://github.com/tkhwang/workbranch/compare/v2.25.1...v2.26.0) (2026-10-05)
+
+
+### Features
+
+* **ui:** update companion ui design ([f7e128c](https://github.com/tkhwang/workbranch/commit/f7e128c1f7d75197d13a90fbbe0d08f203d1b3f0))
+* **ui:** update companion ui design ([8609059](https://github.com/tkhwang/workbranch/commit/8609059a3b7c477eb028aea9215479b354edaa4b))
+
 ## [2.25.1](https://github.com/tkhwang/workbranch/compare/v2.25.0...v2.25.1) (2026-10-05)
 
 
