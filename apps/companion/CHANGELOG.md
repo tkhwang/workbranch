@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.24.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.23.0...workbranch-companion-v2.24.0) (2026-10-05)
+
+
+### Features
+
+* **update:** add update check and apply functionality ([afb3735](https://github.com/tkhwang/workbranch/commit/afb3735746466d57765f10720b8bcc6e5e62ea73))
+* **update:** add update check and apply functionality ([890e16d](https://github.com/tkhwang/workbranch/commit/890e16d3b7acfc65decef943a01bbf87990e4a36)), closes [#234](https://github.com/tkhwang/workbranch/issues/234)
+
 ## [2.23.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.22.0...workbranch-companion-v2.23.0) (2026-10-05)
 
 
