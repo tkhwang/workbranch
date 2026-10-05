@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.25.1](https://github.com/tkhwang/workbranch/compare/v2.25.0...v2.25.1) (2026-10-05)
+
+
+### Bug Fixes
+
+* **hooks:** handle stale provider registrations ([d36c289](https://github.com/tkhwang/workbranch/commit/d36c289db3a9ba32a136ef3da7b33af0715406c1))
+* **hooks:** handle stale provider registrations ([2b4357c](https://github.com/tkhwang/workbranch/commit/2b4357c803ed628a7bba2f92c0f3eadbbe34469f))
+
 ## [2.25.0](https://github.com/tkhwang/workbranch/compare/v2.24.0...v2.25.0) (2026-10-04)
 
 
