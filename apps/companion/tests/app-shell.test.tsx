@@ -29,7 +29,7 @@ function readCssContract(path: string, visited = new Set<string>()): string {
 }
 
 describe("App shell settings wiring", () => {
-	it("opens at 520px while preserving the 460px compact boundary", () => {
+	it("opens at 860px for the kanban board while preserving the 460px compact boundary", () => {
 		const config = JSON.parse(
 			readFileSync("src-tauri/tauri.conf.json", "utf8"),
 		) as {
@@ -44,7 +44,7 @@ describe("App shell settings wiring", () => {
 		};
 
 		expect(config.app.windows[0]).toMatchObject({
-			width: 520,
+			width: 860,
 			height: 760,
 			minWidth: 460,
 			resizable: true,

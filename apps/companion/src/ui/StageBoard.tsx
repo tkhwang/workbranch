@@ -1,19 +1,27 @@
-import { useEffect, useRef, useState } from "react";
+import { type MouseEvent, useEffect, useRef, useState } from "react";
 import { type RepoNotes, repoNoteKey } from "../application/notes";
 import type {
 	MainBaseRow,
 	MainStageGroup,
 	MainTaskRow,
 } from "../application/state";
-import type { BaseRepoAction, MatrixColumn, Repo } from "../domain/model";
+import type {
+	AgentSession,
+	BaseRepoAction,
+	MatrixColumn,
+	Repo,
+} from "../domain/model";
 import {
 	baseRepoAction,
 	baseRepoHealth,
 	runtimeLabels,
 	sessionKey,
 } from "../domain/model";
+import { PROVIDER_NAMES, ProviderIcon, sessionProviders } from "./ProviderIcon";
 import {
 	baseRepoFacts,
+	compactRepoFacts,
+	formatObservedAgo,
 	formatRelativeTime,
 	repoFacts,
 	type TaskActionHandler,
@@ -126,20 +134,53 @@ function BaseRepoRow({ row }: { readonly row: MainBaseRow }) {
 	);
 }
 
+function BranchIcon() {
+	return (
+		<svg
+			aria-hidden="true"
+			className="runtime-branch-icon"
+			fill="none"
+			stroke="currentColor"
+			strokeLinecap="round"
+			strokeWidth="1.6"
+			viewBox="0 0 20 20"
+		>
+			<circle cx="6" cy="4.5" r="2" />
+			<circle cx="6" cy="15.5" r="2" />
+			<circle cx="14" cy="6.5" r="2" />
+			<path d="M6 6.5v7" />
+			<path d="M14 8.5c0 3.5-8 2.5-8 5" />
+		</svg>
+	);
+}
+
+type NoteEdit = { readonly id: string; readonly draft: string };
+
 function StageRepoRow({
+	draft,
+	editing,
 	note,
 	nowSeconds,
-	onSaveNote,
+	onCancelEdit,
+	onDraftChange,
+	onSaveEdit,
+	onStartEdit,
 	repo,
+	showBranch,
+	showCommit,
 }: {
+	readonly draft: string;
+	readonly editing: boolean;
 	readonly note: string | undefined;
 	readonly nowSeconds: number;
-	readonly onSaveNote: (key: string, text: string) => void;
+	readonly onCancelEdit: () => void;
+	readonly onDraftChange: (text: string) => void;
+	readonly onSaveEdit: () => void;
+	readonly onStartEdit: () => void;
 	readonly repo: Repo;
+	readonly showBranch: boolean;
+	readonly showCommit: boolean;
 }) {
-	const key = repoNoteKey(repo.name, repo.branch);
-	const [editing, setEditing] = useState(false);
-	const [draft, setDraft] = useState(note ?? "");
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const relativeTime = formatRelativeTime(repo.lastCommitAt, nowSeconds);
 	const commit =
@@ -147,11 +188,7 @@ function StageRepoRow({
 			? ""
 			: repo.lastCommitSubject +
 				(relativeTime === "" ? "" : " · " + relativeTime);
-
-	const saveAndClose = (): void => {
-		onSaveNote(key, draft);
-		setEditing(false);
-	};
+	const facts = repoFacts(repo);
 
 	useEffect(() => {
 		if (editing) textareaRef.current?.focus();
@@ -169,31 +206,42 @@ function StageRepoRow({
 					title={repo.name}
 				>
 					{repo.name}
-					{repo.dirty ? (
-						<span aria-label="dirty" className="stage-repo-dot" role="img">
-							●
+				</span>
+				<span
+					aria-label={facts}
+					className="stage-repo-facts"
+					role="img"
+					title={facts}
+				>
+					{compactRepoFacts(repo).map((fact) => (
+						<span
+							aria-hidden="true"
+							className="repo-fact"
+							data-tone={fact.tone}
+							key={fact.tone}
+						>
+							{fact.label}
 						</span>
-					) : null}
+					))}
 				</span>
-				<span className="stage-repo-branch" title={repo.branch}>
-					{repo.branch}
-				</span>
-				<span className="stage-repo-facts">{repoFacts(repo)}</span>
 				<button
 					aria-expanded={editing}
 					aria-label={"edit note for " + repo.name + " " + repo.branch}
 					className="stage-note-button"
 					data-has-note={note === undefined ? "false" : "true"}
-					onClick={() => {
-						setDraft(note ?? "");
-						setEditing(true);
-					}}
+					onClick={onStartEdit}
 					type="button"
 				>
 					✎
 				</button>
 			</div>
-			{commit === "" ? null : (
+			{showBranch ? (
+				<div className="runtime-branch" title={`branch: ${repo.branch}`}>
+					<BranchIcon />
+					<span>{repo.branch}</span>
+				</div>
+			) : null}
+			{!showCommit || commit === "" ? null : (
 				<div
 					aria-label={"last commit: " + commit}
 					className="stage-repo-commit"
@@ -220,18 +268,17 @@ function StageRepoRow({
 				<div className="stage-note-editor">
 					<textarea
 						aria-label={"note for " + repo.name + " " + repo.branch}
-						onBlur={saveAndClose}
-						onChange={(event) => setDraft(event.currentTarget.value)}
+						onBlur={onSaveEdit}
+						onChange={(event) => onDraftChange(event.currentTarget.value)}
 						onKeyDown={(event) => {
 							if (event.key === "Escape") {
 								event.preventDefault();
-								setDraft(note ?? "");
-								setEditing(false);
+								onCancelEdit();
 								return;
 							}
 							if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
 								event.preventDefault();
-								saveAndClose();
+								onSaveEdit();
 							}
 						}}
 						value={draft}
@@ -260,147 +307,335 @@ export type StageBoardProps = {
 	readonly onSelect: (key: string) => void;
 	readonly selectedKey: string | undefined;
 };
-function RuntimeTask({
+
+const BOARD_COLUMNS = ["waiting", "running", "finished"] as const;
+type BoardColumn = (typeof BOARD_COLUMNS)[number];
+
+const COLUMN_COPY = {
+	waiting: { label: "내 응답 대기", code: "WAITING" },
+	running: { label: "실행 중", code: "RUNNING" },
+	finished: { label: "턴 종료 · 검토", code: "REVIEW" },
+} as const satisfies Record<BoardColumn, { label: string; code: string }>;
+
+const WAIT_REASON_LABELS: Readonly<Record<string, string>> = {
+	permission: "권한 승인 대기",
+	question: "질문 대기",
+	plan: "plan 승인 대기",
+	elicitation: "입력 대기",
+};
+
+type ChipTone = BoardColumn | "error" | "notify" | "neutral";
+type Chip = { readonly tone: ChipTone; readonly label: string };
+
+function isBoardColumn(role: MainTaskRow["role"]): role is BoardColumn {
+	return (BOARD_COLUMNS as readonly string[]).includes(role);
+}
+
+function observedCount(
+	sessions: readonly AgentSession[],
+	state: BoardColumn,
+): number {
+	return sessions.filter(
+		(s) => s.observation === "observed" && s.state === state,
+	).length;
+}
+
+function leadChip(role: BoardColumn, lead: AgentSession | undefined): Chip {
+	if (role === "waiting")
+		return {
+			tone: "waiting",
+			label: WAIT_REASON_LABELS[lead?.reason ?? ""] ?? runtimeLabels.waiting,
+		};
+	if (role === "finished" && lead?.outcome === "interrupted")
+		return { tone: "error", label: "중단됨" };
+	if (role === "finished" && lead?.outcome === "error")
+		return { tone: "error", label: "오류로 종료" };
+	return { tone: role, label: runtimeLabels[role] };
+}
+
+export function inventoryTag(row: MainTaskRow): string {
+	if (row.role === "idle") return runtimeLabels.idle;
+	return row.sessions.length === 0 ? "세션 없음" : runtimeLabels.unknown;
+}
+
+export function runtimeChips(row: MainTaskRow): readonly Chip[] {
+	const chips: Chip[] = [];
+	const { role, sessions } = row;
+	if (isBoardColumn(role)) {
+		const lead = leadChip(role, sessions[0]);
+		const same = observedCount(sessions, role);
+		chips.push(same > 1 ? { ...lead, label: `${lead.label} ${same}` } : lead);
+		for (const state of BOARD_COLUMNS) {
+			const count = state === role ? 0 : observedCount(sessions, state);
+			if (count > 0)
+				chips.push({
+					tone: "neutral",
+					label: `+${count} ${runtimeLabels[state]}`,
+				});
+		}
+		const unknown = sessions.filter((s) => s.observation !== "observed").length;
+		if (unknown > 0)
+			chips.push({
+				tone: "neutral",
+				label: `${runtimeLabels.unknown} ${unknown}`,
+			});
+	} else {
+		chips.push({ tone: "neutral", label: inventoryTag(row) });
+	}
+	if (row.task.notiCount > 0)
+		chips.push({ tone: "notify", label: `알림 ${row.task.notiCount}` });
+	return chips;
+}
+
+type BoardContext = {
+	readonly now: number;
+	readonly notes: RepoNotes;
+	readonly expandedKeys: ReadonlySet<string>;
+	readonly toggleExpanded: (key: string) => void;
+	readonly noteEdit: NoteEdit | undefined;
+	readonly startNote: (id: string, text: string) => void;
+	readonly changeNote: (id: string, text: string) => void;
+	readonly finishNote: (id: string, key: string, save: boolean) => void;
+	readonly onAction: TaskActionHandler;
+	readonly onSelect: (key: string) => void;
+	readonly selectedKey: string | undefined;
+};
+
+function TaskLaunchers({
 	row,
-	props,
-	now,
+	onAction,
 }: {
 	readonly row: MainTaskRow;
-	readonly props: StageBoardProps;
+	readonly onAction: TaskActionHandler;
+}) {
+	return (
+		<div className="stage-actions">
+			{taskActionsFor(row.task).map((action) => (
+				<button
+					key={action.kind}
+					type="button"
+					aria-label={action.ariaLabel}
+					className="task-action"
+					title={action.label}
+					disabled={action.disabled}
+					onClick={() => onAction(row.root, row.task, action.kind)}
+				>
+					<TaskActionIcon kind={action.kind} />
+				</button>
+			))}
+		</div>
+	);
+}
+
+function SessionDetail({
+	session,
+	now,
+}: {
+	readonly session: AgentSession;
 	readonly now: number;
 }) {
-	const [expanded, setExpanded] = useState(false);
-	const lead = row.sessions[0];
-	const counts = (["waiting", "running", "finished"] as const).map((state) => ({
-		state,
-		count: row.sessions.filter(
-			(s) => s.state === state && s.observation === "observed",
-		).length,
-	}));
-	const unknown = row.sessions.filter(
-		(s) => s.observation !== "observed",
-	).length;
 	return (
-		<article
-			className="runtime-task"
-			data-state={row.role}
-			data-selected={props.selectedKey === row.key}
+		<section
+			className="runtime-session"
+			aria-label={`${PROVIDER_NAMES[session.provider]} session`}
 		>
-			<button
-				className="runtime-task-heading"
-				type="button"
-				aria-expanded={expanded}
-				onClick={() => {
-					setExpanded(!expanded);
-					props.onSelect(row.key);
-				}}
-			>
-				<span className="runtime-identity">
-					{row.project} / {row.task.name}
-					<span>{expanded ? "−" : "+"}</span>
+			<header>
+				<ProviderIcon provider={session.provider} />
+				<span>
+					{session.observation === "observed"
+						? runtimeLabels[session.state]
+						: "상태 확인 불가"}
+					{session.reason ? ` · ${session.reason}` : ""}
 				</span>
-				<strong className="runtime-title">
-					{lead?.prompt || row.task.name}
-				</strong>
-				<span className="runtime-counts">
-					{row.task.notiCount > 0 ? (
-						<span>알림 {row.task.notiCount}</span>
-					) : null}
-					{counts
-						.filter((c) => c.count > 0)
-						.map((c) => (
-							<span key={c.state}>
-								{c.state === "waiting"
-									? "대기"
-									: c.state === "running"
-										? "실행 중"
-										: "턴 종료"}{" "}
-								{c.count}
-							</span>
-						))}
-					{unknown > 0 ? <span>관측 불명 {unknown}</span> : null}
-					{row.sessions.length === 0 ? (
-						<span>아직 수집된 session이 없습니다</span>
-					) : null}
-				</span>
-			</button>
-			{lead ? (
-				<div className="runtime-activity">
-					<span className="runtime-provider">{lead.provider}</span>
-					<span>
-						{lead.observation !== "observed"
-							? "상태 확인 불가"
-							: lead.reason || runtimeLabels[lead.state]}{" "}
-						· {formatRelativeTime(lead.updatedAt, now)} 전
-					</span>
-					<code title={lead.activity}>{lead.activity}</code>
+			</header>
+			<small>
+				마지막 관측 {formatObservedAgo(session.updatedAt, now)} ·{" "}
+				{session.sessionId.slice(0, 12)}
+			</small>
+			{session.prompt ? <p>{session.prompt}</p> : null}
+			{session.activity ? <code>{session.activity}</code> : null}
+			{session.response ? (
+				<div className="runtime-response">
+					<small>마지막 응답 · 발췌</small>
+					<p>{session.response}</p>
 				</div>
 			) : null}
-			{expanded ? (
+			{session.outcome === "error" || session.outcome === "interrupted" ? (
+				<span className="runtime-outcome">{session.outcome}</span>
+			) : null}
+		</section>
+	);
+}
+
+function RuntimeCard({
+	board,
+	row,
+	variant,
+}: {
+	readonly board: BoardContext;
+	readonly row: MainTaskRow;
+	readonly variant: "card" | "row";
+}) {
+	const expanded = board.expandedKeys.has(row.key);
+	const lead = row.sessions[0];
+	const ideEnabled = row.task.repos.length > 0;
+	// Review cards surface the agent's last answer; live cards surface the tool.
+	const excerpt =
+		row.role === "finished" && lead?.response ? lead.response : lead?.activity;
+	// Worktree repos usually share the task branch; name it once per card.
+	const sharedBranch =
+		row.repos.length > 0 &&
+		row.repos.every((r) => r.branch === row.repos[0]?.branch)
+			? row.repos[0]?.branch
+			: undefined;
+	const handleClick = (event: MouseEvent<HTMLButtonElement>): void => {
+		// The second click of a double-click belongs to the IDE gesture.
+		if (event.detail > 1) return;
+		board.toggleExpanded(row.key);
+		board.onSelect(row.key);
+	};
+	const handleDoubleClick = (): void => {
+		board.toggleExpanded(row.key);
+		if (ideEnabled) board.onAction(row.root, row.task, "ide");
+	};
+
+	return (
+		<article
+			className="runtime-card"
+			data-selected={board.selectedKey === row.key}
+			data-provider={lead?.provider}
+			data-state={row.role}
+			data-variant={variant}
+		>
+			<div className="runtime-card-head">
+				<button
+					aria-expanded={expanded}
+					className="runtime-card-toggle"
+					onClick={handleClick}
+					onDoubleClick={handleDoubleClick}
+					type="button"
+				>
+					<span className="runtime-project" title={row.project}>
+						{row.project}
+					</span>
+					<span className="runtime-task-name">{row.task.name}</span>
+					{lead?.prompt ? (
+						<span className="runtime-title">{lead.prompt}</span>
+					) : null}
+					<span className="runtime-live">
+						{runtimeChips(row).map((chip) => (
+							<span
+								className="runtime-chip"
+								data-tone={chip.tone}
+								key={chip.label}
+							>
+								{chip.label}
+							</span>
+						))}
+						{lead ? (
+							<span className="runtime-meta">
+								{sessionProviders(row.sessions).map((provider) => (
+									<ProviderIcon key={provider} provider={provider} />
+								))}
+								<span>{formatObservedAgo(lead.updatedAt, board.now)}</span>
+							</span>
+						) : null}
+					</span>
+					{excerpt ? (
+						<code
+							className="runtime-excerpt"
+							data-kind={excerpt === lead?.activity ? "activity" : "response"}
+							title={excerpt}
+						>
+							{excerpt}
+						</code>
+					) : null}
+				</button>
+				<TaskLaunchers row={row} onAction={board.onAction} />
+			</div>
+			{row.repos.length === 0 ? (
+				<p className="stage-repo-empty">NO REPOSITORIES</p>
+			) : (
+				<div className="stage-repo-list">
+					{sharedBranch === undefined ? null : (
+						<div className="runtime-branch" title={`branch: ${sharedBranch}`}>
+							<BranchIcon />
+							<span>{sharedBranch}</span>
+						</div>
+					)}
+					{row.repos.map((repo) => {
+						const key = repoNoteKey(repo.name, repo.branch);
+						const id = `${row.key}|${key}`;
+						const editing = board.noteEdit?.id === id;
+						const note = board.notes[key];
+						return (
+							<StageRepoRow
+								key={repo.name}
+								draft={editing ? (board.noteEdit?.draft ?? "") : ""}
+								editing={editing}
+								note={note}
+								nowSeconds={board.now}
+								onCancelEdit={() => board.finishNote(id, key, false)}
+								onDraftChange={(text) => board.changeNote(id, text)}
+								onSaveEdit={() => board.finishNote(id, key, true)}
+								onStartEdit={() => board.startNote(id, note ?? "")}
+								repo={repo}
+								showBranch={sharedBranch === undefined}
+								showCommit={expanded}
+							/>
+						);
+					})}
+				</div>
+			)}
+			{expanded && row.sessions.length > 0 ? (
 				<div className="runtime-details">
 					{row.sessions.map((s) => (
-						<section
-							className="runtime-session"
-							key={sessionKey(s)}
-							aria-label={`${s.provider} session`}
-						>
-							<header>
-								<b>{s.provider}</b>
-								<span>
-									{s.observation === "observed"
-										? runtimeLabels[s.state]
-										: "상태 확인 불가"}
-									{s.reason ? ` · ${s.reason}` : ""}
-								</span>
-							</header>
-							<small>
-								마지막 관측 {formatRelativeTime(s.updatedAt, now)} 전 ·{" "}
-								{s.sessionId.slice(0, 12)}
-							</small>
-							{s.prompt ? <p>{s.prompt}</p> : null}
-							{s.activity ? <code>{s.activity}</code> : null}
-							{s.response ? (
-								<div className="runtime-response">
-									<small>마지막 응답 · 발췌</small>
-									<p>{s.response}</p>
-								</div>
-							) : null}
-							{s.outcome === "error" || s.outcome === "interrupted" ? (
-								<span className="runtime-outcome">{s.outcome}</span>
-							) : null}
-						</section>
-					))}
-					<div className="stage-actions">
-						{taskActionsFor(row.task).map((action) => (
-							<button
-								key={action.kind}
-								type="button"
-								aria-label={action.ariaLabel}
-								className="task-action"
-								title={action.label}
-								disabled={action.disabled}
-								onClick={() => props.onAction(row.root, row.task, action.kind)}
-							>
-								<TaskActionIcon kind={action.kind} />
-							</button>
-						))}
-					</div>
-					{row.repos.map((repo) => (
-						<StageRepoRow
-							key={repo.name}
-							repo={repo}
-							nowSeconds={now}
-							note={props.notes[repoNoteKey(repo.name, repo.branch)]}
-							onSaveNote={props.onSaveNote}
-						/>
+						<SessionDetail key={sessionKey(s)} session={s} now={board.now} />
 					))}
 				</div>
 			) : null}
 		</article>
 	);
 }
+
 export function StageBoard(props: StageBoardProps) {
 	const now = useCurrentEpochSeconds();
+	// Cards move between column parents, so per-card UI state lives here.
+	const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(
+		() => new Set(),
+	);
+	const [noteEdit, setNoteEdit] = useState<NoteEdit>();
+	const noteEditRef = useRef<NoteEdit>();
+	const updateNoteEdit = (next: NoteEdit | undefined): void => {
+		noteEditRef.current = next;
+		setNoteEdit(next);
+	};
+	const board: BoardContext = {
+		now,
+		notes: props.notes,
+		expandedKeys,
+		toggleExpanded: (key) =>
+			setExpandedKeys((current) => {
+				const next = new Set(current);
+				if (!next.delete(key)) next.add(key);
+				return next;
+			}),
+		noteEdit,
+		startNote: (id, text) => updateNoteEdit({ id, draft: text }),
+		changeNote: (id, text) => updateNoteEdit({ id, draft: text }),
+		finishNote: (id, key, save) => {
+			const current = noteEditRef.current;
+			if (current?.id !== id) return;
+			updateNoteEdit(undefined);
+			if (save) props.onSaveNote(key, current.draft);
+		},
+		onAction: props.onAction,
+		onSelect: props.onSelect,
+		selectedKey: props.selectedKey,
+	};
+	const rowsFor = (column: MatrixColumn): readonly MainTaskRow[] =>
+		props.groups.find((g) => g.column === column)?.rows ?? [];
+	const inventoryRows = [...rowsFor("unknown"), ...props.idleRows];
 	const sessions = [
 		...props.groups.flatMap((g) => g.rows),
 		...props.idleRows,
@@ -408,8 +643,10 @@ export function StageBoard(props: StageBoardProps) {
 	return (
 		<section className="runtime-board" aria-label="Agent runtime">
 			<div className="runtime-summary">
+				<span className="runtime-summary-label">SESSIONS</span>
 				{["waiting", "running", "finished", "unknown"].map((state) => (
 					<span key={state} data-state={state}>
+						<i className="runtime-dot" data-state={state} />
 						{runtimeLabels[state as MatrixColumn]}{" "}
 						<b>
 							{
@@ -423,20 +660,51 @@ export function StageBoard(props: StageBoardProps) {
 					</span>
 				))}
 			</div>
-			<div className="runtime-group">
-				{[...props.groups, { column: "idle" as const, rows: props.idleRows }]
-					.filter((g) => g.rows.length > 0)
-					.flatMap((group) => [
-						<h2 key={`header:${group.column}`}>
-							<i data-state={group.column} />
-							{runtimeLabels[group.column]}
-							<small>{group.rows.length} workspaces</small>
-						</h2>,
-						...group.rows.map((row) => (
-							<RuntimeTask key={row.key} row={row} props={props} now={now} />
-						)),
-					])}
+			<div className="runtime-columns">
+				{BOARD_COLUMNS.map((column) => {
+					const rows = rowsFor(column);
+					return (
+						<section
+							aria-label={COLUMN_COPY[column].label}
+							className="runtime-column"
+							data-state={column}
+							key={column}
+						>
+							<h2 className="runtime-column-head">
+								<i className="runtime-dot" data-state={column} />
+								{COLUMN_COPY[column].label}
+								<span className="runtime-column-code">
+									{COLUMN_COPY[column].code}
+								</span>
+								<small title={`${rows.length} workspaces`}>{rows.length}</small>
+							</h2>
+							{rows.length === 0 ? (
+								<p className="runtime-column-empty">없음</p>
+							) : (
+								rows.map((row) => (
+									<RuntimeCard
+										board={board}
+										key={row.key}
+										row={row}
+										variant="card"
+									/>
+								))
+							)}
+						</section>
+					);
+				})}
 			</div>
+			{inventoryRows.length > 0 ? (
+				<section className="runtime-inventory" aria-label="Workspaces">
+					<h2 className="runtime-inventory-head">
+						<span>WORKSPACES · 세션 없음 / 관측 불명 / 비활성</span>
+						<small>{inventoryRows.length}</small>
+					</h2>
+					{inventoryRows.map((row) => (
+						<RuntimeCard board={board} key={row.key} row={row} variant="row" />
+					))}
+				</section>
+			) : null}
 			{props.baseRows.length > 0 ? (
 				<details className="runtime-bases">
 					<summary>Base repositories · {props.baseRows.length}</summary>
