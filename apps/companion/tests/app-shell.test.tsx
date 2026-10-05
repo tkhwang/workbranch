@@ -102,6 +102,13 @@ describe("App shell settings wiring", () => {
 		);
 	});
 
+	it("refreshes when the tray opens the window instead of a refresh button", () => {
+		const appSource = readFileSync("src/App.tsx", "utf8");
+
+		expect(appSource).toContain("onWindowFocused(");
+		expect(appSource).not.toContain("onRefresh={() => void refresh()}");
+	});
+
 	it("advances the activity reload token after successful app refreshes", () => {
 		expect(nextActivityReloadToken(0)).toBe(1);
 		expect(nextActivityReloadToken(41)).toBe(42);
@@ -140,7 +147,8 @@ describe("App shell settings wiring", () => {
 		expect(html).toContain("<h1>Workbranch Companion</h1>");
 		expect(html).not.toContain("<fieldset");
 		expect(html).not.toContain("<svg");
-		expect(html).toContain('aria-label="Refresh tasks"');
+		expect(html).not.toContain('aria-label="Refresh tasks"');
+		expect(html).toContain('aria-label="Check for updates"');
 		expect(html).toContain('aria-label="Quit Companion"');
 		expect(html).toContain('class="toolbar-status-sr"');
 		expect(html).toContain(">Ready</span>");

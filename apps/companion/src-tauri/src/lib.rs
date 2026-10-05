@@ -9,6 +9,7 @@ mod activity_store;
 mod process_env;
 mod setup;
 mod tray;
+mod update;
 mod watch_filter;
 mod watch_roots;
 mod watch_scope;
@@ -304,6 +305,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             setup::setup_status,
             setup::setup_action,
+            update::update_check,
+            update::update_apply,
+            update::relaunch_companion,
             workbranch_list,
             workbranch_list_global,
             workbranch_runtime,

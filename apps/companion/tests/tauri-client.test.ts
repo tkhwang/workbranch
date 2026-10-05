@@ -10,9 +10,12 @@ vi.mock("@tauri-apps/api/event", () => ({ listen: tauri.listen }));
 
 import {
 	appendActivityEvents,
+	applyUpdates,
 	CompanionActionError,
+	checkUpdates,
 	ensureRunSucceeded,
 	onRootChanged,
+	onWindowFocused,
 	quitCompanion,
 	readActivityEvents,
 	refreshRoot,
@@ -187,5 +190,47 @@ describe("runtime compatibility errors", () => {
 				"Install/update the workbranch runtime collector (workbranch-agent-runtime missing)",
 			),
 		).toContain("수집기");
+	});
+});
+
+describe("updates", () => {
+	beforeEach(() => {
+		tauri.invoke.mockReset();
+	});
+
+	it("invokes the allowlisted update commands", async () => {
+		tauri.invoke.mockResolvedValue({});
+
+		await checkUpdates(true);
+		await applyUpdates(["cli", "companion"], "op-1");
+
+		expect(tauri.invoke).toHaveBeenNthCalledWith(1, "update_check", {
+			fetch: true,
+		});
+		expect(tauri.invoke).toHaveBeenNthCalledWith(2, "update_apply", {
+			targets: ["cli", "companion"],
+			operationId: "op-1",
+		});
+	});
+});
+
+describe("onWindowFocused", () => {
+	it("listens for the native window focus event", async () => {
+		let focused = 0;
+		tauri.listen.mockReset();
+		tauri.listen.mockImplementation((_name, callback) => {
+			callback({ payload: null });
+			return Promise.resolve(() => undefined);
+		});
+
+		await onWindowFocused(() => {
+			focused += 1;
+		});
+
+		expect(tauri.listen).toHaveBeenCalledWith(
+			"tauri://focus",
+			expect.any(Function),
+		);
+		expect(focused).toBe(1);
 	});
 });

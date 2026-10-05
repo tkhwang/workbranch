@@ -8,10 +8,12 @@ import {
 	buildMenuModel,
 	type MenuModel,
 } from "./application/state";
+import { updateTargets } from "./application/updates";
 import { useCompanionSettings } from "./application/useCompanionSettings";
 import { useConnections } from "./application/useConnections";
 import { useLimitAccounts } from "./application/useLimitAccounts";
 import { useRepoNotes } from "./application/useRepoNotes";
+import { useUpdates } from "./application/useUpdates";
 import type { AgentSession, GlobalState, Task } from "./domain/model";
 import {
 	appendActivityEvents,
@@ -21,6 +23,7 @@ import {
 	type MigrationReport,
 	migrateRuntime,
 	onRootChanged,
+	onWindowFocused,
 	quitCompanion,
 	readActivityEvents,
 	refreshRoot,
@@ -37,6 +40,7 @@ import { SettingsView } from "./ui/SettingsView";
 import { StageBoard } from "./ui/StageBoard";
 import { StatusAlert } from "./ui/StatusAlert";
 import type { TaskActionKind } from "./ui/TaskRow";
+import { UpdatePanel } from "./ui/UpdatePanel";
 import { WeeklyLimitGauge } from "./ui/WeeklyLimitGauge";
 
 const EMPTY_STATE: GlobalState = { projects: [], errors: [] };
@@ -171,6 +175,43 @@ export function App() {
 		showStatus,
 		tauriRuntimeAvailable,
 	]);
+
+	// Opening the window replaces the removed manual refresh: it picks up
+	// newly registered projects and retries after errors.
+	const refreshingOnShow = useRef(false);
+	useEffect(() => {
+		if (!tauriRuntimeAvailable) return;
+		let stop: (() => void) | undefined;
+		let cancelled = false;
+		void onWindowFocused(() => {
+			if (refreshingOnShow.current) return;
+			refreshingOnShow.current = true;
+			void refresh().finally(() => {
+				refreshingOnShow.current = false;
+			});
+		}).then((unlisten) => {
+			if (cancelled) unlisten();
+			else stop = unlisten;
+		});
+		return () => {
+			cancelled = true;
+			stop?.();
+		};
+	}, [refresh, tauriRuntimeAvailable]);
+
+	const updates = useUpdates(tauriRuntimeAvailable, () => {
+		void refresh();
+		void connections.refresh();
+	});
+	const [updatePanelOpen, setUpdatePanelOpen] = useState(false);
+	const handleCheckUpdates = useCallback(() => {
+		if (!tauriRuntimeAvailable) {
+			showStatus(TAURI_RUNTIME_UNAVAILABLE);
+			return;
+		}
+		setUpdatePanelOpen(true);
+		void updates.check();
+	}, [showStatus, tauriRuntimeAvailable, updates.check]);
 
 	const handleQuit = useCallback(() => {
 		if (!tauriRuntimeAvailable) {
@@ -346,9 +387,19 @@ export function App() {
 				theme={activeTheme}
 				summary={model.summary}
 				status={status}
-				onRefresh={() => void refresh()}
+				onCheckUpdates={handleCheckUpdates}
+				updateAvailable={updateTargets(updates.state.status).length > 0}
 				onQuit={handleQuit}
 			/>
+			{updatePanelOpen ? (
+				<UpdatePanel
+					theme={activeTheme}
+					state={updates.state}
+					onCheck={() => void updates.check()}
+					onApply={() => void updates.apply()}
+					onClose={() => setUpdatePanelOpen(false)}
+				/>
+			) : null}
 			<StatusAlert
 				message={
 					setupError && connections.state.status?.cli.state !== "ready"

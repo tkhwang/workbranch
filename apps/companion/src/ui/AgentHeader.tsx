@@ -5,7 +5,8 @@ export type AgentHeaderProps = {
 	readonly theme: CompanionTheme;
 	readonly summary: MenuSummary;
 	readonly status: string;
-	readonly onRefresh: () => void;
+	readonly onCheckUpdates: () => void;
+	readonly updateAvailable: boolean;
 	readonly onQuit: () => void;
 };
 
@@ -21,9 +22,10 @@ function AgentInventory({ summary }: { readonly summary: MenuSummary }) {
 
 function AgentControls({
 	status,
-	onRefresh,
+	onCheckUpdates,
+	updateAvailable,
 	onQuit,
-}: Pick<AgentHeaderProps, "status" | "onRefresh" | "onQuit">) {
+}: Omit<AgentHeaderProps, "theme" | "summary">) {
 	return (
 		<div
 			className="agent-controls"
@@ -34,12 +36,15 @@ function AgentControls({
 				{status}
 			</span>
 			<button
-				aria-label="Refresh tasks"
-				className="agent-control"
-				onClick={onRefresh}
+				aria-label={updateAvailable ? "Updates available" : "Check for updates"}
+				className="agent-control agent-control-update"
+				data-update-available={updateAvailable ? "true" : undefined}
+				onClick={onCheckUpdates}
 				type="button"
 			>
-				<span aria-hidden="true">↻</span>
+				<span aria-hidden="true" className="agent-update-glyph">
+					↓
+				</span>
 			</button>
 			<button
 				aria-label="Quit Companion"
@@ -57,10 +62,16 @@ export function AgentHeader({
 	theme,
 	summary,
 	status,
-	onRefresh,
+	onCheckUpdates,
+	updateAvailable,
 	onQuit,
 }: AgentHeaderProps) {
-	const controls = { status, onRefresh, onQuit };
+	const controls = {
+		status,
+		onCheckUpdates,
+		updateAvailable,
+		onQuit,
+	};
 
 	return (
 		<section className="agent-header" data-agent-header={theme}>

@@ -17,7 +17,8 @@ const summary: MenuSummary = {
 
 const controls = {
 	status: "Ready",
-	onRefresh: () => undefined,
+	onCheckUpdates: () => undefined,
+	updateAvailable: false,
 	onQuit: () => undefined,
 };
 
@@ -48,10 +49,28 @@ describe("agent primitives", () => {
 			expect(html).not.toContain("4 notifications");
 			expect(html).not.toContain("model codex");
 			expect(html).not.toContain("directory workbranch");
-			expect(html).toContain('aria-label="Refresh tasks"');
+			expect(html).not.toContain('aria-label="Refresh tasks"');
+			expect(html).toContain('aria-label="Check for updates"');
+			expect(html).toContain('class="agent-update-glyph"');
+			expect(html.match(/class="agent-control[ "]/g)).toHaveLength(2);
+			expect(html).not.toContain("data-update-available");
 			expect(html).toContain('aria-label="Quit Companion"');
 			expect(html).toContain('role="status"');
 		}
+	});
+
+	it("marks the update control when a newer version is available", () => {
+		const html = renderToStaticMarkup(
+			<AgentHeader
+				theme="claude"
+				summary={summary}
+				{...controls}
+				updateAvailable
+			/>,
+		);
+
+		expect(html).toContain('aria-label="Updates available"');
+		expect(html).toContain('data-update-available="true"');
 	});
 
 	it("uses singular inventory labels only for counts of one", () => {
