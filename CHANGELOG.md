@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.27.0](https://github.com/tkhwang/workbranch/compare/v2.26.0...v2.27.0) (2026-10-05)
+
+
+### Features
+
+* **update:** add update check and apply functionality ([afb3735](https://github.com/tkhwang/workbranch/commit/afb3735746466d57765f10720b8bcc6e5e62ea73))
+* **update:** add update check and apply functionality ([890e16d](https://github.com/tkhwang/workbranch/commit/890e16d3b7acfc65decef943a01bbf87990e4a36)), closes [#234](https://github.com/tkhwang/workbranch/issues/234)
+
 ## [2.26.0](https://github.com/tkhwang/workbranch/compare/v2.25.1...v2.26.0) (2026-10-05)
 
 
