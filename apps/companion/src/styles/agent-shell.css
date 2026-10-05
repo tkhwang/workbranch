@@ -212,3 +212,47 @@
 		display: block;
 	}
 }
+
+.agent-control-update {
+	position: relative;
+}
+
+/* arrow.down.circle drawn from text so it matches the outline ⏻. */
+.agent-update-glyph {
+	align-items: center;
+	border: 1.5px solid currentColor;
+	border-radius: 50%;
+	box-sizing: border-box;
+	display: inline-flex;
+	font-size: 0.72em;
+	font-weight: 700;
+	height: 1.05em;
+	justify-content: center;
+	line-height: 1;
+	width: 1.05em;
+}
+
+.agent-control-update[data-update-available="true"] {
+	color: var(--notify);
+}
+
+.agent-control-update[data-update-available="true"]::after {
+	background: var(--notify);
+	border-radius: 50%;
+	content: "";
+	height: 6px;
+	position: absolute;
+	right: 3px;
+	top: 3px;
+	width: 6px;
+}
+
+.update-panel {
+	margin-bottom: 16px;
+	word-break: keep-all;
+}
+
+.update-panel .connections-heading .connection-actions {
+	flex: 0 0 auto;
+	flex-wrap: nowrap;
+}

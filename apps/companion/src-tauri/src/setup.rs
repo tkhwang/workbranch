@@ -13,10 +13,10 @@ use std::{
 };
 use tauri::{AppHandle, Emitter};
 
-const FORMULA: &str = "tkhwang/tap/workbranch";
+pub(crate) const FORMULA: &str = "tkhwang/tap/workbranch";
 const OUTPUT_LIMIT: usize = 1_048_576;
 static ACTION_RUNNING: AtomicBool = AtomicBool::new(false);
-type Log = Arc<dyn Fn(&str) + Send + Sync>;
+pub(crate) type Log = Arc<dyn Fn(&str) + Send + Sync>;
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum Provider {
@@ -80,7 +80,7 @@ pub(crate) struct SetupStatus {
     cli: CliStatus,
     agents: Vec<AgentStatus>,
 }
-fn path_env() -> Result<std::ffi::OsString, String> {
+pub(crate) fn path_env() -> Result<std::ffi::OsString, String> {
     let home = std::env::var_os("HOME").map(PathBuf::from);
     let base = gui_safe_path(std::env::var_os("PATH").as_deref(), home.as_deref())
         .map_err(|e| e.to_string())?;
@@ -106,7 +106,7 @@ fn executable(path: &Path) -> bool {
         true
     }
 }
-fn find_program(name: &str) -> Option<PathBuf> {
+pub(crate) fn find_program(name: &str) -> Option<PathBuf> {
     std::env::split_paths(&path_env().ok()?)
         .map(|p| p.join(name))
         .find(|p| executable(p))
@@ -135,7 +135,12 @@ fn reader(mut pipe: impl Read + Send + 'static, log: Log) -> std::thread::JoinHa
         result
     })
 }
-fn execute(bin: &Path, args: &[&str], timeout: Duration, log: Log) -> Result<RunResult, String> {
+pub(crate) fn execute(
+    bin: &Path,
+    args: &[&str],
+    timeout: Duration,
+    log: Log,
+) -> Result<RunResult, String> {
     let mut command = Command::new(bin);
     command
         .args(args)
@@ -371,11 +376,18 @@ fn hook_arguments(
     }
     Ok(args)
 }
-struct ActionGuard;
+pub(crate) struct ActionGuard(());
 impl Drop for ActionGuard {
     fn drop(&mut self) {
         ACTION_RUNNING.store(false, Ordering::Release);
     }
+}
+/// Serializes every Homebrew or hook mutation the Companion starts.
+pub(crate) fn begin_action() -> Result<ActionGuard, String> {
+    ACTION_RUNNING
+        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+        .map(|_| ActionGuard(()))
+        .map_err(|_| "다른 설치 또는 연결 작업이 진행 중입니다.".into())
 }
 #[tauri::command]
 pub(crate) async fn setup_status() -> Result<SetupStatus, String> {
@@ -392,13 +404,7 @@ pub(crate) async fn setup_action(
     if operation_id.len() > 80 {
         return Err("Invalid operation id".into());
     }
-    if ACTION_RUNNING
-        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-        .is_err()
-    {
-        return Err("다른 설치 또는 연결 작업이 진행 중입니다.".into());
-    }
-    let guard = ActionGuard;
+    let guard = begin_action()?;
     tauri::async_runtime::spawn_blocking(move || {
         let _guard = guard;
         let log: Log = Arc::new(move |text| {

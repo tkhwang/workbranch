@@ -103,6 +103,13 @@ export async function onRootChanged(
 	return listen<string>("roots-changed", (event) => callback(event.payload));
 }
 
+/** The window hides on blur, so each focus is the tray opening it. */
+export async function onWindowFocused(
+	callback: () => void,
+): Promise<() => void> {
+	return listen("tauri://focus", () => callback());
+}
+
 export async function refreshRuntime(): Promise<
 	readonly import("../domain/model").AgentSession[]
 > {
@@ -187,4 +194,30 @@ export async function onSetupProgress(
 				receive(event.payload.text);
 		},
 	);
+}
+export async function checkUpdates(
+	fetch: boolean,
+): Promise<import("../application/updates").UpdateStatus> {
+	return invoke("update_check", { fetch });
+}
+export async function applyUpdates(
+	targets: readonly import("../application/updates").UpdateTarget[],
+	operationId: string,
+): Promise<import("../application/updates").UpdateRunResult> {
+	return invoke("update_apply", { targets, operationId });
+}
+export async function onUpdateProgress(
+	operationId: string,
+	receive: (text: string) => void,
+): Promise<() => void> {
+	return listen<{ operationId: string; text: string }>(
+		"update-progress",
+		(event) => {
+			if (event.payload.operationId === operationId)
+				receive(event.payload.text);
+		},
+	);
+}
+export async function relaunchCompanion(): Promise<void> {
+	await invoke("relaunch_companion");
 }

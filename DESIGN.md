@@ -53,7 +53,7 @@
 - Primary navigation: an inset floating terminal tab bar anchored to the viewport bottom with three destinations: Main, Activity, Settings.
 - Core screens: Main runtime-grouped workspace view, Activity report, Settings preferences view.
 - Content hierarchy:
-  1. Compact global inventory (`projects · tasks`) and icon-only refresh.
+  1. Compact global inventory (`projects · tasks`) and two icon-only controls: update check and quit. Opening the window from the tray refreshes everything, so there is no manual refresh control.
   2. Active view content.
   3. Main view: optional weekly limits, runtime session counts, a `내 응답 대기 | 실행 중 | 턴 종료 · 검토` kanban board, then a `WORKSPACES` inventory for session-less, unknown and inactive tasks. Every card shows IDE/Terminal/Finder launchers and repo/branch Git facts without expanding; expanding adds last commits and session request/activity/response excerpts. Base repositories remain in a supporting disclosure.
   4. Activity view: existing day/three-day calendar, session selection, and reload behavior inside the agent shell.
@@ -79,11 +79,13 @@
 - New/changed components:
   - shared `AgentShell` that applies `claude` or `codex` to all views,
   - shared expanded `AgentHeader` for Main, Activity, and Settings with one theme-neutral text anatomy,
+  - update control before quit: a text `↓` inside a 1.5px circular border (`arrow.down.circle`, download the new version) so it pairs with the outline `⏻`; after a check finds an installed package outdated it turns `--notify` with a 6px dot and its label becomes `Updates available`,
+  - `UpdatePanel` below the header (opened by the update control, closed explicitly): CLI and Companion rows with installed/latest versions, the running Companion version, one update action whose label names the restart, and the shared connection log disclosure,
   - `AgentTabs` as an inset floating bottom terminal navigation,
   - shared `TerminalPanel`, `PromptLine`, and `StatusToken` primitives,
   - compact global inventory summary limited to project and task counts,
   - `StageBoard` renders runtime state as kanban columns: waiting (`내 응답 대기`), running (`실행 중`) and finished (`턴 종료 · 검토`). Unknown/session-less and inactive tasks move to the `WORKSPACES` inventory below the board. Cards remount when they change columns, so expanded keys and the open note draft live in `StageBoard` state and survive column moves,
-  - top toolbar with icon-only refresh/quit controls and screen-reader-only live status,
+  - top toolbar with icon-only update/quit controls and screen-reader-only live status,
   - Settings view preferences panel,
   - Settings preference sections always use the Claude Code `fieldset`/`legend` anatomy in both themes; the selected theme still owns colors and control state,
   - Activity report view,
@@ -186,6 +188,8 @@
 - 2026-08-31 (idle inventory + brief summary): Replaced the aggregate `IDLE N` footer with an always-visible compact IDLE section for every successfully loaded clean todo/done task, preserving repo-bearing IDE and task-root Terminal/Finder actions while disabling IDE for repo-less tasks. Repo commit lines use a git-commit icon plus subject/relative time with tooltip and accessible context. Current work resolves as checklist item, then the one-line brief summary parsed from directly below `status:`, then a distinct Plan title. Newly generated task guidance requires agents to maintain that summary; existing workspaces are not migrated.
 - 2026-09-22 (weekly limit gauge): Added an optional `WEEKLY LIMITS` panel between the agent header and the worktree status board plus a Settings section for weekly-limit accounts. Users record each coding-agent account's next reset from `/usage` as a `datetime-local` anchor stored in `companion-limits.json`; the gauge draws every account's current seven-day window on a shared `now − 7d … now + 7d` axis with a fixed centre now line, remaining time, reset weekday/time, and FRESH/SOON pills. Alternatives rejected in review: a per-account ruler with a moving needle, a today-centred calendar-column axis, and weekday+time input. The gauge is time-based only and never reads actual usage.
 
+- 2026-10-05 (update check): Added a header update control and an `UpdatePanel` that reuses the connection-step anatomy. The check is click-only because it runs `brew update`; the dot appears only after a check found an installed, outdated package. The single update button upgrades the CLI before the Companion and says `업데이트 후 재시작` whenever the Companion will restart.
+- 2026-10-05 (two-icon header): Removed the `↻` refresh control; fs watches, the 1s runtime poll and the 5-minute heartbeat already cover routine changes, and the window now refreshes everything when the tray opens it, which also covers newly registered projects and retry after errors. The header keeps `update | quit`. The update icon became a CSS-ringed `↓` after `↥`/`⤒` read too small, filled `⬆︎` outweighed `⏻`, and `⭱`/`⮉` depended on non-system fonts. `↓` reads as downloading the new version, like the `↓N` behind fact; `↻` was rejected because it meant refresh-tasks until now, while this control runs a slow, networked `brew update`.
 
 ## Agent runtime surface (0060)
 
