@@ -39,6 +39,20 @@ main[data-theme="claude"] {
 	--cal-bg-4: rgba(224, 175, 104, 0.18);
 	--cal-bg-5: rgba(187, 154, 247, 0.18);
 	--cal-bg-6: rgba(247, 118, 142, 0.18);
+	--runtime-waiting: #e3a17b;
+	--runtime-waiting-soft: rgba(227, 161, 123, 0.16);
+	--runtime-running: #74c99b;
+	--runtime-running-soft: rgba(116, 201, 155, 0.14);
+	--runtime-finished: #dfc075;
+	--runtime-finished-soft: rgba(223, 192, 117, 0.14);
+	--runtime-unknown: #93939e;
+	--runtime-waiting-ring: rgba(227, 161, 123, 0.34);
+	--provider-claude: #d97757;
+	--provider-claude-line: rgba(217, 119, 87, 0.5);
+	--provider-codex: #5cc2e0;
+	--provider-codex-line: rgba(92, 194, 224, 0.45);
+	--provider-grok: #c7c7d1;
+	--provider-grok-line: rgba(199, 199, 209, 0.42);
 }
 
 main[data-theme="codex"] {
@@ -82,6 +96,20 @@ main[data-theme="codex"] {
 	--cal-bg-4: rgba(167, 167, 167, 0.18);
 	--cal-bg-5: rgba(242, 160, 160, 0.18);
 	--cal-bg-6: rgba(187, 154, 247, 0.18);
+	--runtime-waiting: #e3a17b;
+	--runtime-waiting-soft: rgba(227, 161, 123, 0.16);
+	--runtime-running: #74c99b;
+	--runtime-running-soft: rgba(116, 201, 155, 0.14);
+	--runtime-finished: #dfc075;
+	--runtime-finished-soft: rgba(223, 192, 117, 0.14);
+	--runtime-unknown: #93939e;
+	--runtime-waiting-ring: rgba(227, 161, 123, 0.34);
+	--provider-claude: #d97757;
+	--provider-claude-line: rgba(217, 119, 87, 0.5);
+	--provider-codex: #5cc2e0;
+	--provider-codex-line: rgba(92, 194, 224, 0.45);
+	--provider-grok: #c7c7d1;
+	--provider-grok-line: rgba(199, 199, 209, 0.42);
 }
 
 main[data-font-size="small"] {

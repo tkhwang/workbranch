@@ -55,7 +55,7 @@
 - Content hierarchy:
   1. Compact global inventory (`projects · tasks`) and icon-only refresh.
   2. Active view content.
-  3. Main view: optional weekly limits, runtime session counts and priority-grouped workspace rows. Expand a workspace for session request/activity/response and Git facts. Base repositories remain in a supporting disclosure.
+  3. Main view: optional weekly limits, runtime session counts, a `내 응답 대기 | 실행 중 | 턴 종료 · 검토` kanban board, then a `WORKSPACES` inventory for session-less, unknown and inactive tasks. Every card shows IDE/Terminal/Finder launchers and repo/branch Git facts without expanding; expanding adds last commits and session request/activity/response excerpts. Base repositories remain in a supporting disclosure.
   4. Activity view: existing day/three-day calendar, session selection, and reload behavior inside the agent shell.
   5. Settings view: launch-at-login, font, text size, agent theme, and weekly limit account controls (label plus next reset `datetime-local`).
   6. Screen-reader live status in the agent shell; routine `Updated`/`Ready` text stays out of the visible header.
@@ -72,7 +72,7 @@
 - Spacing/layout rhythm: compact terminal rhythm, 8px grid, row-first grouping, prompt markers, and thin rules. Main, Activity, and Settings use the same expanded agent header so switching tabs does not shift the content vertically.
 - Shape/radius/elevation: 6px agent headers, 8px runtime task corners, 6px session panels, neutral tonal separation and thin borders. No card lift or decorative gradient.
 - Motion: 120ms press/reveal feedback only; respect reduced motion.
-- Imagery/iconography: compact state dots with text labels. Use existing IDE/Terminal/Finder icons in session details; no decorative illustrations or task-complete checkmarks.
+- Imagery/iconography: compact state dots with text labels. Use existing IDE/Terminal/Finder icons on the first line of every runtime card; no decorative illustrations or task-complete checkmarks.
 
 ## Components
 - Existing components to reuse: action buttons, `TerminalPanel`, `PromptLine`, `StatusToken`, activity calendar behavior, and settings preference controls.
@@ -82,7 +82,7 @@
   - `AgentTabs` as an inset floating bottom terminal navigation,
   - shared `TerminalPanel`, `PromptLine`, and `StatusToken` primitives,
   - compact global inventory summary limited to project and task counts,
-  - `StageBoard` groups workspaces by runtime priority: waiting, running, turn ended, unknown and inactive. Task nodes keep a stable parent/key so grouping updates preserve expanded details and editor state,
+  - `StageBoard` renders runtime state as kanban columns: waiting (`내 응답 대기`), running (`실행 중`) and finished (`턴 종료 · 검토`). Unknown/session-less and inactive tasks move to the `WORKSPACES` inventory below the board. Cards remount when they change columns, so expanded keys and the open note draft live in `StageBoard` state and survive column moves,
   - top toolbar with icon-only refresh/quit controls and screen-reader-only live status,
   - Settings view preferences panel,
   - Settings preference sections always use the Claude Code `fieldset`/`legend` anatomy in both themes; the selected theme still owns colors and control state,
@@ -90,8 +90,8 @@
   - switch row for launch-at-login,
   - font select row,
   - agent theme segmented control (`Claude Code`, `Codex`) with Claude Code as the default and migration target,
-  - `RuntimeTask` shows request, provider/session counts, latest activity and last observation. Its disclosure contains session-specific excerpts, icon-only CLI launchers and repository note rows,
-  - `StageRepoRow` containing repo/branch identity, observable Git facts, last-commit relative time, and an inline note editor persisted in `companion-notes.json` by `repo:branch` key.
+  - `RuntimeCard` (variants `card` and `row`) puts the project name (ellipsized) beside the icon-only launcher group on line one, then the task name on its own full-width line, the latest request, a state line (pill for the lead state such as `권한 승인 대기`, `실행 중`, `턴 종료`, `중단됨`/`오류로 종료`; plain faint `+N <state>` / `관측 불명 N` text for other sessions; one provider icon per distinct provider, lead session first, and the observation age pushed to the right), and one excerpt line (tool activity, or the last response on review cards). The repo block names a shared branch once with a branch icon, then one row per repo with name, compact facts and the note button; repos on different branches show their branch under their own row. The disclosure adds last commits and per-session details. Single click toggles the disclosure; double-click opens the IDE for repo-bearing tasks; the card carries no hover tooltip,
+  - `StageRepoRow` containing repo/branch identity, compact Git facts (`●N` dirty files, `↑N`, `↓N`, and `CLEAN` only when none apply, with the full `DIRTY N FILES · BEHIND N` text in title/aria-label); in cards, repo names wrap at hyphens instead of truncating, last-commit relative time when expanded, and an inline note editor persisted in `companion-notes.json` by `repo:branch` key.
   - `BaseRepoRow` inside `StageBoard`, showing base branch, dirty and cached origin/base-branch differences. Quiet dots identify clean rows; notify/blocked tokens identify warning/problem rows. PULL/PUSH/CHECK pills are non-interactive guidance, not execution controls. Dirty + behind is warn/CHECK until clean, then PULL; ahead-only is PUSH, dirty-only has no pill. Missing, mismatch, divergence, missing remote and inspection errors use CHECK. Inspection errors show UNAVAILABLE with a safe reason, never sentinel CLEAN/0 facts, and do not hide healthy sibling repositories or tasks.
   - `WeeklyLimitGauge` above the stage board: a `WEEKLY LIMITS N` caption whose right side names the axis range (`9/15 – 9/29`), a hidden two-week date axis (`now − 7d … now + 7d`, local-midnight cells labelled by day number, today emphasized, labels thinned by axis width) and one row per configured account. Each row is a label, an SVG window bar (last reset → next reset, always half the axis, elapsed part filled, reset marks at both ends) crossed by the fixed centre now line, and `remaining · Day HH:MM` facts with a `FRESH` (first 24h) or `SOON` (last 24h) pill. Columns align through CSS `subgrid`; the panel is absent without accounts.
   - Settings `Weekly Limits` section: one row per account with a label input, a `datetime-local` next-reset input that shows the normalized upcoming reset, and a remove button, plus `+ Add account` (max 12) and a hint that the gauge is time-based.
@@ -107,8 +107,8 @@
 - Reduced motion and sensory considerations: disable transform transitions under `prefers-reduced-motion: reduce`.
 
 ## Responsive behavior
-- Supported breakpoints/devices: the native menu popover opens at 520×760, remains resizable, and cannot resize below 460px wide.
-- Layout adaptations: the shared expanded header keeps its internal columns consistent on every tab. Stage groups remain vertical at every supported width. Task actions stay compact on the task line where space allows and wrap without horizontal overflow at 460px. Repo/fact/commit/note rows use `min-width: 0`; long task, repo, branch, note, and last-commit strings ellipsize with complete values in `title`/accessibility data.
+- Supported breakpoints/devices: the native menu popover opens at 860×760, remains resizable, and cannot resize below 460px wide.
+- Layout adaptations: the shared expanded header keeps its internal columns consistent on every tab. The runtime board is an inline-size container: at 720px of board width and above, the three kanban columns sit side by side and the `WORKSPACES` inventory uses two columns; below that, the same columns stack as lanes in the same order. Task actions stay compact on the task line where space allows and wrap without horizontal overflow at 460px. Repo/fact/commit/note rows use `min-width: 0`; long task, repo, branch, note, and last-commit strings ellipsize with complete values in `title`/accessibility data.
 - Base row facts use a bounded flexible grid track with ellipsis and complete title/aria text. At 480px and below, facts move to a bounded second line; state dots and action pills remain visible. Validate internal row clipping, not just document overflow, including long branch names and the largest font setting.
 - Touch/hover differences: hover is enhancement only; single click toggles task session details. Explicit launcher buttons invoke configured tools.
 
@@ -118,7 +118,7 @@
 - Error: root-scoped error rows preserve partial-global-read details while successfully loaded stage groups remain visible. Operation failures such as refresh/action/preference/note errors also render a visible alert row while routine Ready/Updated statuses stay screen-reader-only.
 - Success: routine `Updated` / `Action complete` messages are not shown as a visible top-line chip; they remain available to assistive tech.
 - Disabled: disabled action has muted text and no press transform.
-- Stage-grouped task selection: pointer single click or native activation selects the task in place. Pointer double-click or command/control-enter opens the configured IDE target only for repo-bearing tasks. Repo-less tasks expose `NO REPOSITORIES`, disabled IDE, and enabled Terminal/Finder actions. Selection no longer synchronizes to a second surface or calls `scrollIntoView`.
+- Runtime card selection: pointer single click or native activation selects the task in place and toggles its details. Pointer double-click opens the configured IDE target only for repo-bearing tasks and leaves the disclosure as it was; keyboard users use the IDE launcher button. Repo-less tasks expose `NO REPOSITORIES`, disabled IDE, and enabled Terminal/Finder actions. Selection no longer synchronizes to a second surface or calls `scrollIntoView`.
 - Repo note editing: each repo/branch exposes one edit button. Opening autofocuses the textarea; command/control-enter saves, Escape cancels and restores the prior value, blur saves, and saving blank text removes the key. Notes persist in `companion-notes.json` under `repo:branch` and survive task/worktree removal.
 - Weekly limit accounts: edits save immediately through the `companion-limits.json` store queue and restore the previous list when a save fails. A blank label displays as `Account N`; an empty or unparsable `datetime-local` value is ignored; a stored next reset that has already passed (or lies more than a week ahead) is normalized onto its weekly cadence for display and for the gauge without rewriting the file. The gauge recomputes every 60 seconds without animation.
 - Theme selection: Settings is the only visible theme switch surface. Selection applies to every view immediately and persists through the existing preference store. Unsupported and legacy theme values migrate to Claude Code.
@@ -136,7 +136,7 @@
 - Compatibility constraints: schema v1 adds optional project-level `baseRepos`; each present base repo has ten required fields including nullable `inspectionError`. Missing `baseRepos` from older CLI output maps to an empty group. Tauri command shape and Rust ports remain unchanged; Companion delegates configured IDE/path behavior to the existing task-level launcher commands. Status reads never fetch; pills reflect cached remote-tracking refs rather than guaranteeing the next Git command can execute.
 - Layout constraints: the weekly limit table relies on CSS `subgrid` (available in the WebKit shipped with the macOS 13.0 minimum system version) so the axis header and account rows share columns, and the date axis is a size container whose `@container` queries thin the date labels to every other or every fourth day as the axis narrows; that surface avoids `color-mix`.
 - Scope constraints: do not add keyboard shortcuts or display shortcut hints for behavior that does not exist.
-- Test/screenshot expectations: cover both theme variants, the 520px primary and 460px minimum boundaries, lifecycle-ordered stage groups, current work, repo facts, note edit/save/cancel/delete, task selection/actions, and Main/Activity/Settings shell contracts with Vitest. Run typecheck, lint, Vite build, Tauri build, then inspect both themes at both widths before final handoff.
+- Test/screenshot expectations: cover both theme variants, the 860px primary and 460px minimum boundaries, lifecycle-ordered stage groups, current work, repo facts, note edit/save/cancel/delete, task selection/actions, and Main/Activity/Settings shell contracts with Vitest. Run typecheck, lint, Vite build, Tauri build, then inspect both themes at both widths before final handoff.
 
 ## Open questions
 - [ ] Whether a later release should restore a light appearance as a separate axis after the two fixed-dark agent themes ship.
@@ -144,6 +144,7 @@
 
 
 ## Direction revision
+- 2026-10-05 (runtime kanban, 0061): Main renders hook runtime state as `내 응답 대기 | 실행 중 | 턴 종료 · 검토` kanban columns (BITL-style waiting/running/needs-review) in an 860px default window, stacking as lanes below 720px of board width. IDE/Terminal/Finder launchers and repo/branch facts move from the disclosure to every card's always-visible area because task-level IDE launch is a primary job. Session-less, unknown and inactive tasks stay launchable in a `WORKSPACES` inventory. Supersedes 0060's single-column, launchers-in-details placement.
 - 2026-10-05: Hook-driven runtime groups replace manual brief/stage reporting; see 0060.
 
 - 2026-09-07 (base repo status group): Added compact `00 BASE` above PLAN using the existing stage header and theme tokens. Repo-local inspection errors remain visible without hiding healthy data. Dirty + behind advises CHECK before PULL. Full facts remain accessible while bounded grid tracks prevent silent clipping at 520px/460px.
@@ -194,6 +195,10 @@ Compact priority groups show request-first titles, provider/repository identity 
 
 Git facts, base repositories, repo notes and launchers remain supporting details. Runtime reads have their own coalesced polling path and never trigger a Git refresh. Migration discovery renders the CLI dry-run result and its action invokes the same CLI apply path, reporting errors and retry state. Legacy agent sessions must restart to reload guidance after migration.
 
+
+## Runtime kanban (0061)
+
+Columns come straight from the existing runtime roles; no plan/execution phase is inferred. A task appears once, in the column of its representative role (waiting > running > finished), and other observed sessions surface as `+N <state>` chips. Stale or uncertain observations never enter a live column: they stay in `WORKSPACES` tagged `관측 불명`, beside `세션 없음` and `비활성`. Card borders take a faint tint of the lead session's provider (`--provider-claude-line` orange, `--provider-codex-line` cyan, `--provider-grok-line` silver); waiting cards add an outer `--runtime-waiting-ring` instead of recolouring the border, so provider and attention read together. Inventory rows stay untinted. Review cards prefer the last response excerpt over the last tool activity. Runtime state colours are theme tokens (`--runtime-waiting`, `--runtime-running`, `--runtime-finished`, `--runtime-unknown` and their soft fills) shared by both themes. Providers render as a 14px `ProviderIcon` instead of names: simplified marks (Claude spark, Codex hexagon, Grok slashed ring) coloured with the matching `--provider-claude`, `--provider-codex` and `--provider-grok` tokens, each with a `title` and `role="img"` accessible name (`Claude Code`, `Codex`, `Grok Build`). They are not brand artwork.
 
 ## Onboarding and Settings connections
 
