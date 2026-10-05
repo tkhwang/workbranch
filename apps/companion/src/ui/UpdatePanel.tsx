@@ -6,6 +6,7 @@ import {
 	updateActionLabel,
 	updateTargets,
 } from "../application/updates";
+import { ProgressButton } from "./ProgressButton";
 import { TerminalPanel } from "./TerminalPanel";
 
 type Props = {
@@ -50,9 +51,14 @@ export function UpdatePanel({
 			<div className="connections-heading">
 				<p>Homebrew로 설치한 CLI와 Companion의 최신 버전을 확인합니다.</p>
 				<div className="connection-actions">
-					<button type="button" disabled={busy} onClick={onCheck}>
-						{checking ? "확인 중…" : "다시 확인"}
-					</button>
+					<ProgressButton
+						pending={checking}
+						pendingLabel="확인 중…"
+						disabled={busy}
+						onClick={onCheck}
+					>
+						다시 확인
+					</ProgressButton>
 					<button type="button" disabled={updating} onClick={onClose}>
 						닫기
 					</button>
@@ -116,9 +122,14 @@ export function UpdatePanel({
 						</section>
 						{targets.length > 0 ? (
 							<div className="connection-actions">
-								<button type="button" disabled={busy} onClick={onApply}>
+								<ProgressButton
+									pending={updating || restarting}
+									pendingLabel={restarting ? "재시작 중…" : "업데이트 중…"}
+									disabled={busy}
+									onClick={onApply}
+								>
 									{updateActionLabel(targets)}
-								</button>
+								</ProgressButton>
 							</div>
 						) : !checking ? (
 							<p role="status">업데이트할 항목이 없습니다.</p>

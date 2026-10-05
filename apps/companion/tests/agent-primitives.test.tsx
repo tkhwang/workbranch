@@ -1,8 +1,10 @@
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { MenuSummary } from "../src/application/state";
 import { AgentHeader } from "../src/ui/AgentHeader";
 import { AgentTabs } from "../src/ui/AgentTabs";
+import { ProgressButton } from "../src/ui/ProgressButton";
 import { PromptLine } from "../src/ui/PromptLine";
 import { StatusToken } from "../src/ui/StatusToken";
 import { TerminalPanel } from "../src/ui/TerminalPanel";
@@ -142,5 +144,50 @@ describe("agent primitives", () => {
 
 		expect(html).toContain("실행 중");
 		expect(html).toContain('aria-hidden="true"');
+	});
+});
+
+describe("progress button", () => {
+	it("keeps its label until the action runs, then shows that it is running", () => {
+		const idle = renderToStaticMarkup(
+			<ProgressButton
+				pending={false}
+				pendingLabel="연결 중…"
+				onClick={() => {}}
+			>
+				연결
+			</ProgressButton>,
+		);
+		expect(idle).toBe('<button type="button">연결</button>');
+
+		const running = renderToStaticMarkup(
+			<ProgressButton pending pendingLabel="연결 중…" onClick={() => {}}>
+				연결
+			</ProgressButton>,
+		);
+		expect(running).toContain('aria-busy="true"');
+		expect(running).toContain('disabled=""');
+		expect(running).toContain(
+			'<span aria-hidden="true" class="button-spinner"></span>연결 중…',
+		);
+		expect(running).not.toContain(">연결<");
+	});
+
+	it("mutes waiting buttons but keeps the running one legible and still under reduced motion", () => {
+		const chrome = readFileSync("src/styles/chrome.css", "utf8");
+		const motion = readFileSync("src/styles/motion.css", "utf8");
+
+		expect(chrome).toMatch(
+			/button:disabled,\s*select:disabled\s*\{[^}]*color:\s*var\(--faint\)[^}]*opacity:\s*0\.55/s,
+		);
+		expect(chrome).toMatch(
+			/button\[aria-busy="true"\]:disabled\s*\{[^}]*color:\s*var\(--text\)[^}]*opacity:\s*1;/s,
+		);
+		expect(chrome).toMatch(
+			/\.button-spinner\s*\{[^}]*animation:\s*button-spin/s,
+		);
+		expect(motion).toMatch(
+			/prefers-reduced-motion: reduce[\s\S]*\.button-spinner\s*\{\s*animation:\s*none;/,
+		);
 	});
 });

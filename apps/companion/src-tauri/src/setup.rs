@@ -2,12 +2,15 @@ use crate::{RunResult, process_env::gui_safe_path, workbranch_bin::resolve_workb
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
+    collections::HashSet,
+    ffi::{OsStr, OsString},
     io::Read,
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::{
-        Arc,
+        Arc, OnceLock,
         atomic::{AtomicBool, Ordering},
+        mpsc,
     },
     time::{Duration, Instant},
 };
@@ -15,6 +18,8 @@ use tauri::{AppHandle, Emitter};
 
 pub(crate) const FORMULA: &str = "tkhwang/tap/workbranch";
 const OUTPUT_LIMIT: usize = 1_048_576;
+const SHELL_PATH_MARKER: &str = "__WORKBRANCH_PATH__";
+const SHELL_PATH_TIMEOUT: Duration = Duration::from_secs(10);
 static ACTION_RUNNING: AtomicBool = AtomicBool::new(false);
 pub(crate) type Log = Arc<dyn Fn(&str) + Send + Sync>;
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
@@ -80,15 +85,129 @@ pub(crate) struct SetupStatus {
     cli: CliStatus,
     agents: Vec<AgentStatus>,
 }
-pub(crate) fn path_env() -> Result<std::ffi::OsString, String> {
+pub(crate) fn path_env() -> Result<OsString, String> {
     let home = std::env::var_os("HOME").map(PathBuf::from);
     let base = gui_safe_path(std::env::var_os("PATH").as_deref(), home.as_deref())
         .map_err(|e| e.to_string())?;
     let mut paths = std::env::split_paths(&base).collect::<Vec<_>>();
+    // Agents installed through version managers (nvm, bun, pnpm, ...) are only
+    // on the shell profile's PATH, which a Finder or login-item launch never
+    // inherits. Appended so existing brew/CLI lookups keep their order.
+    if let Some(profile) = login_shell_path() {
+        paths.extend(std::env::split_paths(profile));
+    }
     if let Some(home) = home {
         paths.push(home.join(".grok/bin"));
     }
+    let mut seen = HashSet::new();
+    paths.retain(|path| seen.insert(path.clone()));
     std::env::join_paths(paths).map_err(|e| e.to_string())
+}
+/// The interactive login shell's PATH, resolved once per launch. A slow or
+/// broken profile falls back to the GUI-safe PATH.
+fn login_shell_path() -> Option<&'static OsStr> {
+    static PROFILE_PATH: OnceLock<Option<OsString>> = OnceLock::new();
+    PROFILE_PATH
+        .get_or_init(|| {
+            // Tests must not depend on the developer's shell profile.
+            if cfg!(test) {
+                return None;
+            }
+            let shell = PathBuf::from(std::env::var_os("SHELL")?);
+            shell_profile_path(&shell, SHELL_PATH_TIMEOUT)
+        })
+        .as_deref()
+}
+fn shell_profile_path(shell: &Path, timeout: Duration) -> Option<OsString> {
+    if !shell.is_absolute() || !executable(shell) {
+        return None;
+    }
+    // printenv reports PATH as child processes see it, whatever list syntax
+    // the shell uses; the markers skip anything the profile prints.
+    let script =
+        format!("echo {SHELL_PATH_MARKER}; /usr/bin/printenv PATH; echo {SHELL_PATH_MARKER}");
+    let mut command = Command::new(shell);
+    command
+        .args(["-ilc", &script])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    if let Some(home) = std::env::var_os("HOME") {
+        command.current_dir(home);
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        // SAFETY: setsid is async-signal-safe. The new session keeps an
+        // interactive profile off any controlling terminal, as on a Finder
+        // launch, and leads the process group the deadline kills.
+        unsafe {
+            command.pre_exec(|| {
+                if libc::setsid() == -1 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
+    }
+    let deadline = Instant::now() + timeout;
+    let mut child = command.spawn().ok()?;
+    let mut stdout = child.stdout.take()?;
+    let (sender, receiver) = mpsc::channel();
+    // A daemon started by the profile can hold the pipe open forever, so the
+    // reader stops at the closing marker and the deadline never waits on it.
+    std::thread::spawn(move || {
+        let mut output = Vec::new();
+        let mut buf = [0u8; 4096];
+        loop {
+            match stdout.read(&mut buf) {
+                Ok(0) | Err(_) => break,
+                Ok(n) => {
+                    output.extend_from_slice(&buf[..n]);
+                    let markers = String::from_utf8_lossy(&output)
+                        .matches(SHELL_PATH_MARKER)
+                        .count();
+                    if markers >= 2 || output.len() > OUTPUT_LIMIT {
+                        break;
+                    }
+                }
+            }
+        }
+        let _ = sender.send(output);
+    });
+    let output = receiver.recv_timeout(timeout).ok();
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(25)),
+            _ => {
+                #[cfg(unix)]
+                {
+                    // SAFETY: setsid above made the child lead its own process group.
+                    unsafe {
+                        libc::kill(-(child.id() as i32), libc::SIGKILL);
+                    }
+                }
+                let _ = child.kill();
+                let _ = child.wait();
+                break;
+            }
+        }
+    }
+    marked_path(&String::from_utf8_lossy(&output?))
+}
+fn marked_path(output: &str) -> Option<OsString> {
+    let mut sections = output.split(SHELL_PATH_MARKER);
+    sections.next()?;
+    let value = sections.next()?;
+    sections.next()?;
+    let paths = std::env::split_paths(value.trim())
+        .filter(|path| path.is_absolute())
+        .collect::<Vec<_>>();
+    if paths.is_empty() {
+        return None;
+    }
+    std::env::join_paths(paths).ok()
 }
 fn executable(path: &Path) -> bool {
     if !path.is_file() {
@@ -563,6 +682,81 @@ mod pipe_deadline_tests {
         )?;
         assert_eq!(result.exit_code, 124);
         assert!(started.elapsed() < Duration::from_secs(1));
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod login_shell_path_tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[cfg(unix)]
+    fn fake_shell(body: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
+        use std::os::unix::fs::PermissionsExt;
+        let stamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+        let dir = std::env::temp_dir().join(format!("workbranch-login-shell-{stamp}"));
+        std::fs::create_dir_all(&dir)?;
+        let shell = dir.join("shell");
+        std::fs::write(&shell, format!("#!/bin/sh\n{body}\n"))?;
+        let mut permissions = std::fs::metadata(&shell)?.permissions();
+        permissions.set_mode(0o755);
+        std::fs::set_permissions(&shell, permissions)?;
+        Ok(shell)
+    }
+
+    #[test]
+    fn marked_path_ignores_profile_output_and_relative_entries() {
+        let marker = SHELL_PATH_MARKER;
+        assert_eq!(
+            marked_path(&format!(
+                "motd\n{marker}\n/a/bin:relative:/b/bin\n{marker}\nbye\n"
+            )),
+            Some(OsString::from("/a/bin:/b/bin"))
+        );
+        assert_eq!(marked_path(&format!("{marker}\n/a/bin\n")), None);
+        assert_eq!(marked_path(&format!("{marker}\n\n{marker}\n")), None);
+        assert_eq!(marked_path("/a/bin"), None);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn profile_path_comes_from_the_shell_script() -> Result<(), Box<dyn std::error::Error>> {
+        // Stands in for `$SHELL -ilc <script>`: profile noise, then the script.
+        let shell = fake_shell(
+            r#"echo "profile noise"; PATH=/profile/bin:/usr/bin:/bin exec /bin/sh -c "$2""#,
+        )?;
+        assert_eq!(
+            shell_profile_path(&shell, Duration::from_secs(5)),
+            Some(OsString::from("/profile/bin:/usr/bin:/bin"))
+        );
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn hanging_profile_falls_back_at_the_deadline() -> Result<(), Box<dyn std::error::Error>> {
+        let shell = fake_shell("sleep 30")?;
+        let started = Instant::now();
+        assert_eq!(shell_profile_path(&shell, Duration::from_millis(200)), None);
+        assert!(started.elapsed() < Duration::from_secs(3));
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn daemon_holding_the_pipe_does_not_hide_the_path() -> Result<(), Box<dyn std::error::Error>> {
+        // The profile leaves a process in another session with stdout open.
+        let shell = fake_shell(&format!(
+            "perl -e 'use POSIX; POSIX::setsid(); sleep 10' &\n\
+             echo {SHELL_PATH_MARKER}; echo /profile/bin; echo {SHELL_PATH_MARKER}"
+        ))?;
+        let started = Instant::now();
+        assert_eq!(
+            shell_profile_path(&shell, Duration::from_secs(5)),
+            Some(OsString::from("/profile/bin"))
+        );
+        assert!(started.elapsed() < Duration::from_secs(3));
         Ok(())
     }
 }

@@ -35,6 +35,8 @@ export type ConnectionState = {
 	readonly status: SetupStatus | null;
 	readonly loading: boolean;
 	readonly busy: SetupAction | null;
+	/** The action `error`/`notice` report on; null when a status check failed. */
+	readonly lastAction: SetupAction | null;
 	readonly error: string | null;
 	readonly logs: string;
 	readonly notice: string | null;
@@ -44,6 +46,7 @@ export const EMPTY_CONNECTION_STATE: ConnectionState = {
 	status: null,
 	loading: true,
 	busy: null,
+	lastAction: null,
 	error: null,
 	logs: "",
 	notice: null,
@@ -99,6 +102,7 @@ export function createConnectionController(
 			if (request === generation && !disposed)
 				update({
 					loading: false,
+					lastAction: null,
 					error: "설치 상태를 확인하지 못했습니다. 다시 확인을 눌러 주세요.",
 				});
 		}
@@ -108,6 +112,7 @@ export function createConnectionController(
 		++generation;
 		update({
 			busy: action,
+			lastAction: action,
 			loading: false,
 			error: null,
 			notice: null,
@@ -220,6 +225,14 @@ export function cliSetupAction(
 ): "installCli" | "updateCli" | "repairCli" {
 	if (status.formulaInstalled !== true) return "installCli";
 	return status.cli.state === "runtimeUnavailable" ? "repairCli" : "updateCli";
+}
+/** The CLI step or agent row an action belongs to. */
+export function setupTarget(action: SetupAction): "cli" | Provider {
+	return "provider" in action ? action.provider : "cli";
+}
+/** Same button: kind and target match; an approved Grok source does not matter. */
+export function sameSetupAction(a: SetupAction, b: SetupAction): boolean {
+	return a.kind === b.kind && setupTarget(a) === setupTarget(b);
 }
 export function receiptState(
 	observedAt: number,
