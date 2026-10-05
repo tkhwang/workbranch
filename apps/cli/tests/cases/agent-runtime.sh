@@ -50,6 +50,53 @@ EOF_PROVIDER
   assert_contains "$calls" 'plugin remove workbranch-agent-events@workbranch-runtime'
 }
 
+test_hooks_replace_stale_provider_registrations() {
+  set -e
+  new_fixture
+  local provider grok_source
+  mkdir -p "$TMP_ROOT/hooks-bin"
+  export WORKBRANCH_RUNTIME_DIR="$TMP_ROOT/runtime"
+  export WORKBRANCH_RUNTIME_BIN="$REPO_ROOT/apps/agent-runtime/target/debug/workbranch-agent-runtime"
+  for provider in claude codex; do
+    export WORKBRANCH_HOOK_TEST_LOG="$TMP_ROOT/$provider-calls"
+    cat > "$TMP_ROOT/hooks-bin/$provider" <<'EOF_PROVIDER'
+#!/bin/sh
+printf '%s\n' "$*" >> "$WORKBRANCH_HOOK_TEST_LOG"
+case "$*" in 'plugin marketplace remove '*) echo 'not configured' >&2; exit 1 ;; esac
+EOF_PROVIDER
+    chmod +x "$TMP_ROOT/hooks-bin/$provider"
+    PATH="$TMP_ROOT/hooks-bin:$PATH" "$WORKBRANCH" hooks install --provider "$provider" >/dev/null
+    assert_contains "$(cat "$WORKBRANCH_HOOK_TEST_LOG")" 'plugin marketplace remove workbranch-runtime'
+    [ "$(grep -n 'marketplace remove' "$WORKBRANCH_HOOK_TEST_LOG" | cut -d: -f1)" -lt "$(grep -n 'marketplace add' "$WORKBRANCH_HOOK_TEST_LOG" | cut -d: -f1)" ] || fail "$provider stale marketplace must be removed before add"
+  done
+
+  # Grok keeps one install per source: after installing, two copies remain until cleared.
+  export WORKBRANCH_HOOK_TEST_LOG="$TMP_ROOT/grok-calls"
+  export WORKBRANCH_GROK_COPIES="$TMP_ROOT/grok-copies"
+  printf '2\n' > "$WORKBRANCH_GROK_COPIES"
+  cat > "$TMP_ROOT/hooks-bin/grok" <<'EOF_PROVIDER'
+#!/bin/sh
+printf '%s\n' "$*" >> "$WORKBRANCH_HOOK_TEST_LOG"
+copies=$(cat "$WORKBRANCH_GROK_COPIES")
+case "$*" in
+  'plugin list --json') i=0; while [ "$i" -lt "$copies" ]; do printf '{"name": "workbranch-agent-events-grok"}\n'; i=$((i + 1)); done ;;
+  'plugin uninstall '*) [ "$copies" -gt 0 ] || exit 1; echo $((copies - 1)) > "$WORKBRANCH_GROK_COPIES" ;;
+  'plugin install '*) [ "$copies" -gt 0 ] || echo 1 > "$WORKBRANCH_GROK_COPIES" ;;
+esac
+EOF_PROVIDER
+  chmod +x "$TMP_ROOT/hooks-bin/grok"
+  grok_source="$REPO_ROOT/integrations/agent-events/grok/plugins/workbranch-agent-events-grok"
+  PATH="$TMP_ROOT/hooks-bin:$PATH" "$WORKBRANCH" hooks install --provider grok --trust --expected-source "$grok_source" >/dev/null
+  [ "$(grep -c "^plugin install $grok_source --trust$" "$WORKBRANCH_HOOK_TEST_LOG")" -eq 2 ] || fail 'grok must reinstall after clearing stale copies'
+  assert_contains "$(cat "$WORKBRANCH_HOOK_TEST_LOG")" 'plugin uninstall workbranch-agent-events-grok'
+  [ "$(cat "$WORKBRANCH_GROK_COPIES")" = 1 ] || fail 'grok should end with exactly one install'
+
+  # A single, current install is left alone.
+  : > "$WORKBRANCH_HOOK_TEST_LOG"
+  PATH="$TMP_ROOT/hooks-bin:$PATH" "$WORKBRANCH" hooks install --provider grok --trust --expected-source "$grok_source" >/dev/null
+  assert_not_contains "$(cat "$WORKBRANCH_HOOK_TEST_LOG")" 'plugin uninstall'
+}
+
 test_installer_copies_runtime_collector_from_verified_local_build() {
   set -e
   new_fixture

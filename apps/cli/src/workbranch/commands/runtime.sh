@@ -63,6 +63,29 @@ cmd_capabilities() {
   printf '%s\n' '{"schemaVersion":1,"listSchemaVersion":2,"runtimeSchemaVersion":1,"grokTrustConfirmation":true,"providers":["claude","codex","grok"]}'
 }
 
+# Claude and Codex refuse to re-add a marketplace name from a different source
+# (e.g. an old dev checkout directory -> GitHub), so drop any previous
+# registration first. A missing registration is not an error.
+hooks_remove_marketplace() {
+  "$1" plugin marketplace remove "$2" >/dev/null 2>&1 || true
+}
+
+# Grok keeps one copy per install source, so switching sources would run the
+# hooks twice. Install first so a declined trust prompt leaves the existing copy
+# untouched; if older copies remain, clear every copy and install once more.
+hooks_grok_install() {
+  local install_source=$1 plugin=$2 trust=$3 count
+  local -a trust_args
+  trust_args=()
+  [ "$trust" -eq 1 ] && trust_args=(--trust)
+  grok plugin install "$install_source" ${trust_args[@]+"${trust_args[@]}"} || return
+  count=$(grok plugin list --json 2>/dev/null | grep -c "\"name\": *\"$plugin\"") || count=0
+  [ "$count" -gt 1 ] || return 0
+  info "Replacing $((count - 1)) Grok plugin install(s) from other sources: $plugin"
+  while grok plugin uninstall "$plugin" >/dev/null 2>&1; do count=$((count - 1)); [ "$count" -ge 0 ] || break; done
+  grok plugin install "$install_source" ${trust_args[@]+"${trust_args[@]}"} || return
+}
+
 cmd_hooks() {
   local action provider binary source self plugin trust expected_source install_source
   action=${1:-}; [ $# -gt 0 ] && shift
@@ -113,15 +136,16 @@ cmd_hooks() {
       "$binary" version >/dev/null || die "runtime collector unavailable"
       "$binary" register "$binary" || die "failed to register hook collector"
       if [ "$provider" = "grok" ]; then
-        if [ "$trust" -eq 1 ]; then grok plugin install "$install_source" --trust || return
-        else grok plugin install "$install_source" || return; fi
+        hooks_grok_install "$install_source" "$plugin" "$trust" || return
         grok plugin enable "$plugin" || return
       elif [ "$provider" = "claude" ]; then
+        hooks_remove_marketplace claude "${plugin#*@}"
         if [ -n "$source" ]; then claude plugin marketplace add "$source" || return
         else claude plugin marketplace add tkhwang/workbranch --sparse .claude-plugin integrations/agent-events/claude-code || return; fi
         claude plugin install "$plugin" || return
         claude plugin enable "$plugin" || return
       else
+        hooks_remove_marketplace codex "${plugin#*@}"
         if [ -n "$source" ]; then codex plugin marketplace add "$source" || return
         else codex plugin marketplace add tkhwang/workbranch --sparse .agents/plugins --sparse integrations/agent-events/codex || return; fi
         codex plugin add "$plugin" || return

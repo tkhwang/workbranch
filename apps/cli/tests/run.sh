@@ -32,6 +32,7 @@ main() {
   run_test test_grok_trust_requires_explicit_flag_and_matching_source
   run_test test_grok_hooks_use_own_plugin_without_trust_bypass
   run_test test_hooks_delegate_without_modifying_user_configuration
+  run_test test_hooks_replace_stale_provider_registrations
   run_test test_runtime_replaces_brief_and_migrates
   run_test test_generated_workbranch_is_up_to_date
   run_test test_run_test_output_uses_status_prefixes
