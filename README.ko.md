@@ -215,7 +215,7 @@ Workbranch Companion은 Main, Activity, Settings view를 제공하는 macOS menu
 - Settings: login 시 자동 실행, interface font와 글자 크기, Claude Code 또는 Codex theme, weekly limit 계정(라벨과 `/usage`에 표시된 다음 reset 날짜·시각), CLI/agent 연결 설정
 - 업데이트: header의 업데이트 버튼으로 업데이트 패널을 엽니다. Homebrew 확인은 요청할 때만 실행하고, 업데이트 버튼 하나로 CLI를 먼저 올린 뒤 Companion을 업데이트합니다. 설치·연결·업데이트 버튼은 실행 중 spinner를 보여주고, 결과는 해당 버튼 옆에 표시합니다
 
-Companion은 hook 기반 runtime snapshot과 Git 조회 결과를 별도로 사용합니다. `TASK-WORKBRANCH.md` 기록은 필요하지 않습니다. 설치 후 `workbranch hooks install --provider claude` 또는 `--provider codex`를 사용하고 provider의 hook trust를 확인하세요.
+Companion은 hook 기반 runtime snapshot과 Git 조회 결과를 별도로 사용합니다. `TASK-WORKBRANCH.md` 기록은 필요하지 않습니다. 설치 후 `workbranch hooks install --provider claude` 또는 `--provider codex`를 사용하고 provider의 hook trust를 확인하세요. Grok Build는 명시적인 신뢰 승인이 필요합니다. `workbranch hooks describe --provider grok`로 plugin source를 확인하고, 신뢰하는 경우에만 `workbranch hooks install --provider grok --trust`를 실행하세요. Companion의 Grok 연결 버튼도 같은 source를 먼저 보여줍니다. 자세한 내용은 [Companion 설치와 agent 연결](docs/usage.ko.md#companion-설치와-agent-연결)을 참고하세요.
 
 설치:
 

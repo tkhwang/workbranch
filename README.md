@@ -215,7 +215,7 @@ Workbranch Companion is a macOS menu bar app with Main, Activity, and Settings v
 - Settings: controls launch at login, the interface font and text size, the Claude Code or Codex theme, weekly limit accounts (a label plus the next reset date and time from `/usage`), and CLI/agent connections
 - Updates: the header's update button opens an update panel. It checks Homebrew only when you ask, and one update action upgrades the CLI before Companion. Setup and update buttons show a spinner while they run, and each result appears next to the button that ran it
 
-Companion reads hook-driven runtime snapshots separately from Git status. No `TASK-WORKBRANCH.md` reporting is required. Install hooks with `workbranch hooks install --provider claude` or `--provider codex`, then review provider hook trust.
+Companion reads hook-driven runtime snapshots separately from Git status. No `TASK-WORKBRANCH.md` reporting is required. Install hooks with `workbranch hooks install --provider claude` or `--provider codex`, then review provider hook trust. Grok Build needs explicit trust: inspect the plugin source with `workbranch hooks describe --provider grok`, and only if you trust it run `workbranch hooks install --provider grok --trust`. Companion's Grok connect button shows the same source first. See [Companion installation and agent connections](docs/usage.md#companion-installation-and-agent-connections).
 
 Install:
 
