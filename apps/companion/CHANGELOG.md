@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.26.1](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.26.0...workbranch-companion-v2.26.1) (2026-10-06)
+
+
+### Bug Fixes
+
+* **tray:** prevent app crash on monitor disconnect ([e3a7cc1](https://github.com/tkhwang/workbranch/commit/e3a7cc16df3cc92cb4e2c249217ccf86ba5927af))
+* **tray:** prevent app crash on monitor disconnect ([ac9ff4c](https://github.com/tkhwang/workbranch/commit/ac9ff4c2fbff75e16f4306d946c6fc9fa94b817c))
+
 ## [2.26.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.25.0...workbranch-companion-v2.26.0) (2026-10-06)
 
 
