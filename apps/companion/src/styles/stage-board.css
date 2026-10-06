@@ -1190,10 +1190,83 @@
 	}
 }
 
+.runtime-bases {
+	margin-top: 12px;
+}
+
 .runtime-bases summary {
+	align-items: center;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	box-sizing: border-box;
+	color: var(--muted);
 	cursor: pointer;
+	display: flex;
 	font-size: var(--fs-label);
-	padding: 10px 0;
+	font-weight: 600;
+	gap: 8px;
+	justify-content: space-between;
+	letter-spacing: 0.04em;
+	list-style: none;
+	padding: 8px 10px;
+	width: 100%;
+}
+
+.runtime-bases summary:hover {
+	color: inherit;
+}
+
+.runtime-bases-meta {
+	align-items: center;
+	display: inline-flex;
+	gap: 8px;
+}
+
+.runtime-bases-meta small {
+	font-size: var(--fs-label);
+	font-variant-numeric: tabular-nums;
+}
+
+.runtime-bases-chevron {
+	border-bottom: 1.5px solid currentColor;
+	border-right: 1.5px solid currentColor;
+	height: 5px;
+	transform: rotate(45deg) translate(-1px, -1px);
+	transition: transform 120ms ease;
+	width: 5px;
+}
+
+.runtime-bases[open] .runtime-bases-chevron {
+	transform: rotate(-135deg) translate(-1px, -1px);
+}
+
+.runtime-bases summary::-webkit-details-marker {
+	display: none;
+}
+
+.runtime-bases summary:hover,
+.runtime-bases[open] summary {
+	border-color: var(--muted);
+}
+
+.runtime-bases[open] summary {
+	margin-bottom: 8px;
+}
+
+.runtime-bases-issues {
+	border-radius: 999px;
+	font-weight: 700;
+	padding: 0 6px;
+}
+
+.runtime-bases summary[data-health="warn"] .runtime-bases-issues {
+	background: var(--notify-soft);
+	color: var(--notify);
+}
+
+.runtime-bases summary[data-health="bad"] .runtime-bases-issues {
+	background: var(--blocked-soft);
+	color: var(--blocked);
 }
 
 .runtime-migration {

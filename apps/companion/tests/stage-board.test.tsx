@@ -38,5 +38,11 @@ it("keeps base repository diagnostics available under runtime view", () => {
 	);
 	expect(html).toContain("CHECK");
 	expect(html).toContain("DIRTY 3 FILES");
-	expect(html).toContain("Base repositories");
+	expect(html).toContain("BASE REPOSITORIES · 새 workspace의 기준");
+	const summary = html.slice(
+		html.indexOf("<summary"),
+		html.indexOf("</summary>"),
+	);
+	expect(summary).toContain('data-health="warn"');
+	expect(summary).toContain('class="runtime-bases-issues"');
 });
