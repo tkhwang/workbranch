@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.26.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.25.0...workbranch-companion-v2.26.0) (2026-10-06)
+
+
+### Features
+
+* **runtime:** implement sorting for tasks and base repos ([60570a5](https://github.com/tkhwang/workbranch/commit/60570a5c2ada4946bc512cfa31c5db540863564f))
+* **runtime:** implement sorting for tasks and base repos ([7651d46](https://github.com/tkhwang/workbranch/commit/7651d46092c46456475b8f74119c859c8bb89077))
+
 ## [2.25.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.24.0...workbranch-companion-v2.25.0) (2026-10-05)
 
 
