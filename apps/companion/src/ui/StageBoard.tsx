@@ -1,9 +1,10 @@
 import { type MouseEvent, useEffect, useRef, useState } from "react";
 import { type RepoNotes, repoNoteKey } from "../application/notes";
-import type {
-	MainBaseRow,
-	MainStageGroup,
-	MainTaskRow,
+import {
+	compareMainTaskRows,
+	type MainBaseRow,
+	type MainStageGroup,
+	type MainTaskRow,
 } from "../application/state";
 import type {
 	AgentSession,
@@ -635,7 +636,16 @@ export function StageBoard(props: StageBoardProps) {
 	};
 	const rowsFor = (column: MatrixColumn): readonly MainTaskRow[] =>
 		props.groups.find((g) => g.column === column)?.rows ?? [];
-	const inventoryRows = [...rowsFor("unknown"), ...props.idleRows];
+	const inventoryRows = [...rowsFor("unknown"), ...props.idleRows].sort(
+		compareMainTaskRows,
+	);
+	const baseHealths = props.baseRows.map((row) => baseRepoHealth(row.repo));
+	const baseIssueCount = baseHealths.filter((h) => h !== "ok").length;
+	const baseHealth = baseHealths.includes("bad")
+		? "bad"
+		: baseIssueCount > 0
+			? "warn"
+			: "ok";
 	const sessions = [
 		...props.groups.flatMap((g) => g.rows),
 		...props.idleRows,
@@ -707,7 +717,18 @@ export function StageBoard(props: StageBoardProps) {
 			) : null}
 			{props.baseRows.length > 0 ? (
 				<details className="runtime-bases">
-					<summary>Base repositories · {props.baseRows.length}</summary>
+					<summary data-health={baseHealth}>
+						<span>BASE REPOSITORIES · 새 workspace의 기준</span>
+						<span className="runtime-bases-meta">
+							{baseIssueCount > 0 ? (
+								<span className="runtime-bases-issues">
+									{baseIssueCount} {baseIssueCount === 1 ? "issue" : "issues"}
+								</span>
+							) : null}
+							<small>{props.baseRows.length}</small>
+							<span aria-hidden="true" className="runtime-bases-chevron" />
+						</span>
+					</summary>
 					{props.baseRows.map((row) => (
 						<BaseRepoRow key={row.key} row={row} />
 					))}

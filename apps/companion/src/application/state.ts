@@ -62,6 +62,16 @@ export function runtimeRole(sessions: readonly AgentSession[]): MainRole {
 		return "unknown";
 	return "idle";
 }
+// Rows with sessions come first, most recent activity first; session-less
+// rows have no runtime signal, so they follow in alphabetical order.
+export function compareMainTaskRows(a: MainTaskRow, b: MainTaskRow): number {
+	const aHasSession = a.sessions.length > 0;
+	const bHasSession = b.sessions.length > 0;
+	if (aHasSession !== bHasSession) return aHasSession ? -1 : 1;
+	if (aHasSession && a.latestActivityAt !== b.latestActivityAt)
+		return b.latestActivityAt - a.latestActivityAt;
+	return a.task.name.localeCompare(b.task.name) || a.key.localeCompare(b.key);
+}
 export function buildMainViewModel(
 	state: GlobalState,
 	sessions: readonly AgentSession[] = [],
@@ -92,22 +102,26 @@ export function buildMainViewModel(
 			};
 		}),
 	);
-	rows.sort(
-		(a, b) =>
-			b.latestActivityAt - a.latestActivityAt || a.key.localeCompare(b.key),
-	);
+	rows.sort(compareMainTaskRows);
 	const matrixRows = rows.filter((r) => r.role !== "idle");
 	const idleRows = rows.filter((r) => r.role === "idle");
 	return {
-		baseRows: state.projects.flatMap((p) =>
-			p.baseRepos.map((repo) => ({
-				key: `${p.root}:${repo.name}`,
-				project: p.name,
-				root: p.root,
-				repo,
-				showProject: state.projects.length > 1,
-			})),
-		),
+		baseRows: state.projects
+			.flatMap((p) =>
+				p.baseRepos.map((repo) => ({
+					key: `${p.root}:${repo.name}`,
+					project: p.name,
+					root: p.root,
+					repo,
+					showProject: state.projects.length > 1,
+				})),
+			)
+			.sort(
+				(a, b) =>
+					a.project.localeCompare(b.project) ||
+					a.repo.name.localeCompare(b.repo.name) ||
+					a.key.localeCompare(b.key),
+			),
 		matrixRows,
 		stageGroups: MATRIX_COLUMNS.map((column) => ({
 			column,

@@ -287,6 +287,71 @@ describe("runtime UI", () => {
 			]).stageGroups.find((g) => g.column === "unknown")?.rows,
 		).toHaveLength(1);
 	});
+	it("orders session rows by activity, then session-less rows alphabetically", () => {
+		const model = buildMainViewModel(
+			stateWith([
+				{ ...task("zeta"), updatedAt: 900 },
+				task("alpha"),
+				task("older"),
+				task("newer"),
+			]),
+			[
+				{ ...session, workspace: "/p/older", stateChangedAt: 100 },
+				{ ...session, workspace: "/p/newer", stateChangedAt: 200 },
+			],
+		);
+		expect(model.matrixRows.map((r) => r.task.name)).toEqual([
+			"newer",
+			"older",
+			"alpha",
+			"zeta",
+		]);
+	});
+	it("interleaves unknown and idle workspaces in the same order", () => {
+		const html = renderBoard(stateWith([task("beta"), task("alpha")]), [
+			{ ...session, workspace: "/p/beta", state: "idle", reason: "" },
+		]);
+		const inventory = html.slice(html.indexOf('aria-label="Workspaces"'));
+		expect(inventory.indexOf("open beta in IDE")).toBeLessThan(
+			inventory.indexOf("open alpha in IDE"),
+		);
+	});
+	it("orders base repositories by project, then repo name", () => {
+		const base = (name: string) => ({
+			name,
+			baseBranch: "main",
+			branch: "main",
+			present: true,
+			dirty: false,
+			changedFiles: 0,
+			remoteAvailable: true,
+			ahead: 0,
+			behind: 0,
+			inspectionError: null,
+		});
+		const model = buildMainViewModel({
+			projects: [
+				{
+					name: "workbranch",
+					root: "/w",
+					baseRepos: [base("workbranch")],
+					tasks: [],
+				},
+				{
+					name: "monask",
+					root: "/m",
+					baseRepos: [base("frontend"), base("backend")],
+					tasks: [],
+				},
+			],
+			errors: [],
+		});
+		expect(model.baseRows.map((r) => `${r.project}/${r.repo.name}`)).toEqual([
+			"monask/backend",
+			"monask/frontend",
+			"workbranch/workbranch",
+		]);
+	});
 	it("rejects old CLI versions with an actionable message", () => {
 		expect(() =>
 			parseGlobalDocument('{"schemaVersion":1,"projects":[],"errors":[]}'),
