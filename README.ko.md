@@ -1,7 +1,7 @@
 # workbranch
 
 <p align="center">
-  <img src="./assets/readme/hero-ko.svg" width="100%" alt="workbranch는 여러 repository를 하나의 feature task 폴더에 모으고 Companion에서 진행 중인 task를 PLAN, EXECUTION, REVIEW 단계로 보여줍니다.">
+  <img src="./assets/readme/hero-ko.svg" width="100%" alt="workbranch는 여러 repository를 하나의 feature task 폴더에 모으고, Companion은 task별 AI agent 세션을 내 응답 대기, 실행 중, 턴 종료 · 검토 열로 보여줍니다.">
 </p>
 
 **한국어** | [English](README.md)
@@ -15,7 +15,7 @@
 
 `workbranch`는 feature마다 하나의 task 폴더를 만들고, single repo와 multi-repo 프로젝트 모두에서 짧고 안전한 branch refresh 명령을 제공합니다.
 
-CLI는 workspace/project 상태를 읽고 task worktree와 Git 흐름을 실행합니다. Companion은 macOS menu bar에서 진행 중인 task를 PLAN, EXECUTION, REVIEW 단계로 모아 보여줍니다. Activity view는 별도의 로컬 append-only activity log를 읽어 timeline을 만듭니다.
+CLI는 workspace/project 상태를 읽고 task worktree와 Git 흐름을 실행합니다. Companion은 macOS menu bar에서 task별 AI agent 세션을 `내 응답 대기 | 실행 중 | 턴 종료 · 검토` 보드로 보여주므로, 어떤 agent가 내 응답을 기다리는지 바로 알 수 있습니다. Activity view는 별도의 로컬 append-only activity log를 읽어 timeline을 만듭니다.
 
 ![workbranch demo](./docs/figs/workbranch-demo.gif)
 
@@ -24,7 +24,7 @@ CLI는 workspace/project 상태를 읽고 task worktree와 Git 흐름을 실행�
 | 필요할 때                                      | 사용                 | 역할                         | 설치                                                   |
 | ---------------------------------------------- | -------------------- | ---------------------------- | ------------------------------------------------------ |
 | task workspace 생성, 최신화, land/push         | `workbranch` CLI     | 실제 Git/worktree 작업 실행  | `brew install tkhwang/tap/workbranch`                  |
-| task 단계, Plan 진행률, repo 상태, activity timeline, 알림 확인 | Workbranch Companion | workspace 상태와 로컬 activity log를 menu bar에서 표시 | `brew install --cask tkhwang/tap/workbranch-companion` |
+| 내 응답을 기다리거나 실행 중이거나 검토할 agent 세션 확인, IDE로 task 열기, repo 상태 확인 | Workbranch Companion | hook 관측 결과와 Git 상태를 menu bar에서 표시 | `brew install --cask tkhwang/tap/workbranch-companion` |
 
 ## 빠른 시작
 
@@ -106,7 +106,7 @@ agent가 작업을 시작하기 전에 `workbranch refresh <task>` 한 번이면
 
 multi-repo에서의 장점은 [AI agent workflow](docs/ai-agents.ko.md)를 참고하세요.
 
-Companion은 이 구조를 `workbranch list --global --json`으로 읽습니다. Main view 맨 위의 간결한 `00 BASE` 그룹에서 각 base repo의 branch, dirty 상태, 마지막 fetch의 `origin/<baseBranch>` 기준 ahead/behind를 확인하고, 그 아래에서 task를 Plan 단계별로 봅니다. PULL/PUSH/CHECK는 실행 버튼이 아닌 안내이며, dirty + behind는 먼저 CHECK를 표시합니다. 조회할 수 없는 repo는 UNAVAILABLE로 표시하고 정상 데이터는 유지합니다. 상태 조회 자체는 fetch하지 않습니다. Activity timeline은 별도의 로컬 append-only log에서 읽으며, task 생성, 최신화, land/push 같은 Git 변경은 계속 CLI에서 실행합니다.
+Companion은 이 구조를 `workbranch list --global --json`으로 읽습니다. Main view의 runtime 보드 아래 접이식 `Base repositories` 섹션에서 각 base repo의 branch, dirty 상태, 마지막 fetch의 `origin/<baseBranch>` 기준 ahead/behind를 확인합니다. PULL/PUSH/CHECK는 실행 버튼이 아닌 안내이며, dirty + behind는 먼저 CHECK를 표시합니다. 조회할 수 없는 repo는 UNAVAILABLE로 표시하고 정상 데이터는 유지합니다. 상태 조회 자체는 fetch하지 않습니다. Activity timeline은 별도의 로컬 append-only log에서 읽으며, task 생성, 최신화, land/push 같은 Git 변경은 계속 CLI에서 실행합니다.
 
 ## 작업 흐름
 
@@ -209,10 +209,11 @@ Combined flow shortcut:
 
 Workbranch Companion은 Main, Activity, Settings view를 제공하는 macOS menu bar app입니다.
 
-- Main: 진행 중인 task를 PLAN, EXECUTION, REVIEW column으로 분류하고 project, task와 Plan title, repo, dirty/blocked 상태, Step 진행률, 알림을 card에 표시. 계정을 등록하면 보드 위 Weekly Limits 패널에서 coding agent 계정별 이번 주 window와 다음 reset까지 남은 시간을 표시
-- Project details: 각 repo와 branch를 표시하고 Finder, IDE, terminal 실행 action 제공
+- Main: agent runtime 상태를 칸반 보드로 표시. `내 응답 대기`는 agent가 권한 승인, 질문 답변, plan 승인, 입력을 기다리는 상태, `실행 중`은 작업 중인 상태, `턴 종료 · 검토`는 agent의 턴이 끝나 내가 검토할 차례라는 뜻이며 task 완료를 뜻하지 않습니다. task는 대표 세션의 열에 한 번만 표시됩니다. 세션이 없거나, 관측 불명(stale)이거나, 비활성 세션만 있는 task는 보드 아래 `WORKSPACES` 목록에 둡니다. 계정을 등록하면 보드 위 Weekly Limits 패널에서 coding agent 계정별 이번 주 window와 다음 reset까지 남은 시간을 표시
+- Task card: 펼치지 않아도 IDE/Terminal/Finder 실행 버튼, repo별 branch와 Git 상태(`●N` 변경 파일, `↑N` ahead, `↓N` behind, 또는 `CLEAN`), 최근 요청, 상태, provider 아이콘(Claude Code, Codex, Grok Build), 관측 시각을 표시. 클릭하면 최근 commit과 세션 상세를 펼치고, 더블클릭하면 IDE로 task를 엽니다. repo 줄마다 note를 남길 수 있습니다
 - Activity: `$XDG_STATE_HOME/workbranch/activity.jsonl`(기본 `~/.local/state/workbranch/activity.jsonl`)을 읽어 하루 또는 3일 calendar timeline 표시
-- Settings: login 시 자동 실행, interface font, Claude Code 또는 Codex theme, weekly limit 계정(라벨과 `/usage`에 표시된 다음 reset 날짜·시각) 설정
+- Settings: login 시 자동 실행, interface font와 글자 크기, Claude Code 또는 Codex theme, weekly limit 계정(라벨과 `/usage`에 표시된 다음 reset 날짜·시각), CLI/agent 연결 설정
+- 업데이트: header의 업데이트 버튼으로 업데이트 패널을 엽니다. Homebrew 확인은 요청할 때만 실행하고, 업데이트 버튼 하나로 CLI를 먼저 올린 뒤 Companion을 업데이트합니다. 설치·연결·업데이트 버튼은 실행 중 spinner를 보여주고, 결과는 해당 버튼 옆에 표시합니다
 
 Companion은 hook 기반 runtime snapshot과 Git 조회 결과를 별도로 사용합니다. `TASK-WORKBRANCH.md` 기록은 필요하지 않습니다. 설치 후 `workbranch hooks install --provider claude` 또는 `--provider codex`를 사용하고 provider의 hook trust를 확인하세요.
 
