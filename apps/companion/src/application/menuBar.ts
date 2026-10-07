@@ -36,16 +36,16 @@ export const DEFAULT_MENU_BAR: MenuBarConfig = {
 };
 
 export const MENU_BAR_ITEM_OPTIONS: readonly MenuBarItemOption[] = [
-	{ item: "claude5h", label: "Claude 5h", detail: "5-hour limit, after CL" },
+	{ item: "claude5h", label: "Claude 5h", detail: "5-hour limit, CL 5h" },
 	{
 		item: "claudeWeekly",
 		label: "Claude weekly",
-		detail: "7-day limit, after CL",
+		detail: "7-day limit, CL W",
 	},
 	{
 		item: "codexWeekly",
 		label: "Codex weekly",
-		detail: "7-day limit, after CO",
+		detail: "7-day limit, CO W",
 	},
 	{
 		item: "todayTokens",
@@ -117,18 +117,20 @@ export const MENU_BAR_SAMPLE = {
 	todayTokens: "31.0M",
 } as const;
 
-/** Same layout as `menu_bar_title` in Rust: `CL 42·63  CO 18 · 31.0M`. */
+/** Same layout as `menu_bar_title` in Rust: `CL 5h 42% · W 63%  CO W 18% · 31.0M`. */
 export function menuBarSampleTitle(config: MenuBarConfig): string {
 	const percent = (used: number) =>
-		String(config.percent === "used" ? used : 100 - used);
+		`${config.percent === "used" ? used : 100 - used}%`;
 	const claude = [
-		config.claude5h ? percent(MENU_BAR_SAMPLE.claude5h) : undefined,
-		config.claudeWeekly ? percent(MENU_BAR_SAMPLE.claudeWeekly) : undefined,
+		config.claude5h ? `5h ${percent(MENU_BAR_SAMPLE.claude5h)}` : undefined,
+		config.claudeWeekly
+			? `W ${percent(MENU_BAR_SAMPLE.claudeWeekly)}`
+			: undefined,
 	].filter((value) => value !== undefined);
 	const limits = [
-		claude.length > 0 ? `CL ${claude.join("·")}` : undefined,
+		claude.length > 0 ? `CL ${claude.join(" · ")}` : undefined,
 		config.codexWeekly
-			? `CO ${percent(MENU_BAR_SAMPLE.codexWeekly)}`
+			? `CO W ${percent(MENU_BAR_SAMPLE.codexWeekly)}`
 			: undefined,
 	].filter((value) => value !== undefined);
 	const parts = [

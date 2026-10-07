@@ -323,10 +323,10 @@ describe("MenuBarSettings", () => {
 	it("previews every item as used percent by default", () => {
 		const html = render(DEFAULT_MENU_BAR);
 
-		expect(html).toContain(">CL 42·63  CO 18 · 31.0M<");
+		expect(html).toContain(">CL 5h 42% · W 63%  CO W 18% · 31.0M<");
 		expect(html.match(/aria-pressed="true"/g)).toHaveLength(5);
-		expect(html).toContain("5-hour limit, after CL");
-		expect(html).toContain("7-day limit, after CO");
+		expect(html).toContain("5-hour limit, CL 5h");
+		expect(html).toContain("7-day limit, CO W");
 		expect(html).toContain("Both agents since midnight");
 	});
 
@@ -338,7 +338,7 @@ describe("MenuBarSettings", () => {
 			percent: "remaining",
 		});
 
-		expect(html).toContain(">CL 37  CO 82<");
+		expect(html).toContain(">CL W 37%  CO W 82%<");
 		expect(html).toContain(
 			'aria-label="Show Claude 5h in the menu bar" aria-pressed="false"',
 		);

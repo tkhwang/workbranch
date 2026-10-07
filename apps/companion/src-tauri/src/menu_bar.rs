@@ -81,8 +81,8 @@ impl Reading {
     fn label(self, basis: PercentBasis) -> String {
         match (self, basis) {
             (Reading::Missing | Reading::Stale, _) => STALE_MARK.to_owned(),
-            (Reading::Fresh(used), PercentBasis::Used) => used.to_string(),
-            (Reading::Fresh(used), PercentBasis::Remaining) => (100 - used).to_string(),
+            (Reading::Fresh(used), PercentBasis::Used) => format!("{used}%"),
+            (Reading::Fresh(used), PercentBasis::Remaining) => format!("{}%", 100 - used),
         }
     }
 }
@@ -91,6 +91,16 @@ impl Reading {
 enum Span {
     FiveHour,
     Weekly,
+}
+
+impl Span {
+    /// Names the window beside its number, since an agent can show both.
+    fn label(self) -> &'static str {
+        match self {
+            Span::FiveHour => "5h",
+            Span::Weekly => "W",
+        }
+    }
 }
 
 /// The 5h window, or the longest window past 5h as "weekly", since Codex
@@ -133,17 +143,21 @@ fn window_reading(limits: Option<&ProviderLimits>, span: Span, now: u64) -> Read
     Reading::Fresh(window.used_percent.clamp(0.0, 100.0).round() as u8)
 }
 
-/// `CL 42·63`: the agent's enabled windows in 5h → weekly order. An agent
-/// with no reading at all is left out rather than shown as dashes.
-fn agent_part(name: &str, readings: &[Reading], basis: PercentBasis) -> Option<String> {
-    if readings.is_empty() || readings.iter().all(|reading| *reading == Reading::Missing) {
+/// `CL 5h 42% · W 63%`: the agent's enabled windows in 5h → weekly order. An
+/// agent with no reading at all is left out rather than shown as dashes.
+fn agent_part(name: &str, readings: &[(Span, Reading)], basis: PercentBasis) -> Option<String> {
+    if readings.is_empty()
+        || readings
+            .iter()
+            .all(|(_, reading)| *reading == Reading::Missing)
+    {
         return None;
     }
     let values: Vec<String> = readings
         .iter()
-        .map(|reading| reading.label(basis))
+        .map(|(span, reading)| format!("{} {}", span.label(), reading.label(basis)))
         .collect();
-    Some(format!("{name} {}", values.join("·")))
+    Some(format!("{name} {}", values.join(" · ")))
 }
 
 fn today_tokens(usage: &ProviderUsage, today_start: u64) -> u64 {
@@ -172,7 +186,7 @@ fn format_tokens(count: u64) -> String {
     }
 }
 
-/// `CL 42·63  CO 18 · 31.0M`; `None` leaves the icon alone in the menu bar.
+/// `CL 5h 42% · W 63%  CO W 18% · 31.0M`; `None` leaves the icon alone in the menu bar.
 pub(crate) fn menu_bar_title(
     config: MenuBarConfig,
     snapshot: &UsageSnapshot,
@@ -183,14 +197,14 @@ pub(crate) fn menu_bar_title(
     let codex = snapshot.codex.limits.as_ref();
     let mut claude_readings = Vec::new();
     if config.claude_5h {
-        claude_readings.push(window_reading(claude, Span::FiveHour, now));
+        claude_readings.push((Span::FiveHour, window_reading(claude, Span::FiveHour, now)));
     }
     if config.claude_weekly {
-        claude_readings.push(window_reading(claude, Span::Weekly, now));
+        claude_readings.push((Span::Weekly, window_reading(claude, Span::Weekly, now)));
     }
     let mut codex_readings = Vec::new();
     if config.codex_weekly {
-        codex_readings.push(window_reading(codex, Span::Weekly, now));
+        codex_readings.push((Span::Weekly, window_reading(codex, Span::Weekly, now)));
     }
     let limits: Vec<String> = [
         agent_part("CL", &claude_readings, config.percent),
