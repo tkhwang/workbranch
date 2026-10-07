@@ -1,5 +1,11 @@
 import { load } from "@tauri-apps/plugin-store";
 import {
+	DEFAULT_MENU_BAR,
+	type MenuBarConfig,
+	sameMenuBarConfig,
+	sanitizeMenuBarConfig,
+} from "./menuBar";
+import {
 	COMPANION_THEME_OPTIONS,
 	type CompanionTheme,
 	isCompanionTheme,
@@ -36,6 +42,7 @@ export type CompanionPreferences = {
 	readonly font: CompanionFont;
 	readonly fontSize: CompanionFontSize;
 	readonly theme: CompanionTheme;
+	readonly menuBar: MenuBarConfig;
 };
 
 export type CompanionFontOption = {
@@ -58,6 +65,7 @@ export type PreferenceStoreEntries = {
 	readonly font: CompanionFont;
 	readonly fontSize: CompanionFontSize;
 	readonly theme: CompanionTheme;
+	readonly menuBar: MenuBarConfig;
 };
 
 export type CompanionPreferenceStore = {
@@ -70,6 +78,7 @@ export const DEFAULT_COMPANION_PREFERENCES: CompanionPreferences = {
 	font: "system-mono",
 	fontSize: "medium",
 	theme: "claude",
+	menuBar: DEFAULT_MENU_BAR,
 };
 
 export const COMPANION_FONT_OPTIONS: readonly CompanionFontOption[] = [
@@ -145,6 +154,7 @@ export function sanitizeCompanionPreferences(input: {
 	readonly theme?: unknown;
 	readonly themeFamily?: unknown;
 	readonly themeMode?: unknown;
+	readonly menuBar?: unknown;
 }): PreferenceSanitizationResult {
 	const font = isCompanionFont(input.font)
 		? input.font
@@ -157,12 +167,14 @@ export function sanitizeCompanionPreferences(input: {
 		: isCompanionTheme(input.themeFamily)
 			? input.themeFamily
 			: DEFAULT_COMPANION_PREFERENCES.theme;
+	const menuBar = sanitizeMenuBarConfig(input.menuBar);
 	return {
-		preferences: { font, fontSize, theme },
+		preferences: { font, fontSize, theme, menuBar: menuBar.config },
 		sanitized:
 			font !== input.font ||
 			fontSize !== input.fontSize ||
-			theme !== input.theme,
+			theme !== input.theme ||
+			menuBar.sanitized,
 	};
 }
 
@@ -173,7 +185,8 @@ export function shouldRestoreFailedPreferenceUpdate(
 	return (
 		current.font === attempted.font &&
 		current.fontSize === attempted.fontSize &&
-		current.theme === attempted.theme
+		current.theme === attempted.theme &&
+		sameMenuBarConfig(current.menuBar, attempted.menuBar)
 	);
 }
 
@@ -193,6 +206,7 @@ export function preferencesToStoreEntries(
 		font: preferences.font,
 		fontSize: preferences.fontSize,
 		theme: preferences.theme,
+		menuBar: preferences.menuBar,
 	};
 }
 
@@ -212,6 +226,7 @@ export async function readCompanionPreferences(
 		theme: await store.get<unknown>("theme"),
 		themeFamily: await store.get<unknown>("themeFamily"),
 		themeMode: await store.get<unknown>("themeMode"),
+		menuBar: await store.get<unknown>("menuBar"),
 	});
 }
 
@@ -223,5 +238,6 @@ export async function writeCompanionPreferences(
 	await store.set("font", entries.font);
 	await store.set("fontSize", entries.fontSize);
 	await store.set("theme", entries.theme);
+	await store.set("menuBar", entries.menuBar);
 	await store.save();
 }

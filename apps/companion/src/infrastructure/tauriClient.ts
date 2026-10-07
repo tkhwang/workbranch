@@ -62,6 +62,11 @@ export async function readUsageSnapshot(days: number): Promise<UsageSnapshot> {
 	return parseUsageSnapshot(await invoke<unknown>("usage_snapshot", { days }));
 }
 
+/** Redraws the tray title now instead of at the next one-minute tick. */
+export async function refreshMenuBar(): Promise<void> {
+	await invoke("menu_bar_refresh");
+}
+
 export async function runAction(
 	command: CompanionCommand,
 	cwd: string,

@@ -1,0 +1,6 @@
+<!-- Source for tray-template.png (18px) and tray-template@2x.png (36px): a macOS template image, so only alpha matters. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" width="18" height="18">
+  <path fill="none" stroke="#000" stroke-width="1.35" stroke-linejoin="round" d="M3.5 8.2A5.5 5.5 0 0 1 14.5 8.2V15.6Q13.6 14.3 12.67 15.6Q11.75 16.9 10.83 15.6Q9.92 14.3 9 15.6Q8.08 16.9 7.17 15.6Q6.25 14.3 5.33 15.6Q4.42 16.9 3.5 15.6Z"/>
+  <circle cx="7" cy="8.4" r="1.05"/>
+  <circle cx="11" cy="8.4" r="1.05"/>
+</svg>
