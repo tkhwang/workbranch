@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.28.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.27.0...workbranch-companion-v2.28.0) (2026-10-07)
+
+
+### Features
+
+* **settings:** add menu bar display options ([5ded6ea](https://github.com/tkhwang/workbranch/commit/5ded6ea350b2088bb882042b4a6a31c07521e832))
+* **settings:** add menu bar display options ([32f0861](https://github.com/tkhwang/workbranch/commit/32f0861f0472a70f43f25ef96f833eb936b7cdb4)), closes [#1007](https://github.com/tkhwang/workbranch/issues/1007)
+
+
+### Bug Fixes
+
+* **menu-bar:** mark expired limit readings stale before showing zero ([4a0028f](https://github.com/tkhwang/workbranch/commit/4a0028f2458df1cdb288d17a6ad69e5bd2bd5d2f))
+
 ## [2.27.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.26.1...workbranch-companion-v2.27.0) (2026-10-07)
 
 
