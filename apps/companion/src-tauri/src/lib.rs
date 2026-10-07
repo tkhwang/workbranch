@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager, State};
 use thiserror::Error;
 
+mod claude_statusline;
 mod menu_bar;
 mod process_env;
 mod setup;
@@ -328,6 +329,8 @@ pub fn run() {
             workbranch_migrate,
             workbranch_run,
             usage_snapshot,
+            claude_statusline::claude_limit_relay_status,
+            claude_statusline::claude_limit_relay_set,
             menu_bar::menu_bar_refresh,
             watch_roots,
             quit_app,

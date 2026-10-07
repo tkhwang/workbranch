@@ -206,3 +206,19 @@ export async function onUpdateProgress(
 export async function relaunchCompanion(): Promise<void> {
 	await invoke("relaunch_companion");
 }
+
+export type ClaudeLimitRelayStatus = {
+	readonly enabled: boolean;
+	/** The status line Claude Code runs besides the relay, if any. */
+	readonly previousCommand: string | null;
+};
+
+export async function readClaudeLimitRelay(): Promise<ClaudeLimitRelayStatus> {
+	return invoke("claude_limit_relay_status");
+}
+
+export async function setClaudeLimitRelay(
+	enabled: boolean,
+): Promise<ClaudeLimitRelayStatus> {
+	return invoke("claude_limit_relay_set", { enabled });
+}

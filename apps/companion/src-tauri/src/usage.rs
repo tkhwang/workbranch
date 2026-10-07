@@ -1,9 +1,11 @@
 //! Local token usage and subscription limits for Claude Code and Codex.
 //!
-//! Everything here reads files the agent CLIs already write. It never presents
-//! a credential, never touches the network, and never writes into the agents'
-//! directories, so the figures can lag: each limit carries the time it was
-//! observed and the UI must show that age instead of treating it as live.
+//! Everything here reads files the agent CLIs already write, plus the Claude
+//! status-line capture the opt-in relay in `claude_statusline.rs` leaves in the
+//! companion's own data directory. It never presents a credential, never
+//! touches the network, and never writes into the agents' directories, so the
+//! figures can lag: each limit carries the time it was observed and the UI
+//! must show that age instead of treating it as live.
 
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -92,6 +94,8 @@ pub(crate) struct UsageSnapshot {
 pub(crate) struct UsagePaths {
     pub(crate) claude_config: PathBuf,
     pub(crate) claude_dir: PathBuf,
+    /// Last status-line input with `rate_limits`, written by the opt-in relay.
+    pub(crate) claude_statusline: PathBuf,
     pub(crate) codex_dir: PathBuf,
 }
 
@@ -111,6 +115,7 @@ impl UsagePaths {
         Some(Self {
             claude_config,
             claude_dir,
+            claude_statusline: crate::claude_statusline::capture_path(&home),
             codex_dir,
         })
     }
@@ -180,13 +185,21 @@ pub(crate) fn snapshot(
     cache.files.retain(|path, _| seen.contains(path));
 
     let mut claude_errors = claude.errors;
-    let claude_limits = match read_claude_limits(&paths.claude_config) {
-        Ok(limits) => limits,
+    let (cached_limits, plan) = match read_claude_limits(&paths.claude_config) {
+        Ok(found) => found,
         Err(error) => {
             push_error(&mut claude_errors, &paths.claude_config, &error);
+            (None, None)
+        }
+    };
+    let live_limits = match read_statusline_limits(&paths.claude_statusline, plan) {
+        Ok(limits) => limits,
+        Err(error) => {
+            push_error(&mut claude_errors, &paths.claude_statusline, &error);
             None
         }
     };
+    let claude_limits = newest_limits(cached_limits, live_limits);
     UsageSnapshot {
         generated_at: now,
         since,
@@ -513,15 +526,22 @@ struct ClaudeAccount {
 
 /// Claude Code caches its last `/usage` answer in `.claude.json`. The snapshot
 /// only moves when Claude Code itself refreshes it, so `observedAt` is the
-/// cache's own fetch time, never the time this function ran.
-fn read_claude_limits(path: &Path) -> std::io::Result<Option<ProviderLimits>> {
+/// cache's own fetch time, never the time this function ran. The plan tier is
+/// returned on its own because the status-line capture does not carry it.
+fn read_claude_limits(path: &Path) -> std::io::Result<(Option<ProviderLimits>, Option<String>)> {
     let raw = match fs::read(path) {
         Ok(raw) => raw,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok((None, None)),
         Err(error) => return Err(error),
     };
     let config: ClaudeConfig = serde_json::from_slice(&raw).map_err(std::io::Error::other)?;
-    Ok(claude_limits_from_config(config))
+    let plan = config.oauth_account.as_ref().and_then(|account| {
+        account
+            .user_tier
+            .clone()
+            .or(account.organization_tier.clone())
+    });
+    Ok((claude_limits_from_config(config), plan))
 }
 
 fn claude_limits_from_config(config: ClaudeConfig) -> Option<ProviderLimits> {
@@ -556,6 +576,67 @@ fn claude_limits_from_config(config: ClaudeConfig) -> Option<ProviderLimits> {
         plan,
         windows,
     })
+}
+
+/// Claude Code hands every status-line command `rate_limits` from its latest
+/// API response, so this is fresh whenever a session is open. The relay only
+/// rewrites the file when that field is present, which makes its mtime the
+/// observation time.
+fn read_statusline_limits(
+    path: &Path,
+    plan: Option<String>,
+) -> std::io::Result<Option<ProviderLimits>> {
+    let raw = match fs::read(path) {
+        Ok(raw) => raw,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    let observed_at = fs::metadata(path)?
+        .modified()?
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_secs());
+    let input: Value = serde_json::from_slice(&raw).map_err(std::io::Error::other)?;
+    Ok(statusline_limits(&input, observed_at, plan))
+}
+
+fn statusline_limits(
+    input: &Value,
+    observed_at: u64,
+    plan: Option<String>,
+) -> Option<ProviderLimits> {
+    let limits = input.get("rate_limits")?;
+    let windows: Vec<LimitWindow> = [
+        (FIVE_HOUR_MINUTES, "five_hour"),
+        (WEEKLY_MINUTES, "seven_day"),
+    ]
+    .into_iter()
+    .filter_map(|(window_minutes, name)| {
+        let window = limits.get(name)?;
+        Some(LimitWindow {
+            window_minutes,
+            used_percent: window.get("used_percentage").and_then(json_number)?,
+            resets_at: window.get("resets_at").and_then(json_epoch),
+        })
+    })
+    .collect();
+    if windows.is_empty() {
+        return None;
+    }
+    Some(ProviderLimits {
+        observed_at,
+        plan,
+        windows,
+    })
+}
+
+fn newest_limits(
+    cached: Option<ProviderLimits>,
+    live: Option<ProviderLimits>,
+) -> Option<ProviderLimits> {
+    match (cached, live) {
+        (Some(cached), Some(live)) if cached.observed_at > live.observed_at => Some(cached),
+        (cached, live) => live.or(cached),
+    }
 }
 
 // --- Codex -------------------------------------------------------------------

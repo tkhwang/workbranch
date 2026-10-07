@@ -52,6 +52,7 @@ fn paths(root: &Path) -> UsagePaths {
     UsagePaths {
         claude_config: root.join(".claude.json"),
         claude_dir: root.join(".claude"),
+        claude_statusline: root.join("companion/claude-rate-limits.json"),
         codex_dir: root.join(".codex"),
     }
 }
@@ -277,6 +278,80 @@ fn claude_limits_come_from_the_cached_usage_snapshot() -> Result<(), Box<dyn std
 fn claude_without_a_cached_snapshot_has_no_limits() -> Result<(), Box<dyn std::error::Error>> {
     let config: ClaudeConfig = serde_json::from_str(r#"{"oauthAccount": null}"#)?;
     assert_eq!(claude_limits_from_config(config), None);
+    Ok(())
+}
+
+#[test]
+fn claude_status_line_limits_read_used_percentage_and_epoch_resets()
+-> Result<(), Box<dyn std::error::Error>> {
+    let input: Value = serde_json::from_str(
+        r#"{"rate_limits":{
+            "five_hour":{"used_percentage":23.5,"resets_at":1791400000},
+            "seven_day":{"used_percentage":41,"resets_at":1791727200}
+        }}"#,
+    )?;
+    assert_eq!(
+        statusline_limits(&input, AT, Some("max".to_string())),
+        Some(ProviderLimits {
+            observed_at: AT,
+            plan: Some("max".to_string()),
+            windows: vec![
+                LimitWindow {
+                    window_minutes: 300,
+                    used_percent: 23.5,
+                    resets_at: Some(1_791_400_000),
+                },
+                LimitWindow {
+                    window_minutes: 10080,
+                    used_percent: 41.0,
+                    resets_at: Some(1_791_727_200),
+                },
+            ],
+        })
+    );
+    assert_eq!(
+        statusline_limits(&serde_json::json!({"rate_limits":{}}), AT, None),
+        None
+    );
+    Ok(())
+}
+
+#[test]
+fn snapshot_prefers_the_newer_of_status_line_and_usage_cache()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = temp_dir()?;
+    let paths = paths(&root);
+    // The /usage cache is from 2026-10-06; the status-line capture is now.
+    write_lines(
+        &paths.claude_config,
+        &[
+            r#"{"oauthAccount":{"organizationRateLimitTier":"default_claude_max_20x"},"cachedUsageUtilization":{"fetchedAtMs":1791247988818,"utilization":{"five_hour":{"utilization":4},"seven_day":{"utilization":11}}}}"#,
+        ],
+    )?;
+    write_lines(
+        &paths.claude_statusline,
+        &[
+            r#"{"rate_limits":{"five_hour":{"used_percentage":30},"seven_day":{"used_percentage":12}}}"#,
+        ],
+    )?;
+    let now = now_epoch();
+    let limits = snapshot(&mut UsageCache::default(), &paths, now, now - 86_400)
+        .claude
+        .limits
+        .ok_or("limits")?;
+    assert!(limits.observed_at >= now - 60);
+    assert_eq!(limits.plan.as_deref(), Some("default_claude_max_20x"));
+    assert_eq!(limits.windows[0].used_percent, 30.0);
+
+    let older = ProviderLimits {
+        observed_at: 1,
+        ..limits.clone()
+    };
+    assert_eq!(
+        newest_limits(Some(limits.clone()), Some(older.clone())),
+        Some(limits.clone())
+    );
+    assert_eq!(newest_limits(Some(older.clone()), None), Some(older));
     Ok(())
 }
 

@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 import type { CompanionPreferences } from "../application/preferences";
+import type { ClaudeLimitRelayProps } from "./ClaudeLimitRelaySettings";
 import { SettingsPanel } from "./SettingsPanel";
 
 type Props = {
+	readonly claudeLimitRelay: ClaudeLimitRelayProps;
 	readonly connections?: ReactNode;
 	readonly preferences: CompanionPreferences;
 	readonly launchAtLogin: boolean;
@@ -12,6 +14,7 @@ type Props = {
 };
 
 export function SettingsView({
+	claudeLimitRelay,
 	connections,
 	preferences,
 	launchAtLogin,
@@ -23,6 +26,7 @@ export function SettingsView({
 		<section className="settings-view view-panel" aria-label="Settings View">
 			{connections}
 			<SettingsPanel
+				claudeLimitRelay={claudeLimitRelay}
 				preferences={preferences}
 				launchAtLogin={launchAtLogin}
 				launchAtLoginLoading={launchAtLoginLoading}
