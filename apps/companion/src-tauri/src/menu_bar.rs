@@ -109,7 +109,8 @@ fn find_window(limits: &ProviderLimits, span: Span) -> Option<&LimitWindow> {
     }
 }
 
-/// A window whose reset already passed reads as 0% used.
+/// An old observation is stale even when its reset has passed: the agent may
+/// have used the new window since, so only a recent reading may claim 0%.
 fn window_reading(limits: Option<&ProviderLimits>, span: Span, now: u64) -> Reading {
     let Some(limits) = limits else {
         return Reading::Missing;
@@ -117,9 +118,6 @@ fn window_reading(limits: Option<&ProviderLimits>, span: Span, now: u64) -> Read
     let Some(window) = find_window(limits, span) else {
         return Reading::Missing;
     };
-    if window.resets_at.is_some_and(|resets_at| resets_at <= now) {
-        return Reading::Fresh(0);
-    }
     let stale_after = if window.window_minutes <= FIVE_HOUR_MINUTES {
         SHORT_WINDOW_STALE_SECONDS
     } else {
@@ -127,6 +125,9 @@ fn window_reading(limits: Option<&ProviderLimits>, span: Span, now: u64) -> Read
     };
     if now.saturating_sub(limits.observed_at) > stale_after {
         return Reading::Stale;
+    }
+    if window.resets_at.is_some_and(|resets_at| resets_at <= now) {
+        return Reading::Fresh(0);
     }
     // Clamped to 0..=100 first, so the cast cannot truncate.
     Reading::Fresh(window.used_percent.clamp(0.0, 100.0).round() as u8)

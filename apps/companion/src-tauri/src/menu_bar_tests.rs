@@ -172,7 +172,25 @@ fn stale_weekly_shows_a_dash_too() {
 }
 
 #[test]
-fn passed_reset_reads_as_zero_even_when_old() {
+fn recent_reading_past_its_reset_reads_as_zero() {
+    let usage = snapshot(
+        provider(
+            limits(30 * 60, vec![window(300, 95.0, Some(NOW - 60))]),
+            Vec::new(),
+        ),
+        provider(None, Vec::new()),
+    );
+    let config = MenuBarConfig {
+        claude_weekly: false,
+        today_tokens: false,
+        ..all()
+    };
+    assert_eq!(title(config, &usage), Some("CL 0".to_owned()));
+}
+
+#[test]
+fn old_reading_past_its_reset_is_stale_not_zero() {
+    // The new window may have been used since; 0% would only look live.
     let usage = snapshot(
         provider(
             limits(10 * 3_600, vec![window(300, 95.0, Some(NOW - 60))]),
@@ -185,7 +203,7 @@ fn passed_reset_reads_as_zero_even_when_old() {
         today_tokens: false,
         ..all()
     };
-    assert_eq!(title(config, &usage), Some("CL 0".to_owned()));
+    assert_eq!(title(config, &usage), Some("CL –".to_owned()));
 }
 
 #[test]
