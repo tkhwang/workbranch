@@ -110,6 +110,11 @@ function renderSettingsPanel({
 } = {}): string {
 	return renderToStaticMarkup(
 		<SettingsPanel
+			claudeLimitRelay={{
+				status: { enabled: false, previousCommand: null },
+				loading: false,
+				onChange: () => undefined,
+			}}
 			preferences={currentPreferences}
 			launchAtLogin={false}
 			launchAtLoginLoading={launchAtLoginLoading}
@@ -127,6 +132,8 @@ describe("SettingsPanel", () => {
 		expect(html).toContain('data-terminal-panel-anatomy="claude"');
 		expect(html).toContain("<fieldset");
 		expect(html).toContain("<legend>Startup</legend>");
+		expect(html).toContain("<legend>Claude Limits</legend>");
+		expect(html).toContain('for="claude-limit-relay"');
 		expect(html).toContain("<legend>Menu Bar</legend>");
 		expect(html).toContain("<legend>Font</legend>");
 		expect(html).toContain("<legend>Text Size</legend>");

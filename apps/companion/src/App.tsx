@@ -7,6 +7,7 @@ import {
 	type MenuModel,
 } from "./application/state";
 import { updateTargets } from "./application/updates";
+import { useClaudeLimitRelay } from "./application/useClaudeLimitRelay";
 import { useCompanionSettings } from "./application/useCompanionSettings";
 import { useConnections } from "./application/useConnections";
 import { useRepoNotes } from "./application/useRepoNotes";
@@ -116,6 +117,10 @@ export function App() {
 		updateLaunchAtLogin,
 		updatePreferences,
 	} = useCompanionSettings({ onError: showError, onStatus: showStatus });
+	const claudeLimitRelay = useClaudeLimitRelay(currentView === "settings", {
+		onError: showError,
+		onStatus: showStatus,
+	});
 	const { notes, saveNote } = useRepoNotes({
 		onError: showError,
 		onStatus: showStatus,
@@ -438,6 +443,11 @@ export function App() {
 			) : null}
 			{currentView === "settings" ? (
 				<SettingsView
+					claudeLimitRelay={{
+						status: claudeLimitRelay.status,
+						loading: claudeLimitRelay.loading,
+						onChange: (enabled) => void claudeLimitRelay.update(enabled),
+					}}
 					connections={connectionPanel(false)}
 					preferences={preferences}
 					launchAtLogin={launchAtLogin}

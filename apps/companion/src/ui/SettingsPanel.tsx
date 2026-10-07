@@ -6,10 +6,15 @@ import {
 	isCompanionFontSize,
 } from "../application/preferences";
 import { AgentThemePicker } from "./AgentThemePicker";
+import {
+	type ClaudeLimitRelayProps,
+	ClaudeLimitRelaySettings,
+} from "./ClaudeLimitRelaySettings";
 import { MenuBarSettings } from "./MenuBarSettings";
 import { TerminalPanel } from "./TerminalPanel";
 
 type Props = {
+	readonly claudeLimitRelay: ClaudeLimitRelayProps;
 	readonly preferences: CompanionPreferences;
 	readonly launchAtLogin: boolean;
 	readonly launchAtLoginLoading: boolean;
@@ -18,6 +23,7 @@ type Props = {
 };
 
 export function SettingsPanel({
+	claudeLimitRelay,
 	preferences,
 	launchAtLogin,
 	launchAtLoginLoading,
@@ -62,6 +68,13 @@ export function SettingsPanel({
 							? "Opens automatically when you sign in"
 							: "Opens only when opened manually"}
 				</p>
+			</TerminalPanel>
+			<TerminalPanel
+				anatomy="claude"
+				label="Claude Limits"
+				theme={preferences.theme}
+			>
+				<ClaudeLimitRelaySettings {...claudeLimitRelay} />
 			</TerminalPanel>
 			<TerminalPanel
 				anatomy="claude"
