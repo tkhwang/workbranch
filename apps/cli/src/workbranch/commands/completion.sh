@@ -19,7 +19,7 @@ cmd_complete_repos() {
 }
 
 cmd_complete_commands() {
-  printf '%s\n' add completion config destroy doctor finalize finder help ide init land list runtime migrate hooks noti path prune pull push refresh remove status terminal update version
+  printf '%s\n' add completion config destroy doctor finalize finder help ide init land list runtime migrate hooks noti path prune pull push refresh remove stash status terminal update version
 }
 
 print_completion_bash() {
@@ -54,6 +54,11 @@ _workbranch() {
       ;;
   esac
 
+  if [ "$cmd" = "stash" ] && [ "$COMP_CWORD" -eq 2 ]; then
+    words='push pop apply list show drop'
+    COMPREPLY=( $(compgen -W "$words" -- "$cur") )
+    return 0
+  fi
   if [ "$cmd" = "noti" ] && [ "$COMP_CWORD" -eq 2 ]; then
     words='add list clear'
     COMPREPLY=( $(compgen -W "$words" -- "$cur") )
@@ -72,6 +77,7 @@ _workbranch() {
         list) words='--json --global' ;;
         config) words='--rewrite' ;;
         remove|destroy) words='--force' ;;
+        stash) words='-m --branch --index' ;;
         doctor) words='--fix --repo' ;;
         update) words='--all --repo' ;;
         status|pull|push|land|finalize|refresh|path|finder|ide|terminal) words='--repo' ;;
@@ -101,7 +107,7 @@ print_completion_zsh() {
 #compdef workbranch
 # zsh completion for workbranch
 _workbranch() {
-  local -a commands tasks repos flags noti_commands
+  local -a commands tasks repos flags noti_commands stash_commands
   local cmd prev cur wb_bin
   wb_bin=${WORKBRANCH:-workbranch}
   cur=${words[CURRENT]:-}
@@ -117,6 +123,12 @@ _workbranch() {
   if [[ "$prev" == "--repo" ]]; then
     repos=(${(f)"$($wb_bin __complete-repos 2>/dev/null)"})
     _describe 'repo' repos
+    return
+  fi
+
+  if [[ "$cmd" == "stash" && $CURRENT == 3 ]]; then
+    stash_commands=(push pop apply list show drop)
+    _describe 'stash command' stash_commands
     return
   fi
 
@@ -138,6 +150,7 @@ _workbranch() {
       list) flags=(--json --global) ;;
       config) flags=(--rewrite) ;;
       remove|destroy) flags=(--force) ;;
+      stash) flags=(-m --branch --index) ;;
       doctor) flags=(--fix --repo) ;;
       update) flags=(--all --repo) ;;
       status|pull|push|land|finalize|refresh|path|finder|ide|terminal) flags=(--repo) ;;
@@ -198,6 +211,11 @@ function __workbranch_completing_noti_task
     test (count $tokens) -ge 3; and test $tokens[2] = noti; and contains -- $tokens[3] add list clear
 end
 
+function __workbranch_completing_stash_subcommand
+    set -l tokens (commandline -opc)
+    test (count $tokens) -eq 2; and test $tokens[2] = stash
+end
+
 function __workbranch_completing_command
     set -l tokens (commandline -opc)
     set -l current (commandline -ct)
@@ -208,6 +226,7 @@ end
 complete -c workbranch -f -n '__workbranch_completing_command' -a '(__workbranch_complete_commands)'
 complete -c workbranch -f -n '__workbranch_seen_command update' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_completing_noti_subcommand' -a 'add list clear'
+complete -c workbranch -f -n '__workbranch_completing_stash_subcommand' -a 'push pop apply list show drop'
 complete -c workbranch -f -n '__workbranch_completing_noti_task' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command refresh' -a '(__workbranch_complete_tasks)'
 complete -c workbranch -f -n '__workbranch_seen_command remove' -a '(__workbranch_complete_tasks)'
@@ -226,6 +245,9 @@ complete -c workbranch -n '__workbranch_seen_command config' -l rewrite -d 'Rewr
 complete -c workbranch -n '__workbranch_seen_command remove' -l force -d 'Force removal'
 complete -c workbranch -n '__workbranch_seen_command destroy' -l force -d 'Force destruction'
 complete -c workbranch -n '__workbranch_seen_command doctor' -l fix -d 'Apply safe repairs'
+complete -c workbranch -n '__workbranch_seen_command stash' -s m -l message -d 'Stash message'
+complete -c workbranch -n '__workbranch_seen_command stash' -l branch -d 'Use another branch stash slot'
+complete -c workbranch -n '__workbranch_seen_command stash' -l index -d 'Also restore the index'
 complete -c workbranch -n '__workbranch_seen_command update' -l all -d 'Update every task workspace'
 complete -c workbranch -n '__workbranch_seen_command update' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command status' -l repo -d 'Limit operation to one repo'

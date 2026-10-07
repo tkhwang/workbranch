@@ -22,6 +22,7 @@ main() {
     status) cmd_status "$@" ;;
     doctor) cmd_doctor "$@" ;;
     pull) cmd_pull "$@" ;;
+    stash) cmd_stash "$@" ;;
     update) cmd_update "$@" ;;
     refresh) cmd_refresh "$@" ;;
     finalize) cmd_finalize "$@" ;;

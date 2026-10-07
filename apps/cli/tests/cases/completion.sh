@@ -23,6 +23,7 @@ test_complete_helpers_list_tasks_repos_and_commands() {
   assert_contains "$commands" "prune"
   assert_not_contains "$commands" "memo"
   assert_contains "$commands" "noti"
+  assert_contains "$commands" "stash"
   assert_contains "$commands" "destroy"
   assert_not_contains "$commands" "forget"
 }
@@ -102,6 +103,12 @@ test_completion_bash_completes_tasks_and_repos() {
   assert_contains "${COMPREPLY[*]}" "add"
   assert_contains "${COMPREPLY[*]}" "list"
   assert_contains "${COMPREPLY[*]}" "clear"
+
+  COMP_WORDS=(workbranch stash "")
+  COMP_CWORD=2
+  _workbranch
+  assert_contains "${COMPREPLY[*]}" "pop"
+  assert_contains "${COMPREPLY[*]}" "drop"
 
   COMP_WORDS=(workbranch noti add "")
   COMP_CWORD=3

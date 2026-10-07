@@ -38,6 +38,10 @@ Git:
   land <task>       Land task branches into base branches
   common
   --repo <repo>     Limit operation to one repo; otherwise all repos
+  current worktree
+  stash [-m <msg>]  Save changes under this branch, not the shared git stash
+  stash pop|apply   Restore this branch's saved changes
+  stash list|show|drop  Inspect or discard branch-scoped stashes
 Combined:
   refresh           Pull base branches, then update every task workspace
   refresh <task>    Pull base branches, then update one task workspace
@@ -89,6 +93,10 @@ usage_enhanced() {
   printf '  land <task>       Land task branches into base branches\n'
   printf '%s  common%s\n' "$WB_GRAY" "$WB_RESET"
   printf '  --repo <repo>     Limit operation to one repo; otherwise all repos\n'
+  printf '%s  current worktree%s\n' "$WB_GRAY" "$WB_RESET"
+  printf '  stash [-m <msg>]  Save changes under this branch, not the shared git stash\n'
+  printf '  stash pop|apply   Restore this branch'"'"'s saved changes\n'
+  printf '  stash list|show|drop  Inspect or discard branch-scoped stashes\n'
   section "Combined"
   printf '  refresh           Pull base branches, then update every task workspace\n'
   printf '  refresh <task>    Pull base branches, then update one task workspace\n'
