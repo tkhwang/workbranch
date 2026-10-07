@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.31.0](https://github.com/tkhwang/workbranch/compare/v2.30.0...v2.31.0) (2026-10-07)
+
+
+### Features
+
+* **stash:** add branch-scoped stash command ([3b15ebb](https://github.com/tkhwang/workbranch/commit/3b15ebbbecab83ccf60aab4436b61a5654a41f03))
+* **stash:** add branch-scoped stash command ([6a95727](https://github.com/tkhwang/workbranch/commit/6a95727edbfa9aa2c9ef7cd8e1809af7ab5f503f))
+
 ## [2.30.0](https://github.com/tkhwang/workbranch/compare/v2.29.0...v2.30.0) (2026-10-07)
 
 
