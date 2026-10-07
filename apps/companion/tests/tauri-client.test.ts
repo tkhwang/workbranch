@@ -9,7 +9,6 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: tauri.invoke }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: tauri.listen }));
 
 import {
-	appendActivityEvents,
 	applyUpdates,
 	CompanionActionError,
 	checkUpdates,
@@ -17,7 +16,7 @@ import {
 	onRootChanged,
 	onWindowFocused,
 	quitCompanion,
-	readActivityEvents,
+	readUsageSnapshot,
 	refreshRoot,
 	runAction,
 } from "../src/infrastructure/tauriClient";
@@ -62,64 +61,49 @@ describe("root refresh", () => {
 	});
 });
 
-describe("appendActivityEvents", () => {
+describe("readUsageSnapshot", () => {
 	beforeEach(() => {
 		tauri.invoke.mockReset();
 	});
 
-	it("invokes the Tauri activity append command with event payloads", async () => {
-		tauri.invoke.mockResolvedValue(undefined);
+	const provider = {
+		available: true,
+		limits: {
+			observedAt: 100,
+			plan: "pro",
+			windows: [{ windowMinutes: 10080, usedPercent: 32, resetsAt: 900 }],
+		},
+		buckets: [{ start: 0, input: 1, output: 2, cacheRead: 3, cacheWrite: 4 }],
+		errors: [],
+	};
 
-		await appendActivityEvents([
-			{
-				v: 1,
-				editedAt: 20,
-				observedAt: 100,
-				root: "/tmp/workbranch",
-				project: "workbranch",
-				task: "feat-login",
-				plan: "Backend",
-				planIndex: 0,
-				planTitle: "Backend",
-				planStatus: "in-progress",
-				status: "in-progress",
-				taskProgressDone: 1,
-				taskProgressTotal: 2,
-				progressDone: 1,
-				progressTotal: 2,
-				items: [{ text: "Run verification", checked: false, depth: 1 }],
-			},
-		]);
-
-		expect(tauri.invoke).toHaveBeenCalledWith("append_activity_events", {
-			events: [
-				expect.objectContaining({
-					editedAt: 20,
-					planTitle: "Backend",
-				}),
-			],
+	it("asks Rust for the requested day span and keeps the validated payload", async () => {
+		tauri.invoke.mockResolvedValue({
+			generatedAt: 200,
+			since: 0,
+			claude: { ...provider, limits: null },
+			codex: provider,
 		});
-	});
-});
 
-describe("readActivityEvents", () => {
-	beforeEach(() => {
-		tauri.invoke.mockReset();
+		const snapshot = await readUsageSnapshot(14);
+
+		expect(tauri.invoke).toHaveBeenCalledWith("usage_snapshot", { days: 14 });
+		expect(snapshot.claude.limits).toBeNull();
+		expect(snapshot.codex.limits?.windows[0]?.resetsAt).toBe(900);
+		expect(snapshot.codex.buckets[0]?.cacheWrite).toBe(4);
 	});
 
-	it("invokes the Tauri activity read command and filters invalid rows", async () => {
-		tauri.invoke.mockResolvedValue([
-			{ observedAt: 100, root: "/r", project: "workbranch", task: "feat-x" },
-			{ observedAt: 200, project: "missing-root", task: "bad" },
-		]);
-
-		await expect(readActivityEvents(0, 300)).resolves.toEqual([
-			{ observedAt: 100, root: "/r", project: "workbranch", task: "feat-x" },
-		]);
-		expect(tauri.invoke).toHaveBeenCalledWith("read_activity_events", {
-			fromEpoch: 0,
-			toEpoch: 300,
+	it("rejects a payload with a malformed bucket instead of drawing it", async () => {
+		tauri.invoke.mockResolvedValue({
+			generatedAt: 200,
+			since: 0,
+			claude: provider,
+			codex: { ...provider, buckets: [{ start: 0, input: -1 }] },
 		});
+
+		await expect(readUsageSnapshot(14)).rejects.toThrow(
+			/Invalid usage snapshot/,
+		);
 	});
 });
 

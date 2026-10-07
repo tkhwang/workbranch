@@ -6,9 +6,7 @@ Tauri v2 + React menu bar companion for the `workbranch` CLI.
 
 The companion is a presentation-first consumer of the CLI JSON contract. It reads task state through `workbranch list --global --json`, maps the DTOs through `packages/contract`, and delegates only the v1 allowlisted operational actions to the CLI: memo edit/clear, notification clear, Finder/IDE/terminal launch, and copy path. Task lifecycle and Git mutation commands remain CLI-only.
 
-The Activity view reads the local append-only activity log and renders project-colored task sessions in day or three-day calendar timelines. It is a navigation/reporting surface only; activity recording still comes from normal Companion refreshes and CLI state changes.
-
-Weekly limit accounts are frontend-owned state in the Tauri store file `companion-limits.json` (next to `companion-preferences.json` and `companion-notes.json`). Each account stores a label and the next reset instant entered from the coding agent's `/usage` output; the Main view derives the current seven-day window from that anchor and never reads actual usage.
+Agent usage comes from the Rust `usage_snapshot` command (`src-tauri/src/usage.rs`), which reads only files the agents already write: Claude Code transcripts under `~/.claude/projects` (each response counted once by `message.id` + `requestId`) and the `/usage` result Claude Code caches in `~/.claude.json`, plus Codex rollouts under `~/.codex/sessions` and `~/.codex/archived_sessions` (token deltas from `total_token_usage`, limits from `rate_limits`). `CLAUDE_CONFIG_DIR` and `CODEX_HOME` are honored. It never signs in or touches the network, keeps parsed files in memory keyed by size and mtime, and returns 15-minute token buckets that the frontend folds into local days. Daily totals match ccusage.
 
 ## Development
 

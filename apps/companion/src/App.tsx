@@ -1,7 +1,5 @@
 import { isTauri } from "@tauri-apps/api/core";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityCalendarView } from "./activity/ActivityCalendarView";
-import { createActivityRefresh } from "./application/activity";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { SetupAction } from "./application/connections";
 import {
 	buildMainViewModel,
@@ -11,12 +9,11 @@ import {
 import { updateTargets } from "./application/updates";
 import { useCompanionSettings } from "./application/useCompanionSettings";
 import { useConnections } from "./application/useConnections";
-import { useLimitAccounts } from "./application/useLimitAccounts";
 import { useRepoNotes } from "./application/useRepoNotes";
 import { useUpdates } from "./application/useUpdates";
+import { useUsage } from "./application/useUsage";
 import type { AgentSession, GlobalState, Task } from "./domain/model";
 import {
-	appendActivityEvents,
 	type CompanionCommand,
 	companionErrorMessage,
 	isCliCompatibilityError,
@@ -25,7 +22,6 @@ import {
 	onRootChanged,
 	onWindowFocused,
 	quitCompanion,
-	readActivityEvents,
 	refreshRoot,
 	refreshRuntime,
 	refreshStatus,
@@ -42,14 +38,11 @@ import { StageBoard } from "./ui/StageBoard";
 import { StatusAlert } from "./ui/StatusAlert";
 import type { TaskActionKind } from "./ui/TaskRow";
 import { UpdatePanel } from "./ui/UpdatePanel";
-import { WeeklyLimitGauge } from "./ui/WeeklyLimitGauge";
+import { UsageSummary } from "./ui/UsageSummary";
+import { UsageView } from "./ui/UsageView";
 
 const EMPTY_STATE: GlobalState = { projects: [], errors: [] };
 const TAURI_RUNTIME_UNAVAILABLE = "Tauri runtime unavailable";
-
-function currentEpochSeconds(): number {
-	return Math.floor(Date.now() / 1000);
-}
 
 function commandForTaskAction(
 	task: Task,
@@ -65,14 +58,9 @@ function commandForTaskAction(
 	}
 }
 
-export function nextActivityReloadToken(current: number): number {
-	return current + 1;
-}
-
 export function App() {
 	const [state, setState] = useState<GlobalState>(EMPTY_STATE);
 	const stateRef = useRef<GlobalState>(EMPTY_STATE);
-	const [activityReloadToken, setActivityReloadToken] = useState(0);
 	const [status, setStatus] = useState("Ready");
 	const [visibleError, setVisibleError] = useState<string>();
 	const [setupError, setSetupError] = useState(false);
@@ -99,16 +87,7 @@ export function App() {
 	const tauriRuntimeAvailable = isTauri();
 	const connections = useConnections(tauriRuntimeAvailable);
 	const [onboardingDismissed, setOnboardingDismissed] = useState(false);
-	const refreshWithActivity = useMemo(
-		() =>
-			createActivityRefresh({
-				refresh: refreshStatus,
-				refreshRoot,
-				append: appendActivityEvents,
-				now: currentEpochSeconds,
-			}),
-		[],
-	);
+	const usage = useUsage(tauriRuntimeAvailable);
 
 	const showStatus = useCallback((message: string) => {
 		setStatus(message);
@@ -141,10 +120,6 @@ export function App() {
 		onError: showError,
 		onStatus: showStatus,
 	});
-	const { accounts, saveAccounts } = useLimitAccounts({
-		onError: showError,
-		onStatus: showStatus,
-	});
 	const activeTheme = preferences.theme;
 
 	const applyState = useCallback(
@@ -152,7 +127,6 @@ export function App() {
 			setCliCompatible(true);
 			stateRef.current = next;
 			setState(next);
-			setActivityReloadToken(nextActivityReloadToken);
 			showStatus("Updated");
 		},
 		[showStatus],
@@ -164,18 +138,13 @@ export function App() {
 			return;
 		}
 		try {
-			applyState(await refreshWithActivity.all());
+			void usage.refresh();
+			applyState(await refreshStatus());
 			setMigration(await migrateRuntime(false));
 		} catch (error) {
 			showError(error);
 		}
-	}, [
-		applyState,
-		refreshWithActivity,
-		showError,
-		showStatus,
-		tauriRuntimeAvailable,
-	]);
+	}, [applyState, usage.refresh, showError, showStatus, tauriRuntimeAvailable]);
 
 	// Opening the window replaces the removed manual refresh: it picks up
 	// newly registered projects and retries after errors.
@@ -231,19 +200,13 @@ export function App() {
 			const command = commandForTaskAction(task, kind);
 			try {
 				await runAction(command, root);
-				applyState(await refreshWithActivity.all());
+				applyState(await refreshStatus());
 				showStatus("Action complete");
 			} catch (error) {
 				showError(error);
 			}
 		},
-		[
-			applyState,
-			refreshWithActivity,
-			showError,
-			showStatus,
-			tauriRuntimeAvailable,
-		],
+		[applyState, showError, showStatus, tauriRuntimeAvailable],
 	);
 
 	useEffect(() => {
@@ -253,8 +216,8 @@ export function App() {
 		let stop: (() => void) | undefined;
 		let cancelled = false;
 		void startWorkspaceMonitor({
-			refresh: refreshWithActivity.all,
-			refreshRoot: refreshWithActivity.root,
+			refresh: refreshStatus,
+			refreshRoot,
 			getState: () => stateRef.current,
 			onState: applyState,
 			onError: showError,
@@ -279,7 +242,7 @@ export function App() {
 			cancelled = true;
 			stop?.();
 		};
-	}, [applyState, refreshWithActivity, showError, tauriRuntimeAvailable]);
+	}, [applyState, showError, tauriRuntimeAvailable]);
 
 	useEffect(() => {
 		if (!tauriRuntimeAvailable || !cliCompatible) {
@@ -439,12 +402,15 @@ export function App() {
 			) : null}
 			{currentView === "main" ? (
 				<section className="view-panel" aria-label="Main View">
+					{usage.snapshot ? (
+						<UsageSummary
+							onOpenDetails={() => setCurrentView("usage")}
+							snapshot={usage.snapshot}
+						/>
+					) : null}
 					{tauriRuntimeAvailable && !onboardingDismissed && needsOnboarding
 						? connectionPanel(true)
 						: null}
-					{accounts.length > 0 ? (
-						<WeeklyLimitGauge accounts={accounts} />
-					) : null}
 					<StageBoard
 						activeCount={main.activeCount}
 						baseRows={main.baseRows}
@@ -467,26 +433,15 @@ export function App() {
 					) : null}
 				</section>
 			) : null}
-			{currentView === "activity" ? (
-				<section
-					className="activity-view view-panel"
-					aria-label="Activity calendar"
-				>
-					<ActivityCalendarView
-						loadEvents={readActivityEvents}
-						reloadToken={activityReloadToken}
-						today={() => new Date()}
-					/>
-				</section>
+			{currentView === "usage" ? (
+				<UsageView error={usage.error} snapshot={usage.snapshot} />
 			) : null}
 			{currentView === "settings" ? (
 				<SettingsView
 					connections={connectionPanel(false)}
-					accounts={accounts}
 					preferences={preferences}
 					launchAtLogin={launchAtLogin}
 					launchAtLoginLoading={launchAtLoginLoading}
-					onAccountsChange={(next) => void saveAccounts(next)}
 					onLaunchAtLoginChange={(enabled) => void updateLaunchAtLogin(enabled)}
 					onPreferencesChange={(next) => void updatePreferences(next)}
 				/>

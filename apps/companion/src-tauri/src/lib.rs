@@ -5,11 +5,11 @@ use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, State};
 use thiserror::Error;
 
-mod activity_store;
 mod process_env;
 mod setup;
 mod tray;
 mod update;
+mod usage;
 mod watch_filter;
 mod watch_roots;
 mod watch_scope;
@@ -36,6 +36,11 @@ enum CompanionError {
 #[derive(Default)]
 struct WatcherStore {
     watchers: Arc<Mutex<WatcherSet>>,
+}
+
+#[derive(Default)]
+struct UsageStore {
+    cache: Arc<Mutex<usage::UsageCache>>,
 }
 
 impl serde::Serialize for CompanionError {
@@ -139,24 +144,27 @@ async fn workbranch_migrate(apply: bool) -> Result<RunResult, CompanionError> {
     .map_err(|e| std::io::Error::other(e.to_string()))?
 }
 
+/// Reads Claude Code and Codex usage from their local files only.
 #[tauri::command]
-async fn append_activity_events(
-    events: Vec<activity_store::ActivityEvent>,
-) -> Result<(), CompanionError> {
+async fn usage_snapshot(
+    days: u32,
+    store: State<'_, UsageStore>,
+) -> Result<usage::UsageSnapshot, CompanionError> {
+    let cache = Arc::clone(&store.cache);
     tauri::async_runtime::spawn_blocking(move || {
-        activity_store::append_activity_events_default(&events)
-    })
-    .await
-    .map_err(|error| std::io::Error::other(error.to_string()))?
-}
-
-#[tauri::command]
-async fn read_activity_events(
-    from_epoch: u64,
-    to_epoch: u64,
-) -> Result<Vec<serde_json::Value>, CompanionError> {
-    tauri::async_runtime::spawn_blocking(move || {
-        activity_store::read_activity_events_default(from_epoch, to_epoch)
+        let paths = usage::UsagePaths::from_env().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "HOME is required to read agent usage",
+            )
+        })?;
+        let mut guard = cache
+            .lock()
+            .map_err(|_| std::io::Error::other("usage cache lock poisoned"))?;
+        let now = usage::now_epoch();
+        // One spare day lets the UI cut local-midnight boundaries in any time zone.
+        let since = now.saturating_sub((u64::from(days.clamp(1, 60)) + 1) * 86_400);
+        Ok(usage::snapshot(&mut guard, &paths, now, since))
     })
     .await
     .map_err(|error| std::io::Error::other(error.to_string()))?
@@ -298,6 +306,7 @@ pub fn run() {
     let builder = builder
         .plugin(tauri_plugin_positioner::init())
         .manage(WatcherStore::default())
+        .manage(UsageStore::default())
         .setup(|app| {
             tray::install(app)?;
             Ok(())
@@ -313,8 +322,7 @@ pub fn run() {
             workbranch_runtime,
             workbranch_migrate,
             workbranch_run,
-            append_activity_events,
-            read_activity_events,
+            usage_snapshot,
             watch_roots,
             quit_app,
         ]);

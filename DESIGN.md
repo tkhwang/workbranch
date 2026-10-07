@@ -28,12 +28,12 @@
   - Make intervention needs and the latest tool activity scannable without opening session details.
   - Keep repo branch/dirty state available as supporting details.
   - Keep actions discoverable but visually secondary.
-  - Let the user choose a Claude Code or Codex CLI experience that applies to Main, Activity, and Settings.
+  - Let the user choose a Claude Code or Codex CLI experience that applies to Main, Usage, and Settings.
+  - Show how much of each agent's plan limits is used and how many tokens each agent burned, without signing in anywhere.
 - Non-goals:
   - Task lifecycle mutation UI.
-  - Full activity report implementation.
   - New UI dependency stack.
-  - Reading actual token usage from Claude Code or Codex accounts; the weekly limit gauge is time-based only.
+  - OAuth, API keys, Keychain or network reads for usage; Companion reads only files the agents already write, so limits can lag and must say so.
 - Success signals:
   - A user can identify active/blocked work in under three seconds.
   - A user can identify which workspace needs attention without expanding it.
@@ -50,14 +50,14 @@
 - Key contexts of use: quick menu bar glance while coding, before switching tasks, during AI-agent execution.
 
 ## Information architecture
-- Primary navigation: an inset floating terminal tab bar anchored to the viewport bottom with three destinations: Main, Activity, Settings.
-- Core screens: Main runtime-grouped workspace view, Activity report, Settings preferences view.
+- Primary navigation: an inset floating terminal tab bar anchored to the viewport bottom with three destinations: Main, Usage, Settings.
+- Core screens: Main runtime-grouped workspace view, Usage detail view, Settings preferences view.
 - Content hierarchy:
   1. Compact global inventory (`projects · tasks`) and two icon-only controls: update check and quit. Opening the window from the tray refreshes everything, so there is no manual refresh control.
   2. Active view content.
-  3. Main view: optional weekly limits, runtime session counts, a `내 응답 대기 | 실행 중 | 턴 종료 · 검토` kanban board, then a `WORKSPACES` inventory for session-less, unknown and inactive tasks. Every card shows IDE/Terminal/Finder launchers and repo/branch Git facts without expanding; expanding adds last commits and session request/activity/response excerpts. Base repositories remain in a supporting disclosure.
-  4. Activity view: existing day/three-day calendar, session selection, and reload behavior inside the agent shell.
-  5. Settings view: launch-at-login, font, text size, agent theme, and weekly limit account controls (label plus next reset `datetime-local`).
+  3. Main view: a Claude | Codex usage summary (limits plus 14-day tokens), runtime session counts, a `내 응답 대기 | 실행 중 | 턴 종료 · 검토` kanban board, then a `WORKSPACES` inventory for session-less, unknown and inactive tasks. Every card shows IDE/Terminal/Finder launchers and repo/branch Git facts without expanding; expanding adds last commits and session request/activity/response excerpts. Base repositories remain in a supporting disclosure.
+  4. Usage view: per-agent limits and today's token mix, one daily chart with both agents on a shared scale, and a last-7-days table.
+  5. Settings view: launch-at-login, font, text size, and agent theme.
   6. Screen-reader live status in the agent shell; routine `Updated`/`Ready` text stays out of the visible header.
 
 ## Design principles
@@ -69,16 +69,16 @@
 ## Visual language
 - Color: Settings exposes two fixed-dark agent themes. Claude Code uses low-saturation warm-graphite surfaces and neutral warm-gray borders; `#cd694a` remains the identity anchor but is reserved for compact prompt, focus, and active-state signals rather than broad backgrounds. Stage cards use existing neutral surfaces while blocked, review, done, and notification semantics use their existing tokens. `#c0caf5` remains primary terminal text and `#9aa5ce` is the brighter muted text. Codex uses brighter cool-neutral surfaces and borders, `#ededed` for primary text, `#a8a8ad` for muted text, and `#5cc2e0` only for command-like actions and links. Existing Companion, Light, Dark, System, and legacy family values migrate to Claude Code.
 - Typography: the agent shell, navigation, content panels, form controls, task metadata, and activity labels use the user-selected monospace stack. The fixed-dark type scale is raised by one pixel with no production size below `10px`, except that the narrow-width agent header remains `13px`; explicit WebKit antialias smoothing is removed so native rendering controls glyph weight. Weight, contrast, spacing, and rules create hierarchy instead of a sans/mono split.
-- Spacing/layout rhythm: compact terminal rhythm, 8px grid, row-first grouping, prompt markers, and thin rules. Main, Activity, and Settings use the same expanded agent header so switching tabs does not shift the content vertically.
+- Spacing/layout rhythm: compact terminal rhythm, 8px grid, row-first grouping, prompt markers, and thin rules. Main, Usage, and Settings use the same expanded agent header so switching tabs does not shift the content vertically.
 - Shape/radius/elevation: 6px agent headers, 8px runtime task corners, 6px session panels, neutral tonal separation and thin borders. No card lift or decorative gradient.
 - Motion: 120ms press/reveal feedback, plus a spinner on the button of a running action; respect reduced motion.
 - Imagery/iconography: compact state dots with text labels. Use existing IDE/Terminal/Finder icons on the first line of every runtime card; no decorative illustrations or task-complete checkmarks.
 
 ## Components
-- Existing components to reuse: action buttons, `TerminalPanel`, `PromptLine`, `StatusToken`, activity calendar behavior, and settings preference controls.
+- Existing components to reuse: action buttons, `TerminalPanel`, `PromptLine`, `StatusToken`, `ProviderIcon`, and settings preference controls.
 - New/changed components:
   - shared `AgentShell` that applies `claude` or `codex` to all views,
-  - shared expanded `AgentHeader` for Main, Activity, and Settings with one theme-neutral text anatomy,
+  - shared expanded `AgentHeader` for Main, Usage, and Settings with one theme-neutral text anatomy,
   - update control before quit: a text `↓` inside a 1.5px circular border (`arrow.down.circle`, download the new version) so it pairs with the outline `⏻`; after a check finds an installed package outdated it turns `--notify` with a 6px dot and its label becomes `Updates available`,
   - `UpdatePanel` below the header (opened by the update control, closed explicitly): CLI and Companion rows with installed/latest versions, the running Companion version, one update action whose label names the restart, and the shared connection log disclosure,
   - `AgentTabs` as an inset floating bottom terminal navigation,
@@ -88,15 +88,15 @@
   - top toolbar with icon-only update/quit controls and screen-reader-only live status,
   - Settings view preferences panel,
   - Settings preference sections always use the Claude Code `fieldset`/`legend` anatomy in both themes; the selected theme still owns colors and control state,
-  - Activity report view,
+  - Usage detail view,
   - switch row for launch-at-login,
   - font select row,
   - agent theme segmented control (`Claude Code`, `Codex`) with Claude Code as the default and migration target,
   - `RuntimeCard` (variants `card` and `row`) puts the project name (ellipsized) beside the icon-only launcher group on line one, then the task name on its own full-width line, the latest request, a state line (pill for the lead state such as `권한 승인 대기`, `실행 중`, `턴 종료`, `중단됨`/`오류로 종료`; plain faint `+N <state>` / `관측 불명 N` text for other sessions; one provider icon per distinct provider, lead session first, and the observation age pushed to the right), and one excerpt line (tool activity, or the last response on review cards). The repo block names a shared branch once with a branch icon, then one row per repo with name, compact facts and the note button; repos on different branches show their branch under their own row. The disclosure adds last commits and per-session details. Single click toggles the disclosure; double-click opens the IDE for repo-bearing tasks; the card carries no hover tooltip,
   - `StageRepoRow` containing repo/branch identity, compact Git facts (`●N` dirty files, `↑N`, `↓N`, and `CLEAN` only when none apply, with the full `DIRTY N FILES · BEHIND N` text in title/aria-label); in cards, repo names wrap at hyphens instead of truncating, last-commit relative time when expanded, and an inline note editor persisted in `companion-notes.json` by `repo:branch` key.
   - `BaseRepoRow` inside `StageBoard`, showing base branch, dirty and cached origin/base-branch differences. Quiet dots identify clean rows; notify/blocked tokens identify warning/problem rows. PULL/PUSH/CHECK pills are non-interactive guidance, not execution controls. Dirty + behind is warn/CHECK until clean, then PULL; ahead-only is PUSH, dirty-only has no pill. Missing, mismatch, divergence, missing remote and inspection errors use CHECK. Inspection errors show UNAVAILABLE with a safe reason, never sentinel CLEAN/0 facts, and do not hide healthy sibling repositories or tasks.
-  - `WeeklyLimitGauge` above the stage board: a `WEEKLY LIMITS N` caption whose right side names the axis range (`9/15 – 9/29`), a hidden two-week date axis (`now − 7d … now + 7d`, local-midnight cells labelled by day number, today emphasized, labels thinned by axis width) and one row per configured account. Each row is a label, an SVG window bar (last reset → next reset, always half the axis, elapsed part filled, reset marks at both ends) crossed by the fixed centre now line, and `remaining · Day HH:MM` facts with a `FRESH` (first 24h) or `SOON` (last 24h) pill. Columns align through CSS `subgrid`; the panel is absent without accounts.
-  - Settings `Weekly Limits` section: one row per account with a label input, a `datetime-local` next-reset input that shows the normalized upcoming reset, and a remove button, plus `+ Add account` (max 12) and a hint that the gauge is time-based.
+  - `UsageSummary` above the stage board: always two columns, one per agent (`ProviderIcon`, name, plan such as `max 20x`, and `Nh 전 관측`) with compact limit rows (`label | bar | % | remaining · Day HH:MM`; under 560px the reset text drops below the bar) and a `today · 7d` foot. A 5h row appears only when the agent reports a 5h window (Claude today); a window whose reset passed reads 0%, a never-started one reads `미시작`. Below the columns, a `DAILY TOKENS · 7d` chart pairs both agents per day for the last seven days ending today: each day is a tinted slot (weekends darker, today outlined) over a two-line axis of day number (with the month on the first day and on the 1st) and Korean weekday initial, and each day lists both agents' totals in their colors. A `Usage 탭에서 자세히 ›` link opens the Usage view. It is the first block in Main, above the setup onboarding panel, and absent until the first snapshot loads.
+  - `UsageView`: the same columns with detail limit rows (large %, full-width bar) and a TODAY block (total, `in · out`, `cache r · w`, 7d; `오늘 사용 없음 · 어제 N` when idle), a `DAILY TOKENS · 14d` chart pairing both agents per day on one scale, a `LAST 7 DAYS` table, and a footnote that only local files are read.
 - Variants and states: running/waiting/finished/idle with independent observed/uncertain/stale confidence. Unknown or unobserved workspaces remain visible.
 - Shared header anatomy: Claude Code and Codex use the same text-only title block: `Workbranch Companion` above `projects · tasks`. The top banner contains no Workbranch mark, product icon, or Claude/Codex prompt prefix; theme identity comes from surrounding color tokens rather than different header geometry. Task metadata rows may retain their theme-specific prompt and action accents.
 - Token/component ownership: `style.css` is the CSS import manifest; `src/styles/base.css`, `themes.css`, `chrome.css`, `stage-board.css`, `limit-gauge.css`, `task-details.css`, `task-actions.css`, `status-groups.css`, `settings.css`, and `motion.css` own CSS custom properties and component classes by surface.
@@ -123,7 +123,7 @@
 - Pending: a long-running action (CLI install/update/repair, agent connect/disconnect, update check/apply, runtime migration) keeps its own button with `aria-busy`, a small ring spinner and a `… 중…` label at full text color while sibling actions wait muted. Reduced motion stops the spinner; the label still reports progress.
 - Runtime card selection: pointer single click or native activation selects the task in place and toggles its details. Pointer double-click opens the configured IDE target only for repo-bearing tasks and leaves the disclosure as it was; keyboard users use the IDE launcher button. Repo-less tasks expose `NO REPOSITORIES`, disabled IDE, and enabled Terminal/Finder actions. Selection no longer synchronizes to a second surface or calls `scrollIntoView`.
 - Repo note editing: each repo/branch exposes one edit button. Opening autofocuses the textarea; command/control-enter saves, Escape cancels and restores the prior value, blur saves, and saving blank text removes the key. Notes persist in `companion-notes.json` under `repo:branch` and survive task/worktree removal.
-- Weekly limit accounts: edits save immediately through the `companion-limits.json` store queue and restore the previous list when a save fails. A blank label displays as `Account N`; an empty or unparsable `datetime-local` value is ignored; a stored next reset that has already passed (or lies more than a week ahead) is normalized onto its weekly cadence for display and for the gauge without rewriting the file. The gauge recomputes every 60 seconds without animation.
+- Usage freshness: the snapshot reloads every 60 seconds and whenever the window opens. Each agent shows its limits' observation age; a 5h reading older than one hour or a weekly reading older than six hours is stale: its bar and percentage dim and the age turns `--notify`. Read failures keep the last good snapshot on screen with the error below it. Token totals include cache reads (ccusage-compatible) and the detail view breaks out input, output, cache read and cache write.
 - Theme selection: Settings is the only visible theme switch surface. Selection applies to every view immediately and persists through the existing preference store. Unsupported and legacy theme values migrate to Claude Code.
 - Offline/slow network: not applicable; CLI/local filesystem driven.
 
@@ -137,9 +137,9 @@
 - Design-token constraints: CSS custom properties remain in the existing theme/base files; `style.css` is the import manifest.
 - Performance constraints: no extra runtime package; no animation loops; preserve 0033 responsiveness fixes.
 - Compatibility constraints: schema v1 adds optional project-level `baseRepos`; each present base repo has ten required fields including nullable `inspectionError`. Missing `baseRepos` from older CLI output maps to an empty group. Tauri command shape and Rust ports remain unchanged; Companion delegates configured IDE/path behavior to the existing task-level launcher commands. Status reads never fetch; pills reflect cached remote-tracking refs rather than guaranteeing the next Git command can execute.
-- Layout constraints: the weekly limit table relies on CSS `subgrid` (available in the WebKit shipped with the macOS 13.0 minimum system version) so the axis header and account rows share columns, and the date axis is a size container whose `@container` queries thin the date labels to every other or every fourth day as the axis narrows; that surface avoids `color-mix`.
+- Layout constraints: the usage summary and Usage view are `usage` size containers; their agent columns sit side by side from 720px (matching the runtime board's three-column breakpoint) and stack below it, so the 460px minimum still reads one agent per row.
 - Scope constraints: do not add keyboard shortcuts or display shortcut hints for behavior that does not exist.
-- Test/screenshot expectations: cover both theme variants, the 860px primary and 460px minimum boundaries, lifecycle-ordered stage groups, current work, repo facts, note edit/save/cancel/delete, task selection/actions, and Main/Activity/Settings shell contracts with Vitest. Run typecheck, lint, Vite build, Tauri build, then inspect both themes at both widths before final handoff.
+- Test/screenshot expectations: cover both theme variants, the 860px primary and 460px minimum boundaries, lifecycle-ordered stage groups, current work, repo facts, note edit/save/cancel/delete, task selection/actions, usage summary/detail states, and Main/Usage/Settings shell contracts with Vitest. Run typecheck, lint, Vite build, Tauri build, then inspect both themes at both widths before final handoff.
 
 ## Open questions
 - [ ] Whether a later release should restore a light appearance as a separate axis after the two fixed-dark agent themes ship.
@@ -192,6 +192,7 @@
 - 2026-10-05 (update check): Added a header update control and an `UpdatePanel` that reuses the connection-step anatomy. The check is click-only because it runs `brew update`; the dot appears only after a check found an installed, outdated package. The single update button upgrades the CLI before the Companion and says `업데이트 후 재시작` whenever the Companion will restart.
 - 2026-10-05 (two-icon header): Removed the `↻` refresh control; fs watches, the 1s runtime poll and the 5-minute heartbeat already cover routine changes, and the window now refreshes everything when the tray opens it, which also covers newly registered projects and retry after errors. The header keeps `update | quit`. The update icon became a CSS-ringed `↓` after `↥`/`⤒` read too small, filled `⬆︎` outweighed `⏻`, and `⭱`/`⮉` depended on non-system fonts. `↓` reads as downloading the new version, like the `↓N` behind fact; `↻` was rejected because it meant refresh-tasks until now, while this control runs a slow, networked `brew update`.
 - 2026-10-06 (setup progress): Setup and update buttons now show their own running state (spinner plus `연결 중…`-style label) because the only progress line sat at the bottom of a long panel and scrolled out of view, so clicks looked ignored. Disabled buttons became visibly muted after a missing-agent `연결` looked enabled yet did nothing. An action's result moved beside its button for the same reason. Agent lookup also reads the login shell PATH: a Finder launch had reported a version-manager-installed Codex as `Agent 미설치`.
+- 2026-10-07 (local usage): Replaced the brief-fed Activity calendar and the manual, time-only `WEEKLY LIMITS` gauge. Main now opens with a Claude | Codex usage summary (limits plus 14-day token bars) and the third tab became Usage (per-agent detail, shared daily chart, 7-day table). Data comes only from the agents' local files — Claude transcripts and its cached `/usage` in `~/.claude.json`, Codex rollouts — so nothing asks for OAuth or Keychain access; the cost is freshness, which every limit row states. HTML comparison rounds chose the side-by-side Usage B layout and the chart-below-limits Main summary; Codex shows no 5h row because its plan reports none.
 
 ## Agent runtime surface (0060)
 
