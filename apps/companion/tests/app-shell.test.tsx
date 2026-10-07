@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { App, nextActivityReloadToken } from "../src/App";
+import { App } from "../src/App";
 import { StatusAlert } from "../src/ui/StatusAlert";
 
 function readCssContract(path: string, visited = new Set<string>()): string {
@@ -65,24 +65,27 @@ describe("App shell settings wiring", () => {
 		expect(appSource).toContain("{model.errors.map");
 	});
 
-	it("wires weekly limit accounts above the stage board and into settings", () => {
+	it("puts the usage summary above the stage board and usage details in their own tab", () => {
 		const appSource = readFileSync("src/App.tsx", "utf8");
 
-		expect(appSource).toContain("useLimitAccounts({");
-		expect(appSource).toContain("accounts.length > 0 ?");
-		expect(appSource).toContain("<WeeklyLimitGauge accounts={accounts} />");
-		expect(appSource.indexOf("<WeeklyLimitGauge")).toBeLessThan(
+		expect(appSource).toContain("useUsage(tauriRuntimeAvailable)");
+		expect(appSource.indexOf('aria-label="Main View"')).toBeLessThan(
+			appSource.indexOf("<UsageSummary"),
+		);
+		expect(appSource.indexOf("<UsageSummary")).toBeLessThan(
+			appSource.indexOf("connectionPanel(true)"),
+		);
+		expect(appSource.indexOf("<UsageSummary")).toBeLessThan(
 			appSource.indexOf("<StageBoard"),
 		);
-		expect(appSource.indexOf('aria-label="Main View"')).toBeLessThan(
-			appSource.indexOf("<WeeklyLimitGauge"),
-		);
-		expect(appSource).toContain("accounts={accounts}");
 		expect(appSource).toContain(
-			"onAccountsChange={(next) => void saveAccounts(next)}",
+			'onOpenDetails={() => setCurrentView("usage")}',
 		);
+		expect(appSource).toContain('currentView === "usage"');
+		expect(appSource).not.toContain("WeeklyLimitGauge");
+		expect(appSource).not.toContain("Activity");
 		expect(readFileSync("src/style.css", "utf8")).toContain(
-			'@import "./styles/limit-gauge.css";',
+			'@import "./styles/usage.css";',
 		);
 	});
 
@@ -107,11 +110,6 @@ describe("App shell settings wiring", () => {
 
 		expect(appSource).toContain("onWindowFocused(");
 		expect(appSource).not.toContain("onRefresh={() => void refresh()}");
-	});
-
-	it("advances the activity reload token after successful app refreshes", () => {
-		expect(nextActivityReloadToken(0)).toBe(1);
-		expect(nextActivityReloadToken(41)).toBe(42);
 	});
 
 	it("skips already-read CSS imports to avoid import cycles", () => {
@@ -158,7 +156,7 @@ describe("App shell settings wiring", () => {
 		expect(html).toContain('class="runtime-summary"');
 		expect(html).not.toContain("ALL REPOSITORIES");
 		expect(html).toContain(">Main</button>");
-		expect(html).toContain(">Activity</button>");
+		expect(html).toContain(">Usage</button>");
 		expect(html).toContain(">Settings</button>");
 		expect(html).toContain('role="status"');
 		expect(html).toContain('aria-live="polite"');
@@ -438,7 +436,9 @@ describe("App shell settings wiring", () => {
 		expect(css).toMatch(
 			/\.font-preview-label\s*\{[^}]*color:\s*var\(--muted\)/s,
 		);
-		expect(css).toMatch(/\.cal-hour-label\s*\{[^}]*color:\s*var\(--muted\)/s);
+		expect(css).toMatch(
+			/\.usage-limit-label\s*\{[^}]*color:\s*var\(--muted\)/s,
+		);
 		expect(css).toMatch(
 			/\.stage-repo-branch\s*\{[^}]*color:\s*var\(--faint\)/s,
 		);
@@ -482,17 +482,11 @@ describe("App shell settings wiring", () => {
 			/\.font-preview-label\s*\{[^}]*font-size:\s*var\(--fs-label\)/s,
 			/\.font-preview-meta\s*\{[^}]*font-size:\s*var\(--fs-meta\)/s,
 			/\.agent-theme-button\s*\{[^}]*font-size:\s*var\(--fs-body\)/s,
-			/\.cal-title\s*\{[^}]*font-size:\s*var\(--fs-ui\)/s,
-			/\.cal-nav-button,\s*\.cal-today-button,\s*\.cal-mode-button,\s*\.cal-chip\s*\{[^}]*font-size:\s*var\(--fs-body\)/s,
-			/\.cal-hour-label\s*\{[^}]*font-size:\s*var\(--fs-label\)/s,
-			/\.cal-day-heading\s*\{[^}]*font-size:\s*var\(--fs-meta\)/s,
-			/\.cal-block-task\s*\{[^}]*font-size:\s*var\(--fs-body\)/s,
-			/\.cal-block-time\s*\{[^}]*font-size:\s*var\(--fs-meta\)/s,
-			/\.cal-block-plan\s*\{[^}]*font-size:\s*var\(--fs-label\)/s,
-			/\.cal-timeline\[data-mode="day"\]\s*\.cal-session\[data-width="narrow"\]\s*\.cal-block-task\s*\{[^}]*font-size:\s*var\(--fs-meta\)/s,
-			/\.cal-timeline\[data-mode="day"\]\s*\.cal-session\[data-width="narrow"\]\s*\.cal-block-time\s*\{[^}]*font-size:\s*var\(--fs-label\)/s,
-			/\.cal-detail strong\s*\{[^}]*font-size:\s*var\(--fs-body\)/s,
-			/\.cal-detail span,\s*\.cal-detail li\s*\{[^}]*font-size:\s*var\(--fs-meta\)/s,
+			/\.usage-name\s*\{[^}]*font-size:\s*var\(--fs-meta\)/s,
+			/\.usage-limit\s*\{[^}]*font-size:\s*var\(--fs-meta\)/s,
+			/\.usage-limit-detail\s*\{[^}]*font-size:\s*var\(--fs-label\)/s,
+			/\.usage-axis\s*\{[^}]*font-size:\s*var\(--fs-label\)/s,
+			/\.usage-table\s*\{[^}]*font-size:\s*var\(--fs-meta\)/s,
 		] as const;
 
 		// Then native smoothing is used and no selector re-hardcodes a pixel size
@@ -549,20 +543,13 @@ describe("App shell settings wiring", () => {
 		);
 	});
 
-	it("keeps theme tokens in the theme contract and calendar fills theme-aware", () => {
+	it("keeps theme tokens in the theme contract", () => {
 		const baseCss = readFileSync("src/styles/base.css", "utf8");
 		const themeCss = readFileSync("src/styles/themes.css", "utf8");
-		const activityCss = readFileSync(
-			"src/activity/activity-calendar.css",
-			"utf8",
-		);
 
 		expect(baseCss).not.toContain("--surface-0:");
-		expect(themeCss).toContain("--cal-bg-1:");
-		expect(themeCss).toContain("--cal-bg-6:");
-		expect(activityCss).toContain("--cal-bg: var(--cal-bg-1)");
-		expect(activityCss).toContain("--cal-bg: var(--cal-bg-6)");
-		expect(activityCss).not.toMatch(/--cal-bg:\s*rgba\(/);
+		expect(themeCss).toContain("--provider-claude:");
+		expect(themeCss).toContain("--provider-codex:");
 	});
 
 	it("renders settings inside the flexible view panel so bottom nav stays at the shell bottom", () => {
@@ -570,7 +557,7 @@ describe("App shell settings wiring", () => {
 		// When the settings branch is inspected
 		const source = readFileSync("src/ui/SettingsView.tsx", "utf8");
 
-		// Then SettingsView uses the same flexing view-panel contract as Main and Activity
+		// Then SettingsView uses the same flexing view-panel contract as Main and Usage
 		expect(source).toContain('className="settings-view view-panel"');
 		expect(source).toContain('aria-label="Settings View"');
 		expect(source).toMatch(

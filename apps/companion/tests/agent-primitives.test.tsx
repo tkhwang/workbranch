@@ -99,12 +99,12 @@ describe("agent primitives", () => {
 
 	it("renders three text-only accessible terminal tabs", () => {
 		const html = renderToStaticMarkup(
-			<AgentTabs currentView="activity" onViewChange={() => undefined} />,
+			<AgentTabs currentView="usage" onViewChange={() => undefined} />,
 		);
 
 		expect(html.match(/<button/g)).toHaveLength(3);
 		expect(html).toContain(">Main</button>");
-		expect(html).toContain(">Activity</button>");
+		expect(html).toContain(">Usage</button>");
 		expect(html).toContain(">Settings</button>");
 		expect(html.match(/aria-current="page"/g)).toHaveLength(1);
 		expect(html).not.toContain("<svg");

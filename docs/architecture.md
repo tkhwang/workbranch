@@ -34,7 +34,7 @@ A task root is metadata outside Git; repositories live under `<task>/<repo>`. Ge
 
 ## Runtime and setup boundaries
 
-The Rust collector owns canonical Claude/Codex/Grok observations and embedded SQLite at `~/.workbranch/runtime/state.sqlite3`. Agent hooks invoke it independently of Companion. The CLI exposes Git inventory with list schema 2 and runtime with a separate snapshot schema 1. Companion refreshes runtime without re-running Git; historical activity reports are no longer fed by task briefs.
+The Rust collector owns canonical Claude/Codex/Grok observations and embedded SQLite at `~/.workbranch/runtime/state.sqlite3`. Agent hooks invoke it independently of Companion. The CLI exposes Git inventory with list schema 2 and runtime with a separate snapshot schema 1. Companion refreshes runtime without re-running Git. Token usage and plan limits are not part of the runtime collector: Companion reads them directly from the agents' own local files (see `apps/companion/README.md`).
 
 The Companion native setup port locates Homebrew and checks the CLI/collector capability contract even before the CLI is installed. Installation actions accept fixed enum/argv combinations for `tkhwang/tap/workbranch`, with bounded logs, process deadlines and one active setup action per app. Provider connection actions delegate to the CLI and native provider plugin managers without bypassing trust. Onboarding and Settings share one controller. Configuration and fresh event receipt are separate states.
 

@@ -15,7 +15,7 @@ Manage Git worktree task spaces without memorizing `git worktree` commands.
 
 `workbranch` creates one task folder per feature, works with one repo or many repos, and keeps branch refresh commands short and safe.
 
-The CLI reads shared workbranch project state and runs the task worktree/Git flow. Companion shows each task's AI agent sessions on a `내 응답 대기 | 실행 중 | 턴 종료 · 검토` (waiting on you | running | turn ended, review) board in the macOS menu bar, so you can see which agent needs your reply. Its Activity view builds a timeline from the separate local append-only activity log.
+The CLI reads shared workbranch project state and runs the task worktree/Git flow. Companion shows each task's AI agent sessions on a `내 응답 대기 | 실행 중 | 턴 종료 · 검토` (waiting on you | running | turn ended, review) board in the macOS menu bar, so you can see which agent needs your reply. A usage summary above the board and the Usage view show Claude Code and Codex token usage and plan limits, read from the agents' own local files.
 
 ![workbranch demo](./docs/figs/workbranch-demo.gif)
 
@@ -106,7 +106,7 @@ Before an agent starts, `workbranch refresh <task>` brings every repo in the tas
 
 See [AI agent workflows](docs/ai-agents.md) for the multi-repo benefits.
 
-Companion reads this structure through `workbranch list --global --json`. Below the runtime board, the Main view's collapsible `Base repositories` section shows each base repo's branch, dirty state, and ahead/behind counts against cached `origin/<baseBranch>` refs. PULL/PUSH/CHECK pills are guidance only; dirty + behind advises CHECK first, and an unreadable repo shows UNAVAILABLE without hiding healthy data. Reads do not fetch. The Activity timeline reads from the separate local append-only log; task creation, refresh, land, and push remain CLI actions.
+Companion reads this structure through `workbranch list --global --json`. Below the runtime board, the Main view's collapsible `Base repositories` section shows each base repo's branch, dirty state, and ahead/behind counts against cached `origin/<baseBranch>` refs. PULL/PUSH/CHECK pills are guidance only; dirty + behind advises CHECK first, and an unreadable repo shows UNAVAILABLE without hiding healthy data. Reads do not fetch. Task creation, refresh, land, and push remain CLI actions.
 
 ## Working on a task
 
@@ -207,12 +207,12 @@ Combined flow shortcuts:
 
 ## View with Companion
 
-Workbranch Companion is a macOS menu bar app with Main, Activity, and Settings views.
+Workbranch Companion is a macOS menu bar app with Main, Usage, and Settings views.
 
-- Main: a kanban board of agent runtime state. `내 응답 대기` (waiting on you) means the agent needs your permission, answer, plan approval, or input; `실행 중` (running) means it is working; `턴 종료 · 검토` (turn ended, review) means its turn ended and it is your turn to review, not that the task is done. A task appears once, in its lead session's column. Tasks with no session, an unknown (stale) observation, or only inactive sessions are listed under `WORKSPACES` below the board. An optional Weekly Limits panel above the board shows each configured coding-agent account's current weekly window and the time until its next reset
+- Main: a kanban board of agent runtime state. `내 응답 대기` (waiting on you) means the agent needs your permission, answer, plan approval, or input; `실행 중` (running) means it is working; `턴 종료 · 검토` (turn ended, review) means its turn ended and it is your turn to review, not that the task is done. A task appears once, in its lead session's column. Tasks with no session, an unknown (stale) observation, or only inactive sessions are listed under `WORKSPACES` below the board. A usage summary above the board shows Claude Code and Codex side by side: plan limits (Claude 5h and weekly, Codex weekly) with time to reset and today's tokens, then the last seven days by day with both agents' totals
 - Task cards: IDE/Terminal/Finder launchers and each repo's branch and Git facts (`●N` dirty files, `↑N` ahead, `↓N` behind, or `CLEAN`) are visible without expanding, next to the latest request, state, provider icon (Claude Code, Codex, or Grok Build), and observation age. Click a card for last commits and session details; double-click opens the task in your IDE. Each repo row keeps a note
-- Activity: reads `$XDG_STATE_HOME/workbranch/activity.jsonl` (default `~/.local/state/workbranch/activity.jsonl`) and shows day or three-day calendar timelines
-- Settings: controls launch at login, the interface font and text size, the Claude Code or Codex theme, weekly limit accounts (a label plus the next reset date and time from `/usage`), and CLI/agent connections
+- Usage: per-agent detail — limits, today's input/output/cache tokens, a shared 14-day daily chart, and a last-7-days table. Companion reads only local files and never signs in: Claude Code transcripts in `~/.claude/projects` and its cached `/usage` result in `~/.claude.json`, and Codex rollouts in `~/.codex/sessions`. Limits are the agents' last observation, so each shows its age and dims when stale; Claude's limits refresh when Claude Code refreshes `/usage`
+- Settings: controls launch at login, the interface font and text size, the Claude Code or Codex theme, and CLI/agent connections
 - Updates: the header's update button opens an update panel. It checks Homebrew only when you ask, and one update action upgrades the CLI before Companion. Setup and update buttons show a spinner while they run, and each result appears next to the button that ran it
 
 Companion reads hook-driven runtime snapshots separately from Git status. No `TASK-WORKBRANCH.md` reporting is required. Install hooks with `workbranch hooks install --provider claude` or `--provider codex`, then review provider hook trust. Grok Build needs explicit trust: inspect the plugin source with `workbranch hooks describe --provider grok`, and only if you trust it run `workbranch hooks install --provider grok --trust`. Companion's Grok connect button shows the same source first. See [Companion installation and agent connections](docs/usage.md#companion-installation-and-agent-connections).

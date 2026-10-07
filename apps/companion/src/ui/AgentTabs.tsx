@@ -1,4 +1,4 @@
-export type CompanionView = "main" | "activity" | "settings";
+export type CompanionView = "main" | "usage" | "settings";
 
 export type AgentTabsProps = {
 	readonly currentView: CompanionView;
@@ -12,7 +12,7 @@ type AgentTab = {
 
 const AGENT_TABS: readonly AgentTab[] = [
 	{ view: "main", label: "Main" },
-	{ view: "activity", label: "Activity" },
+	{ view: "usage", label: "Usage" },
 	{ view: "settings", label: "Settings" },
 ];
 

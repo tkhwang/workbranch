@@ -49,7 +49,7 @@ describe("AgentTabs", () => {
 		expect(html).toContain('aria-label="Companion views"');
 		expect(html).toContain('aria-current="page"');
 		expect(html).toContain("Main");
-		expect(html).toContain("Activity");
+		expect(html).toContain("Usage");
 		expect(html).toContain("Settings");
 		expect(html).not.toContain("<svg");
 	});
@@ -90,12 +90,12 @@ describe("AgentTabs", () => {
 			onViewChange: (view) => calls.push(view),
 		});
 
-		// When the Activity and Settings buttons are clicked
+		// When the Usage and Settings buttons are clicked
 		const buttons = collectButtons(element);
 		buttons[1]?.onClick?.();
 		buttons[2]?.onClick?.();
 
 		// Then the parent shell receives route-level view changes
-		expect(calls).toEqual(["activity", "settings"]);
+		expect(calls).toEqual(["usage", "settings"]);
 	});
 });

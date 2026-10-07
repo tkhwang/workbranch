@@ -1,17 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import {
-	type CalendarEventInput,
-	calendarEventFromUnknown,
-} from "../activity/calendar";
-import type { ActivityEvent } from "../application/activity";
 import type { GlobalState, Project } from "../domain/model";
+import type { UsageSnapshot } from "../domain/usage";
 import { mapGlobalDocumentToState, mapListDocumentToProject } from "./acl";
 import {
 	parseGlobalDocument,
 	parseListDocument,
 	parseRuntimeDocument,
 } from "./parseContract";
+import { parseUsageSnapshot } from "./usageSnapshot";
 
 export type RunResult = {
 	readonly exit_code: number;
@@ -56,30 +53,13 @@ export async function refreshRoot(root: string): Promise<Project> {
 	return mapListDocumentToProject(parseListDocument(raw));
 }
 
-export async function appendActivityEvents(
-	events: readonly ActivityEvent[],
-): Promise<void> {
-	if (events.length === 0) {
-		return;
-	}
-	await invoke("append_activity_events", { events });
-}
-
 export async function quitCompanion(): Promise<void> {
 	await invoke("quit_app");
 }
 
-export async function readActivityEvents(
-	fromEpoch: number,
-	toEpoch: number,
-): Promise<readonly CalendarEventInput[]> {
-	const raw = await invoke<readonly unknown[]>("read_activity_events", {
-		fromEpoch,
-		toEpoch,
-	});
-	return raw
-		.map(calendarEventFromUnknown)
-		.filter((event): event is CalendarEventInput => event !== undefined);
+/** Claude Code and Codex usage for the last `days` local days, from local files only. */
+export async function readUsageSnapshot(days: number): Promise<UsageSnapshot> {
+	return parseUsageSnapshot(await invoke<unknown>("usage_snapshot", { days }));
 }
 
 export async function runAction(

@@ -4729,6 +4729,7 @@ name = "workbranch-companion"
 version = "2.26.1"
 dependencies = [
  "libc",
+ "memchr",
  "notify",
  "serde",
  "serde_json",
