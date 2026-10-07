@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.29.0](https://github.com/tkhwang/workbranch/compare/v2.28.0...v2.29.0) (2026-10-07)
+
+
+### Features
+
+* **usage:** rename activity to usage for clarity ([5c2da99](https://github.com/tkhwang/workbranch/commit/5c2da99c6deca08835f80272c8328b5d72d42aa5))
+* **usage:** rename activity to usage for clarity ([f159b95](https://github.com/tkhwang/workbranch/commit/f159b95dd5ce7678a3c83366815863aeb6124c31))
+
 ## [2.28.0](https://github.com/tkhwang/workbranch/compare/v2.27.0...v2.28.0) (2026-10-05)
 
 
