@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.32.0](https://github.com/tkhwang/workbranch/compare/v2.31.0...v2.32.0) (2026-10-07)
+
+
+### Features
+
+* **usage:** update live claude limits explanation ([fcdc354](https://github.com/tkhwang/workbranch/commit/fcdc3541649f3683d768f8bee5e0554090b5aeda))
+
 ## [2.31.0](https://github.com/tkhwang/workbranch/compare/v2.30.0...v2.31.0) (2026-10-07)
 
 
