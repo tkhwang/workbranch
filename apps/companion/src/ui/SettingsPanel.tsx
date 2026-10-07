@@ -6,6 +6,7 @@ import {
 	isCompanionFontSize,
 } from "../application/preferences";
 import { AgentThemePicker } from "./AgentThemePicker";
+import { MenuBarSettings } from "./MenuBarSettings";
 import { TerminalPanel } from "./TerminalPanel";
 
 type Props = {
@@ -61,6 +62,18 @@ export function SettingsPanel({
 							? "Opens automatically when you sign in"
 							: "Opens only when opened manually"}
 				</p>
+			</TerminalPanel>
+			<TerminalPanel
+				anatomy="claude"
+				label="Menu Bar"
+				theme={preferences.theme}
+			>
+				<MenuBarSettings
+					value={preferences.menuBar}
+					onChange={(menuBar) =>
+						onPreferencesChange({ ...preferences, menuBar })
+					}
+				/>
 			</TerminalPanel>
 			<TerminalPanel anatomy="claude" label="Font" theme={preferences.theme}>
 				<div className="settings-row settings-row-select">

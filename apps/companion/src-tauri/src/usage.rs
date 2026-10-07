@@ -21,6 +21,8 @@ pub(crate) const BUCKET_SECONDS: u64 = 15 * 60;
 const FIVE_HOUR_MINUTES: u64 = 5 * 60;
 const WEEKLY_MINUTES: u64 = 7 * 24 * 60;
 const MAX_ERRORS: usize = 5;
+/// Matches `USAGE_DAYS` in domain/usage.ts, the Usage view's span.
+pub(crate) const USAGE_DAYS: u32 = 14;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -201,6 +203,11 @@ pub(crate) fn snapshot(
             errors: codex.errors,
         },
     }
+}
+
+/// One spare day lets the UI cut local-midnight boundaries in any time zone.
+pub(crate) fn since_for_days(now: u64, days: u32) -> u64 {
+    now.saturating_sub((u64::from(days.clamp(1, 60)) + 1) * 86_400)
 }
 
 pub(crate) fn now_epoch() -> u64 {

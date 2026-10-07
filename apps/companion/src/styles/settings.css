@@ -124,6 +124,128 @@
 	color: var(--emphasis);
 }
 
+.menu-bar-settings {
+	display: grid;
+	gap: 8px;
+}
+
+.menu-bar-preview {
+	align-items: center;
+	display: flex;
+	gap: 10px;
+}
+
+.menu-bar-preview-label {
+	color: var(--muted);
+	flex: none;
+	font-size: var(--fs-label);
+}
+
+/* A slice of the macOS menu bar: system font and size, not the app's mono. */
+.menu-bar-sample {
+	align-items: center;
+	background: var(--surface-2);
+	border: 1px solid var(--line);
+	border-radius: 3px;
+	color: var(--text);
+	display: flex;
+	flex: 1;
+	font:
+		13px / 1 -apple-system,
+		BlinkMacSystemFont,
+		"SF Pro Text",
+		sans-serif;
+	font-variant-numeric: tabular-nums;
+	gap: 4px;
+	height: 28px;
+	justify-content: flex-end;
+	min-width: 0;
+	overflow: hidden;
+	padding: 0 10px;
+	white-space: pre;
+}
+
+.menu-bar-ghost {
+	flex: none;
+	height: 16px;
+	width: 16px;
+}
+
+.menu-bar-sample-text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.menu-bar-items {
+	border: 0;
+	display: grid;
+	gap: 8px;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	margin: 0;
+	min-width: 0;
+	padding: 0;
+}
+
+.menu-bar-item {
+	align-items: start;
+	background: transparent;
+	border-radius: 4px;
+	color: var(--muted);
+	display: flex;
+	gap: 8px;
+	min-width: 0;
+	padding: 8px;
+	text-align: left;
+}
+
+.menu-bar-item:hover:not(:disabled) {
+	color: var(--text);
+}
+
+.menu-bar-item[data-active="true"] {
+	background: var(--emphasis-soft);
+	border-color: var(--emphasis);
+	color: var(--emphasis);
+}
+
+.menu-bar-item-check {
+	align-items: center;
+	border: 1px solid currentColor;
+	border-radius: 3px;
+	display: inline-flex;
+	flex: none;
+	font-size: var(--fs-label);
+	height: 14px;
+	justify-content: center;
+	margin-top: 2px;
+	width: 14px;
+}
+
+.menu-bar-item-text {
+	display: grid;
+	gap: 2px;
+	min-width: 0;
+}
+
+.menu-bar-item-label {
+	font-size: var(--fs-body);
+	font-weight: 700;
+}
+
+.menu-bar-item-detail {
+	color: var(--muted);
+	font-size: var(--fs-meta);
+}
+
+.menu-bar-percent {
+	margin: 0;
+	padding: 0;
+}
+
+.menu-bar-percent:disabled {
+	opacity: 0.55;
+}
+
 .connections-panel {
 	display: grid;
 	gap: 14px;

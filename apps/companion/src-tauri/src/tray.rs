@@ -5,7 +5,8 @@ use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
 use tauri::{App, AppHandle, Manager, PhysicalPosition, WebviewWindow, WindowEvent};
 use tauri_plugin_positioner::{Position, WindowExt};
 
-const TRAY_TEMPLATE_ICON: &[u8] = include_bytes!("../icons/tray-template.png");
+// The @2x bitmap: tray-icon sizes the image to 18pt, so it stays sharp on Retina.
+const TRAY_TEMPLATE_ICON: &[u8] = include_bytes!("../icons/tray-template@2x.png");
 
 pub(crate) fn install(app: &mut App) -> tauri::Result<()> {
     #[cfg(target_os = "macos")]
@@ -28,7 +29,7 @@ pub(crate) fn install(app: &mut App) -> tauri::Result<()> {
 
     let icon = Image::from_bytes(TRAY_TEMPLATE_ICON)?;
     let click_gate = Arc::new(Mutex::new(TrayClickGate::default()));
-    TrayIconBuilder::with_id("workbranch-companion")
+    TrayIconBuilder::with_id(crate::menu_bar::TRAY_ID)
         .icon(icon)
         .icon_as_template(true)
         .show_menu_on_left_click(false)

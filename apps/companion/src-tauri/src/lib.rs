@@ -2,9 +2,10 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use thiserror::Error;
 
+mod menu_bar;
 mod process_env;
 mod setup;
 mod tray;
@@ -162,8 +163,7 @@ async fn usage_snapshot(
             .lock()
             .map_err(|_| std::io::Error::other("usage cache lock poisoned"))?;
         let now = usage::now_epoch();
-        // One spare day lets the UI cut local-midnight boundaries in any time zone.
-        let since = now.saturating_sub((u64::from(days.clamp(1, 60)) + 1) * 86_400);
+        let since = usage::since_for_days(now, days);
         Ok(usage::snapshot(&mut guard, &paths, now, since))
     })
     .await
@@ -297,6 +297,9 @@ fn run_pbcopy(path: &str) -> Result<RunResult, CompanionError> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let usage_store = UsageStore::default();
+    // The menu bar title shares the Usage view's parse cache.
+    let usage_cache = Arc::clone(&usage_store.cache);
     let builder = tauri::Builder::default().plugin(tauri_plugin_store::Builder::new().build());
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let builder = builder.plugin(tauri_plugin_autostart::init(
@@ -306,9 +309,11 @@ pub fn run() {
     let builder = builder
         .plugin(tauri_plugin_positioner::init())
         .manage(WatcherStore::default())
-        .manage(UsageStore::default())
-        .setup(|app| {
+        .manage(usage_store)
+        .setup(move |app| {
             tray::install(app)?;
+            let refresher = menu_bar::start(app.handle(), usage_cache);
+            app.manage(refresher);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -323,6 +328,7 @@ pub fn run() {
             workbranch_migrate,
             workbranch_run,
             usage_snapshot,
+            menu_bar::menu_bar_refresh,
             watch_roots,
             quit_app,
         ]);

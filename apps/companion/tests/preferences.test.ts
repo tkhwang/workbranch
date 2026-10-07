@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import { load } from "@tauri-apps/plugin-store";
 import { describe, expect, it, vi } from "vitest";
 import {
+	DEFAULT_MENU_BAR,
+	type MenuBarConfig,
+} from "../src/application/menuBar";
+import {
 	COMPANION_FONT_OPTIONS,
 	COMPANION_FONT_SIZE_OPTIONS,
 	COMPANION_PREFERENCES_STORE_FILE,
@@ -16,6 +20,14 @@ import {
 	writeCompanionPreferences,
 } from "../src/application/preferences";
 
+const CUSTOM_MENU_BAR: MenuBarConfig = {
+	claude5h: false,
+	claudeWeekly: true,
+	codexWeekly: true,
+	todayTokens: false,
+	percent: "remaining",
+};
+
 vi.mock("@tauri-apps/plugin-store", () => ({ load: vi.fn() }));
 
 describe("companion preferences", () => {
@@ -24,6 +36,7 @@ describe("companion preferences", () => {
 			font: "system-mono",
 			fontSize: "medium",
 			theme: "claude",
+			menuBar: DEFAULT_MENU_BAR,
 		});
 	});
 
@@ -33,6 +46,7 @@ describe("companion preferences", () => {
 				font: "comic-sans",
 				fontSize: "gigantic",
 				theme: "rainbow",
+				menuBar: { claude5h: "yes", percent: "left" },
 			}),
 		).toEqual({
 			preferences: DEFAULT_COMPANION_PREFERENCES,
@@ -48,7 +62,12 @@ describe("companion preferences", () => {
 				themeMode: "light",
 			}),
 		).toEqual({
-			preferences: { font: "menlo", fontSize: "medium", theme: "claude" },
+			preferences: {
+				font: "menlo",
+				fontSize: "medium",
+				theme: "claude",
+				menuBar: DEFAULT_MENU_BAR,
+			},
 			sanitized: true,
 		});
 	});
@@ -57,7 +76,30 @@ describe("companion preferences", () => {
 		expect(
 			sanitizeCompanionPreferences({ font: "menlo", theme: "codex" }),
 		).toEqual({
-			preferences: { font: "menlo", fontSize: "medium", theme: "codex" },
+			preferences: {
+				font: "menlo",
+				fontSize: "medium",
+				theme: "codex",
+				menuBar: DEFAULT_MENU_BAR,
+			},
+			sanitized: true,
+		});
+	});
+
+	it("backfills every menu bar item on stores written before Menu Bar existed", () => {
+		expect(
+			sanitizeCompanionPreferences({
+				font: "menlo",
+				fontSize: "large",
+				theme: "codex",
+			}),
+		).toEqual({
+			preferences: {
+				font: "menlo",
+				fontSize: "large",
+				theme: "codex",
+				menuBar: DEFAULT_MENU_BAR,
+			},
 			sanitized: true,
 		});
 	});
@@ -88,21 +130,32 @@ describe("companion preferences", () => {
 					theme,
 				}),
 			).toEqual({
-				preferences: { font: "monaco", fontSize: "medium", theme: "claude" },
+				preferences: {
+					font: "monaco",
+					fontSize: "medium",
+					theme: "claude",
+					menuBar: DEFAULT_MENU_BAR,
+				},
 				sanitized: true,
 			});
 		}
 	});
 
-	it("preserves a valid Codex theme without sanitization", () => {
+	it("preserves a valid Codex theme and menu bar config without sanitization", () => {
 		expect(
 			sanitizeCompanionPreferences({
 				font: "menlo",
 				fontSize: "large",
 				theme: "codex",
+				menuBar: CUSTOM_MENU_BAR,
 			}),
 		).toEqual({
-			preferences: { font: "menlo", fontSize: "large", theme: "codex" },
+			preferences: {
+				font: "menlo",
+				fontSize: "large",
+				theme: "codex",
+				menuBar: CUSTOM_MENU_BAR,
+			},
 			sanitized: false,
 		});
 	});
@@ -115,6 +168,16 @@ describe("companion preferences", () => {
 			{ value: "extra-large", label: "Extra Large" },
 		]);
 		expect(DEFAULT_COMPANION_PREFERENCES.fontSize).toBe("medium");
+	});
+
+	it("defaults the menu bar to every item as used percent", () => {
+		expect(DEFAULT_COMPANION_PREFERENCES.menuBar).toEqual({
+			claude5h: true,
+			claudeWeekly: true,
+			codexWeekly: true,
+			todayTokens: true,
+			percent: "used",
+		});
 	});
 
 	it("exposes only Claude Code and Codex themes", () => {
@@ -144,13 +207,14 @@ describe("companion preferences", () => {
 			font: "menlo",
 			fontSize: "medium",
 			theme: "claude",
+			menuBar: DEFAULT_MENU_BAR,
 		} as const;
-		const newerCurrent = {
-			font: "menlo",
-			fontSize: "medium",
-			theme: "codex",
-		} as const;
+		const newerCurrent = { ...failedAttempt, theme: "codex" } as const;
 		const newerSize = { ...failedAttempt, fontSize: "large" } as const;
+		const newerMenuBar = {
+			...failedAttempt,
+			menuBar: CUSTOM_MENU_BAR,
+		} as const;
 
 		expect(
 			shouldRestoreFailedPreferenceUpdate(newerCurrent, failedAttempt),
@@ -158,6 +222,9 @@ describe("companion preferences", () => {
 		expect(shouldRestoreFailedPreferenceUpdate(newerSize, failedAttempt)).toBe(
 			false,
 		);
+		expect(
+			shouldRestoreFailedPreferenceUpdate(newerMenuBar, failedAttempt),
+		).toBe(false);
 		expect(
 			shouldRestoreFailedPreferenceUpdate(failedAttempt, failedAttempt),
 		).toBe(true);
@@ -188,22 +255,29 @@ describe("companion preferences", () => {
 		expect(writes).toEqual(["font", "theme"]);
 	});
 
-	it("serializes only font, fontSize, and theme store keys", () => {
+	it("serializes only font, fontSize, theme, and menuBar store keys", () => {
 		const entries = preferencesToStoreEntries({
 			font: "menlo",
 			fontSize: "large",
 			theme: "codex",
+			menuBar: CUSTOM_MENU_BAR,
 		});
 
 		expect(entries).toEqual({
 			font: "menlo",
 			fontSize: "large",
 			theme: "codex",
+			menuBar: CUSTOM_MENU_BAR,
 		});
-		expect(Object.keys(entries)).toEqual(["font", "fontSize", "theme"]);
+		expect(Object.keys(entries)).toEqual([
+			"font",
+			"fontSize",
+			"theme",
+			"menuBar",
+		]);
 	});
 
-	it("writes font, fontSize, and theme to the preference store", async () => {
+	it("writes every preference key to the preference store", async () => {
 		const writes: Array<readonly [string, unknown]> = [];
 		let saveCount = 0;
 		const store: CompanionPreferenceStore = {
@@ -220,12 +294,14 @@ describe("companion preferences", () => {
 			font: "sf-mono",
 			fontSize: "extra-large",
 			theme: "claude",
+			menuBar: CUSTOM_MENU_BAR,
 		});
 
 		expect(writes).toEqual([
 			["font", "sf-mono"],
 			["fontSize", "extra-large"],
 			["theme", "claude"],
+			["menuBar", CUSTOM_MENU_BAR],
 		]);
 		expect(saveCount).toBe(1);
 	});

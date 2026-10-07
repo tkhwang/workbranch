@@ -1,6 +1,8 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { refreshMenuBar } from "../infrastructure/tauriClient";
+import { sameMenuBarConfig } from "./menuBar";
 import {
 	type CompanionPreferenceStore,
 	type CompanionPreferences,
@@ -134,6 +136,12 @@ export function useCompanionSettings({
 						: current,
 				);
 				onError(error);
+				return;
+			}
+			// The saved choice stands even if this nudge fails; the tray's
+			// one-minute tick picks it up anyway.
+			if (!sameMenuBarConfig(next.menuBar, previous.menuBar)) {
+				await refreshMenuBar().catch(onError);
 			}
 		},
 		[onError, onStatus, preferenceStore, preferences, tauriRuntimeAvailable],

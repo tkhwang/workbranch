@@ -1,6 +1,10 @@
 import { Children, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import {
+	DEFAULT_MENU_BAR,
+	type MenuBarConfig,
+} from "../src/application/menuBar";
 import type {
 	CompanionFont,
 	CompanionFontSize,
@@ -8,6 +12,7 @@ import type {
 	CompanionTheme,
 } from "../src/application/preferences";
 import { AgentThemePicker } from "../src/ui/AgentThemePicker";
+import { MenuBarSettings } from "../src/ui/MenuBarSettings";
 import { SettingsPanel } from "../src/ui/SettingsPanel";
 
 type InputProps = {
@@ -29,6 +34,11 @@ type SelectProps = {
 
 type TraversableProps = {
 	readonly children?: ReactNode;
+};
+
+type MenuBarPickerProps = {
+	readonly value: MenuBarConfig;
+	readonly onChange: (config: MenuBarConfig) => void;
 };
 
 type ThemePickerProps = {
@@ -69,10 +79,26 @@ function findThemePicker(node: ReactNode): ThemePickerProps | undefined {
 	return result;
 }
 
+function findMenuBarPicker(node: ReactNode): MenuBarPickerProps | undefined {
+	let result: MenuBarPickerProps | undefined;
+	const visit = (child: ReactNode): void => {
+		if (!isValidElement<MenuBarPickerProps & TraversableProps>(child)) {
+			return;
+		}
+		if (child.type === MenuBarSettings) {
+			result = child.props;
+		}
+		Children.forEach(child.props.children, visit);
+	};
+	visit(node);
+	return result;
+}
+
 const preferences: CompanionPreferences = {
 	font: "system-mono",
 	fontSize: "medium",
 	theme: "claude",
+	menuBar: DEFAULT_MENU_BAR,
 };
 
 function renderSettingsPanel({
@@ -101,10 +127,12 @@ describe("SettingsPanel", () => {
 		expect(html).toContain('data-terminal-panel-anatomy="claude"');
 		expect(html).toContain("<fieldset");
 		expect(html).toContain("<legend>Startup</legend>");
+		expect(html).toContain("<legend>Menu Bar</legend>");
 		expect(html).toContain("<legend>Font</legend>");
 		expect(html).toContain("<legend>Text Size</legend>");
 		expect(html).toContain("<legend>Theme</legend>");
 		expect(html).not.toContain("Weekly Limits");
+		expect(html).toContain('aria-label="Menu bar items"');
 		expect(html).toContain('for="launch-at-login"');
 		expect(html).toContain('for="companion-font"');
 		expect(html).toContain('for="companion-font-size"');
@@ -114,8 +142,8 @@ describe("SettingsPanel", () => {
 		expect(html).toContain("Extra Large");
 		expect(html).toContain("Claude Code");
 		expect(html).toContain("Codex");
-		// The two theme buttons are the only buttons.
-		expect(html.match(/<button/g)).toHaveLength(2);
+		// Four menu bar items, two percent bases and two themes are the only buttons.
+		expect(html.match(/<button/g)).toHaveLength(8);
 		expect(html).not.toContain(">Light</button>");
 		expect(html).not.toContain(">Dark</button>");
 		expect(html).not.toContain(">System</button>");
@@ -124,7 +152,12 @@ describe("SettingsPanel", () => {
 
 	it("renders Codex settings with Claude fieldset sections", () => {
 		const html = renderSettingsPanel({
-			currentPreferences: { font: "menlo", fontSize: "medium", theme: "codex" },
+			currentPreferences: {
+				font: "menlo",
+				fontSize: "medium",
+				theme: "codex",
+				menuBar: DEFAULT_MENU_BAR,
+			},
 		});
 
 		expect(html).toContain('data-terminal-panel="codex"');
@@ -145,6 +178,7 @@ describe("SettingsPanel", () => {
 				font: "menlo",
 				fontSize: "medium",
 				theme: "claude",
+				menuBar: DEFAULT_MENU_BAR,
 			},
 		});
 
@@ -156,7 +190,12 @@ describe("SettingsPanel", () => {
 
 	it("previews the smallest scaled copy alongside the selected text size", () => {
 		const html = renderSettingsPanel({
-			currentPreferences: { font: "menlo", fontSize: "large", theme: "claude" },
+			currentPreferences: {
+				font: "menlo",
+				fontSize: "large",
+				theme: "claude",
+				menuBar: DEFAULT_MENU_BAR,
+			},
 		});
 
 		expect(html).toContain("Preview · Large");
@@ -208,10 +247,42 @@ describe("SettingsPanel", () => {
 
 		expect(launchCalls).toEqual([true]);
 		expect(preferenceCalls).toEqual([
-			{ font: "menlo", fontSize: "medium", theme: "claude" },
-			{ font: "system-mono", fontSize: "large", theme: "claude" },
-			{ font: "system-mono", fontSize: "medium", theme: "codex" },
+			{
+				font: "menlo",
+				fontSize: "medium",
+				theme: "claude",
+				menuBar: DEFAULT_MENU_BAR,
+			},
+			{
+				font: "system-mono",
+				fontSize: "large",
+				theme: "claude",
+				menuBar: DEFAULT_MENU_BAR,
+			},
+			{
+				font: "system-mono",
+				fontSize: "medium",
+				theme: "codex",
+				menuBar: DEFAULT_MENU_BAR,
+			},
 		]);
+	});
+
+	it("delegates the edited menu bar config", () => {
+		const preferenceCalls: CompanionPreferences[] = [];
+		const element = SettingsPanel({
+			preferences,
+			launchAtLogin: false,
+			launchAtLoginLoading: false,
+			onLaunchAtLoginChange: () => undefined,
+			onPreferencesChange: (next) => {
+				preferenceCalls.push(next);
+			},
+		});
+		const edited = { ...DEFAULT_MENU_BAR, todayTokens: false };
+		findMenuBarPicker(element)?.onChange(edited);
+
+		expect(preferenceCalls).toEqual([{ ...preferences, menuBar: edited }]);
 	});
 
 	it("ignores a text size the preference contract does not know", () => {
@@ -232,5 +303,81 @@ describe("SettingsPanel", () => {
 		fontSizeSelect?.onChange?.({ currentTarget: { value: "gigantic" } });
 
 		expect(preferenceCalls).toEqual([]);
+	});
+});
+
+describe("MenuBarSettings", () => {
+	function render(value: MenuBarConfig): string {
+		return renderToStaticMarkup(
+			<MenuBarSettings value={value} onChange={() => undefined} />,
+		);
+	}
+
+	it("previews every item as used percent by default", () => {
+		const html = render(DEFAULT_MENU_BAR);
+
+		expect(html).toContain(">CL 42·63  CO 18 · 31.0M<");
+		expect(html.match(/aria-pressed="true"/g)).toHaveLength(5);
+		expect(html).toContain("5-hour limit, after CL");
+		expect(html).toContain("7-day limit, after CO");
+		expect(html).toContain("Both agents since midnight");
+	});
+
+	it("previews remaining percent and only the picked items", () => {
+		const html = render({
+			...DEFAULT_MENU_BAR,
+			claude5h: false,
+			todayTokens: false,
+			percent: "remaining",
+		});
+
+		expect(html).toContain(">CL 37  CO 82<");
+		expect(html).toContain(
+			'aria-label="Show Claude 5h in the menu bar" aria-pressed="false"',
+		);
+	});
+
+	it("shows the icon alone and disables the percent switch with nothing picked", () => {
+		const html = render({
+			...DEFAULT_MENU_BAR,
+			claude5h: false,
+			claudeWeekly: false,
+			codexWeekly: false,
+			todayTokens: false,
+		});
+
+		expect(html).not.toContain("menu-bar-sample-text");
+		expect(html).toContain("the menu bar shows the icon alone");
+		expect(html).toMatch(
+			/<fieldset[^>]*aria-label="Limit percent"[^>]*disabled/,
+		);
+	});
+
+	it("toggles one item and keeps the rest", () => {
+		const calls: MenuBarConfig[] = [];
+		const element = MenuBarSettings({
+			value: DEFAULT_MENU_BAR,
+			onChange: (next) => {
+				calls.push(next);
+			},
+		});
+		const buttons = collectByType<{
+			readonly "aria-label"?: string;
+			readonly onClick?: () => void;
+		}>(element, "button");
+		buttons
+			.find(
+				(button) =>
+					button["aria-label"] === "Show Codex weekly in the menu bar",
+			)
+			?.onClick?.();
+		buttons
+			.find((button) => button["aria-label"] === "Show limits as Remaining %")
+			?.onClick?.();
+
+		expect(calls).toEqual([
+			{ ...DEFAULT_MENU_BAR, codexWeekly: false },
+			{ ...DEFAULT_MENU_BAR, percent: "remaining" },
+		]);
 	});
 });
