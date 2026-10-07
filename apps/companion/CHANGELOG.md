@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.29.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.28.0...workbranch-companion-v2.29.0) (2026-10-07)
+
+
+### Features
+
+* **usage:** update live claude limits explanation ([fcdc354](https://github.com/tkhwang/workbranch/commit/fcdc3541649f3683d768f8bee5e0554090b5aeda))
+* **usage:** update live claude limits explanation ([5a6fa18](https://github.com/tkhwang/workbranch/commit/5a6fa182aa5e50a061cb7b21ed62c721a8534ddc))
+
 ## [2.28.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.27.0...workbranch-companion-v2.28.0) (2026-10-07)
 
 
