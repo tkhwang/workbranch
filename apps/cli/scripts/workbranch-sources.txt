@@ -26,6 +26,7 @@ src/workbranch/commands/tool-launcher.sh
 src/workbranch/commands/status.sh
 src/workbranch/commands/doctor.sh
 src/workbranch/commands/pull.sh
+src/workbranch/commands/stash.sh
 src/workbranch/commands/update.sh
 src/workbranch/commands/refresh.sh
 src/workbranch/commands/push.sh

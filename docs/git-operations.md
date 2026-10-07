@@ -205,6 +205,37 @@ cd <task>/<repo>
 git push -u origin <task-branch>
 ```
 
+### `workbranch stash`
+
+Direction: current worktree -> branch-scoped stash ref, and back.
+
+`refs/stash` lives in the common git directory, so `_base/<repo>` and every `<task>/<repo>` share one stash list. A bare `git stash apply` or `pop` takes `stash@{0}`, which may belong to another worktree. `workbranch stash` never reads or writes `refs/stash`.
+
+Save (`workbranch stash [push] [-m <message>]`), run inside the worktree:
+
+```bash
+git stash create [<message>]                         # HEAD + index + worktree commit, no ref update
+GIT_INDEX_FILE=<tmp> git update-index --add ...      # untracked, non-ignored files
+git commit-tree ... -p HEAD -p <index> -p <untracked> # same shape as `git stash push -u`
+git update-ref refs/workbranch/stash/<branch> <sha> ""  # create only; fails if the slot exists
+git reset --hard                                     # then remove exactly the captured untracked files
+```
+
+Restore (`pop` / `apply [--index]`):
+
+```bash
+git stash apply [--index] <sha>                       # sha read from refs/workbranch/stash/<branch>
+git update-ref -d refs/workbranch/stash/<branch> <sha> # pop only, after a clean apply
+```
+
+Safety:
+
+- Runs only in the current git worktree; does not need a workbranch project.
+- Fails on detached HEAD, during a rebase, merge, or cherry-pick, or when the branch already has a saved stash.
+- If the apply conflicts, the slot is kept; resolve, then `workbranch stash drop`.
+- `drop` and `pop` print the full SHA so a dropped stash can still be recovered with `git stash apply <sha>` until garbage collection.
+- `list` shows every branch's slot; `--branch <branch>` targets another branch's slot explicitly.
+
 ## Branch naming
 
 For each repo, task branch names are explicit values chosen at `workbranch add` prompts. The recommended task folder depends on the base shape. Interactive `add <name>` pre-fills that name in the base-aware creation flow; non-interactive task keys without the conventional `type-` prefix keep the legacy defaults:

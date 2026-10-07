@@ -206,6 +206,10 @@ main() {
   run_test test_status_reports_stale_task_shaped_directories_separately
   run_test test_status_reports_standalone_repo_task_dirs_as_stale
   run_test test_status_skips_partial_task_workspaces
+  run_test test_stash_keeps_worktree_changes_separate
+  run_test test_stash_restores_after_base_moves_and_from_subdirectory
+  run_test test_stash_refuses_second_slot_and_keeps_stash_on_conflict
+  run_test test_stash_rejects_detached_head_and_non_repo
   run_test test_path_prints_task_and_repo_paths
   run_test test_path_accepts_completion_trailing_slash_for_task_key
   run_test test_scoped_tool_paths_reject_stale_task_directories

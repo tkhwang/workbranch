@@ -146,6 +146,14 @@ workbranch update    # apply local bases to every task
 workbranch refresh   # pull bases, then update every task
 ```
 
+`update` and `refresh` stop when a task worktree is dirty. Set the changes aside with `workbranch stash`, which saves them under the current branch instead of the `git stash` list that every worktree shares:
+
+```bash
+workbranch stash              # run inside <task>/<repo>
+workbranch refresh feat-login
+workbranch stash pop          # restores only this branch's changes
+```
+
 To refresh the base, apply it to a task, and land in one step, use `finalize`.
 
 ```bash

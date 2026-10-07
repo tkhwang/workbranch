@@ -146,6 +146,14 @@ workbranch update    # local base를 모든 task에 반영
 workbranch refresh   # base를 pull한 뒤 모든 task update
 ```
 
+`update`와 `refresh`는 task worktree가 dirty하면 멈춥니다. 변경을 잠시 치워 둘 때는 `workbranch stash`를 쓰세요. 모든 worktree가 함께 쓰는 `git stash` 목록이 아니라 현재 branch 이름으로 보관합니다.
+
+```bash
+workbranch stash              # <task>/<repo> 안에서 실행
+workbranch refresh feat-login
+workbranch stash pop          # 이 branch의 변경만 복원
+```
+
 base를 최신화하고 task에 반영한 뒤 land까지 한 번에 하려면 `finalize`를 씁니다.
 
 ```bash
