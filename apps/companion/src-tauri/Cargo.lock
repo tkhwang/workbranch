@@ -4726,7 +4726,7 @@ dependencies = [
 
 [[package]]
 name = "workbranch-companion"
-version = "2.26.1"
+version = "2.27.0"
 dependencies = [
  "libc",
  "memchr",
