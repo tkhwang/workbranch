@@ -39,6 +39,10 @@ fn initialize(db: &Connection) -> Result<()> {
     if version > 1 {
         return Err("Runtime database is newer; update workbranch".into());
     }
+    // Opening an initialized store must not compete with hook event writers.
+    if version == 1 {
+        return Ok(());
+    }
     db.execute_batch("CREATE TABLE IF NOT EXISTS sessions (workspace TEXT NOT NULL, provider TEXT NOT NULL, session TEXT NOT NULL, agent TEXT NOT NULL, data TEXT NOT NULL, updated INTEGER NOT NULL, PRIMARY KEY(workspace,provider,session,agent)); PRAGMA user_version=1;")?;
     Ok(())
 }
