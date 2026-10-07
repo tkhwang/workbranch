@@ -79,11 +79,27 @@ fn ambiguous_permission_is_not_resumed_by_unrelated_completion() {
 }
 
 #[test]
+fn opening_initialized_database_does_not_require_a_write_lock() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("runtime/state.sqlite3");
+    let mut writer = store::open(&path).unwrap();
+    let _transaction = writer
+        .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+        .unwrap();
+
+    // An existing collector may be writing while another opens its connection.
+    let reader = store::open(&path).unwrap();
+    assert!(store::snapshot(&reader, 100).unwrap().is_empty());
+}
+
+#[test]
 fn concurrent_sessions_do_not_lose_updates() {
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("runtime/state.sqlite3");
     store::open(&path).unwrap();
-    let threads:Vec<_>=(0..8).map(|id|{let path=path.clone();std::thread::spawn(move||{
+    let start = std::sync::Arc::new(std::sync::Barrier::new(8));
+    let threads:Vec<_>=(0..8).map(|id|{let path=path.clone();let start=start.clone();std::thread::spawn(move||{
+        start.wait();
         let mut db=store::open(&path).unwrap();
         event::ingest(&mut db,"/p/t","claude",&json!({"session_id":format!("s{id}"),"hook_event_name":"UserPromptSubmit","prompt":"safe request"}),100).unwrap();
     })}).collect();
