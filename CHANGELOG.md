@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.30.0](https://github.com/tkhwang/workbranch/compare/v2.29.0...v2.30.0) (2026-10-07)
+
+
+### Features
+
+* **settings:** add menu bar display options ([5ded6ea](https://github.com/tkhwang/workbranch/commit/5ded6ea350b2088bb882042b4a6a31c07521e832))
+* **settings:** add menu bar display options ([32f0861](https://github.com/tkhwang/workbranch/commit/32f0861f0472a70f43f25ef96f833eb936b7cdb4)), closes [#1007](https://github.com/tkhwang/workbranch/issues/1007)
+
+
+### Bug Fixes
+
+* **store:** prevent write lock on initialized db ([b715e37](https://github.com/tkhwang/workbranch/commit/b715e3766893c8eb00acbab42b3dedb5e4caf4cf))
+
 ## [2.29.0](https://github.com/tkhwang/workbranch/compare/v2.28.0...v2.29.0) (2026-10-07)
 
 
