@@ -26,6 +26,28 @@ fn write_lines(path: &Path, lines: &[&str]) -> Result<(), Box<dyn std::error::Er
     Ok(())
 }
 
+fn codex_sum(usage: &FileUsage) -> TokenCounts {
+    let mut sum = TokenCounts::default();
+    for event in &usage.codex_events {
+        sum.add(event.counts);
+    }
+    sum
+}
+
+fn codex_event(at: &str, total: (u64, u64, u64), last: Option<(u64, u64, u64)>) -> String {
+    let tokens = |(input, cached, output): (u64, u64, u64)| {
+        format!(
+            r#"{{"input_tokens":{input},"cached_input_tokens":{cached},"output_tokens":{output},"total_tokens":{}}}"#,
+            input + output
+        )
+    };
+    let last = last.map_or_else(|| "null".to_string(), tokens);
+    format!(
+        r#"{{"timestamp":"{at}","type":"event_msg","payload":{{"type":"token_count","info":{{"total_token_usage":{},"last_token_usage":{last}}},"rate_limits":null}}}}"#,
+        tokens(total)
+    )
+}
+
 fn paths(root: &Path) -> UsagePaths {
     UsagePaths {
         claude_config: root.join(".claude.json"),
@@ -106,13 +128,73 @@ fn codex_counts_total_usage_deltas_and_survives_counter_resets()
     let usage = parse_codex_rollout(lines.join("\n").as_bytes())?;
 
     assert_eq!(
-        usage.buckets.get(&bucket_start(AT)),
-        Some(&TokenCounts {
+        codex_sum(&usage),
+        TokenCounts {
             input: 60 + 50 + 20,
             output: 10 + 20 + 5,
             cache_read: 40 + 100,
             cache_write: 0,
-        })
+        }
+    );
+    assert!(usage.buckets.is_empty());
+    Ok(())
+}
+
+#[test]
+fn codex_counts_only_the_first_request_of_a_rollout_that_inherits_totals()
+-> Result<(), Box<dyn std::error::Error>> {
+    // A forked child starts from its parent's cumulative total (1000 in, 100
+    // out); only its own request (50 in, 5 out) is new.
+    let lines = [
+        codex_event("2026-10-06T21:32:40Z", (1_000, 0, 100), Some((50, 0, 5))),
+        codex_event("2026-10-06T21:33:00Z", (1_070, 0, 110), Some((70, 0, 10))),
+    ];
+    let usage = parse_codex_rollout(lines.join("\n").as_bytes())?;
+
+    let sum = codex_sum(&usage);
+    assert_eq!((sum.input, sum.output), (50 + 70, 5 + 10));
+    Ok(())
+}
+
+#[test]
+fn codex_splits_cache_writes_out_of_input() -> Result<(), Box<dyn std::error::Error>> {
+    let line = r#"{"timestamp":"2026-10-06T21:32:40Z","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"cached_input_tokens":60,"cache_write_input_tokens":30,"output_tokens":7}},"rate_limits":null}}"#;
+    let usage = parse_codex_rollout(line.as_bytes())?;
+
+    assert_eq!(
+        codex_sum(&usage),
+        TokenCounts {
+            input: 10,
+            output: 7,
+            cache_read: 60,
+            cache_write: 30,
+        }
+    );
+    Ok(())
+}
+
+#[test]
+fn codex_keeps_tokens_and_limits_when_resets_at_is_a_string()
+-> Result<(), Box<dyn std::error::Error>> {
+    let line = r#"{"timestamp":"2026-10-06T21:32:40Z","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":5,"cached_input_tokens":0,"output_tokens":1}},"rate_limits":{"primary":{"used_percent":"12.5","window_minutes":300,"resets_at":"2026-10-06T23:00:00Z"},"secondary":{"used_percent":40,"window_minutes":10080,"resets_at":"1791604768"}}}}"#;
+    let usage = parse_codex_rollout(line.as_bytes())?;
+
+    assert_eq!(codex_sum(&usage).input, 5);
+    let windows = usage.limits.get("").map(|limits| limits.windows.clone());
+    assert_eq!(
+        windows,
+        Some(vec![
+            LimitWindow {
+                window_minutes: 300,
+                used_percent: 12.5,
+                resets_at: Some(AT + 87 * 60 + 20),
+            },
+            LimitWindow {
+                window_minutes: 10080,
+                used_percent: 40.0,
+                resets_at: Some(1_791_604_768),
+            },
+        ])
     );
     Ok(())
 }
@@ -224,6 +306,15 @@ fn snapshot_merges_files_reuses_unchanged_ones_and_drops_deleted_ones()
             r#"{"timestamp":"2026-10-06T21:32:40Z","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":5,"cached_input_tokens":0,"output_tokens":1}},"rate_limits":{"limit_id":"codex","primary":{"used_percent":10.0,"window_minutes":10080,"resets_at":1791604768}}}}"#,
         ],
     )?;
+    // A forked child that copied its parent's event counts it only once.
+    let child_file = paths.codex_dir.join("sessions/2026/10/06/rollout-b.jsonl");
+    write_lines(
+        &child_file,
+        &[
+            r#"{"timestamp":"2026-10-06T21:32:40Z","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":5,"cached_input_tokens":0,"output_tokens":1}},"rate_limits":null}}"#,
+            r#"{"timestamp":"2026-10-06T21:40:00Z","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":9,"cached_input_tokens":0,"output_tokens":2}},"rate_limits":null}}"#,
+        ],
+    )?;
     write_lines(
         &paths.claude_config,
         &[
@@ -236,18 +327,20 @@ fn snapshot_merges_files_reuses_unchanged_ones_and_drops_deleted_ones()
     assert!(first.claude.available && first.codex.available);
     assert_eq!(first.claude.buckets.len(), 1);
     assert_eq!(first.claude.buckets[0].tokens.output, 22);
-    assert_eq!(first.codex.buckets[0].tokens.input, 5);
+    assert_eq!(first.codex.buckets.len(), 1);
+    assert_eq!(first.codex.buckets[0].tokens.input, 5 + 4);
+    assert_eq!(first.codex.buckets[0].tokens.output, 1 + 1);
     assert_eq!(
         first.claude.limits.map(|l| l.windows[0].used_percent),
         Some(12.0)
     );
     assert_eq!(first.codex.limits.map(|l| l.observed_at), Some(AT));
-    assert_eq!(cache.files.len(), 3);
+    assert_eq!(cache.files.len(), 4);
 
     fs::remove_file(&subagent)?;
     let second = snapshot(&mut cache, &paths, AT + 120, AT - 86_400);
     assert_eq!(second.claude.buckets[0].tokens.output, 2);
-    assert_eq!(cache.files.len(), 2);
+    assert_eq!(cache.files.len(), 3);
 
     // Buckets before the window are left out even when their file is fresh.
     let later = snapshot(&mut cache, &paths, AT + 86_400, AT + 3_600);

@@ -5,13 +5,16 @@
 //! directories, so the figures can lag: each limit carries the time it was
 //! observed and the UI must show that age instead of treating it as live.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::hash_map::DefaultHasher;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs::{self, File};
+use std::hash::{Hash, Hasher};
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 /// Buckets are 15 minutes so every real UTC offset still splits days exactly.
 pub(crate) const BUCKET_SECONDS: u64 = 15 * 60;
@@ -114,6 +117,9 @@ impl UsagePaths {
 #[derive(Debug, Default, Clone)]
 struct FileUsage {
     buckets: BTreeMap<u64, TokenCounts>,
+    /// Codex token deltas, kept per event so copies shared across rollouts
+    /// (a forked child carrying its parent's history) are counted once.
+    codex_events: Vec<CodexEvent>,
     /// Latest Codex rate-limit snapshot per limit bucket id.
     limits: HashMap<String, ProviderLimits>,
 }
@@ -129,6 +135,14 @@ struct CachedFile {
 #[derive(Default)]
 pub(crate) struct UsageCache {
     files: HashMap<PathBuf, CachedFile>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct CodexEvent {
+    /// Identity of the cumulative counters at this event; equal across copies.
+    key: u64,
+    at: u64,
+    counts: TokenCounts,
 }
 
 #[derive(Clone, Copy)]
@@ -218,6 +232,9 @@ fn collect(
             walk_jsonl(root, &mut files, &mut errors);
         }
     }
+    // A stable order decides which copy of a shared Codex event is counted.
+    files.sort();
+    let mut counted_events = HashSet::new();
 
     let cutoff = UNIX_EPOCH + std::time::Duration::from_secs(since);
     let mut totals: BTreeMap<u64, TokenCounts> = BTreeMap::new();
@@ -258,6 +275,14 @@ fn collect(
         if let Some(entry) = cache.files.get(&path) {
             for (start, tokens) in entry.usage.buckets.range(since - since % BUCKET_SECONDS..) {
                 totals.entry(*start).or_default().add(*tokens);
+            }
+            for event in &entry.usage.codex_events {
+                if event.at >= since && counted_events.insert(event.key) {
+                    totals
+                        .entry(bucket_start(event.at))
+                        .or_default()
+                        .add(event.counts);
+                }
             }
             limits.extend(
                 entry
@@ -539,20 +564,25 @@ struct CodexPayload {
     #[serde(rename = "type")]
     kind: Option<String>,
     info: Option<CodexInfo>,
-    rate_limits: Option<CodexRateLimits>,
+    /// Read loosely: older rollouts store some fields (`resets_at`) as RFC3339
+    /// strings, and a strict shape would drop the whole event with its tokens.
+    rate_limits: Option<Value>,
 }
 
 #[derive(Deserialize)]
 struct CodexInfo {
     total_token_usage: Option<CodexTokens>,
+    last_token_usage: Option<CodexTokens>,
 }
 
-#[derive(Debug, Default, Clone, Copy, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
 struct CodexTokens {
     #[serde(default)]
     input_tokens: u64,
     #[serde(default)]
     cached_input_tokens: u64,
+    #[serde(default)]
+    cache_write_input_tokens: u64,
     #[serde(default)]
     output_tokens: u64,
 }
@@ -568,40 +598,40 @@ impl CodexTokens {
             cached_input_tokens: self
                 .cached_input_tokens
                 .saturating_sub(other.cached_input_tokens),
+            cache_write_input_tokens: self
+                .cache_write_input_tokens
+                .saturating_sub(other.cache_write_input_tokens),
             output_tokens: self.output_tokens.saturating_sub(other.output_tokens),
         }
     }
 
-    /// Codex `input_tokens` already includes the cached part.
+    /// Codex `input_tokens` already includes cache reads and writes; they are
+    /// split out so the four counts never overlap and still sum to the total.
     fn counts(self) -> TokenCounts {
+        let cache_read = self.cached_input_tokens.min(self.input_tokens);
+        let cache_write = self
+            .cache_write_input_tokens
+            .min(self.input_tokens - cache_read);
         TokenCounts {
-            input: self.input_tokens.saturating_sub(self.cached_input_tokens),
+            input: self.input_tokens - cache_read - cache_write,
             output: self.output_tokens,
-            cache_read: self.cached_input_tokens.min(self.input_tokens),
-            cache_write: 0,
+            cache_read,
+            cache_write,
         }
     }
 }
 
-#[derive(Deserialize)]
-struct CodexRateLimits {
-    limit_id: Option<String>,
-    primary: Option<CodexWindow>,
-    secondary: Option<CodexWindow>,
-    plan_type: Option<String>,
+fn event_key(total: CodexTokens, last: Option<CodexTokens>) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    (total, last).hash(&mut hasher);
+    hasher.finish()
 }
 
-#[derive(Deserialize)]
-struct CodexWindow {
-    used_percent: Option<f64>,
-    window_minutes: Option<u64>,
-    resets_at: Option<u64>,
-    resets_in_seconds: Option<u64>,
-}
-
-/// Usage comes from the running `total_token_usage` so a repeated
-/// `token_count` event adds nothing; a total that drops means the counter was
-/// reset (a resumed session) and the new total is counted from zero.
+/// Usage comes from the running `total_token_usage`, so a repeated
+/// `token_count` event adds nothing. Without a baseline in this file (its
+/// first event, or a counter that restarted) only `last_token_usage` is new:
+/// a forked rollout's first total also carries the parent's tokens, which the
+/// parent's own file already counts.
 fn parse_codex_rollout(reader: impl BufRead) -> std::io::Result<FileUsage> {
     let mut usage = FileUsage::default();
     let mut previous: Option<CodexTokens> = None;
@@ -618,23 +648,26 @@ fn parse_codex_rollout(reader: impl BufRead) -> std::io::Result<FileUsage> {
         let Some(at) = entry.timestamp.as_deref().and_then(parse_rfc3339) else {
             return;
         };
-        if let Some(total) = payload.info.and_then(|info| info.total_token_usage) {
+        if let Some(info) = payload.info
+            && let Some(total) = info.total_token_usage
+        {
             let delta = match previous {
                 Some(prior) if total.total() >= prior.total() => total.saturating_sub(prior),
-                _ => total,
+                _ => info.last_token_usage.unwrap_or(total),
             };
             previous = Some(total);
             let counts = delta.counts();
             if !counts.is_empty() {
-                usage
-                    .buckets
-                    .entry(bucket_start(at))
-                    .or_default()
-                    .add(counts);
+                usage.codex_events.push(CodexEvent {
+                    key: event_key(total, info.last_token_usage),
+                    at,
+                    counts,
+                });
             }
         }
         if let Some(limits) = payload
             .rate_limits
+            .as_ref()
             .and_then(|limits| codex_limits(limits, at))
         {
             usage.limits.insert(limits.0, limits.1);
@@ -643,28 +676,56 @@ fn parse_codex_rollout(reader: impl BufRead) -> std::io::Result<FileUsage> {
     Ok(usage)
 }
 
-fn codex_limits(limits: CodexRateLimits, at: u64) -> Option<(String, ProviderLimits)> {
-    let windows: Vec<LimitWindow> = [limits.primary, limits.secondary]
+/// Epoch seconds from a number, a numeric string, or an RFC3339 string.
+fn json_epoch(value: &Value) -> Option<u64> {
+    match value {
+        Value::Number(number) => number.as_u64().or_else(|| {
+            number
+                .as_f64()
+                .filter(|seconds| seconds.is_finite() && *seconds >= 0.0)
+                .map(|seconds| seconds as u64)
+        }),
+        Value::String(text) => text.trim().parse().ok().or_else(|| parse_rfc3339(text)),
+        _ => None,
+    }
+}
+
+fn json_number(value: &Value) -> Option<f64> {
+    match value {
+        Value::Number(number) => number.as_f64(),
+        Value::String(text) => text.trim().parse().ok(),
+        _ => None,
+    }
+    .filter(|number: &f64| number.is_finite())
+}
+
+fn codex_limits(limits: &Value, at: u64) -> Option<(String, ProviderLimits)> {
+    let windows: Vec<LimitWindow> = ["primary", "secondary"]
         .into_iter()
-        .flatten()
+        .filter_map(|name| limits.get(name).filter(|window| window.is_object()))
         .filter_map(|window| {
+            let minutes = window.get("window_minutes").and_then(json_number)?;
             Some(LimitWindow {
-                window_minutes: window.window_minutes?,
-                used_percent: window.used_percent?,
-                resets_at: window
-                    .resets_at
-                    .or_else(|| window.resets_in_seconds.map(|seconds| at + seconds)),
+                window_minutes: minutes as u64,
+                used_percent: window.get("used_percent").and_then(json_number)?,
+                resets_at: window.get("resets_at").and_then(json_epoch).or_else(|| {
+                    window
+                        .get("resets_in_seconds")
+                        .and_then(json_epoch)
+                        .map(|seconds| at + seconds)
+                }),
             })
         })
         .collect();
     if windows.is_empty() {
         return None;
     }
+    let text = |key: &str| limits.get(key).and_then(Value::as_str).map(str::to_owned);
     Some((
-        limits.limit_id.unwrap_or_default(),
+        text("limit_id").unwrap_or_default(),
         ProviderLimits {
             observed_at: at,
-            plan: limits.plan_type,
+            plan: text("plan_type"),
             windows,
         },
     ))
