@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.33.0](https://github.com/tkhwang/workbranch/compare/v2.32.0...v2.33.0) (2026-10-08)
+
+
+### Features
+
+* **menubar:** clarify usage units and labels ([f014dfd](https://github.com/tkhwang/workbranch/commit/f014dfd65acdb19b1d4cc764c0340fad3c55fded))
+
 ## [2.32.0](https://github.com/tkhwang/workbranch/compare/v2.31.0...v2.32.0) (2026-10-07)
 
 
