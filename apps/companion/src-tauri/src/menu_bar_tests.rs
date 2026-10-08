@@ -80,7 +80,7 @@ fn fresh_pair() -> UsageSnapshot {
 fn every_item_shows_used_percent_and_todays_tokens_by_default() {
     assert_eq!(
         title(all(), &fresh_pair()),
-        Some("CL 42·63  CO 18 · 31.0M".to_owned())
+        Some("CL 5h 42% · W 63%  CO W 18% · 31.0M".to_owned())
     );
 }
 
@@ -92,7 +92,7 @@ fn remaining_basis_subtracts_from_one_hundred() {
     };
     assert_eq!(
         title(config, &fresh_pair()),
-        Some("CL 58·37  CO 82 · 31.0M".to_owned())
+        Some("CL 5h 58% · W 37%  CO W 82% · 31.0M".to_owned())
     );
 }
 
@@ -130,9 +130,12 @@ fn single_items_stand_alone() {
         codex_weekly: true,
         ..none
     };
-    assert_eq!(title(claude_5h, &fresh_pair()), Some("CL 42".to_owned()));
+    assert_eq!(
+        title(claude_5h, &fresh_pair()),
+        Some("CL 5h 42%".to_owned())
+    );
     assert_eq!(title(tokens, &fresh_pair()), Some("31.0M".to_owned()));
-    assert_eq!(title(codex, &fresh_pair()), Some("CO 18".to_owned()));
+    assert_eq!(title(codex, &fresh_pair()), Some("CO W 18%".to_owned()));
 }
 
 #[test]
@@ -150,7 +153,7 @@ fn stale_short_window_shows_a_dash_beside_fresh_weekly() {
         ),
         provider(None, Vec::new()),
     );
-    assert_eq!(title(all(), &usage), Some("CL –·40 · 0".to_owned()));
+    assert_eq!(title(all(), &usage), Some("CL 5h – · W 40% · 0".to_owned()));
 }
 
 #[test]
@@ -167,7 +170,7 @@ fn stale_weekly_shows_a_dash_too() {
     );
     assert_eq!(
         title(all(), &usage),
-        Some("CL –·–  CO 18 · 1.5k".to_owned())
+        Some("CL 5h – · W –  CO W 18% · 1.5k".to_owned())
     );
 }
 
@@ -185,7 +188,7 @@ fn recent_reading_past_its_reset_reads_as_zero() {
         today_tokens: false,
         ..all()
     };
-    assert_eq!(title(config, &usage), Some("CL 0".to_owned()));
+    assert_eq!(title(config, &usage), Some("CL 5h 0%".to_owned()));
 }
 
 #[test]
@@ -203,7 +206,7 @@ fn old_reading_past_its_reset_is_stale_not_zero() {
         today_tokens: false,
         ..all()
     };
-    assert_eq!(title(config, &usage), Some("CL –".to_owned()));
+    assert_eq!(title(config, &usage), Some("CL 5h –".to_owned()));
 }
 
 #[test]
@@ -225,7 +228,7 @@ fn codex_weekly_is_its_longest_window() {
         today_tokens: false,
         ..all()
     };
-    assert_eq!(title(config, &usage), Some("CO 18".to_owned()));
+    assert_eq!(title(config, &usage), Some("CO W 18%".to_owned()));
 }
 
 #[test]
@@ -237,7 +240,7 @@ fn missing_agent_is_left_out() {
             vec![(TODAY, 2_000_000)],
         ),
     );
-    assert_eq!(title(all(), &usage), Some("CO 18 · 2.0M".to_owned()));
+    assert_eq!(title(all(), &usage), Some("CO W 18% · 2.0M".to_owned()));
 }
 
 #[test]
