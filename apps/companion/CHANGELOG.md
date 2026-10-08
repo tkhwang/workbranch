@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.30.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.29.0...workbranch-companion-v2.30.0) (2026-10-08)
+
+
+### Features
+
+* **menubar:** clarify usage units and labels ([f014dfd](https://github.com/tkhwang/workbranch/commit/f014dfd65acdb19b1d4cc764c0340fad3c55fded))
+
 ## [2.29.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.28.0...workbranch-companion-v2.29.0) (2026-10-07)
 
 
