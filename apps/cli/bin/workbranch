@@ -4800,9 +4800,10 @@ cmd_pull() {
 # shares one stash list and a bare `git stash pop` can take another worktree's
 # entry. workbranch stash builds the same stash-shaped commit (HEAD, index,
 # optional untracked parent) without touching refs/stash and stores it under
-# refs/workbranch/stash/<branch>, one slot per branch.
+# refs/workbranch/stash-v2/<encoded-branch>, one slot per branch.
 
-WORKBRANCH_STASH_REF_PREFIX=refs/workbranch/stash
+WORKBRANCH_STASH_REF_PREFIX=refs/workbranch/stash-v2
+WORKBRANCH_STASH_LEGACY_REF_PREFIX=refs/workbranch/stash
 
 cmd_stash_usage() {
   die "usage: workbranch stash [push [-m <message>]] | pop [--index] | apply [--index] | show [-p] | drop | list  (pop/apply/show/drop accept --branch <branch>)"
@@ -4819,8 +4820,13 @@ stash_current_branch() {
 }
 
 stash_ref_for_branch() {
+  local encoded
   git check-ref-format --branch "$1" >/dev/null 2>&1 || die "invalid branch name: $1"
-  printf '%s/%s' "$WORKBRANCH_STASH_REF_PREFIX" "$1"
+  # Escape percent first so literal %2F and slash remain distinct. A separate
+  # namespace prevents old, unencoded slots from blocking new refs.
+  encoded=${1//%/%25}
+  encoded=${encoded//\//%2F}
+  printf '%s/%s' "$WORKBRANCH_STASH_REF_PREFIX" "$encoded"
 }
 
 stash_saved_commit() {
@@ -4830,8 +4836,8 @@ stash_saved_commit() {
 stash_require_no_operation_in_progress() {
   local git_dir
   git_dir=$(git_dir_for_path "$STASH_TOP") || die "failed to resolve git dir: $STASH_TOP"
-  if [ -d "$git_dir/rebase-merge" ] || [ -d "$git_dir/rebase-apply" ] || [ -f "$git_dir/MERGE_HEAD" ] || [ -f "$git_dir/CHERRY_PICK_HEAD" ]; then
-    die "a rebase, merge, or cherry-pick is in progress in $STASH_TOP; finish or abort it first"
+  if [ -d "$git_dir/rebase-merge" ] || [ -d "$git_dir/rebase-apply" ] || [ -f "$git_dir/MERGE_HEAD" ] || [ -f "$git_dir/CHERRY_PICK_HEAD" ] || [ -f "$git_dir/REVERT_HEAD" ]; then
+    die "a rebase, merge, cherry-pick, or revert is in progress in $STASH_TOP; finish or abort it first"
   fi
 }
 
@@ -4863,7 +4869,7 @@ stash_remove_captured_untracked() {
   untracked=$1
   git -C "$STASH_TOP" ls-tree -r -z --name-only "$untracked" |
     while IFS= read -r -d '' path; do
-      rm -f -- "$STASH_TOP/$path"
+      rm -f -- "$STASH_TOP/$path" || return 1
       dir=${path%/*}
       while [ "$dir" != "$path" ] && [ -n "$dir" ]; do
         rmdir -- "$STASH_TOP/$dir" 2>/dev/null || break
@@ -4894,7 +4900,7 @@ cmd_stash_push() {
   stash_require_no_operation_in_progress
   head=$(git -C "$STASH_TOP" rev-parse -q --verify HEAD) || die "branch '$branch' has no commits yet"
 
-  if existing=$(stash_saved_commit "$ref"); then
+  if existing=$(stash_saved_commit "$ref") || existing=$(stash_saved_commit "$WORKBRANCH_STASH_LEGACY_REF_PREFIX/$branch"); then
     die "branch '$branch' already has a workbranch stash ($(git -C "$STASH_TOP" rev-parse --short "$existing")); run workbranch stash pop or drop first"
   fi
 
@@ -4937,10 +4943,14 @@ cmd_stash_push() {
   git -C "$STASH_TOP" update-ref -m "workbranch stash push" "$ref" "$final" "" ||
     die "failed to save workbranch stash for branch '$branch'"
 
-  git -C "$STASH_TOP" reset --hard -q || die "saved $final but failed to reset $STASH_TOP; restore with: workbranch stash apply"
+  # Cleanup must precede reset: HEAD may restore a tracked symlink over a
+  # directory, redirecting captured paths to unrelated files outside the repo.
+  # The durable ref already exists; on cleanup failure keep it and skip reset.
   if [ -n "$untracked" ]; then
-    stash_remove_captured_untracked "$untracked"
+    stash_remove_captured_untracked "$untracked" ||
+      die "saved $final but failed to remove captured files in $STASH_TOP; stash kept and reset skipped"
   fi
+  git -C "$STASH_TOP" reset --hard -q || die "saved $final but failed to reset $STASH_TOP; restore with: workbranch stash apply"
 
   short=$(git -C "$STASH_TOP" rev-parse --short "$final")
   success "Saved local changes on $branch as $short"
@@ -4975,7 +4985,10 @@ stash_resolve_target() {
   [ -n "$branch" ] || branch=$(stash_current_branch) || exit 1
   STASH_BRANCH=$branch
   STASH_REF=$(stash_ref_for_branch "$branch") || exit 1
-  STASH_COMMIT=$(stash_saved_commit "$STASH_REF") || die "no workbranch stash for branch '$branch'"
+  if ! STASH_COMMIT=$(stash_saved_commit "$STASH_REF"); then
+    STASH_REF="$WORKBRANCH_STASH_LEGACY_REF_PREFIX/$branch"
+    STASH_COMMIT=$(stash_saved_commit "$STASH_REF") || die "no workbranch stash for branch '$branch'"
+  fi
 }
 
 cmd_stash_restore() {
@@ -5009,20 +5022,28 @@ cmd_stash_drop() {
 }
 
 cmd_stash_list() {
-  local current branch rest marker found
+  local current branch ref rest marker found
   [ $# -eq 0 ] || cmd_stash_usage
   current=$(git -C "$STASH_TOP" symbolic-ref --short -q HEAD || true)
   found=0
-  while IFS=$'\t' read -r branch rest; do
-    [ -n "$branch" ] || continue
+  while IFS=$'\t' read -r ref rest; do
+    [ -n "$ref" ] || continue
+    case "$ref" in
+      "$WORKBRANCH_STASH_REF_PREFIX/"*)
+        branch=${ref#"$WORKBRANCH_STASH_REF_PREFIX/"}
+        branch=${branch//%2F/\/}
+        branch=${branch//%25/%}
+        ;;
+      *) branch=${ref#"$WORKBRANCH_STASH_LEGACY_REF_PREFIX/"} ;;
+    esac
     found=1
     marker=' '
     [ "$branch" = "$current" ] && marker='*'
     printf '%s %s\t%s\n' "$marker" "$(color_branch_name "$branch")" "$rest"
   done <<EOF
 $(git -C "$STASH_TOP" for-each-ref --sort=-committerdate \
-    --format='%(refname:lstrip=3)%09%(objectname:short)%09%(committerdate:relative)%09%(subject)' \
-    "$WORKBRANCH_STASH_REF_PREFIX/")
+    --format='%(refname)%09%(objectname:short)%09%(committerdate:relative)%09%(subject)' \
+    "$WORKBRANCH_STASH_REF_PREFIX/" "$WORKBRANCH_STASH_LEGACY_REF_PREFIX/")
 EOF
   [ "$found" -eq 1 ] || info "No workbranch stashes"
 }

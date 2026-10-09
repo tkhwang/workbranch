@@ -217,21 +217,26 @@ Save (`workbranch stash [push] [-m <message>]`), run inside the worktree:
 git stash create [<message>]                         # HEAD + index + worktree commit, no ref update
 GIT_INDEX_FILE=<tmp> git update-index --add ...      # untracked, non-ignored files
 git commit-tree ... -p HEAD -p <index> -p <untracked> # same shape as `git stash push -u`
-git update-ref refs/workbranch/stash/<branch> <sha> ""  # create only; fails if the slot exists
-git reset --hard                                     # then remove exactly the captured untracked files
+git update-ref refs/workbranch/stash-v2/<encoded-branch> <sha> ""  # create only; fails if the slot exists
+# Remove exactly the captured untracked files BEFORE restoring tracked symlinks.
+git reset --hard
 ```
 
 Restore (`pop` / `apply [--index]`):
 
 ```bash
-git stash apply [--index] <sha>                       # sha read from refs/workbranch/stash/<branch>
-git update-ref -d refs/workbranch/stash/<branch> <sha> # pop only, after a clean apply
+git stash apply [--index] <sha>                       # sha read from refs/workbranch/stash-v2/<encoded-branch>
+git update-ref -d refs/workbranch/stash-v2/<encoded-branch> <sha> # pop only, after a clean apply
 ```
+
+Branch names encode `%` as `%25` and `/` as `%2F`, so `foo` and `foo/bar` have independent slots. Existing `refs/workbranch/stash/<branch>` slots remain readable by list/show/apply/pop/drop and block a second save for the same branch. New saves use only the v2 namespace; older CLI versions cannot see these new slots.
 
 Safety:
 
+- Cleanup happens only after the stash ref is saved and before reset. Cleanup failure keeps the saved slot and skips reset; some captured files may already have been removed. Avoid concurrent worktree edits during stash operations.
 - Runs only in the current git worktree; does not need a workbranch project.
-- Fails on detached HEAD, during a rebase, merge, or cherry-pick, or when the branch already has a saved stash.
+- Fails on detached HEAD, during a rebase, merge, cherry-pick, or revert, or when the branch already has a saved stash.
+- A saved directory replacing a tracked symlink may conflict on restore: the slot is kept. Remove only the obstructing symlink (not its target), then retry restore.
 - If the apply conflicts, the slot is kept; resolve, then `workbranch stash drop`.
 - `drop` and `pop` print the full SHA so a dropped stash can still be recovered with `git stash apply <sha>` until garbage collection.
 - `list` shows every branch's slot; `--branch <branch>` targets another branch's slot explicitly.

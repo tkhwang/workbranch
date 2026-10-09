@@ -40,7 +40,7 @@ macOS 전용: `finder`, `ide`, `terminal`, `config ide`, `config terminal`. Linu
 | `workbranch stash [-m <msg>]` | 현재 worktree 변경사항을 그 branch 이름으로 보관 |
 | `workbranch stash pop`     | 현재 branch에 보관한 변경사항 복원                |
 
-`git stash` 목록은 repo의 모든 worktree가 함께 쓰므로, 인자 없는 `git stash pop`은 다른 worktree가 넣은 항목을 꺼낼 수 있습니다. `workbranch stash`는 현재 worktree에서 실행되며 tracked, staged, untracked 변경을 공유 stash 목록이 아니라 `refs/workbranch/stash/<branch>`에 저장합니다. `pop`과 `apply`는 `--branch <branch>`를 주지 않는 한 현재 branch의 항목만 복원합니다. `list`, `show [-p]`, `drop`으로 확인하거나 버릴 수 있습니다. branch마다 한 번에 하나만 보관합니다.
+`git stash` 목록은 repo의 모든 worktree가 함께 쓰므로, 인자 없는 `git stash pop`은 다른 worktree가 넣은 항목을 꺼낼 수 있습니다. `workbranch stash`는 현재 worktree에서 실행되며 tracked, staged, untracked 변경을 공유 stash 목록이 아니라 `refs/workbranch/stash-v2/<encoded-branch>`에 저장합니다. `pop`과 `apply`는 `--branch <branch>`를 주지 않는 한 현재 branch의 항목만 복원합니다. `list`, `show [-p]`, `drop`으로 확인하거나 버릴 수 있습니다. branch마다 한 번에 하나만 보관합니다.
 
 ### Combined flow
 
