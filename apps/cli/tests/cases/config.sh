@@ -40,7 +40,7 @@ test_config_ide_can_set_custom_command_without_prompting_repos() {
 
   input=$(printf '%s
 %s
-' "8" "code --reuse-window")
+' "9" "code --reuse-window")
   out=$(printf '%s' "$input" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" config ide)
   assert_contains "$out" "[*] IDE command:"
   assert_not_contains "$out" "Base repo branch for frontend"
@@ -64,10 +64,32 @@ test_config_ide_preset_uses_superset_level1_order() {
   assert_contains "$out" '5) Sublime Text (open -na "Sublime Text")'
   assert_contains "$out" "6) Xcode (open -na Xcode)"
   assert_contains "$out" '7) VS Code (open -na "Visual Studio Code" --args --new-window'
-  assert_contains "$out" "8) Custom command"
-  assert_contains "$out" "9) Clear"
+  assert_contains "$out" "8) Tern (open -a Tern)"
+  assert_contains "$out" "9) Custom command"
+  assert_contains "$out" "10) Clear"
   assert_contains "$out" "[+] Config updated:"
   assert_contains "$(cat "$project/.workbranch.config")" "IDE open -na Cursor --args --new-window"
+}
+
+test_config_ide_tern_preset_stores_open_a_tern() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  out=$(printf '%s\n' "8" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" config ide)
+  assert_contains "$out" "[+] Config updated:"
+  assert_contains "$(cat "$project/.workbranch.config")" "IDE open -a Tern"
+}
+
+test_config_ide_clear_choice_follows_custom_command() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  printf 'IDE open -a Tern\n' >> "$project/.workbranch.config"
+
+  out=$(printf '%s\n' "10" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" config ide)
+  assert_contains "$out" "[+] Config updated:"
+  assert_not_contains "$(cat "$project/.workbranch.config")" "IDE open -a Tern"
 }
 
 test_config_tool_preset_names_are_colored() {
@@ -83,6 +105,7 @@ test_config_tool_preset_names_are_colored() {
   assert_contains "$out" $'5) \033[0;36mSublime Text\033[0m (open -na "Sublime Text")'
   assert_contains "$out" $'6) \033[0;36mXcode\033[0m (open -na Xcode)'
   assert_contains "$out" $'7) \033[0;36mVS Code\033[0m (open -na "Visual Studio Code" --args --new-window)'
+  assert_contains "$out" $'8) \033[0;36mTern\033[0m (open -a Tern)'
 
   out=$(printf '\n' | env -u NO_COLOR WORKBRANCH_COLOR=always WORKBRANCH_TEST_PLATFORM=macos "$WORKBRANCH" config terminal 2>&1)
   assert_contains "$out" $'1) \033[0;36miTerm\033[0m (open -a iTerm)'
