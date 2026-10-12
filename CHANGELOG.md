@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.34.0](https://github.com/tkhwang/workbranch/compare/v2.33.0...v2.34.0) (2026-10-12)
+
+
+### Features
+
+* **ide:** add tern and zed support ([621887b](https://github.com/tkhwang/workbranch/commit/621887b9b96778c12806724966620d60f496c9c9))
+* **ide:** add tern and zed support ([9c9a52c](https://github.com/tkhwang/workbranch/commit/9c9a52c40b15c752554a662a1f7d022d05f50caf))
+
+
+### Bug Fixes
+
+* **stash:** preserve external files and isolate branch refs ([b07228c](https://github.com/tkhwang/workbranch/commit/b07228c85c5e53d0f3baa814b966648c0f43413a))
+* **stash:** prevent external file deletion and branch ref collisions ([8460f22](https://github.com/tkhwang/workbranch/commit/8460f2291981e8fb04ac41682b47618680f72c56))
+
 ## [2.33.0](https://github.com/tkhwang/workbranch/compare/v2.32.0...v2.33.0) (2026-10-08)
 
 
