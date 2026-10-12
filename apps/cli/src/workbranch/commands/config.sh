@@ -140,12 +140,12 @@ configure_ide_prompt() {
   fi
   case "$value" in
     "") ;;
-    1|2|3|4|5|6|7) set_ide_command "$(ide_preset_command "$value")" ;;
-    8)
+    1|2|3|4|5|6|7|8) set_ide_command "$(ide_preset_command "$value")" ;;
+    9)
       custom=$(prompt_required "Custom IDE command")
       set_ide_command "$custom"
       ;;
-    9|--clear) clear_ide_command ;;
+    10|--clear) clear_ide_command ;;
     *) die "invalid IDE choice: $value" ;;
   esac
 }

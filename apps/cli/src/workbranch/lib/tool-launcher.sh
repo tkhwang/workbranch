@@ -18,8 +18,9 @@ print_ide_presets() {
   print_tool_preset 5 "Sublime Text" 'open -na "Sublime Text"'
   print_tool_preset 6 "Xcode" 'open -na Xcode'
   print_tool_preset 7 "VS Code" 'open -na "Visual Studio Code" --args --new-window'
-  printf '    8) Custom command\n' >&2
-  printf '    9) Clear\n' >&2
+  print_tool_preset 8 "Tern" 'open -a Tern'
+  printf '    9) Custom command\n' >&2
+  printf '    10) Clear\n' >&2
 }
 
 ide_preset_command() {
@@ -31,6 +32,9 @@ ide_preset_command() {
     5) printf '%s' 'open -na "Sublime Text"' ;;
     6) printf '%s' 'open -na Xcode' ;;
     7) printf '%s' 'open -na "Visual Studio Code" --args --new-window' ;;
+    # Tern keeps one app instance around its session daemon; `open -a` adds a tab
+    # in the repo path to the running window instead of starting a second app.
+    8) printf '%s' 'open -a Tern' ;;
     *) return 1 ;;
   esac
 }
@@ -90,16 +94,18 @@ ide_application_roots() {
 }
 
 # Bundled CLI path (relative to an Applications directory) for VS Code-family IDE
-# presets. `open -na <App> --args ...` launches a throwaway instance that hands the
-# path to the running IDE and quits, which leaves macOS focus on the caller; the
-# bundled CLI hands the path over directly, so an already-open repo window is
-# focused, and run_ide_bundled_cli then brings the IDE to the front.
+# presets and Zed (see run_zed_bundled_cli). `open -na <App> --args ...` launches
+# a throwaway instance that hands the path to the running IDE and quits, which
+# leaves macOS focus on the caller; the bundled CLI hands the path over directly,
+# so an already-open repo window is focused, and run_ide_bundled_cli then brings
+# the IDE to the front.
 ide_bundled_cli_relative_path() {
   case "$1" in
     'open -na "Visual Studio Code" --args --new-window') printf '%s' 'Visual Studio Code.app/Contents/Resources/app/bin/code' ;;
     'open -na Cursor --args --new-window'|'open -na "Cursor" --args --new-window') printf '%s' 'Cursor.app/Contents/Resources/app/bin/cursor' ;;
     'open -na "Antigravity IDE" --args --new-window') printf '%s' 'Antigravity IDE.app/Contents/Resources/app/bin/antigravity-ide' ;;
     'open -na Windsurf --args --new-window'|'open -na "Windsurf" --args --new-window') printf '%s' 'Windsurf.app/Contents/Resources/app/bin/windsurf' ;;
+    'open -na Zed'|'open -a Zed'|'open -na "Zed"'|'open -a "Zed"') printf '%s' 'Zed.app/Contents/MacOS/cli' ;;
     *) return 1 ;;
   esac
 }
@@ -220,6 +226,20 @@ run_ide_bundled_cli() {
   )
 }
 
+# `open -na Zed <repo>` per repo hands every repo of a multi-repo task to one Zed
+# window, which keeps only the first. Zed's CLI talks to the running Zed directly,
+# and `--classic` (Zed's "Open a new window" behavior) focuses the window that
+# already has the repo open and otherwise opens the repo in its own window, so
+# each repo keeps its own window just like the VS Code-family `--new-window`.
+run_zed_bundled_cli() {
+  zed_cli=$1
+  path=$2
+  (
+    cd "$path" || exit 1
+    "$zed_cli" --classic "$path"
+  )
+}
+
 run_tool_command() {
   tool_label=$1
   command=$2
@@ -234,7 +254,10 @@ run_tool_command() {
         'open -a Windsurf'|'open -na Windsurf'|'open -a "Windsurf"'|'open -na "Windsurf"') command='open -na Windsurf --args --new-window' ;;
       esac
       if bundled_cli_path=$(resolve_ide_bundled_cli "$command"); then
-        run_ide_bundled_cli "$bundled_cli_path" "$path"
+        case "$bundled_cli_path" in
+          */Zed.app/Contents/MacOS/cli) run_zed_bundled_cli "$bundled_cli_path" "$path" ;;
+          *) run_ide_bundled_cli "$bundled_cli_path" "$path" ;;
+        esac
         return $?
       fi
       ;;

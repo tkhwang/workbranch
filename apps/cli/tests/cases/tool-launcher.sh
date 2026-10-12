@@ -532,7 +532,33 @@ test_ide_non_vscode_family_preset_keeps_configured_open_command() {
   append_fake_launcher_open_script "$fake_bin"
   append_fake_lsappinfo_script "$fake_bin"
   apps_root="$TMP_ROOT/apps"
-  append_fake_ide_bundle_cli "$apps_root" "Zed.app/Contents/Resources/app/bin/zed"
+  append_fake_ide_bundle_cli "$apps_root" "Sublime Text.app/Contents/SharedSupport/bin/subl"
+  export WORKBRANCH_FAKE_TOOL_LOG="$TMP_ROOT/ide.log"
+
+  cat >> "$project/.workbranch.config" <<'CONFIG'
+IDE open -na "Sublime Text"
+CONFIG
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  printf '\n\n' | run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  PATH="$fake_bin:$PATH" WORKBRANCH_FAKE_IDE_RUNNING=1 WORKBRANCH_TEST_APPLICATIONS_DIR="$apps_root" WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" ide login --repo frontend >/dev/null
+  log=$(cat "$WORKBRANCH_FAKE_TOOL_LOG")
+  # Sublime Text and Xcode presets are outside the bundled-CLI rule and keep the configured command.
+  expected_open_call="$canonical_project/login/frontend|3|-na Sublime Text $canonical_project/login/frontend"
+  [ "$log" = "$expected_open_call" ] || fail "expected only the configured open command '$expected_open_call'; got: $log"
+}
+
+test_ide_zed_preset_opens_each_task_repo_in_its_own_window_via_bundled_cli() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  canonical_project=$(pwd -P)
+  fake_bin="$TMP_ROOT/bin"
+  append_fake_launcher_open_script "$fake_bin"
+  append_fake_lsappinfo_script "$fake_bin"
+  apps_root="$TMP_ROOT/apps"
+  append_fake_ide_bundle_cli "$apps_root" "Zed.app/Contents/MacOS/cli"
   export WORKBRANCH_FAKE_TOOL_LOG="$TMP_ROOT/ide.log"
 
   cat >> "$project/.workbranch.config" <<'CONFIG'
@@ -542,9 +568,62 @@ CONFIG
   run_expect_success "$WORKBRANCH" init >/dev/null
   printf '\n\n' | run_expect_success "$WORKBRANCH" add login >/dev/null
 
-  PATH="$fake_bin:$PATH" WORKBRANCH_FAKE_IDE_RUNNING=1 WORKBRANCH_TEST_APPLICATIONS_DIR="$apps_root" WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" ide login --repo frontend >/dev/null
+  out=$(PATH="$fake_bin:$PATH" WORKBRANCH_FAKE_IDE_RUNNING=1 WORKBRANCH_TEST_APPLICATIONS_DIR="$apps_root" WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" ide login)
+  assert_contains "$out" "[*] Opening IDE: login/frontend"
+  assert_contains "$out" "[*] Opening IDE: login/backend"
   log=$(cat "$WORKBRANCH_FAKE_TOOL_LOG")
-  # Zed, Sublime Text, and Xcode presets are outside the VS Code-family rule and keep the configured command.
-  expected_open_call="$canonical_project/login/frontend|3|-na Zed $canonical_project/login/frontend"
-  [ "$log" = "$expected_open_call" ] || fail "expected only the configured open command '$expected_open_call'; got: $log"
+  # Exactly one Zed CLI call per task repo (never the task root), with --classic,
+  # and Zed activates itself so no `open` call follows.
+  assert_contains "$log" "$canonical_project/login/frontend|2|--classic $canonical_project/login/frontend"
+  assert_contains "$log" "$canonical_project/login/backend|2|--classic $canonical_project/login/backend"
+  assert_not_contains "$log" "-na Zed"
+  [ "$(printf '%s\n' "$log" | wc -l | tr -d ' ')" = "2" ] || fail "expected one Zed CLI call per repo; got: $log"
+}
+
+test_ide_zed_preset_falls_back_to_open_when_bundled_cli_missing() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  canonical_project=$(pwd -P)
+  fake_bin="$TMP_ROOT/bin"
+  append_fake_launcher_open_script "$fake_bin"
+  export WORKBRANCH_FAKE_TOOL_LOG="$TMP_ROOT/ide.log"
+
+  cat >> "$project/.workbranch.config" <<'CONFIG'
+IDE open -na Zed
+CONFIG
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  printf '\n\n' | run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  mkdir -p "$TMP_ROOT/apps"
+  PATH="$fake_bin:$PATH" WORKBRANCH_TEST_APPLICATIONS_DIR="$TMP_ROOT/apps" WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" ide login >/dev/null
+  log=$(cat "$WORKBRANCH_FAKE_TOOL_LOG")
+  assert_contains "$log" "$canonical_project/login/frontend|3|-na Zed $canonical_project/login/frontend"
+  assert_contains "$log" "$canonical_project/login/backend|3|-na Zed $canonical_project/login/backend"
+}
+
+test_ide_tern_preset_opens_each_repo_in_running_tern() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  canonical_project=$(pwd -P)
+  fake_bin="$TMP_ROOT/bin"
+  append_fake_launcher_open_script "$fake_bin"
+  export WORKBRANCH_FAKE_TOOL_LOG="$TMP_ROOT/ide.log"
+
+  cat >> "$project/.workbranch.config" <<'CONFIG'
+IDE open -a Tern
+CONFIG
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  printf '\n\n' | run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  PATH="$fake_bin:$PATH" WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" ide login >/dev/null
+  log=$(cat "$WORKBRANCH_FAKE_TOOL_LOG")
+  # Tern is outside the VS Code-family rule: `open -a Tern <repo>` adds a tab per repo
+  # to the running Tern instead of starting another app instance with `open -n`.
+  assert_contains "$log" "$canonical_project/login/frontend|3|-a Tern $canonical_project/login/frontend"
+  assert_contains "$log" "$canonical_project/login/backend|3|-a Tern $canonical_project/login/backend"
+  assert_not_contains "$log" "-na Tern"
 }
