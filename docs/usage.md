@@ -40,7 +40,7 @@ macOS-only: `finder`, `ide`, `terminal`, `config ide`, and `config terminal`. On
 | `workbranch stash [-m <msg>]` | Set aside the current worktree's changes under its branch |
 | `workbranch stash pop`     | Restore the current branch's saved changes           |
 
-`git stash` keeps one stash list for every worktree of a repo, so a bare `git stash pop` can restore another worktree's entry. `workbranch stash` runs in the current worktree and stores tracked, staged, and untracked changes under `refs/workbranch/stash/<branch>` without touching the shared list. `pop` and `apply` only restore the current branch's slot unless `--branch <branch>` is given; `list`, `show [-p]`, and `drop` inspect or discard slots. Each branch holds one slot at a time.
+`git stash` keeps one stash list for every worktree of a repo, so a bare `git stash pop` can restore another worktree's entry. `workbranch stash` runs in the current worktree and stores tracked, staged, and untracked changes under `refs/workbranch/stash-v2/<encoded-branch>` without touching the shared list. `pop` and `apply` only restore the current branch's slot unless `--branch <branch>` is given; `list`, `show [-p]`, and `drop` inspect or discard slots. Each branch holds one slot at a time.
 
 ### Combined flow
 
