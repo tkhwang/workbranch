@@ -79,8 +79,9 @@ _workbranch() {
         remove|destroy) words='--force' ;;
         stash) words='-m --branch --index' ;;
         doctor) words='--fix --repo' ;;
-        update) words='--all --repo' ;;
-        status|pull|push|land|finalize|refresh|path|finder|ide|terminal) words='--repo' ;;
+        update) words='--all --repo --autostash' ;;
+        refresh) words='--repo --autostash' ;;
+        status|pull|push|land|finalize|path|finder|ide|terminal) words='--repo' ;;
         *) words='' ;;
       esac
       COMPREPLY=( $(compgen -W "$words" -- "$cur") )
@@ -152,8 +153,9 @@ _workbranch() {
       remove|destroy) flags=(--force) ;;
       stash) flags=(-m --branch --index) ;;
       doctor) flags=(--fix --repo) ;;
-      update) flags=(--all --repo) ;;
-      status|pull|push|land|finalize|refresh|path|finder|ide|terminal) flags=(--repo) ;;
+      update) flags=(--all --repo --autostash) ;;
+      refresh) flags=(--repo --autostash) ;;
+      status|pull|push|land|finalize|path|finder|ide|terminal) flags=(--repo) ;;
       *) flags=() ;;
     esac
     _describe 'option' flags
@@ -250,12 +252,14 @@ complete -c workbranch -n '__workbranch_seen_command stash' -l branch -d 'Use an
 complete -c workbranch -n '__workbranch_seen_command stash' -l index -d 'Also restore the index'
 complete -c workbranch -n '__workbranch_seen_command update' -l all -d 'Update every task workspace'
 complete -c workbranch -n '__workbranch_seen_command update' -l repo -d 'Limit operation to one repo'
+complete -c workbranch -n '__workbranch_seen_command update' -l autostash -d 'Stash dirty task repos, then restore them'
 complete -c workbranch -n '__workbranch_seen_command status' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command pull' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command push' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command land' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command finalize' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command refresh' -l repo -d 'Limit operation to one repo'
+complete -c workbranch -n '__workbranch_seen_command refresh' -l autostash -d 'Stash dirty task repos, then restore them'
 complete -c workbranch -n '__workbranch_seen_command doctor' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command path' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command finder' -l repo -d 'Limit operation to one repo'

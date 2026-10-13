@@ -38,12 +38,23 @@ stash_saved_commit() {
   git -C "$STASH_TOP" rev-parse -q --verify "$1^{commit}" 2>/dev/null
 }
 
-stash_require_no_operation_in_progress() {
+stash_operation_in_progress() {
   local git_dir
   git_dir=$(git_dir_for_path "$STASH_TOP") || die "failed to resolve git dir: $STASH_TOP"
-  if [ -d "$git_dir/rebase-merge" ] || [ -d "$git_dir/rebase-apply" ] || [ -f "$git_dir/MERGE_HEAD" ] || [ -f "$git_dir/CHERRY_PICK_HEAD" ] || [ -f "$git_dir/REVERT_HEAD" ]; then
+  [ -d "$git_dir/rebase-merge" ] || [ -d "$git_dir/rebase-apply" ] || [ -f "$git_dir/MERGE_HEAD" ] || [ -f "$git_dir/CHERRY_PICK_HEAD" ] || [ -f "$git_dir/REVERT_HEAD" ]
+}
+
+stash_require_no_operation_in_progress() {
+  if stash_operation_in_progress; then
     die "a rebase, merge, cherry-pick, or revert is in progress in $STASH_TOP; finish or abort it first"
   fi
+}
+
+# Print the commit held in the branch's slot, checking the legacy namespace too.
+stash_existing_commit() {
+  local ref
+  ref=$(stash_ref_for_branch "$1") || return 1
+  stash_saved_commit "$ref" || stash_saved_commit "$WORKBRANCH_STASH_LEGACY_REF_PREFIX/$1"
 }
 
 stash_has_untracked() {
@@ -86,28 +97,13 @@ stash_remove_captured_untracked() {
     done
 }
 
-cmd_stash_push() {
-  local message branch ref head existing tracked untracked index_commit final subject short
-  message=
-  while [ $# -gt 0 ]; do
-    case "$1" in
-      -m|--message)
-        [ $# -ge 2 ] || cmd_stash_usage
-        message=$2
-        shift 2
-        ;;
-      *) cmd_stash_usage ;;
-    esac
-  done
-
-  branch=$(stash_current_branch) || exit 1
-  ref=$(stash_ref_for_branch "$branch") || exit 1
-  stash_require_no_operation_in_progress
+# Build the stash-shaped commit for STASH_TOP without touching the worktree,
+# index, or any ref. Prints nothing when there are no local changes.
+stash_build_commit() {
+  local branch message head tracked untracked index_commit final subject
+  branch=$1
+  message=$2
   head=$(git -C "$STASH_TOP" rev-parse -q --verify HEAD) || die "branch '$branch' has no commits yet"
-
-  if existing=$(stash_saved_commit "$ref") || existing=$(stash_saved_commit "$WORKBRANCH_STASH_LEGACY_REF_PREFIX/$branch"); then
-    die "branch '$branch' already has a workbranch stash ($(git -C "$STASH_TOP" rev-parse --short "$existing")); run workbranch stash pop or drop first"
-  fi
 
   if [ -n "$message" ]; then
     tracked=$(cd "$STASH_TOP" && git stash create "$message") || die "failed to create stash commit in $STASH_TOP"
@@ -121,7 +117,6 @@ cmd_stash_push() {
   fi
 
   if [ -z "$tracked" ] && [ -z "$untracked" ]; then
-    info "No local changes to save on $branch"
     return 0
   fi
 
@@ -143,6 +138,16 @@ cmd_stash_push() {
   else
     final=$tracked
   fi
+  printf '%s' "$final"
+}
+
+# Record a built stash commit in the branch slot, then clear the saved changes
+# from the worktree.
+stash_save_commit() {
+  local branch ref final untracked
+  branch=$1
+  ref=$2
+  final=$3
 
   # Empty old value: fail instead of overwriting a slot created concurrently.
   git -C "$STASH_TOP" update-ref -m "workbranch stash push" "$ref" "$final" "" ||
@@ -151,11 +156,42 @@ cmd_stash_push() {
   # Cleanup must precede reset: HEAD may restore a tracked symlink over a
   # directory, redirecting captured paths to unrelated files outside the repo.
   # The durable ref already exists; on cleanup failure keep it and skip reset.
-  if [ -n "$untracked" ]; then
+  if untracked=$(git -C "$STASH_TOP" rev-parse -q --verify "$final^3"); then
     stash_remove_captured_untracked "$untracked" ||
       die "saved $final but failed to remove captured files in $STASH_TOP; stash kept and reset skipped"
   fi
   git -C "$STASH_TOP" reset --hard -q || die "saved $final but failed to reset $STASH_TOP; restore with: workbranch stash apply"
+}
+
+cmd_stash_push() {
+  local message branch ref existing final short
+  message=
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -m|--message)
+        [ $# -ge 2 ] || cmd_stash_usage
+        message=$2
+        shift 2
+        ;;
+      *) cmd_stash_usage ;;
+    esac
+  done
+
+  branch=$(stash_current_branch) || exit 1
+  ref=$(stash_ref_for_branch "$branch") || exit 1
+  stash_require_no_operation_in_progress
+  git -C "$STASH_TOP" rev-parse -q --verify HEAD >/dev/null || die "branch '$branch' has no commits yet"
+
+  if existing=$(stash_existing_commit "$branch"); then
+    die "branch '$branch' already has a workbranch stash ($(git -C "$STASH_TOP" rev-parse --short "$existing")); run workbranch stash pop or drop first"
+  fi
+
+  final=$(stash_build_commit "$branch" "$message") || exit 1
+  if [ -z "$final" ]; then
+    info "No local changes to save on $branch"
+    return 0
+  fi
+  stash_save_commit "$branch" "$ref" "$final"
 
   short=$(git -C "$STASH_TOP" rev-parse --short "$final")
   success "Saved local changes on $branch as $short"

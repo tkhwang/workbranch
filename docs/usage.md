@@ -42,12 +42,15 @@ macOS-only: `finder`, `ide`, `terminal`, `config ide`, and `config terminal`. On
 
 `git stash` keeps one stash list for every worktree of a repo, so a bare `git stash pop` can restore another worktree's entry. `workbranch stash` runs in the current worktree and stores tracked, staged, and untracked changes under `refs/workbranch/stash-v2/<encoded-branch>` without touching the shared list. `pop` and `apply` only restore the current branch's slot unless `--branch <branch>` is given; `list`, `show [-p]`, and `drop` inspect or discard slots. Each branch holds one slot at a time.
 
+`update --autostash` and `refresh --autostash` do that for every dirty task repo: save to the branch slot, rebase, then restore with `--index` so staged and unstaged changes keep their split. Preflight replays the rebase and the restore in a scratch worktree, so a conflict in any repo stops the command before anything changes. A dirty repo whose task already contains the base keeps its changes in place. A branch that already holds a slot must `pop` or `drop` it first.
+
 ### Combined flow
 
 | Command                      | Use it to                                                                  |
 | ---------------------------- | -------------------------------------------------------------------------- |
 | `workbranch refresh`         | Pull base branches, then update every task workspace                       |
 | `workbranch refresh <task>`  | Pull base branches, then update one task workspace                         |
+| `workbranch refresh --autostash` | Same, setting aside and restoring changes in dirty task repos          |
 | `workbranch finalize <task>` | Pull base branches, update one task, then land it into local base branches |
 | `workbranch prune`           | Remove clean task workspaces already merged into local base branches       |
 

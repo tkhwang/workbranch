@@ -25,3 +25,5 @@ TASK_BRANCH_NAMES=()
 PREFLIGHT_ERRORS=()
 FILTER_REPO=""
 ARGS=()
+# 1 or 0 when the command accepts --autostash; empty when it does not.
+UPDATE_AUTOSTASH=""

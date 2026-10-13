@@ -42,12 +42,15 @@ macOS 전용: `finder`, `ide`, `terminal`, `config ide`, `config terminal`. Linu
 
 `git stash` 목록은 repo의 모든 worktree가 함께 쓰므로, 인자 없는 `git stash pop`은 다른 worktree가 넣은 항목을 꺼낼 수 있습니다. `workbranch stash`는 현재 worktree에서 실행되며 tracked, staged, untracked 변경을 공유 stash 목록이 아니라 `refs/workbranch/stash-v2/<encoded-branch>`에 저장합니다. `pop`과 `apply`는 `--branch <branch>`를 주지 않는 한 현재 branch의 항목만 복원합니다. `list`, `show [-p]`, `drop`으로 확인하거나 버릴 수 있습니다. branch마다 한 번에 하나만 보관합니다.
 
+`update --autostash`와 `refresh --autostash`는 dirty한 모든 task repo에 대해 이 과정을 대신합니다. branch slot에 저장하고, rebase한 뒤, staged/unstaged 구분이 유지되도록 `--index`로 복원합니다. preflight가 임시 worktree에서 rebase와 복원을 재현하므로, 어느 repo라도 충돌하면 아무것도 바꾸기 전에 멈춥니다. task가 이미 base를 포함하는 dirty repo는 변경을 그대로 둡니다. 이미 slot을 가진 branch는 먼저 `pop`이나 `drop`해야 합니다.
+
 ### Combined flow
 
 | Command                      | 용도                                                                      |
 | ---------------------------- | ------------------------------------------------------------------------- |
 | `workbranch refresh`         | base branch를 pull한 뒤 모든 task workspace update                        |
 | `workbranch refresh <task>`  | base branch를 pull한 뒤 하나의 task workspace update                      |
+| `workbranch refresh --autostash` | 위와 같되, dirty한 task repo의 변경을 치워 두었다가 복원              |
 | `workbranch finalize <task>` | base branch를 pull하고 하나의 task를 update한 뒤 local base branch로 반영 |
 | `workbranch prune`           | local base branch에 이미 merge된 clean task workspace 정리                |
 

@@ -146,7 +146,14 @@ workbranch update    # local base를 모든 task에 반영
 workbranch refresh   # base를 pull한 뒤 모든 task update
 ```
 
-`update`와 `refresh`는 task worktree가 dirty하면 멈춥니다. 변경을 잠시 치워 둘 때는 `workbranch stash`를 쓰세요. 모든 worktree가 함께 쓰는 `git stash` 목록이 아니라 현재 branch 이름으로 보관합니다.
+`update`와 `refresh`는 task worktree가 dirty하면 멈춥니다. `--autostash`를 붙이면 dirty한 repo마다 변경을 치워 두고, update한 뒤 다시 복원합니다. 변경은 모든 worktree가 함께 쓰는 `git stash` 목록이 아니라 `workbranch stash`로 각 branch 이름 아래에 보관합니다.
+
+```bash
+workbranch refresh --autostash             # 모든 task
+workbranch update feat-login --autostash   # 하나의 task
+```
+
+preflight가 먼저 임시 worktree에서 rebase와 복원을 재현해 보고, 어느 repo라도 충돌하면 아무것도 바꾸지 않습니다. 한 repo에서 직접 하려면:
 
 ```bash
 workbranch stash              # <task>/<repo> 안에서 실행

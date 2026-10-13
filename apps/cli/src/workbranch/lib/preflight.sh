@@ -78,28 +78,51 @@ preflight_require_no_rebase() {
 
 
 preflight_rebase_conflict_message() {
-  local label base_label task repo task_path base_path
+  local label base_label autostash task repo task_path base_path
   label=$1
   base_label=$2
+  autostash=${3:-}
   task=${label%%/*}
   repo=${label#*/}
   task_path="$PROJECT_ROOT/$label"
   base_path="$PROJECT_ROOT/$base_label"
   printf '%s\n' \
     "$label cannot rebase onto $base_label without conflicts" \
-    "Resolve manually:" \
+    "Resolve manually:"
+  [ -z "$autostash" ] || printf '%s\n' "  (cd $task_path && workbranch stash)"
+  printf '%s\n' \
     "  git -C $task_path rebase \"\$(git -C $base_path rev-parse HEAD)\"" \
     "  git -C $task_path add <resolved-files>" \
     "  git -C $task_path rebase --continue" \
     "  workbranch update $task --repo $repo"
+  [ -z "$autostash" ] || printf '%s\n' "  (cd $task_path && workbranch stash pop)"
 }
 
+preflight_autostash_conflict_message() {
+  local label base_label task repo task_path
+  label=$1
+  base_label=$2
+  task=${label%%/*}
+  repo=${label#*/}
+  task_path="$PROJECT_ROOT/$label"
+  printf '%s\n' \
+    "$label local changes conflict with $base_label after rebase" \
+    "Resolve manually:" \
+    "  (cd $task_path && workbranch stash)" \
+    "  workbranch update $task --repo $repo" \
+    "  (cd $task_path && workbranch stash pop)" \
+    "  # resolve the conflicts, then: (cd $task_path && workbranch stash drop)"
+}
+
+# With a saved stash commit, also replay its restore (--index) after the
+# rebase, as `workbranch update --autostash` will.
 preflight_update_rebase_clean() {
-  local label task_path base_label base_ref tmp_parent tmp_path
+  local label task_path base_label base_ref saved tmp_parent tmp_path
   label=$1
   task_path=$2
   base_label=$3
   base_ref=$4
+  saved=${5:-}
 
   git_ref_exists "$task_path" HEAD || return 0
   git_ref_exists "$task_path" "$base_ref" || return 0
@@ -120,7 +143,9 @@ preflight_update_rebase_clean() {
   fi
 
   if ! git -C "$tmp_path" rebase "$base_ref" >/dev/null 2>&1; then
-    preflight_error "$(preflight_rebase_conflict_message "$label" "$base_label")"
+    preflight_error "$(preflight_rebase_conflict_message "$label" "$base_label" ${saved:+autostash})"
+  elif [ -n "$saved" ] && ! (cd "$tmp_path" && git stash apply --index "$saved" >/dev/null 2>&1); then
+    preflight_error "$(preflight_autostash_conflict_message "$label" "$base_label")"
   fi
 
   git -C "$tmp_path" rebase --abort >/dev/null 2>&1 || true
