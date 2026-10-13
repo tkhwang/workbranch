@@ -190,3 +190,28 @@ test_refresh_preflight_blocks_rebase_conflict_after_pull_without_touching_task()
   [ "$(git -C "$project/login/frontend" rev-parse HEAD)" = "$task_head_before" ] || fail "task HEAD changed after refresh conflict preflight"
   assert_clean "$project/login/frontend"
 }
+
+test_refresh_autostash_pulls_then_restores_dirty_task() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  export GIT_AUTHOR_NAME="Workbranch Test" GIT_AUTHOR_EMAIL="workbranch-test@example.com"
+  export GIT_COMMITTER_NAME="Workbranch Test" GIT_COMMITTER_EMAIL="workbranch-test@example.com"
+
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add feat-login >/dev/null
+  commit_to_remote_master frontend refresh-autostash
+  printf 'local\n' >> "$project/feat-login/frontend/README.md"
+
+  out=$(run_expect_fail "$WORKBRANCH" refresh)
+  assert_contains "$out" "feat-login/frontend dirty worktree; retry with --autostash"
+  assert_not_exists "$project/_base/frontend/refresh-autostash.txt"
+
+  out=$(run_expect_success "$WORKBRANCH" refresh --autostash)
+  assert_contains "$out" "Restored local changes from"
+  assert_file "$project/_base/frontend/refresh-autostash.txt"
+  assert_file "$project/feat-login/frontend/refresh-autostash.txt"
+  assert_contains "$(cat "$project/feat-login/frontend/README.md")" "local"
+  refs=$(git -C "$project/feat-login/frontend" for-each-ref refs/workbranch)
+  [ -z "$refs" ] || fail "expected no workbranch stash refs, got: $refs"
+}

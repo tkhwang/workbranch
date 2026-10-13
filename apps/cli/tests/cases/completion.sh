@@ -128,6 +128,7 @@ test_completion_bash_uses_command_specific_flags() {
   _workbranch
   assert_contains "${COMPREPLY[*]}" "--all"
   assert_contains "${COMPREPLY[*]}" "--repo"
+  assert_contains "${COMPREPLY[*]}" "--autostash"
   assert_not_contains "${COMPREPLY[*]}" "--from"
 
   COMP_WORDS=(workbranch doctor --)
@@ -146,6 +147,7 @@ test_completion_bash_uses_command_specific_flags() {
   COMP_CWORD=2
   _workbranch
   assert_contains "${COMPREPLY[*]}" "--repo"
+  assert_contains "${COMPREPLY[*]}" "--autostash"
   assert_not_contains "${COMPREPLY[*]}" "--all"
 
   COMP_WORDS=(workbranch add --)

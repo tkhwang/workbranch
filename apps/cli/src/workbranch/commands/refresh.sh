@@ -1,7 +1,8 @@
 cmd_refresh() {
   require_project
   parse_repo_option "$@"
-  [ ${#ARGS[@]} -le 1 ] || die "usage: workbranch refresh [task] [--repo <repo>]"
+  parse_autostash_option
+  [ ${#ARGS[@]} -le 1 ] || die "usage: workbranch refresh [task] [--repo <repo>] [--autostash]"
   if [ ${#ARGS[@]} -eq 1 ]; then
     task=$(normalize_task_argument "${ARGS[0]}")
     validate_task_folder_name "$task"

@@ -72,10 +72,14 @@ workbranch_git_checkout_base_branch() {
   fi
 }
 
+workbranch_git_rebase_task() {
+  git -C "$1" rebase "$2"
+}
+
 workbranch_git_update_task() {
   task_path=$1
   local_base_head=$2
-  git -C "$task_path" rebase "$local_base_head" || die "update failed in $task_path; resolve conflicts manually"
+  workbranch_git_rebase_task "$task_path" "$local_base_head" || die "update failed in $task_path; resolve conflicts manually"
 }
 
 workbranch_git_push_base() {

@@ -146,7 +146,14 @@ workbranch update    # apply local bases to every task
 workbranch refresh   # pull bases, then update every task
 ```
 
-`update` and `refresh` stop when a task worktree is dirty. Set the changes aside with `workbranch stash`, which saves them under the current branch instead of the `git stash` list that every worktree shares:
+`update` and `refresh` stop when a task worktree is dirty. Add `--autostash` to set the changes aside, update, and restore them in every dirty repo. Changes are saved under each branch with `workbranch stash`, not in the `git stash` list that every worktree shares:
+
+```bash
+workbranch refresh --autostash             # every task
+workbranch update feat-login --autostash   # one task
+```
+
+Preflight first replays the rebase and the restore in a scratch worktree; if any repo would conflict, nothing changes. To do the same by hand in one repo:
 
 ```bash
 workbranch stash              # run inside <task>/<repo>

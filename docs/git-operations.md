@@ -90,17 +90,39 @@ git rebase <_base/<repo> HEAD>
 
 Safety:
 
-- Fails before running if the task worktree is dirty.
+- Fails before running if the task worktree is dirty, unless `--autostash` is given.
 - Uses the local base worktree HEAD, not `origin/<base-branch>`.
 - Fails before running if `_base/<repo>` is not checked out to the configured base branch.
 - Fails before running if `_base/<repo>` has a rebase in progress.
+- Replays the rebase in a scratch worktree first (with `rebase.updateRefs=false`, so no other branch moves). Fails before running on a rebase conflict, or when a path the rebase adds already exists in the task worktree as an ignored file, which a rebase would silently overwrite.
 - Conflict resolution is left to Git and the user.
+
+With `--autostash` (also on `refresh`), a dirty task repo runs the `workbranch stash` save and restore around the rebase:
+
+```bash
+cd <task>/<repo>
+# save as `workbranch stash`, message "autostash: workbranch update"
+git rebase <_base/<repo> HEAD>
+git stash apply --index <sha>
+git update-ref -d refs/workbranch/stash-v2/<encoded-branch> <sha>
+```
+
+Clean repos run the plain rebase. A dirty repo whose HEAD already contains the base HEAD is left untouched.
+
+Autostash safety:
+
+- Preflight builds the stash commit without touching the worktree (`git stash create` plus the untracked commit), then in a scratch worktree rebases and runs `git stash apply --index`. A rebase or restore conflict in any repo fails the whole command before changes.
+- Ignored files and untracked files the stash cannot save, such as embedded repositories, stay in the worktree. Preflight fails if the rebase would add any of their paths.
+- Fails before running if the branch already holds a workbranch stash slot, or a merge, cherry-pick, or revert is in progress.
+- Never reads or writes the shared `refs/stash`.
+- If the rebase still fails, it runs `git rebase --abort`, restores the stash, drops the slot, and stops.
+- If the restore conflicts after the rebase, the slot is kept; resolve, then `workbranch stash drop` in that repo.
 
 ### `workbranch refresh [<task>]`
 
 Direction: remote base -> local base, then local base -> task workspace(s).
 
-Without `<task>`, `workbranch refresh` targets every task workspace. With `<task>`, it targets only that task workspace. For each repo, `refresh` first validates that every target task workspace can be updated. If there are no task workspaces, or any target task worktree is dirty, missing, on the wrong branch, or has a rebase in progress, the command fails before pulling base branches.
+Without `<task>`, `workbranch refresh` targets every task workspace. With `<task>`, it targets only that task workspace. For each repo, `refresh` first validates that every target task workspace can be updated. If there are no task workspaces, or any target task worktree is dirty (without `--autostash`), missing, on the wrong branch, or has a rebase in progress, the command fails before pulling base branches. `--autostash` behaves as in `workbranch update`.
 
 After update preflight passes, refresh runs the same base pull behavior as `workbranch pull`:
 
