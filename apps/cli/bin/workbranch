@@ -1876,10 +1876,44 @@ preflight_autostash_conflict_message() {
     "  # resolve the conflicts, then: (cd $task_path && workbranch stash drop)"
 }
 
+# Print paths the rebased tree adds that already exist in the task worktree.
+# A rebase silently overwrites ignored files and is blocked by untracked files
+# autostash cannot save, such as embedded repositories. Untracked files saved
+# in the autostash commit are removed before the rebase, so they are skipped.
+preflight_update_overwritten_paths() {
+  local task_path rebased saved saved_untracked path
+  task_path=$1
+  rebased=$2
+  saved=${3:-}
+  saved_untracked=
+  [ -z "$saved" ] || saved_untracked=$(git -C "$task_path" rev-parse -q --verify "$saved^3") || saved_untracked=
+  git -C "$task_path" diff --name-only -z --no-renames --diff-filter=A HEAD "$rebased" |
+    while IFS= read -r -d '' path; do
+      [ -e "$task_path/$path" ] || [ -L "$task_path/$path" ] || continue
+      if [ -n "$saved_untracked" ] && git -C "$task_path" cat-file -e "$saved_untracked:$path" 2>/dev/null; then
+        continue
+      fi
+      printf '%s\n' "$path"
+    done
+}
+
+preflight_overwrite_message() {
+  local label base_label paths task_path count
+  label=$1
+  base_label=$2
+  paths=$3
+  task_path="$PROJECT_ROOT/$label"
+  count=$(printf '%s\n' "$paths" | wc -l | tr -d ' ')
+  printf '%s\n' "$label has local files that $base_label would overwrite; they are ignored or cannot be stashed"
+  printf '%s\n' "$paths" | head -n 5 | sed 's/^/  /'
+  [ "$count" -le 5 ] || printf '  ... and %s more\n' "$((count - 5))"
+  printf '%s\n' "Move them out of $task_path, then retry."
+}
+
 # With a saved stash commit, also replay its restore (--index) after the
 # rebase, as `workbranch update --autostash` will.
 preflight_update_rebase_clean() {
-  local label task_path base_label base_ref saved tmp_parent tmp_path
+  local label task_path base_label base_ref saved tmp_parent tmp_path overwritten
   label=$1
   task_path=$2
   base_label=$3
@@ -1904,10 +1938,15 @@ preflight_update_rebase_clean() {
     return 0
   fi
 
-  if ! git -C "$tmp_path" rebase "$base_ref" >/dev/null 2>&1; then
+  # rebase.updateRefs would move real branches that point into the replayed
+  # history; a config override also works on Git versions without the flag.
+  if ! git -C "$tmp_path" -c rebase.updateRefs=false rebase "$base_ref" >/dev/null 2>&1; then
     preflight_error "$(preflight_rebase_conflict_message "$label" "$base_label" ${saved:+autostash})"
   elif [ -n "$saved" ] && ! (cd "$tmp_path" && git stash apply --index "$saved" >/dev/null 2>&1); then
     preflight_error "$(preflight_autostash_conflict_message "$label" "$base_label")"
+  else
+    overwritten=$(preflight_update_overwritten_paths "$task_path" "$(git -C "$tmp_path" rev-parse HEAD)" "$saved")
+    [ -z "$overwritten" ] || preflight_error "$(preflight_overwrite_message "$label" "$base_label" "$overwritten")"
   fi
 
   git -C "$tmp_path" rebase --abort >/dev/null 2>&1 || true

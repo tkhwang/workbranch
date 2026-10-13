@@ -94,6 +94,7 @@ Safety:
 - Uses the local base worktree HEAD, not `origin/<base-branch>`.
 - Fails before running if `_base/<repo>` is not checked out to the configured base branch.
 - Fails before running if `_base/<repo>` has a rebase in progress.
+- Replays the rebase in a scratch worktree first (with `rebase.updateRefs=false`, so no other branch moves). Fails before running on a rebase conflict, or when a path the rebase adds already exists in the task worktree as an ignored file, which a rebase would silently overwrite.
 - Conflict resolution is left to Git and the user.
 
 With `--autostash` (also on `refresh`), a dirty task repo runs the `workbranch stash` save and restore around the rebase:
@@ -111,6 +112,7 @@ Clean repos run the plain rebase. A dirty repo whose HEAD already contains the b
 Autostash safety:
 
 - Preflight builds the stash commit without touching the worktree (`git stash create` plus the untracked commit), then in a scratch worktree rebases and runs `git stash apply --index`. A rebase or restore conflict in any repo fails the whole command before changes.
+- Ignored files and untracked files the stash cannot save, such as embedded repositories, stay in the worktree. Preflight fails if the rebase would add any of their paths.
 - Fails before running if the branch already holds a workbranch stash slot, or a merge, cherry-pick, or revert is in progress.
 - Never reads or writes the shared `refs/stash`.
 - If the rebase still fails, it runs `git rebase --abort`, restores the stash, drops the slot, and stops.

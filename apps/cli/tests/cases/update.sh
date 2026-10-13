@@ -334,3 +334,69 @@ test_update_autostash_keeps_stash_when_restore_fails() {
   assert_contains "$(cat "$wt/README.md")" "local"
   assert_no_workbranch_stash "$wt"
 }
+
+test_update_preflight_protects_ignored_files_from_base() {
+  autostash_fixture || return 1
+  wt="$project/login/frontend"
+  printf 'local.env\n' >> "$(git -C "$wt" rev-parse --git-common-dir)/info/exclude"
+  printf 'MY SECRET\n' > "$wt/local.env"
+  printf 'BASE\n' > "$project/_base/frontend/local.env"
+  git -C "$project/_base/frontend" add -f local.env
+  git -C "$project/_base/frontend" commit -m "base tracks local.env" >/dev/null
+  head_before=$(git -C "$wt" rev-parse HEAD)
+
+  out=$(run_expect_fail "$WORKBRANCH" update login --repo frontend)
+  assert_contains "$out" "login/frontend has local files that _base/frontend would overwrite"
+  assert_contains "$out" "  local.env"
+  [ "$(cat "$wt/local.env")" = "MY SECRET" ] || fail "ignored file overwritten by update"
+
+  printf 'dirty\n' >> "$wt/README.md"
+  out=$(run_expect_fail "$WORKBRANCH" update login --repo frontend --autostash)
+  assert_contains "$out" "login/frontend has local files that _base/frontend would overwrite"
+  [ "$(cat "$wt/local.env")" = "MY SECRET" ] || fail "ignored file overwritten by autostash update"
+  [ "$(git -C "$wt" rev-parse HEAD)" = "$head_before" ] || fail "task HEAD changed after overwrite preflight"
+  assert_no_workbranch_stash "$wt"
+}
+
+test_update_autostash_preflight_blocks_embedded_repo_it_cannot_save() {
+  autostash_fixture || return 1
+  wt="$project/login/frontend"
+  mkdir -p "$project/_base/frontend/vendor/lib"
+  commit_to_local_base frontend vendor/lib/lib.txt "base lib"
+  git init -q "$wt/vendor/lib"
+  printf 'nested\n' > "$wt/vendor/lib/lib.txt"
+  commit_to_local_base backend base-backend.txt "base backend"
+
+  out=$(run_expect_fail "$WORKBRANCH" update --autostash)
+  assert_contains "$out" "login/frontend has local files that _base/frontend would overwrite"
+  assert_contains "$out" "  vendor/lib/lib.txt"
+  [ "$(cat "$wt/vendor/lib/lib.txt")" = "nested" ] || fail "embedded repository file changed"
+  assert_not_exists "$project/payment/backend/base-backend.txt"
+  assert_no_workbranch_stash "$wt"
+}
+
+test_update_preflight_keeps_other_branch_refs_with_update_refs() {
+  autostash_fixture || return 1
+  wt="$project/login/frontend"
+  printf 'task\n' > "$wt/task.txt"
+  git -C "$wt" add task.txt
+  git -C "$wt" commit -m "task commit" >/dev/null
+  git -C "$wt" branch side HEAD
+  git -C "$wt" config rebase.updateRefs true
+  side_before=$(git -C "$wt" rev-parse side)
+  commit_to_local_base frontend base-frontend.txt "base frontend"
+
+  # login/frontend replays its rebase in a scratch worktree; the dirty
+  # payment/backend then fails preflight, so nothing should change.
+  printf 'dirty payment\n' >> "$project/payment/backend/README.md"
+  run_expect_fail "$WORKBRANCH" update >/dev/null
+  [ "$(git -C "$wt" rev-parse side)" = "$side_before" ] || fail "rebase preflight moved branch side"
+
+  # Same with the autostash replay; an occupied slot fails payment/backend.
+  printf 'dirty\n' >> "$wt/README.md"
+  (cd "$project/payment/backend" && run_expect_success "$WORKBRANCH" stash) >/dev/null || return 1
+  printf 'dirty payment again\n' >> "$project/payment/backend/README.md"
+  out=$(run_expect_fail "$WORKBRANCH" update --autostash)
+  assert_contains "$out" "payment/backend already has a workbranch stash"
+  [ "$(git -C "$wt" rev-parse side)" = "$side_before" ] || fail "autostash preflight moved branch side"
+}
