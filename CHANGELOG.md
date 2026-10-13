@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.35.0](https://github.com/tkhwang/workbranch/compare/v2.34.0...v2.35.0) (2026-10-13)
+
+
+### Features
+
+* **cli:** update --autostash 기능 구현하기 ([b1cff3c](https://github.com/tkhwang/workbranch/commit/b1cff3ce1b3b64ec866d6e91bd7270477e03d244))
+* **docs:** update README와 사용법 문서에 --autostash 설명 추가하기 ([4827bd5](https://github.com/tkhwang/workbranch/commit/4827bd5a71afc6b4687f734c5ba98c0dac82ec18))
+
+
+### Bug Fixes
+
+* **update:** keep rebase preflight side-effect free and protect local files ([4335aa7](https://github.com/tkhwang/workbranch/commit/4335aa79e3ca568eca23d9fe563abed4ce20e6a3))
+
 ## [2.34.0](https://github.com/tkhwang/workbranch/compare/v2.33.0...v2.34.0) (2026-10-12)
 
 
