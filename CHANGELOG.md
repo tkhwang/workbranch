@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.36.0](https://github.com/tkhwang/workbranch/compare/v2.35.0...v2.36.0) (2026-10-16)
+
+
+### Features
+
+* **companion:** implement screen saver feature ([36f80ab](https://github.com/tkhwang/workbranch/commit/36f80ab9b044b0069a8c038659d1d20448ba435a))
+* **dashboard:** 대시보드 메뉴 추가 및 화면 보호기 기능 구현하기 ([00ac05e](https://github.com/tkhwang/workbranch/commit/00ac05e81db5cc0864dfda6bdc7f5e6974d48961))
+
 ## [2.35.0](https://github.com/tkhwang/workbranch/compare/v2.34.0...v2.35.0) (2026-10-13)
 
 
