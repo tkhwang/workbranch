@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.37.0](https://github.com/tkhwang/workbranch/compare/v2.36.0...v2.37.0) (2026-10-16)
+
+
+### Features
+
+* **docs:** 화면보호기 대시보드에 대한 문서 추가하기 ([cc84a7e](https://github.com/tkhwang/workbranch/commit/cc84a7e39bcacdcfcffdcc5b71ef1924d4b97fd4))
+
+
+### Bug Fixes
+
+* **docs:** clarify screensaver lock fallback and verification ([89b55e0](https://github.com/tkhwang/workbranch/commit/89b55e0d539494dc37fa4665817090f666629493))
+
 ## [2.36.0](https://github.com/tkhwang/workbranch/compare/v2.35.0...v2.36.0) (2026-10-16)
 
 
