@@ -111,9 +111,84 @@ Behaviour checks (실제 Mac, `pnpm companion:dev` 또는 빌드한 앱):
 
 - 2026-10-16 · (구현 중 추가) Settings 미리 보기 → intent R12(SHOULD) 와 Slice 4 추가. 미리 보기 창은 라벨 `dashboard-preview-<n>` 으로 구분해 기존 `dashboard-*` capability 를 그대로 쓰고, 상태 기계에 미리 보기 모드(2초 입력 무시, 잠금 없음, 잠자기 방지 없음)를 둔다 · 사용자 요청
 - 2026-10-16 · (구현 중 변경) dashboard 카드 정보 → 시안 E, intent R9·R11 변경과 Slice 5 추가(프론트엔드만, Rust 변경 없음). 열당 카드 3장, 세부 줄 line clamp, 종료 결과 문구를 `boardCopy.ts` 로 모아 메뉴바와 공유 · 사용자 요청: 전체 화면인데 메뉴바보다 정보가 적음
+- 2026-10-16 · (verify) 범위 밖 실패 2건(contract lint 서식, CLI 테스트 2개) → 기존 상태로 기록하고 별도 작업으로 넘김. signoff 를 막지 않음 · COMP001 이 건드리지 않은 코드이고 R-id 영향 없음, 고치면 plan 범위(CLI·contract 무변경)를 넓힘
+- 2026-10-16 · (verify 중 발견) dashboard 닫을 때 흰 화면 깜빡임 → Tauri `macos-private-api`(`app.macOSPrivateApi`) 를 켜 dashboard 의 배경색을 webview 층에도 적용하고, 창은 화면에서 먼저 내린 뒤 destroy 한다 · 흰색의 출처(webview 기본 배경)를 없애는 근본 수정. 비공개 API(`drawsBackground`)가 하나 늘지만 이미 `SACLockScreenImmediate` 를 쓰고 brew 배포라 App Store 제약은 원래 해당. main 창은 배경색·투명 지정이 없어 동작이 바뀌지 않음. 창을 숨긴 채 만들고 첫 렌더 뒤에 보이는 방식은 화면을 덮는 시점이 늦어지고 handshake·대체 타이머가 필요해 택하지 않음
 
 ## Discovered
 - follow-up(COMP001 범위 밖): 목록 데이터(workspace monitor 의 root 별 갱신·오류 병합)도 Rust store 로 옮겨, 모든 창이 하나의 push 상태를 구독하는 순수 view 가 되게 한다.
 - NOTICED, NOT TOUCHED: `formatRelativeTime` 이 컴포넌트 파일 `apps/companion/src/ui/TaskRow.tsx` 에 있어 dashboard 번들이 TaskRow 공유 chunk 를 함께 받는다 · `src/ui/TaskRow.tsx` · 시간 포맷터를 `src/ui/time.ts` 같은 순수 모듈로 옮기기
 - NOTICED, NOT TOUCHED: `apps/companion/tsconfig.json` 의 `include` 가 `tests/**/*.ts` 만 있어 `.tsx` 테스트는 typecheck 되지 않는다 · tsconfig.json · `tests/**/*.tsx` 추가 후 드러나는 타입 오류 정리
 - NOTICED, NOT TOUCHED: 기존 `setup.rs`·`watch_scope_tests.rs` 가 rustfmt 형식과 다르고 CI 에 rustfmt 검사가 없다 · apps/companion/src-tauri · `cargo fmt` 적용과 CI 의 `cargo fmt --check` 도입 검토
+- NOTICED, NOT TOUCHED: `packages/contract` 의 `src/index.ts`·`tests/contract.test.mjs` 가 biome 서식과 달라 `pnpm --filter @workbranch/contract lint` 가 실패하고, CI 는 이 lint 를 돌리지 않는다 · packages/contract · `biome format --write` 적용 후 CI 에 contract lint 추가 검토
+- NOTICED, NOT TOUCHED: macOS 로컬에서 CLI 테스트 2개 실패(`test_add_bare_tty_name_prefills_task_name_on_shared_parent_feature_base`: TTY 출력의 색 코드, `test_stash_cleanup_failure_keeps_saved_ref_and_skips_reset`: rm mock 경로에서 기대한 실패가 나지 않음). CI 는 ubuntu 에서만 돈다 · apps/cli/tests/cases · 깨끗한 checkout 에서 재현 확인 후 테스트를 환경 독립적으로 고치기
+
+## Verification
+run: 2026-10-16 23:18 · fix: no · stale: yes
+
+| package | check | command | result | notes |
+|---|---|---|---|---|
+| companion | typecheck | `pnpm --filter @workbranch/companion typecheck` | pass | config |
+| companion | lint · format | `pnpm --filter @workbranch/companion lint` (biome check) | pass | errors 0, warnings 0, infos 110(구현 전과 같음) |
+| companion | test (TS) | `pnpm --filter @workbranch/companion test` | pass | 21 files / 237 tests |
+| companion | test (Rust) | `cargo test --manifest-path apps/companion/src-tauri/Cargo.toml` | pass | 133 passed, 1 ignored(기존) |
+| companion | clippy | `cargo clippy --manifest-path apps/companion/src-tauri/Cargo.toml --all-targets` | pass | 경고 0 · plan Verification plan |
+| companion | bundle smoke | `pnpm --filter @workbranch/companion tauri build` | pass | `WorkbranchCompanion.app` 생성 · companion-ci.yml |
+| contract | typecheck | `pnpm --filter @workbranch/contract typecheck` | pass | config |
+| contract | lint · format | `pnpm --filter @workbranch/contract lint` (biome check) | fail | 기존 상태로 수용(Decision Log, Discovered). `src/index.ts`, `tests/contract.test.mjs` 서식 오류 2건. COMP001 이 건드리지 않은 파일(마지막 변경 3a35216, 2026-10-05)이고 CI 는 이 명령을 돌리지 않는다. R-id 영향 없음 |
+| contract | test | `pnpm --filter @workbranch/contract test` | pass | 8 tests |
+| agent-runtime | typecheck (build) | `cargo +1.95.0 build --locked --manifest-path apps/agent-runtime/Cargo.toml` | pass | 경고 0. 이 Mac 은 PATH 첫 `cargo` 가 Homebrew 라 `+toolchain` 을 몰라 rustup proxy(`~/.cargo/bin/cargo`)로 같은 명령 실행 |
+| agent-runtime | lint · format | — | — | config 에 없음(rustfmt 검사 없음은 Discovered) |
+| agent-runtime | test | `cargo +1.95.0 test --locked --manifest-path apps/agent-runtime/Cargo.toml` | pass | 23 tests |
+| cli | typecheck (syntax) | `/bin/bash -n bin/workbranch install.sh apps/cli/install.sh apps/cli/bin/workbranch apps/cli/tests/run.sh apps/cli/scripts/build-workbranch.sh` | pass | config · ci.yml |
+| cli | lint | `find apps/cli/src/workbranch apps/cli/scripts -type f -name '*.sh' -print0 \| xargs -0 shellcheck -s bash -S warning -e SC2034 install.sh apps/cli/install.sh` | pass | config · ci.yml |
+| cli | format | — | — | config 에 없음 |
+| cli | test | `apps/cli/scripts/build-workbranch.sh && apps/cli/tests/run.sh` | fail | 기존 상태로 수용(Decision Log, Discovered). 290 passed, 2 failed(아래). COMP001 은 CLI 파일을 하나도 바꾸지 않았고(빌드 후에도 변경 0), CI 는 ubuntu 에서 돌린다. 이 Mac 환경에서의 기존 실패로 보이며 R-id 영향 없음 |
+
+```text
+contract lint
+src/index.ts format ━━━
+  × Formatter would have printed the following content:
+    13    │ - ·readonly·name:·string;          (공백 1칸 들여쓰기 → 탭)
+    67    │ - export·type·WorkbranchRuntimeDocument·=·{·readonly·schemaVersion:·1;·readonly·sessions:·readonly·WorkbranchAgentSession[]·};
+tests/contract.test.mjs format ━━━
+  × Formatter would have printed the following content:
+Found 2 errors.
+
+cli tests
+[*] test_add_bare_tty_name_prefills_task_name_on_shared_parent_feature_base
+[-] Error: expected output to contain '  task repo branch [feature/cpq-task1]'; got: … task repo branch [\e[0;35mfeature/cpq-task1\e[0m]: …
+[*] test_stash_cleanup_failure_keeps_saved_ref_and_skips_reset
+[-] Error: expected output to contain 'stash kept and reset skipped'; got: [-] Error: expected failure: …/apps/cli/bin/workbranch stash
+Tests passed: 290
+Tests failed: 2
+```
+
+| R-id | behaviour check | result | evidence |
+|---|---|---|---|
+| R1 (MUST) | 기본 꺼짐, 꺼진 채로는 잠자기 방지·dashboard 없음 | human | 설정 기본값·보정은 `tests/preferences.test.ts`, 꺼짐 전이는 `machine_tests.rs` 로 통과. 실제 앱은 Human check 1 |
+| R2 (MUST) | 작업 중·잠기지 않음에서만 잠자기 방지, 비정상 종료 시 사라짐 | human | 전이는 `machine_tests.rs` 통과, 같은 activity 가 PreventUserIdleSystemSleep·PreventUserIdleDisplaySleep 을 만드는 것은 구현 중 Swift probe 로 확인. Human check 2 |
+| R3 (MUST) | 설정 시간 뒤 dashboard, macOS 화면보호기보다 먼저 | human | Human check 3 |
+| R4 (MUST) | 디스플레이 꺼짐 시간보다 오래 dashboard 유지 | human | Human check 4 |
+| R5 (MUST) | 작업 중이 끝나면 dashboard 내림, 턴 종료만 있으면 안 뜸 | human | 전이는 `machine_tests.rs` 통과. Human check 5 |
+| R6 (MUST) | 입력 시 즉시 macOS 잠금, 데스크톱·키 유출 없음 | human | Human check 6 |
+| R7 (MUST) | 잠금 불가 환경에서 표시 숨김, 입력 시 닫힘 | human | 표시 숨김은 `tests/dashboard.test.tsx`, 닫힘 전이는 `machine_tests.rs` 통과. Human check 7 |
+| R8 (MUST) | 시안 D 구성, 시계·개수 일치 | human | 렌더 구조는 `tests/dashboard.test.tsx` 통과. Human check 8 |
+| R9 (MUST) | 카드 목록·프롬프트·도구 동작·마지막 응답이 메뉴바 칸반과 같음 | human | 모델은 `tests/dashboard-model.test.ts`(같은 `buildMainViewModel` 원천) 통과. Human check 8 |
+| R10 (MUST) | 모든 모니터에 dashboard | human | 모니터별 창 배치는 `windows.rs` 테스트 통과. Human check 9 |
+| R11 (SHOULD) | "+n more", 스크롤·카드 넘침 없음 | pass (자동) + human | 가장 긴 카드로 채운 화면을 headless Chrome 1280×800·1440×900·1920×1080 렌더 → 세 열 모두 "+n more" 까지 화면 안. 실제 화면은 Human check 8 |
+| R12 (SHOULD) | 미리 보기: 즉시 표시, 2초 무시, 잠금 없이 닫힘, 잠자기 방지 없음 | human | 전이는 `machine_tests.rs` 통과. Human check 10 |
+| R5·R7·R12 | dashboard 가 닫혀 데스크톱으로 돌아갈 때 흰 화면 깜빡임이 없다 | fail | 사람 확인 중 보고: "dashboard 빠져 나올 때 하얀색으로 깜빡임". 원인: Tauri `macos-private-api` 가 꺼져 있어 `background_color` 가 WKWebView 에 적용되지 않음(wry `drawsBackground` 는 `transparent` 기능에서만 끔) → 창을 destroy 하는 동안 webview 기본 흰 배경이 보임. todo `## Fixes` F1·F2 |
+
+### Human checks
+준비: 설치된 Companion 을 종료한다(같은 `~/Library/Application Support/dev.tkhwang.workbranch.companion/companion-preferences.json` 을 쓴다). 방금 빌드한 앱을 `pnpm companion:run` 으로 연다(Slice 5 포함). Settings › Screen Saver 에서 "While agents work" 를 켜고 "Dashboard after" 를 1 min 으로 둔다. "작업 중" 은 터미널에서 Claude Code 등에 몇 분 걸리는 작업을 시켜 실행 중 또는 권한 승인 대기로 만든 상태다.
+
+1. (R1) Companion 을 끄고 위 preference 파일을 다른 이름으로 옮긴 뒤 다시 연다 → Settings 의 스위치가 꺼져 있다. 꺼진 채로 작업을 걸고 3분 비운다 → `pmset -g assertions | grep -i "Workbranch agents"` 결과 없음, dashboard 없음. 확인 후 파일을 되돌린다.
+2. (R2) 켠 상태에서 작업을 건다 → `pmset -g assertions | grep -i "Workbranch agents"` 에 보인다. 턴이 끝나면 사라진다. 작업 중에 Ctrl+Cmd+Q 로 잠그면 사라지고, 풀면 다시 보인다. `kill -9 $(pgrep -x workbranch-companion)` 뒤 즉시 사라진다.
+3. (R3) Companion 2 min, 시스템 설정 › 잠금 화면 › 화면보호기 1분으로 두고 작업 중에 비운다 → 2분에 dashboard, 그 전에 macOS 화면보호기가 뜨지 않는다.
+4. (R4) 디스플레이 꺼짐 시간(이 Mac 10분)보다 오래(11분 이상) 비운다 → 작업 중이면 dashboard 가 켜져 있다.
+5. (R5) dashboard 가 떠 있을 때 마지막 실행 중·대기 세션의 턴이 끝나면 dashboard 가 내려가고 이후 macOS 설정대로 진행된다. 턴 종료만 남은 상태에서는 설정 시간이 지나도 dashboard 가 뜨지 않는다.
+6. (R6) dashboard 에서 마우스를 움직인다 → 곧바로 잠금 화면, 데스크톱이 보이지 않는다. 밑에 터미널이 포커스였던 상태에서 키를 눌러 잠근 뒤 풀면 그 키가 터미널에 들어가 있지 않다.
+7. (R7) Companion 을 끄고 `WORKBRANCH_SCREENSAVER_NO_LOCK=1 pnpm companion:dev` 로 띄운 뒤 dashboard 를 띄운다 → "입력 시 잠금" 표시가 없고, 입력하면 잠금 없이 dashboard 만 닫힌다.
+8. (R8·R9·R11) dashboard 가 상단 시계·날짜·"입력 시 잠금"·상태별 개수, 하단 3열(시안 D + E 카드)이다. 개수와 카드 목록이 메뉴바 칸반과 같고, 각 카드의 프롬프트·도구 동작(대기·실행 중)·마지막 응답(턴 종료)이 메뉴바 카드와 같다. 한 열에 4개 이상이면 "+n more", 긴 프롬프트·응답이 있어도 카드가 잘리거나 화면 아래로 넘치지 않는다(내장·외부 모니터 모두).
+9. (R10) 모니터 2대에서 두 화면 모두 dashboard 가 뜨고, 메뉴바·Dock·다른 Space 의 전체 화면 앱 위를 덮는다.
+10. (R12, SHOULD) 기능을 끈 채 Settings › Screen Saver › Show now → 모든 모니터에 dashboard 와 "미리 보기 · 입력하면 닫힘". 2초 안의 마우스 움직임으로는 닫히지 않고, 그 뒤 움직이면 잠금 없이 닫힌다. 그동안 `pmset -g assertions | grep -i "Workbranch agents"` 결과 없음.

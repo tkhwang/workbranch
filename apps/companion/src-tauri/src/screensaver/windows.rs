@@ -125,11 +125,21 @@ pub(crate) fn show<R: Runtime>(
     }
 }
 
+/// Takes every dashboard window off screen before tearing any of them down,
+/// so the screen goes straight from the dashboard to what lies beneath and no
+/// window is still visible while its webview is being released.
 pub(crate) fn hide<R: Runtime>(app: &AppHandle<R>) {
-    for (label, window) in app.webview_windows() {
-        if label.starts_with(LABEL_PREFIX) {
-            let _ = window.destroy();
-        }
+    let windows: Vec<WebviewWindow<R>> = app
+        .webview_windows()
+        .into_iter()
+        .filter(|(label, _)| label.starts_with(LABEL_PREFIX))
+        .map(|(_, window)| window)
+        .collect();
+    for window in &windows {
+        let _ = window.hide();
+    }
+    for window in windows {
+        let _ = window.destroy();
     }
 }
 
