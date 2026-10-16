@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="724" viewBox="0 0 1200 724" role="img" aria-labelledby="title desc">
+  <title id="title">Workbranch Companion screen saver dashboard</title>
+  <desc id="desc">While agents work and nobody touches the Mac, Companion covers every display with a view-only dashboard: a 7-segment clock, the date, 입력 시 잠금 (input locks), per-state counts, and the 내 응답 대기 (waiting on you), 실행 중 (running) and 턴 종료 · 검토 (turn ended, review) columns with each task's prompt, tool activity or last response, and repo changes. Any input hands over to the macOS lock screen.</desc>
+  <rect width="1200" height="724" rx="24" fill="#13244B"/>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Apple SD Gothic Neo', 'Noto Sans KR', monospace">
+    <text x="64" y="58" font-size="18" fill="#9AA5CE" letter-spacing="2.5">WORKBRANCH COMPANION · SCREEN SAVER</text>
+    <text x="1136" y="58" font-size="18" fill="#6F7FA8" text-anchor="end">opt-in · while agents work</text>
+    <g id="display">
+      <rect x="40" y="84" width="1120" height="558" rx="14" fill="#0E1B3A" stroke="#2E4370" stroke-width="2"/>
+      <rect x="40" y="84" width="4" height="558" rx="2" fill="#A2583B"/>
+    </g>
+    <g id="dashboard-top">
+      <g id="segment-clock">
+        <g transform="translate(76 116) scale(0.8)">
+          <rect x="12" y="0" width="36" height="10" rx="5" fill="#FDF4E2" fill-opacity="0.07"/>
+          <rect x="50" y="12" width="10" height="37" rx="5" fill="#FDF4E2"/>
+          <rect x="50" y="61" width="10" height="37" rx="5" fill="#FDF4E2"/>
+          <rect x="12" y="100" width="36" height="10" rx="5" fill="#FDF4E2" fill-opacity="0.07"/>
+          <rect x="0" y="61" width="10" height="37" rx="5" fill="#FDF4E2" fill-opacity="0.07"/>
+          <rect x="0" y="12" width="10" height="37" rx="5" fill="#FDF4E2" fill-opacity="0.07"/>
+          <rect x="12" y="50" width="36" height="10" rx="5" fill="#FDF4E2" fill-opacity="0.07"/>
+        </g>
+        <g transform="translate(136.0 116) scale(0.8)">
+          <rect x="12" y="0" width="36" height="10" rx="5" fill="#FDF4E2" fill-opacity="0.07"/>
+          <rect x="50" y="12" width="10" height="37" rx="5" fill="#FDF4E2"/>
+          <rect x="50" y="61" width="10" height="37" rx="5" fill="#FDF4E2"/>
+          <rect x="12" y="100" width="36" height="10" rx="5" fill="#FDF4E2" fill-opacity="0.07"/>
+          <rect x="0" y="61" width="10" height="37" rx="5" fill="#FDF4E2" fill-opacity="0.07"/>
+          <rect x="0" y="12" width="10" height="37" rx="5" fill="#FDF4E2"/>
+          <rect x="12" y="50" width="36" height="10" rx="5" fill="#FDF4E2"/>
+        </g>
+        <circle cx="202.0" cy="146" r="5.5" fill="#FDF4E2"/>
+        <circle cx="202.0" cy="174" r="5.5" fill="#FDF4E2"/>
+        <g transform="translate(220.0 116) scale(0.8)">
+          <rect x="12" y="0" width="36" height="10" rx="5" fill="#FDF4E2"/>
+          <rect x="50" y="12" width="10" height="37" rx="5" fill="#FDF4E2"/>
+          <rect x="50" y="61" width="10" height="37" rx="5" fill="#FDF4E2"/>
+          <rect x="12" y="100" width="36" height="10" rx="5" fill="#FDF4E2"/>
+          <rect x="0" y="61" width="10" height="37" rx="5" fill="#FDF4E2" fill-opacity="0.07"/>
+          <rect x="0" y="12" width="10" height="37" rx="5" fill="#FDF4E2" fill-opacity="0.07"/>
+          <rect x="12" y="50" width="36" height="10" rx="5" fill="#FDF4E2"/>
+        </g>
+        <g transform="translate(280.0 116) scale(0.8)">
+          <rect x="12" y="0" width="36" height="10" rx="5" fill="#FDF4E2"/>
+          <rect x="50" y="12" width="10" height="37" rx="5" fill="#FDF4E2"/>
+          <rect x="50" y="61" width="10" height="37" rx="5" fill="#FDF4E2" fill-opacity="0.07"/>
+          <rect x="12" y="100" width="36" height="10" rx="5" fill="#FDF4E2"/>
+          <rect x="0" y="61" width="10" height="37" rx="5" fill="#FDF4E2"/>
+          <rect x="0" y="12" width="10" height="37" rx="5" fill="#FDF4E2" fill-opacity="0.07"/>
+          <rect x="12" y="50" width="36" height="10" rx="5" fill="#FDF4E2"/>
+        </g>
+      </g>
+      <text x="372" y="160" font-size="24" fill="#9AA5CE">10월 17일 금요일</text>
+      <g transform="translate(372 178)" fill="none" stroke="#9AA5CE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="8" width="16" height="12" rx="2.5"/><path d="M4.5 8V5a4.5 4.5 0 0 1 9 0v3"/></g>
+      <text x="398" y="197" font-size="20" fill="#9AA5CE">입력 시 잠금</text>
+      <text x="1124" y="176" font-size="68" fill="#DFC075" font-weight="700" text-anchor="end">1</text>
+      <text x="1124" y="206" font-size="18" fill="#9AA5CE" text-anchor="end">턴 종료</text>
+      <text x="974" y="176" font-size="68" fill="#74C99B" font-weight="700" text-anchor="end">2</text>
+      <text x="974" y="206" font-size="18" fill="#9AA5CE" text-anchor="end">실행 중</text>
+      <text x="824" y="176" font-size="68" fill="#E3A17B" font-weight="700" text-anchor="end">1</text>
+      <text x="824" y="206" font-size="18" fill="#9AA5CE" text-anchor="end">내 응답 대기</text>
+      <line x1="76" y1="228" x2="1124" y2="228" stroke="#24365E" stroke-width="2"/>
+    </g>
+    <g id="column-waiting">
+      <circle cx="84" cy="258" r="7" fill="#E3A17B"/>
+      <text x="100" y="265" font-size="22" fill="#FDF4E2" font-weight="700">내 응답 대기</text>
+      <text x="406" y="264" font-size="16" fill="#6F7FA8" text-anchor="end" letter-spacing="2">WAITING</text>
+      <line x1="76" y1="282" x2="406" y2="282" stroke="#2E4370"/>
+      <g id="card-feat-login" transform="translate(76 298)">
+        <rect width="330" height="198" rx="10" fill="#182A52" stroke="#E3A17B" stroke-opacity="0.55" stroke-width="2"/>
+        <text x="16" y="38" font-size="22" fill="#FDF4E2" font-weight="700">feat-login</text>
+        <text x="314" y="38" font-size="18" fill="#E3A17B" text-anchor="end">12m</text>
+        <text x="16" y="68" font-size="18" fill="#F4EAD5"><tspan fill="#6F7FA8">› </tspan>로그인 폼에 OAuth 추가</text>
+        <rect x="16" y="80" width="298" height="66" rx="8" fill="#E3A17B" fill-opacity="0.13"/>
+        <text x="26" y="105" font-size="18" fill="#F4EAD5"><tspan fill="#E3A17B" font-weight="700">권한 승인 대기</tspan>  Bash</text>
+        <text x="26" y="133" font-size="18" fill="#F4EAD5">pnpm test --filter ui</text>
+        <text x="16" y="178" font-size="18" fill="#6F7FA8"><tspan fill="#9AA5CE">claude</tspan> · ui · feat/login</text>
+        <text x="314" y="178" font-size="18" fill="#F4EAD5" text-anchor="end">●2</text>
+      </g>
+    </g>
+    <g id="column-running">
+      <circle cx="443" cy="258" r="7" fill="#74C99B"/>
+      <text x="459" y="265" font-size="22" fill="#FDF4E2" font-weight="700">실행 중</text>
+      <text x="765" y="264" font-size="16" fill="#6F7FA8" text-anchor="end" letter-spacing="2">RUNNING</text>
+      <line x1="435" y1="282" x2="765" y2="282" stroke="#2E4370"/>
+      <g id="card-search-api" transform="translate(435 298)">
+        <rect width="330" height="150" rx="10" fill="#182A52" stroke="#2E4370" stroke-width="1.5"/>
+        <text x="16" y="38" font-size="22" fill="#FDF4E2" font-weight="700">search-api</text>
+        <text x="314" y="38" font-size="18" fill="#9AA5CE" text-anchor="end">4m</text>
+        <text x="16" y="68" font-size="18" fill="#F4EAD5"><tspan fill="#6F7FA8">› </tspan>검색 API 페이지네이션</text>
+        <text x="16" y="98" font-size="18" fill="#74C99B">▸ Edit src/search/cursor.ts</text>
+        <text x="16" y="130" font-size="18" fill="#6F7FA8"><tspan fill="#9AA5CE">codex</tspan> · api · feat/page</text>
+        <text x="314" y="130" font-size="18" fill="#E3A17B" text-anchor="end">↓3</text>
+      </g>
+      <g id="card-docs-site" transform="translate(435 462)">
+        <rect width="330" height="150" rx="10" fill="#182A52" stroke="#2E4370" stroke-width="1.5"/>
+        <text x="16" y="38" font-size="22" fill="#FDF4E2" font-weight="700">docs-site</text>
+        <text x="314" y="38" font-size="18" fill="#9AA5CE" text-anchor="end">1m</text>
+        <text x="16" y="68" font-size="18" fill="#F4EAD5"><tspan fill="#6F7FA8">› </tspan>설치 문서 정리</text>
+        <text x="16" y="98" font-size="18" fill="#74C99B">▸ Read docs/usage.md</text>
+        <text x="16" y="130" font-size="18" fill="#6F7FA8"><tspan fill="#9AA5CE">claude</tspan> · docs · feat/docs</text>
+      </g>
+    </g>
+    <g id="column-finished">
+      <circle cx="802" cy="258" r="7" fill="#DFC075"/>
+      <text x="818" y="265" font-size="22" fill="#FDF4E2" font-weight="700">턴 종료 · 검토</text>
+      <text x="1124" y="264" font-size="16" fill="#6F7FA8" text-anchor="end" letter-spacing="2">REVIEW</text>
+      <line x1="794" y1="282" x2="1124" y2="282" stroke="#2E4370"/>
+      <g id="card-release-notes" transform="translate(794 298)">
+        <rect width="330" height="176" rx="10" fill="#182A52" stroke="#2E4370" stroke-width="1.5"/>
+        <text x="16" y="38" font-size="22" fill="#FDF4E2" font-weight="700">release-notes</text>
+        <text x="314" y="38" font-size="18" fill="#9AA5CE" text-anchor="end">25m</text>
+        <text x="16" y="68" font-size="18" fill="#F4EAD5"><tspan fill="#6F7FA8">› </tspan>2.31.0 릴리스 노트 작성</text>
+        <text x="16" y="98" font-size="18" fill="#F4EAD5"><tspan fill="#9AA5CE" font-weight="700">마지막 응답</tspan>  노트 초안을 썼어요.</text>
+        <text x="16" y="124" font-size="18" fill="#F4EAD5">검토하고 PR 을 열어 주세요.</text>
+        <text x="16" y="156" font-size="18" fill="#6F7FA8"><tspan fill="#9AA5CE">claude</tspan> · blog · release</text>
+        <text x="314" y="156" font-size="18" fill="#F4EAD5" text-anchor="end">●1</text>
+      </g>
+    </g>
+    <g id="flow">
+      <circle cx="77" cy="685" r="13" fill="#A2583B"/>
+      <text x="77" y="692" font-size="17" fill="#FDF4E2" font-weight="700" text-anchor="middle">1</text>
+      <text x="100" y="692" font-size="20" fill="#F4EAD5">No input for 5 min</text>
+      <circle cx="385" cy="685" r="13" fill="#A2583B"/>
+      <text x="385" y="692" font-size="17" fill="#FDF4E2" font-weight="700" text-anchor="middle">2</text>
+      <text x="408" y="692" font-size="20" fill="#F4EAD5">Dashboard on every display</text>
+      <circle cx="789" cy="685" r="13" fill="#A2583B"/>
+      <text x="789" y="692" font-size="17" fill="#FDF4E2" font-weight="700" text-anchor="middle">3</text>
+      <text x="812" y="692" font-size="20" fill="#F4EAD5">Any input locks the Mac</text>
+    </g>
+  </g>
+</svg>
