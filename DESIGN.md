@@ -3,7 +3,7 @@
 ## Source of truth
 - Status: Active
 - Last refreshed: 2026-10-05
-- Primary product surfaces: Workbranch Companion macOS menu bar popover.
+- Primary product surfaces: Workbranch Companion macOS menu bar popover, and its opt-in full-screen screensaver dashboard.
 - Evidence reviewed:
   - `docs/plans/0032-companion-tauri-react-rewrite.md`
   - `docs/plans/0033-companion-responsiveness-nonblocking-commands-and-watch-scope.md`
@@ -51,13 +51,13 @@
 
 ## Information architecture
 - Primary navigation: an inset floating terminal tab bar anchored to the viewport bottom with three destinations: Main, Usage, Settings.
-- Core screens: Main runtime-grouped workspace view, Usage detail view, Settings preferences view.
+- Core screens: Main runtime-grouped workspace view, Usage detail view, Settings preferences view, and the full-screen screensaver dashboard, a separate window outside the tab bar.
 - Content hierarchy:
   1. Compact global inventory (`projects · tasks`) and two icon-only controls: update check and quit. Opening the window from the tray refreshes everything, so there is no manual refresh control.
   2. Active view content.
   3. Main view: a Claude | Codex usage summary (limits plus 14-day tokens), runtime session counts, a `내 응답 대기 | 실행 중 | 턴 종료 · 검토` kanban board, then a `WORKSPACES` inventory for session-less, unknown and inactive tasks. Every card shows IDE/Terminal/Finder launchers and repo/branch Git facts without expanding; expanding adds last commits and session request/activity/response excerpts. Base repositories remain in a supporting disclosure.
   4. Usage view: per-agent limits and today's token mix, one daily chart with both agents on a shared scale, and a last-7-days table.
-  5. Settings view: launch-at-login, menu bar display, font, text size, and agent theme.
+  5. Settings view: launch-at-login, menu bar display, font, text size, agent theme, and screen saver (switch, idle minutes, `Show now` preview).
   6. Screen-reader live status in the agent shell; routine `Updated`/`Ready` text stays out of the visible header.
 
 ## Design principles
@@ -99,7 +99,7 @@
   - `UsageView`: the same columns with detail limit rows (large %, full-width bar) and a TODAY block (total, `in · out`, `cache r · w`, 7d; `오늘 사용 없음 · 어제 N` when idle), a `DAILY TOKENS · 14d` chart pairing both agents per day on one scale, a `LAST 7 DAYS` table, and a footnote that only local files are read.
 - Variants and states: running/waiting/finished/idle with independent observed/uncertain/stale confidence. Unknown or unobserved workspaces remain visible.
 - Shared header anatomy: Claude Code and Codex use the same text-only title block: `Workbranch Companion` above `projects · tasks`. The top banner contains no Workbranch mark, product icon, or Claude/Codex prompt prefix; theme identity comes from surrounding color tokens rather than different header geometry. Task metadata rows may retain their theme-specific prompt and action accents.
-- Token/component ownership: `style.css` is the CSS import manifest; `src/styles/base.css`, `themes.css`, `chrome.css`, `stage-board.css`, `limit-gauge.css`, `task-details.css`, `task-actions.css`, `status-groups.css`, `settings.css`, and `motion.css` own CSS custom properties and component classes by surface.
+- Token/component ownership: `style.css` is the CSS import manifest; `src/styles/base.css`, `themes.css`, `chrome.css`, `stage-board.css`, `limit-gauge.css`, `task-details.css`, `task-actions.css`, `status-groups.css`, `settings.css`, and `motion.css` own CSS custom properties and component classes by surface. The dashboard entry (`src/dashboardMain.tsx`) imports `src/styles/dashboard.css` on its own, outside that manifest.
 
 ## Accessibility
 - Target standard: keyboard-operable popover controls and readable contrast.
@@ -202,12 +202,16 @@ The Main surface uses runtime groups: waiting for you, running, turn ended, unkn
 
 Compact priority groups show request-first titles, provider/repository identity and current tool activity. Existing monospace size tokens, Claude/Codex themes and 460px minimum width remain. Neutral surfaces and small rounded corners separate groups; warm attention, green execution and amber turn-end dots carry semantic accents. Entire cards are not recolored by state. Task disclosure, focus and selection survive runtime refreshes; command strings are displayed as text. No remote allow/deny controls are introduced.
 
-Git facts, base repositories, repo notes and launchers remain supporting details. Runtime reads have their own coalesced polling path and never trigger a Git refresh. Migration discovery renders the CLI dry-run result and its action invokes the same CLI apply path, reporting errors and retry state. Legacy agent sessions must restart to reload guidance after migration.
+Git facts, base repositories, repo notes and launchers remain supporting details. Runtime reads arrive as pushes from the Rust runtime service (`docs/specs/comp/runtime-snapshot.md`) and never trigger a Git refresh. Migration discovery renders the CLI dry-run result and its action invokes the same CLI apply path, reporting errors and retry state. Legacy agent sessions must restart to reload guidance after migration.
 
 
 ## Runtime kanban (0061)
 
 Columns come straight from the existing runtime roles; no plan/execution phase is inferred. A task appears once, in the column of its representative role (waiting > running > finished), and other observed sessions surface as `+N <state>` chips. Stale or uncertain observations never enter a live column: they stay in `WORKSPACES` tagged `관측 불명`, beside `세션 없음` and `비활성`. Card borders take a faint tint of the lead session's provider (`--provider-claude-line` orange, `--provider-codex-line` cyan, `--provider-grok-line` silver); waiting cards add an outer `--runtime-waiting-ring` instead of recolouring the border, so provider and attention read together. Inventory rows stay untinted. Review cards prefer the last response excerpt over the last tool activity. Runtime state colours are theme tokens (`--runtime-waiting`, `--runtime-running`, `--runtime-finished`, `--runtime-unknown` and their soft fills) shared by both themes. Providers render as a 14px `ProviderIcon` instead of names: simplified marks (Claude spark, Codex hexagon, Grok slashed ring) coloured with the matching `--provider-claude`, `--provider-codex` and `--provider-grok` tokens, each with a `title` and `role="img"` accessible name (`Claude Code`, `Codex`, `Grok Build`). They are not brand artwork.
+
+## Screensaver dashboard (COMP001)
+
+A full-screen, view-only window on every display, shown by the opt-in screensaver while agents work and nobody touches the Mac, and read from two or three metres away. The top-left holds a 7-segment clock (hours and minutes), the date and an `입력 시 잠금` tag, shown only when input will lock the Mac (`미리 보기 · 입력하면 닫힘` in a Settings preview); the top-right holds the per-state counts in large type. Below sit the board's three live columns in the same order, with the same names, wait reasons and outcome labels (`ui/boardCopy.ts`) and the same runtime colour tokens. A card carries what the menu bar card carries and no controls: task name and time in state at title size, agent, repo · branch, one prompt line, one line-clamped detail (tool activity, or the last response on turn-ended cards, with the wait reason on waiting cards and `중단됨`/`오류로 종료` on turn-ended ones), summed repo facts (`●N`, `↑N`, `↓N`) and the notification count. Each column shows three cards, then `+n more`; sizes scale with viewport height, so nothing scrolls or overflows at any display size. Theme and font follow Settings. The window and webview background is the Claude `--surface-0` (`#131313`), so opening and closing never flash white. Behaviour is specified in `docs/specs/comp/screensaver.md`.
 
 ## Onboarding and Settings connections
 

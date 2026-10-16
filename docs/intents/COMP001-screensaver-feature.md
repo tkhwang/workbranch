@@ -2,7 +2,7 @@
 id: COMP001
 slug: screensaver-feature
 created: 2026-10-16T03:56:10.000Z
-updated: 2026-10-17T04:40:00.000Z
+updated: 2026-10-17T06:08:00.000Z
 ---
 # COMP001 · screensaver-feature
 
@@ -103,3 +103,31 @@ _None._
 - 2026-10-16 · (구현 중 추가) Settings 확인 버튼 → A. 미리 보기: 즉시 표시, 2초 입력 무시 후 입력 시 잠금 없이 닫힘, 기능 꺼짐에서도 동작, 잠자기 방지 없음. R12(SHOULD) 로 추가 · 작업을 걸고 N분 기다리지 않고 화면·데이터를 바로 확인. 잠금 동작은 실제 흐름으로 확인
 - 2026-10-16 · (구현 중 변경) dashboard 카드 정보 → 시안 E: 프롬프트 한 줄, 열별 세부(대기: 기다리는 대상, 실행 중: 도구 동작, 턴 종료: 마지막 응답·오류·중단), repo 변경 상태, 알림 수. R9 의 "프롬프트 제외" 를 뒤집고 R11 을 카드 제목 크기 + 세부 줄 수 제한으로 바꾸며, 열당 카드는 4장에서 3장으로 · 화면 전체를 쓰면서 메뉴바 카드보다 정보가 적었음. 민감 정보는 runtime 이 저장 단계에서 빼고, dashboard 가 없으면 그 자리에 터미널이 그대로 보였을 것이라 노출을 이유로 뺄 근거가 약함. 별도 표시 설정은 두지 않음(Q9 스위치 하나)
 - 2026-10-17 · (구현 중 변경) 화면이 잠긴 동안의 잠자기 방지 → 작업 중이면 잠겨 있어도 시스템 잠자기는 계속 막고, 디스플레이만 macOS 기본 동작대로 꺼지게 둔다. R2·Non-goals·Success criteria 수정 · 잠금 화면은 agent 를 멈추지 않지만 잠자기는 멈춘다. 잠기면 잠자기 방지를 풀던 기존 결정(plan Q4)으로는 R6 으로 잠긴 뒤나 직접 잠그고 자리를 뜬 뒤 Mac 이 잠들어 agent 가 멈춤 · 사용자 선택
+
+## Outcome
+- 2026-10-17 · **Pending human verification** · 구현은 [PR #236](https://github.com/tkhwang/workbranch/pull/236)(`36f80ab`, 2026-10-16 20:03 UTC)으로 main 에 병합되었고, [workbranch-companion 2.31.0](https://github.com/tkhwang/workbranch/releases/tag/workbranch-companion-v2.31.0)은 2026-10-16 20:47 UTC 에 발행되었다. 이 문서 브랜치의 package·Tauri·Cargo·release-please 버전은 2.30.0 이므로 릴리스 근거는 해당 태그와 릴리스 기록이다.
+- 자동 검사: 이전 2026-10-17 05:11 verify run 의 통과 기록과 범위 밖 기존 실패는 아래에 남긴다. 이는 실제 앱에서의 수동 검증 완료를 뜻하지 않는다.
+- Human check 1~11: **확인 대기**. 기존의 "모두 통과(사용자 확인)" 문구를 뒷받침하는 항목별 실행 결과가 이 PR 에 없어 완료 판정을 보류한다. 실제 앱에서 잠금·잠금 불가 fallback·다중 모니터·잠자기 방지 등을 확인하고 결과를 기록한 뒤 최종 Go 를 갱신한다.
+- 출시된 동작 (현재 동작은 `docs/specs/comp/screensaver.md`, `docs/specs/comp/runtime-snapshot.md`):
+  - R1: Settings › Screen Saver 의 "While agents work" 스위치 하나(기본 꺼짐)와 "Dashboard after"(기본 5분, 1~60분). 꺼져 있으면 잠자기·화면보호기·잠금에 관여하지 않는다. 설정은 Settings 와 Rust 서비스가 필드별로 같은 규칙으로 읽는다.
+  - R2: 켜짐 && 작업 중이면 시스템 잠자기 방지(`PreventUserIdleSystemSleep`)를 화면 잠김과 상관없이 건다. 디스플레이 잠자기 방지(`PreventUserIdleDisplaySleep`)는 잠기지 않은 동안만 건다. runtime 읽기 실패는 3분 동안 마지막 판단을 유지한다.
+  - R3·R4: 무장 중 idle 이 설정 시간을 넘으면 dashboard 가 뜨고, 디스플레이 activity 가 macOS 화면보호기와 디스플레이 꺼짐을 막는다.
+  - R5: 작업 중이 끝나면 dashboard 를 바로 내리고 전원 유지를 푼다. 턴 종료만 있으면 뜨지 않는다.
+  - R6: 입력 시 `SACLockScreenImmediate` 로 잠그고, 잠김이 확인될 때까지 dashboard 를 유지한다(2초마다 재요청, 모두 3번). 덮는 동안 앱 메인 메뉴를 떼어 Cmd-Q 등 단축키로 우회할 수 없다.
+  - R7: 잠금을 쓸 수 없으면 "입력 시 잠금" 표시를 숨기고 입력 시 dashboard 만 닫는다. 끝내 잠기지 않는 Mac 도 같은 경로다.
+  - R8: 시안 D(7-segment 시계·날짜·잠금 표시·상태별 개수 + 칸반 3열).
+  - R9: 시안 E 카드(프롬프트, 도구 동작 또는 마지막 응답, 대기 이유, 종료 결과, repo 변경 상태, 알림 수). 메뉴바 칸반과 같은 원천(`buildMainViewModel()`)이다.
+  - R10: 모니터마다 dashboard 창 하나, 모니터 구성이 바뀌면 다시 맞춘다.
+  - R11 (SHOULD): 열당 카드 3장 + "+n more", 세부 줄 줄 수 제한, 화면 높이 비례 크기.
+  - R12 (SHOULD): Settings › Screen Saver › Show now 미리 보기(2초 입력 무시, 잠금·잠자기 방지 없음).
+  - Slice 0: runtime 데이터를 Rust `RuntimeService` 단일 출처로 옮겼다(디렉터리 감시 + 60초 보조 읽기, `runtime-snapshot` push). main 창의 1초 polling 은 없다.
+- 구현 범위의 Deferred: 없음. MUST·SHOULD 최종 acceptance 는 위 수동 검증 완료까지 대기한다. 의도적으로 하지 않은 것: runtime 디렉터리 삭제·재생성 시 watcher 재등록(FSEvents 는 경로 기준이라 불필요, inode 기준 backend 로 옮길 때만 필요).
+- 범위 밖 기존 실패(수용, 아래 follow-up 5·7): `pnpm --filter @workbranch/contract lint` 서식 오류 2건, macOS 로컬 CLI 테스트 2개.
+- Discovered follow-ups (새 intent 후보):
+  1. 목록 데이터(workspace monitor 의 root 별 갱신·오류 병합)도 Rust store 로 옮겨 모든 창이 하나의 push 상태를 구독하는 순수 view 가 되게 한다.
+  2. `formatRelativeTime` 을 `apps/companion/src/ui/TaskRow.tsx` 에서 순수 모듈(예: `src/ui/time.ts`)로 옮겨 dashboard 번들이 TaskRow chunk 를 받지 않게 한다.
+  3. `apps/companion/tsconfig.json` 의 `include` 에 `tests/**/*.tsx` 를 넣고 드러나는 타입 오류를 정리한다.
+  4. `apps/companion/src-tauri` 의 rustfmt 차이(`setup.rs`, `watch_scope_tests.rs`)를 정리하고 CI 에 `cargo fmt --check` 를 검토한다.
+  5. `packages/contract` 를 biome 서식으로 맞추고 CI 에 contract lint 를 검토한다.
+  6. CI(ubuntu) CLI 통합 테스트 간헐 실패(`test_config_base_preflights_fast_forward_before_checkout`, `test_scoped_tool_paths_reject_stale_task_directories`): 실패 출력이 로그에 남게 고친 뒤 원인을 조사한다.
+  7. macOS 로컬 CLI 테스트 2개 실패(`test_add_bare_tty_name_prefills_task_name_on_shared_parent_feature_base`, `test_stash_cleanup_failure_keeps_saved_ref_and_skips_reset`)를 환경 독립적으로 고친다.
