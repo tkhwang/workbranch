@@ -71,6 +71,9 @@ export function useCompanionSettings({
 					);
 					preferenceSaveQueue.current = save;
 					await save;
+					// The tray and the screensaver read the store themselves;
+					// tell them it was rewritten, as an edit in Settings does.
+					await Promise.all([refreshMenuBar(), refreshScreensaver()]);
 				}
 			} catch (error) {
 				if (!cancelled) {

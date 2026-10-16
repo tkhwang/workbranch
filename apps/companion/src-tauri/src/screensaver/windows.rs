@@ -110,6 +110,9 @@ pub(crate) fn show<R: Runtime>(
             .title("Workbranch Dashboard")
             .decorations(false)
             .resizable(false)
+            // Nothing but the lock (or, in a preview, input) takes it down.
+            .minimizable(false)
+            .closable(false)
             .shadow(false)
             .skip_taskbar(true)
             .always_on_top(true)

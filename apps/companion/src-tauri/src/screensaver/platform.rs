@@ -12,6 +12,8 @@ pub(crate) trait Platform {
     fn set_awake(&mut self, awake: bool);
     /// Time since the last keyboard or mouse input, from any app.
     fn idle_time(&self) -> Duration;
+    /// Whether the login session's screen is locked right now.
+    fn screen_locked(&self) -> bool;
     /// Covers every display with the dashboard.
     fn show_dashboard(&mut self, mode: Mode);
     fn hide_dashboard(&mut self);
@@ -43,6 +45,9 @@ impl Platform for NoopPlatform {
     fn idle_time(&self) -> Duration {
         Duration::ZERO
     }
+    fn screen_locked(&self) -> bool {
+        false
+    }
     fn show_dashboard(&mut self, _mode: Mode) {}
     fn hide_dashboard(&mut self) {}
     fn lock_screen(&mut self) {}
@@ -61,6 +66,9 @@ mod tests {
         }
         fn idle_time(&self) -> Duration {
             Duration::ZERO
+        }
+        fn screen_locked(&self) -> bool {
+            false
         }
         fn show_dashboard(&mut self, mode: Mode) {
             self.0.push(format!("show={mode:?}"));

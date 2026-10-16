@@ -10,8 +10,7 @@ const MAX_IDLE_MINUTES: u32 = 60;
 
 /// Mirrors `ScreensaverConfig` in application/screensaver.ts, stored under
 /// the `screensaver` preference key.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
-#[serde(rename_all = "camelCase", default)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct Config {
     pub(crate) enabled: bool,
     pub(crate) idle_minutes: u32,
@@ -31,41 +30,101 @@ impl Config {
         Duration::from_secs(u64::from(self.idle_minutes) * 60)
     }
 
+    /// Reads each field on its own and falls back to that field's default,
+    /// as `sanitizeScreensaverConfig()` does, so Settings and this service
+    /// always read a damaged value the same way.
     pub(crate) fn from_store_value(value: Option<serde_json::Value>) -> Self {
-        let config: Self = value
-            .and_then(|value| serde_json::from_value(value).ok())
-            .unwrap_or_default();
+        let defaults = Self::default();
+        let field = |name: &str| value.as_ref().and_then(|value| value.get(name));
         Self {
-            idle_minutes: config
-                .idle_minutes
-                .clamp(MIN_IDLE_MINUTES, MAX_IDLE_MINUTES),
-            ..config
+            enabled: field("enabled")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(defaults.enabled),
+            // Rounded, then held to the bounds, like Math.round there.
+            idle_minutes: field("idleMinutes")
+                .and_then(serde_json::Value::as_f64)
+                .map_or(defaults.idle_minutes, |minutes| {
+                    minutes
+                        .round()
+                        .clamp(f64::from(MIN_IDLE_MINUTES), f64::from(MAX_IDLE_MINUTES))
+                        as u32
+                }),
         }
     }
 }
 
+const RUNTIME_SCHEMA_VERSION: u64 = 1;
+
+/// The runtime v1 document (`WorkbranchRuntimeDocument` in packages/contract),
+/// held to the contract as strictly as `parseRuntimeDocument()` holds it for
+/// the board, so a document the board rejects keeps nothing awake.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RuntimeDocument {
+    schema_version: u64,
+    sessions: Vec<RuntimeSession>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[expect(
+    dead_code,
+    reason = "every field is checked against the contract; only state and observation are read"
+)]
+struct RuntimeSession {
+    workspace: String,
+    provider: Provider,
+    session_id: String,
+    agent_id: String,
+    turn_id: String,
+    state: SessionState,
+    observation: Observation,
+    reason: String,
+    prompt: String,
+    activity: String,
+    response: String,
+    outcome: String,
+    updated_at: u64,
+    state_changed_at: u64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum Provider {
+    Claude,
+    Codex,
+    Grok,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum SessionState {
+    Running,
+    Waiting,
+    Finished,
+    Idle,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum Observation {
+    Observed,
+    Uncertain,
+    Stale,
+}
+
 /// "작업 중": an observed session that is running or waiting for the user,
 /// the same reading as `runtimeRole()` in application/state.ts. A document
-/// that cannot be read counts as idle, so a broken CLI never pins the Mac awake.
+/// that breaks the contract counts as idle, so a broken or mismatched CLI
+/// never pins the Mac awake.
 pub(crate) fn is_working(document: &str) -> bool {
-    let Ok(value) = serde_json::from_str::<serde_json::Value>(document) else {
-        return false;
-    };
-    value
-        .get("sessions")
-        .and_then(serde_json::Value::as_array)
-        .is_some_and(|sessions| {
-            sessions.iter().any(|session| {
-                session
-                    .get("observation")
-                    .and_then(serde_json::Value::as_str)
-                    == Some("observed")
-                    && matches!(
-                        session.get("state").and_then(serde_json::Value::as_str),
-                        Some("running" | "waiting")
-                    )
+    serde_json::from_str::<RuntimeDocument>(document).is_ok_and(|document| {
+        document.schema_version == RUNTIME_SCHEMA_VERSION
+            && document.sessions.iter().any(|session| {
+                matches!(session.observation, Observation::Observed)
+                    && matches!(session.state, SessionState::Running | SessionState::Waiting)
             })
-        })
+    })
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -73,6 +132,9 @@ pub(crate) enum Event {
     Config(Config),
     Working(bool),
     Locked(bool),
+    /// The session's lock state, read on each sample while a requested lock
+    /// is awaited, so the lock is confirmed even when its notification is late.
+    LockSample(bool),
     /// How long since the last keyboard or mouse input, sampled while armed.
     Idle(Duration),
     /// Settings asked to show the dashboard now (COMP001 R12).
@@ -95,11 +157,21 @@ pub(crate) enum Action {
 pub(crate) const IDLE_POLL: Duration = Duration::from_secs(1);
 /// How often it is sampled while the dashboard shows, to catch input quickly.
 pub(crate) const INPUT_POLL: Duration = Duration::from_millis(250);
-/// Samples to wait for the lock screen before giving up on it (~2 s).
+/// Samples to wait for each lock request to land (~2 s).
 pub(crate) const LOCK_WAIT_SAMPLES: u8 = 8;
+/// Times the lock is asked for before this Mac counts as having none (~6 s).
+pub(crate) const LOCK_ATTEMPTS: u8 = 3;
 /// Samples a preview ignores input for, so the click that opened it and the
 /// hand still on the mouse do not close it at once (~2 s).
 pub(crate) const PREVIEW_GRACE_SAMPLES: u8 = 8;
+
+#[derive(Clone, Copy, Debug)]
+struct LockWait {
+    /// Lock requests made so far.
+    attempts: u8,
+    /// Samples taken since the latest request.
+    samples: u8,
+}
 
 #[derive(Debug, Default)]
 pub(crate) struct Machine {
@@ -113,8 +185,8 @@ pub(crate) struct Machine {
     idle: Option<Duration>,
     /// Whether macOS offers an immediate lock here (COMP001 R7).
     lock_available: bool,
-    /// Samples taken since the lock was asked for, while waiting for it.
-    lock_wait: Option<u8>,
+    /// A lock asked for and not confirmed yet.
+    lock_wait: Option<LockWait>,
     /// Samples taken since a preview opened, while it shows.
     preview: Option<u8>,
 }
@@ -138,7 +210,7 @@ impl Machine {
         match event {
             Event::Config(config) => self.config = config,
             Event::Working(working) => self.working = working,
-            Event::Locked(locked) => self.locked = locked,
+            Event::Locked(locked) | Event::LockSample(locked) => self.locked = locked,
             Event::Idle(idle) => {
                 input = self.idle.is_some_and(|previous| idle < previous);
                 self.idle = Some(idle);
@@ -159,7 +231,7 @@ impl Machine {
                     self.preview = Some(samples);
                     input && samples > PREVIEW_GRACE_SAMPLES
                 }
-                Event::Locked(true) => true,
+                Event::Locked(true) | Event::LockSample(true) => true,
                 _ => false,
             };
             if closes {
@@ -174,20 +246,33 @@ impl Machine {
             self.idle = None;
             actions.push(Action::ShowPreview);
         } else if self.dashboard && armed && self.lock_wait.is_some() {
-            // The dashboard stays up until the lock screen covers it, so the
-            // desktop never shows and no key reaches the app underneath. If
-            // the lock never lands, the dashboard closes anyway.
-            if matches!(event, Event::Idle(_)) {
-                let waited = self.lock_wait.map_or(1, |waited| waited.saturating_add(1));
-                self.lock_wait = Some(waited);
-                if waited >= LOCK_WAIT_SAMPLES {
+            // The dashboard stays up until the session reads as locked, so the
+            // desktop never shows and no key reaches the app underneath (R6).
+            // A lock that has not landed is asked for again. One that never
+            // lands means this Mac offers no lock after all: the dashboard
+            // closes as it does without one (R7), rather than cover the
+            // screen with no way back.
+            if let (Event::LockSample(_), Some(wait)) = (event, self.lock_wait) {
+                let samples = wait.samples.saturating_add(1);
+                if samples < LOCK_WAIT_SAMPLES {
+                    self.lock_wait = Some(LockWait { samples, ..wait });
+                } else if wait.attempts < LOCK_ATTEMPTS {
+                    self.lock_wait = Some(LockWait {
+                        attempts: wait.attempts + 1,
+                        samples: 0,
+                    });
+                    actions.push(Action::LockScreen);
+                } else {
                     self.lock_wait = None;
                     self.dashboard = false;
                     actions.push(Action::HideDashboard);
                 }
             }
         } else if self.dashboard && armed && input && self.lock_available {
-            self.lock_wait = Some(0);
+            self.lock_wait = Some(LockWait {
+                attempts: 1,
+                samples: 0,
+            });
             actions.push(Action::LockScreen);
         } else if self.dashboard && (!armed || input) {
             self.lock_wait = None;
@@ -219,6 +304,12 @@ impl Machine {
 
     pub(crate) fn previewing(&self) -> bool {
         self.preview.is_some()
+    }
+
+    /// A lock was asked for and has not landed: the service then samples the
+    /// session's lock state instead of idle time.
+    pub(crate) fn awaiting_lock(&self) -> bool {
+        self.lock_wait.is_some()
     }
 
     /// When to sample idle time next; `None` while there is nothing to show.

@@ -20,6 +20,7 @@ use objc2_foundation::{
     NSActivityOptions, NSDistributedNotificationCenter, NSNotification, NSNotificationCenter,
     NSObjectProtocol, NSProcessInfo, NSString,
 };
+use tauri::menu::Menu;
 use tauri::{AppHandle, Runtime, WebviewWindow};
 
 use super::platform::Platform;
@@ -73,6 +74,8 @@ pub(crate) struct MacPlatform<R: Runtime> {
     app: AppHandle<R>,
     activity: Option<Retained<ProtocolObject<dyn NSObjectProtocol>>>,
     lock: Option<ScreenLock>,
+    /// The app menu, set aside while a dashboard covers the screen.
+    menu: Option<Menu<R>>,
 }
 
 impl<R: Runtime> MacPlatform<R> {
@@ -81,6 +84,7 @@ impl<R: Runtime> MacPlatform<R> {
             app,
             activity: None,
             lock,
+            menu: None,
         }
     }
 }
@@ -114,12 +118,26 @@ impl<R: Runtime> Platform for MacPlatform<R> {
         Duration::try_from_secs_f64(seconds).unwrap_or(Duration::ZERO)
     }
 
+    fn screen_locked(&self) -> bool {
+        screen_locked()
+    }
+
     fn show_dashboard(&mut self, mode: Mode) {
+        // The app has no main menu while the dashboard covers the screen.
+        // Its key equivalents (Cmd-Q quit, Cmd-H hide, Cmd-M minimize, Cmd-W
+        // close) act before the next input sample, so they could take the
+        // cover down, or the whole app, without the Mac ever locking.
+        if self.menu.is_none() {
+            self.menu = self.app.remove_menu().ok().flatten();
+        }
         windows::show(&self.app, mode, raise);
     }
 
     fn hide_dashboard(&mut self) {
         windows::hide(&self.app);
+        if let Some(menu) = self.menu.take() {
+            let _ = self.app.set_menu(menu);
+        }
     }
 
     fn lock_screen(&mut self) {
@@ -144,7 +162,7 @@ fn end_activity(activity: &ProtocolObject<dyn NSObjectProtocol>) {
 }
 
 /// Whether the login session's screen is locked right now.
-pub(crate) fn screen_locked() -> bool {
+fn screen_locked() -> bool {
     let Some(session) = CGSessionCopyCurrentDictionary() else {
         return false;
     };

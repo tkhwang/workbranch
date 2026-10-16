@@ -1,8 +1,24 @@
 use super::*;
 use std::time::Duration;
 
+/// A session that meets the runtime v1 contract.
 fn session(state: &str, observation: &str) -> serde_json::Value {
-    serde_json::json!({ "state": state, "observation": observation })
+    serde_json::json!({
+        "workspace": "/work/feat-x",
+        "provider": "claude",
+        "sessionId": "s1",
+        "agentId": "",
+        "turnId": "t1",
+        "state": state,
+        "observation": observation,
+        "reason": "",
+        "prompt": "",
+        "activity": "",
+        "response": "",
+        "outcome": "",
+        "updatedAt": 1_760_000_000,
+        "stateChangedAt": 1_760_000_000,
+    })
 }
 
 fn document(sessions: &[serde_json::Value]) -> String {
@@ -49,6 +65,38 @@ fn config_reads_the_preference_shape() {
 }
 
 #[test]
+fn config_reads_each_field_on_its_own_as_settings_does() {
+    // A damaged minutes value keeps the switch the user turned on, as
+    // sanitizeScreensaverConfig() keeps it in Settings.
+    assert_eq!(
+        Config::from_store_value(Some(
+            serde_json::json!({ "enabled": true, "idleMinutes": "5" })
+        )),
+        Config {
+            enabled: true,
+            idle_minutes: 5
+        }
+    );
+    assert_eq!(
+        Config::from_store_value(Some(
+            serde_json::json!({ "enabled": "yes", "idleMinutes": 9 })
+        )),
+        Config {
+            enabled: false,
+            idle_minutes: 9
+        }
+    );
+}
+
+#[test]
+fn config_rounds_fractional_minutes_like_settings() {
+    let config = Config::from_store_value(Some(
+        serde_json::json!({ "enabled": true, "idleMinutes": 2.6 }),
+    ));
+    assert_eq!(config.idle_minutes, 3);
+}
+
+#[test]
 fn config_clamps_idle_minutes_to_one_through_sixty() {
     let low = Config::from_store_value(Some(
         serde_json::json!({ "enabled": true, "idleMinutes": 0 }),
@@ -89,6 +137,35 @@ fn one_working_session_among_others_is_enough() {
 fn an_unreadable_document_is_not_working() {
     assert!(!is_working("not json"));
     assert!(!is_working(r#"{"schemaVersion":1}"#));
+}
+
+#[test]
+fn a_document_from_another_schema_version_is_not_working() {
+    let sessions = [session("running", "observed")];
+    let document = serde_json::json!({ "schemaVersion": 2, "sessions": sessions });
+    assert!(!is_working(&document.to_string()));
+}
+
+#[test]
+fn a_document_the_board_would_reject_is_not_working() {
+    // One session off the contract fails the whole document on the board,
+    // so it keeps nothing awake here either.
+    let mut broken = session("waiting", "observed");
+    broken["provider"] = serde_json::json!("other");
+    assert!(!is_working(&document(&[
+        session("running", "observed"),
+        broken
+    ])));
+
+    let mut missing = session("running", "observed");
+    missing
+        .as_object_mut()
+        .map(|fields| fields.remove("turnId"));
+    assert!(!is_working(&document(&[missing])));
+
+    let mut negative = session("running", "observed");
+    negative["updatedAt"] = serde_json::json!(-1);
+    assert!(!is_working(&document(&[negative])));
 }
 
 #[test]
@@ -258,10 +335,22 @@ fn input_locks_the_mac_and_the_dashboard_stays_until_the_lock_lands() {
         vec![Action::LockScreen]
     );
     assert!(machine.showing());
-    // More input while the lock screen comes up asks for nothing more.
-    assert_eq!(machine.step(Event::Idle(Duration::from_millis(50))), vec![]);
+    assert!(machine.awaiting_lock());
+    // The lock screen is not up yet: nothing more is asked for.
+    assert_eq!(machine.step(Event::LockSample(false)), vec![]);
     assert_eq!(
         machine.step(Event::Locked(true)),
+        vec![Action::HideDashboard, Action::ReleaseAwake]
+    );
+    assert!(!machine.awaiting_lock());
+}
+
+#[test]
+fn a_lock_read_from_the_session_counts_without_its_notification() {
+    let mut machine = showing_with_lock(true);
+    machine.step(Event::Idle(Duration::from_millis(100)));
+    assert_eq!(
+        machine.step(Event::LockSample(true)),
         vec![Action::HideDashboard, Action::ReleaseAwake]
     );
 }
@@ -275,23 +364,54 @@ fn without_a_lock_input_only_closes_the_dashboard() {
     );
 }
 
+/// Steps unconfirmed lock samples until something happens, returning the
+/// sample number and the actions.
+fn until_action(machine: &mut Machine) -> (u8, Vec<Action>) {
+    for sample in 1..=LOCK_WAIT_SAMPLES {
+        let actions = machine.step(Event::LockSample(false));
+        if !actions.is_empty() {
+            return (sample, actions);
+        }
+    }
+    (LOCK_WAIT_SAMPLES + 1, vec![])
+}
+
 #[test]
-fn a_lock_that_never_lands_still_closes_the_dashboard() {
+fn a_lock_that_has_not_landed_is_asked_for_again_with_the_dashboard_up() {
     let mut machine = showing_with_lock(true);
     machine.step(Event::Idle(Duration::from_millis(100)));
-    let mut closed_at = None;
-    for sample in 1..=LOCK_WAIT_SAMPLES {
-        let actions = machine.step(Event::Idle(Duration::from_millis(
-            100 + 250 * u64::from(sample),
-        )));
-        if actions == vec![Action::HideDashboard] {
-            closed_at = Some(sample);
-            break;
-        }
-        assert_eq!(actions, vec![]);
+    for _ in 1..LOCK_ATTEMPTS {
+        assert_eq!(
+            until_action(&mut machine),
+            (LOCK_WAIT_SAMPLES, vec![Action::LockScreen])
+        );
+        assert!(machine.showing());
     }
-    assert_eq!(closed_at, Some(LOCK_WAIT_SAMPLES));
+}
+
+#[test]
+fn a_lock_that_never_lands_counts_as_no_lock_and_closes_the_dashboard() {
+    let mut machine = showing_with_lock(true);
+    machine.step(Event::Idle(Duration::from_millis(100)));
+    for _ in 1..LOCK_ATTEMPTS {
+        until_action(&mut machine);
+    }
+    assert_eq!(
+        until_action(&mut machine),
+        (LOCK_WAIT_SAMPLES, vec![Action::HideDashboard])
+    );
     assert!(!machine.showing());
+    assert!(!machine.awaiting_lock());
+}
+
+#[test]
+fn idle_samples_never_end_the_wait_for_the_lock() {
+    let mut machine = showing_with_lock(true);
+    machine.step(Event::Idle(Duration::from_millis(100)));
+    for _ in 0..u32::from(LOCK_WAIT_SAMPLES) * u32::from(LOCK_ATTEMPTS) {
+        assert_eq!(machine.step(Event::Idle(Duration::from_millis(10))), vec![]);
+    }
+    assert!(machine.showing());
 }
 
 #[test]

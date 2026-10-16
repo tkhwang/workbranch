@@ -95,11 +95,8 @@ fn run<R: Runtime>(
 ) {
     let mut machine = Machine::new(lock_available);
 
-    #[cfg(target_os = "macos")]
-    apply(
-        &mut platform,
-        &machine.step(Event::Locked(macos::screen_locked())),
-    );
+    let locked = platform.screen_locked();
+    apply(&mut platform, &machine.step(Event::Locked(locked)));
     apply(
         &mut platform,
         &machine.step(Event::Config(read_config(app))),
@@ -107,7 +104,8 @@ fn run<R: Runtime>(
 
     loop {
         // Idle time has no notification, so it is sampled, and only while
-        // the machine could act on it.
+        // the machine could act on it. While a lock is awaited, the lock
+        // state is sampled instead, since its notification can come late.
         let message = match machine.poll_interval() {
             Some(interval) => match messages.recv_timeout(interval) {
                 Ok(message) => Some(message),
@@ -135,6 +133,7 @@ fn run<R: Runtime>(
                 }
                 continue;
             }
+            None if machine.awaiting_lock() => Event::LockSample(platform.screen_locked()),
             None => Event::Idle(platform.idle_time()),
         };
         apply(&mut platform, &machine.step(event));

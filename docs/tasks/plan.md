@@ -113,6 +113,9 @@ Behaviour checks (실제 Mac, `pnpm companion:dev` 또는 빌드한 앱):
 - 2026-10-16 · (구현 중 변경) dashboard 카드 정보 → 시안 E, intent R9·R11 변경과 Slice 5 추가(프론트엔드만, Rust 변경 없음). 열당 카드 3장, 세부 줄 line clamp, 종료 결과 문구를 `boardCopy.ts` 로 모아 메뉴바와 공유 · 사용자 요청: 전체 화면인데 메뉴바보다 정보가 적음
 - 2026-10-16 · (verify) 범위 밖 실패 2건(contract lint 서식, CLI 테스트 2개) → 기존 상태로 기록하고 별도 작업으로 넘김. signoff 를 막지 않음 · COMP001 이 건드리지 않은 코드이고 R-id 영향 없음, 고치면 plan 범위(CLI·contract 무변경)를 넓힘
 - 2026-10-16 · (verify 중 발견) dashboard 닫을 때 흰 화면 깜빡임 → Tauri `macos-private-api`(`app.macOSPrivateApi`) 를 켜 dashboard 의 배경색을 webview 층에도 적용하고, 창은 화면에서 먼저 내린 뒤 destroy 한다 · 흰색의 출처(webview 기본 배경)를 없애는 근본 수정. 비공개 API(`drawsBackground`)가 하나 늘지만 이미 `SACLockScreenImmediate` 를 쓰고 brew 배포라 App Store 제약은 원래 해당. main 창은 배경색·투명 지정이 없어 동작이 바뀌지 않음. 창을 숨긴 채 만들고 첫 렌더 뒤에 보이는 방식은 화면을 덮는 시점이 늦어지고 handshake·대체 타이머가 필요해 택하지 않음
+- 2026-10-17 · (PR #236 리뷰) 잠금이 오지 않을 때 → 알림만 기다리지 않고 세션 잠금 상태를 표본마다 읽어 확인하고, 2초마다 잠금을 다시 요청(모두 3번, 약 6초)하는 동안 dashboard 를 유지한다. 끝내 잠기지 않으면 잠금 없는 Mac 으로 보고 R7 처럼 닫는다 · 확인되지 않은 2초 타임아웃으로 데스크톱이 드러나는 것은 R6 위반. 잠기지 않는 Mac 에서 dashboard 를 끝없이 유지하면 Cmd-Q 도 막혀 강제 재시동 말고는 돌아갈 길이 없어 택하지 않음
+- 2026-10-17 · (PR #236 리뷰) dashboard 가 덮는 동안 앱 메인 메뉴를 떼어 둔다(`AppHandle::remove_menu`/`set_menu`) · Cmd-Q·Cmd-H 같은 메뉴 단축키는 250ms 입력 표본보다 먼저 처리돼 잠금 없이 앱을 끝낼 수 있다. Tauri 는 macOS Cmd-Q 에 `ExitRequested` 를 보장하지 않아(tauri-apps/tauri#9198) 종료 가로채기보다 단축키 자체를 없애는 쪽을 택함. dashboard 는 보기 전용이라 메뉴가 없어도 잃는 것이 없음
+- 2026-10-17 · (PR #236 리뷰) Rust 가 runtime 문서를 v1 계약 serde 타입으로 검사하고, `screensaver` 설정을 필드별로 읽는다 · board(`parseRuntimeDocument`)와 Settings(`sanitizeScreensaverConfig`)와 같은 문서·설정을 같은 뜻으로 읽어야 UI 와 서비스가 어긋나지 않음
 
 ## Discovered
 - follow-up(COMP001 범위 밖): 목록 데이터(workspace monitor 의 root 별 갱신·오류 병합)도 Rust store 로 옮겨, 모든 창이 하나의 push 상태를 구독하는 순수 view 가 되게 한다.
@@ -187,7 +190,7 @@ Tests failed: 2
 3. (R3) Companion 2 min, 시스템 설정 › 잠금 화면 › 화면보호기 1분으로 두고 작업 중에 비운다 → 2분에 dashboard, 그 전에 macOS 화면보호기가 뜨지 않는다.
 4. (R4) 디스플레이 꺼짐 시간(이 Mac 10분)보다 오래(11분 이상) 비운다 → 작업 중이면 dashboard 가 켜져 있다.
 5. (R5) dashboard 가 떠 있을 때 마지막 실행 중·대기 세션의 턴이 끝나면 dashboard 가 내려가고 이후 macOS 설정대로 진행된다. 턴 종료만 남은 상태에서는 설정 시간이 지나도 dashboard 가 뜨지 않는다.
-6. (R6) dashboard 에서 마우스를 움직인다 → 곧바로 잠금 화면, 데스크톱이 보이지 않는다. 밑에 터미널이 포커스였던 상태에서 키를 눌러 잠근 뒤 풀면 그 키가 터미널에 들어가 있지 않다.
+6. (R6) dashboard 에서 마우스를 움직인다 → 곧바로 잠금 화면, 데스크톱이 보이지 않는다. 밑에 터미널이 포커스였던 상태에서 키를 눌러 잠근 뒤 풀면 그 키가 터미널에 들어가 있지 않다. dashboard 에서 Cmd-Q, Cmd-H, Cmd-M, Cmd-W 를 각각 눌러도 앱이 끝나거나 숨지 않고 잠금 화면이 된다. 풀고 나면 메뉴바 창에서 Cmd-C/Cmd-V 가 다시 된다(메뉴 복원).
 7. (R7) Companion 을 끄고 `WORKBRANCH_SCREENSAVER_NO_LOCK=1 pnpm companion:dev` 로 띄운 뒤 dashboard 를 띄운다 → "입력 시 잠금" 표시가 없고, 입력하면 잠금 없이 dashboard 만 닫힌다.
 8. (R8·R9·R11) dashboard 가 상단 시계·날짜·"입력 시 잠금"·상태별 개수, 하단 3열(시안 D + E 카드)이다. 개수와 카드 목록이 메뉴바 칸반과 같고, 각 카드의 프롬프트·도구 동작(대기·실행 중)·마지막 응답(턴 종료)이 메뉴바 카드와 같다. 한 열에 4개 이상이면 "+n more", 긴 프롬프트·응답이 있어도 카드가 잘리거나 화면 아래로 넘치지 않는다(내장·외부 모니터 모두).
 9. (R10) 모니터 2대에서 두 화면 모두 dashboard 가 뜨고, 메뉴바·Dock·다른 Space 의 전체 화면 앱 위를 덮는다.
