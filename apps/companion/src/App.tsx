@@ -1,6 +1,6 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { SetupAction } from "./application/connections";
+import { needsOnboarding, type SetupAction } from "./application/connections";
 import {
 	buildMainViewModel,
 	buildMenuModel,
@@ -35,11 +35,12 @@ import { AgentHeader } from "./ui/AgentHeader";
 import { AgentTabs, type CompanionView } from "./ui/AgentTabs";
 import { ConnectionsPanel } from "./ui/ConnectionsPanel";
 import { ProgressButton } from "./ui/ProgressButton";
+import type { SettingsCategory } from "./ui/SettingsNav";
 import { SettingsView } from "./ui/SettingsView";
 import { StageBoard } from "./ui/StageBoard";
 import { StatusAlert } from "./ui/StatusAlert";
+import { StatusSettings } from "./ui/StatusSettings";
 import type { TaskActionKind } from "./ui/TaskRow";
-import { UpdatePanel } from "./ui/UpdatePanel";
 import { UsageSummary } from "./ui/UsageSummary";
 import { UsageView } from "./ui/UsageView";
 
@@ -67,6 +68,8 @@ export function App() {
 	const [visibleError, setVisibleError] = useState<string>();
 	const [setupError, setSetupError] = useState(false);
 	const [currentView, setCurrentView] = useState<CompanionView>("main");
+	const [settingsCategory, setSettingsCategory] =
+		useState<SettingsCategory>("general");
 	const [selectedStageTask, setSelectedStageTask] = useState<
 		string | undefined
 	>(undefined);
@@ -95,6 +98,7 @@ export function App() {
 	const main = buildMainViewModel(state, sessions);
 	const connections = useConnections(tauriRuntimeAvailable);
 	const [onboardingDismissed, setOnboardingDismissed] = useState(false);
+	const [setupStartedOnMain, setSetupStartedOnMain] = useState(false);
 	const usage = useUsage(tauriRuntimeAvailable);
 
 	const showStatus = useCallback((message: string) => {
@@ -185,13 +189,15 @@ export function App() {
 		void refresh();
 		void connections.refresh();
 	});
-	const [updatePanelOpen, setUpdatePanelOpen] = useState(false);
+	const updateAvailable = updateTargets(updates.state.status).length > 0;
+	// The header control opens the update status on Settings › General.
 	const handleCheckUpdates = useCallback(() => {
 		if (!tauriRuntimeAvailable) {
 			showStatus(TAURI_RUNTIME_UNAVAILABLE);
 			return;
 		}
-		setUpdatePanelOpen(true);
+		setCurrentView("settings");
+		setSettingsCategory("general");
 		void updates.check();
 	}, [showStatus, tauriRuntimeAvailable, updates.check]);
 
@@ -300,7 +306,8 @@ export function App() {
 		}
 	};
 
-	const handleSetupAction = (action: SetupAction) => {
+	const handleSetupAction = (action: SetupAction, onMain: boolean) => {
+		setSetupStartedOnMain(onMain);
 		void connections.run(action).then((ok) => {
 			if (ok) void refresh();
 		});
@@ -311,23 +318,15 @@ export function App() {
 			state={connections.state}
 			sessions={sessions}
 			onRefresh={() => void connections.refresh()}
-			onAction={handleSetupAction}
+			onAction={(action) => handleSetupAction(action, onboarding)}
 			onboarding={onboarding}
 			onDismiss={() => setOnboardingDismissed(true)}
 		/>
 	);
-	const needsOnboarding =
-		connections.state.busy !== null ||
-		connections.state.notice !== null ||
-		connections.state.error !== null ||
-		connections.state.status === null ||
-		connections.state.status.cli.state !== "ready" ||
-		!connections.state.status.agents.some(
-			(a) =>
-				a.state === "configured" &&
-				((a.lastObservedAt ?? 0) > 0 ||
-					sessions.some((s) => s.provider === a.provider)),
-		);
+	const showOnboarding =
+		tauriRuntimeAvailable &&
+		!onboardingDismissed &&
+		needsOnboarding(connections.state, sessions, setupStartedOnMain);
 
 	return (
 		<main
@@ -340,18 +339,9 @@ export function App() {
 				summary={model.summary}
 				status={status}
 				onCheckUpdates={handleCheckUpdates}
-				updateAvailable={updateTargets(updates.state.status).length > 0}
+				updateAvailable={updateAvailable}
 				onQuit={handleQuit}
 			/>
-			{updatePanelOpen ? (
-				<UpdatePanel
-					theme={activeTheme}
-					state={updates.state}
-					onCheck={() => void updates.check()}
-					onApply={() => void updates.apply()}
-					onClose={() => setUpdatePanelOpen(false)}
-				/>
-			) : null}
 			<StatusAlert
 				message={
 					setupError && connections.state.status?.cli.state !== "ready"
@@ -396,9 +386,7 @@ export function App() {
 							snapshot={usage.snapshot}
 						/>
 					) : null}
-					{tauriRuntimeAvailable && !onboardingDismissed && needsOnboarding
-						? connectionPanel(true)
-						: null}
+					{showOnboarding ? connectionPanel(true) : null}
 					<StageBoard
 						activeCount={main.activeCount}
 						baseRows={main.baseRows}
@@ -426,6 +414,23 @@ export function App() {
 			) : null}
 			{currentView === "settings" ? (
 				<SettingsView
+					attention={{
+						general: updateAvailable,
+						connections:
+							connections.state.status !== null &&
+							connections.state.status.cli.state !== "ready",
+					}}
+					category={settingsCategory}
+					onCategoryChange={setSettingsCategory}
+					status={
+						<StatusSettings
+							connections={connections.state}
+							onApplyUpdates={() => void updates.apply()}
+							onCheckUpdates={() => void updates.check()}
+							onOpenConnections={() => setSettingsCategory("connections")}
+							updates={updates.state}
+						/>
+					}
 					claudeLimitRelay={{
 						status: claudeLimitRelay.status,
 						loading: claudeLimitRelay.loading,

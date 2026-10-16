@@ -1,9 +1,9 @@
+import type { ReactNode } from "react";
 import type { CompanionPreferences } from "../application/preferences";
 import {
 	COMPANION_FONT_OPTIONS,
 	COMPANION_FONT_SIZE_OPTIONS,
 	isCompanionFont,
-	isCompanionFontSize,
 } from "../application/preferences";
 import { AgentThemePicker } from "./AgentThemePicker";
 import {
@@ -12,9 +12,21 @@ import {
 } from "./ClaudeLimitRelaySettings";
 import { MenuBarSettings } from "./MenuBarSettings";
 import { ScreensaverSettings } from "./ScreensaverSettings";
-import { TerminalPanel } from "./TerminalPanel";
+import {
+	SegmentedControl,
+	SettingsGroup,
+	SettingsPage,
+	SettingsRow,
+} from "./SettingsLayout";
+import type { SettingsCategory } from "./SettingsNav";
+
+/** Every tab except Connections, which the app shell renders itself. */
+export type PreferenceCategory = Exclude<SettingsCategory, "connections">;
 
 type Props = {
+	readonly category: PreferenceCategory;
+	/** Update and connection status, shown first on General. */
+	readonly status?: ReactNode;
 	readonly claudeLimitRelay: ClaudeLimitRelayProps;
 	readonly preferences: CompanionPreferences;
 	readonly launchAtLogin: boolean;
@@ -24,15 +36,95 @@ type Props = {
 	readonly onScreensaverPreview: () => void;
 };
 
-export function SettingsPanel({
+export function SettingsPanel(props: Props) {
+	switch (props.category) {
+		case "general":
+			return generalPage(props);
+		case "menu-bar":
+			return (
+				<SettingsPage
+					category="menu-bar"
+					description="The text beside the menu bar icon. Each switch changes the preview at once."
+					title="What the menu bar shows"
+				>
+					<MenuBarSettings
+						onChange={(menuBar) =>
+							props.onPreferencesChange({ ...props.preferences, menuBar })
+						}
+						value={props.preferences.menuBar}
+					/>
+				</SettingsPage>
+			);
+		case "screen-saver":
+			return (
+				<SettingsPage
+					category="screen-saver"
+					description="Keeps the Mac awake while agents work, then covers every screen with the board."
+					title="Dashboard while agents work"
+				>
+					<ScreensaverSettings
+						onChange={(screensaver) =>
+							props.onPreferencesChange({ ...props.preferences, screensaver })
+						}
+						onPreview={props.onScreensaverPreview}
+						value={props.preferences.screensaver}
+					/>
+				</SettingsPage>
+			);
+		case "appearance":
+			return appearancePage(props);
+	}
+}
+
+/** Called, not mounted, so the page's controls stay in the returned tree. */
+function generalPage({
+	status,
 	claudeLimitRelay,
-	preferences,
 	launchAtLogin,
 	launchAtLoginLoading,
 	onLaunchAtLoginChange,
-	onPreferencesChange,
-	onScreensaverPreview,
 }: Props) {
+	return (
+		<SettingsPage
+			category="general"
+			description="What needs attention, when Companion opens, and where Claude limits come from."
+			title="Status, startup and limits"
+		>
+			{status}
+			<SettingsGroup label="Startup">
+				<SettingsRow
+					description={
+						launchAtLoginLoading
+							? "Checking login item state"
+							: launchAtLogin
+								? "Opens automatically when you sign in"
+								: "Opens only when opened manually"
+					}
+					htmlFor="launch-at-login"
+					title="Open at Login"
+				>
+					<input
+						aria-checked={launchAtLogin}
+						checked={launchAtLogin}
+						className="settings-switch"
+						disabled={launchAtLoginLoading}
+						id="launch-at-login"
+						onChange={(event) =>
+							onLaunchAtLoginChange(event.currentTarget.checked)
+						}
+						role="switch"
+						type="checkbox"
+					/>
+				</SettingsRow>
+			</SettingsGroup>
+			<SettingsGroup label="Claude Limits">
+				<ClaudeLimitRelaySettings {...claudeLimitRelay} />
+			</SettingsGroup>
+		</SettingsPage>
+	);
+}
+
+function appearancePage({ preferences, onPreferencesChange }: Props) {
 	const fontOption = COMPANION_FONT_OPTIONS.find(
 		(candidate) => candidate.value === preferences.font,
 	);
@@ -44,140 +136,75 @@ export function SettingsPanel({
 	const fontSizeName = fontSizeOption?.label ?? preferences.fontSize;
 
 	return (
-		<section className="settings-panel" aria-label="Settings">
-			<div className="settings-panel-header">
-				<div>
-					<h2>Settings</h2>
-					<p>Companion preferences</p>
-				</div>
-			</div>
-			<TerminalPanel anatomy="claude" label="Startup" theme={preferences.theme}>
-				<div className="settings-row">
-					<label htmlFor="launch-at-login">Open at Login</label>
-					<input
-						checked={launchAtLogin}
-						disabled={launchAtLoginLoading}
-						id="launch-at-login"
-						onChange={(event) =>
-							onLaunchAtLoginChange(event.currentTarget.checked)
-						}
-						type="checkbox"
+		<SettingsPage
+			category="appearance"
+			description="Applies immediately across Main, Usage, and Settings."
+			title="Theme, font and text size"
+		>
+			<SettingsGroup label="Theme">
+				<SettingsRow
+					description="Claude Code: warm graphite with a clay accent. Codex: cool neutrals."
+					title="Agent theme"
+				>
+					<AgentThemePicker
+						onChange={(theme) => onPreferencesChange({ ...preferences, theme })}
+						value={preferences.theme}
 					/>
-				</div>
-				<p className="settings-hint">
-					{launchAtLoginLoading
-						? "Checking login item state"
-						: launchAtLogin
-							? "Opens automatically when you sign in"
-							: "Opens only when opened manually"}
-				</p>
-			</TerminalPanel>
-			<TerminalPanel
-				anatomy="claude"
-				label="Claude Limits"
-				theme={preferences.theme}
-			>
-				<ClaudeLimitRelaySettings {...claudeLimitRelay} />
-			</TerminalPanel>
-			<TerminalPanel
-				anatomy="claude"
-				label="Menu Bar"
-				theme={preferences.theme}
-			>
-				<MenuBarSettings
-					value={preferences.menuBar}
-					onChange={(menuBar) =>
-						onPreferencesChange({ ...preferences, menuBar })
-					}
-				/>
-			</TerminalPanel>
-			<TerminalPanel
-				anatomy="claude"
-				label="Screen Saver"
-				theme={preferences.theme}
-			>
-				<ScreensaverSettings
-					value={preferences.screensaver}
-					onChange={(screensaver) =>
-						onPreferencesChange({ ...preferences, screensaver })
-					}
-					onPreview={onScreensaverPreview}
-				/>
-			</TerminalPanel>
-			<TerminalPanel anatomy="claude" label="Font" theme={preferences.theme}>
-				<div className="settings-row settings-row-select">
-					<label htmlFor="companion-font">Font</label>
-					<select
-						id="companion-font"
-						onChange={(event) => {
-							const nextFont = event.currentTarget.value;
-							if (isCompanionFont(nextFont)) {
-								onPreferencesChange({ ...preferences, font: nextFont });
-							}
-						}}
-						value={preferences.font}
-					>
-						{COMPANION_FONT_OPTIONS.map((option) => (
-							<option key={option.value} value={option.value}>
-								{option.label}
-							</option>
-						))}
-					</select>
-				</div>
-				<div className="font-preview" style={{ fontFamily }}>
-					<span className="font-preview-label">Preview · {fontName}</span>
-					<code>workbranch feat/update-0619</code>
-					<span>1234567890 · RUN 1 · 21/21</span>
-				</div>
-				<p className="settings-hint">Current font: {fontName}</p>
-			</TerminalPanel>
-			<TerminalPanel
-				anatomy="claude"
-				label="Text Size"
-				theme={preferences.theme}
-			>
-				<div className="settings-row settings-row-select">
-					<label htmlFor="companion-font-size">Text Size</label>
-					<select
-						id="companion-font-size"
-						onChange={(event) => {
-							const nextFontSize = event.currentTarget.value;
-							if (isCompanionFontSize(nextFontSize)) {
-								onPreferencesChange({
-									...preferences,
-									fontSize: nextFontSize,
-								});
-							}
-						}}
+				</SettingsRow>
+			</SettingsGroup>
+			<SettingsGroup label="Text">
+				<SettingsRow
+					description="Monospace font for every view."
+					htmlFor="companion-font"
+					title="Font"
+				>
+					<div className="settings-select">
+						<select
+							id="companion-font"
+							onChange={(event) => {
+								const nextFont = event.currentTarget.value;
+								if (isCompanionFont(nextFont)) {
+									onPreferencesChange({ ...preferences, font: nextFont });
+								}
+							}}
+							value={preferences.font}
+						>
+							{COMPANION_FONT_OPTIONS.map((option) => (
+								<option key={option.value} value={option.value}>
+									{option.label}
+								</option>
+							))}
+						</select>
+					</div>
+				</SettingsRow>
+				<SettingsRow
+					description="Scales every text size in Main, Usage, and Settings."
+					stacked
+					title="Text Size"
+				>
+					<SegmentedControl
+						label="Text size"
+						onChange={(fontSize) =>
+							onPreferencesChange({ ...preferences, fontSize })
+						}
+						options={COMPANION_FONT_SIZE_OPTIONS}
+						stretch
 						value={preferences.fontSize}
-					>
-						{COMPANION_FONT_SIZE_OPTIONS.map((option) => (
-							<option key={option.value} value={option.value}>
-								{option.label}
-							</option>
-						))}
-					</select>
+					/>
+				</SettingsRow>
+				<div className="settings-preview">
+					<div className="font-preview" style={{ fontFamily }}>
+						<span className="font-preview-label">
+							Preview · {fontName} · {fontSizeName}
+						</span>
+						<code>workbranch feat/update-0619</code>
+						<span>1234567890 · RUN 1 · 21/21</span>
+						<span className="font-preview-meta">
+							ci: build signed macOS DMGs · 11d
+						</span>
+					</div>
 				</div>
-				<div className="font-preview">
-					<span className="font-preview-label">Preview · {fontSizeName}</span>
-					<code>workbranch feat/update-0619</code>
-					<span className="font-preview-meta">
-						ci: build signed macOS DMGs · 11d
-					</span>
-				</div>
-				<p className="settings-hint">
-					Scales every text size in Main, Usage, and Settings.
-				</p>
-			</TerminalPanel>
-			<TerminalPanel anatomy="claude" label="Theme" theme={preferences.theme}>
-				<AgentThemePicker
-					value={preferences.theme}
-					onChange={(theme) => onPreferencesChange({ ...preferences, theme })}
-				/>
-				<p className="settings-hint">
-					Applies immediately across Main, Usage, and Settings.
-				</p>
-			</TerminalPanel>
-		</section>
+			</SettingsGroup>
+		</SettingsPage>
 	);
 }

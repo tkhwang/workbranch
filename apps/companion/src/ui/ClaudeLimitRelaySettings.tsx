@@ -1,4 +1,5 @@
 import type { ClaudeLimitRelayStatus } from "../infrastructure/tauriClient";
+import { SettingsRow } from "./SettingsLayout";
 
 export type ClaudeLimitRelayProps = {
 	readonly status: ClaudeLimitRelayStatus | undefined;
@@ -20,18 +21,21 @@ function hint({ status, loading }: ClaudeLimitRelayProps): string {
 export function ClaudeLimitRelaySettings(props: ClaudeLimitRelayProps) {
 	const { status, loading, onChange } = props;
 	return (
-		<>
-			<div className="settings-row">
-				<label htmlFor="claude-limit-relay">Live Claude Limits</label>
-				<input
-					checked={status?.enabled ?? false}
-					disabled={loading || status === undefined}
-					id="claude-limit-relay"
-					onChange={(event) => onChange(event.currentTarget.checked)}
-					type="checkbox"
-				/>
-			</div>
-			<p className="settings-hint">{hint(props)}</p>
-		</>
+		<SettingsRow
+			description={hint(props)}
+			htmlFor="claude-limit-relay"
+			title="Live Claude Limits"
+		>
+			<input
+				aria-checked={status?.enabled ?? false}
+				checked={status?.enabled ?? false}
+				className="settings-switch"
+				disabled={loading || status === undefined}
+				id="claude-limit-relay"
+				onChange={(event) => onChange(event.currentTarget.checked)}
+				role="switch"
+				type="checkbox"
+			/>
+		</SettingsRow>
 	);
 }

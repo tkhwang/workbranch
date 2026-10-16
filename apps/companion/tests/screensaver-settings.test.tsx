@@ -131,6 +131,7 @@ describe("SettingsPanel screen saver section", () => {
 	it("renders a Screen Saver panel", () => {
 		const html = renderToStaticMarkup(
 			<SettingsPanel
+				category="screen-saver"
 				claudeLimitRelay={{
 					status: { enabled: false, previousCommand: null },
 					loading: false,
@@ -144,13 +145,15 @@ describe("SettingsPanel screen saver section", () => {
 				onScreensaverPreview={() => undefined}
 			/>,
 		);
-		expect(html).toContain("Screen Saver");
+		expect(html).toContain("04 · Screen Saver");
+		expect(html).toContain('aria-label="Screen Saver"');
 		expect(html).toContain('id="screensaver-enabled"');
 	});
 
 	it("delegates the edited screensaver config", () => {
 		const calls: CompanionPreferences[] = [];
 		const element = SettingsPanel({
+			category: "screen-saver",
 			claudeLimitRelay: {
 				status: { enabled: false, previousCommand: null },
 				loading: false,
@@ -248,6 +251,7 @@ describe("Screen saver preview", () => {
 	it("passes the preview request up from the settings panel", () => {
 		let previews = 0;
 		const element = SettingsPanel({
+			category: "screen-saver",
 			claudeLimitRelay: {
 				status: { enabled: false, previousCommand: null },
 				loading: false,

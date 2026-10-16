@@ -246,13 +246,3 @@
 	top: 3px;
 	width: 6px;
 }
-
-.update-panel {
-	margin-bottom: 16px;
-	word-break: keep-all;
-}
-
-.update-panel .connections-heading .connection-actions {
-	flex: 0 0 auto;
-	flex-wrap: nowrap;
-}

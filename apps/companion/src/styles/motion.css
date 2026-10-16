@@ -12,4 +12,9 @@
 	.button-spinner {
 		animation: none;
 	}
+
+	.settings-switch,
+	.settings-switch::before {
+		transition: none;
+	}
 }

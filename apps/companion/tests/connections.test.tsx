@@ -4,6 +4,7 @@ import {
 	type ConnectionState,
 	createConnectionController,
 	EMPTY_CONNECTION_STATE,
+	needsOnboarding,
 	type SetupStatus,
 	sameSetupAction,
 } from "../src/application/connections";
@@ -292,7 +293,7 @@ it("puts an action result beside the button that ran it", () => {
 		lastAction: { kind: "updateCli" },
 		notice: "CLI와 수집기 준비가 완료됐습니다.",
 	});
-	expect(between(cli, "1 · Workbranch CLI", "Claude Code")).toContain(
+	expect(between(cli, "Workbranch CLI", "Claude Code")).toContain(
 		"CLI와 수집기 준비가 완료됐습니다.",
 	);
 });
@@ -345,4 +346,75 @@ it("matches a running action to its button regardless of the approved source", (
 	expect(sameSetupAction({ kind: "updateCli" }, { kind: "repairCli" })).toBe(
 		false,
 	);
+});
+
+it("keeps Main onboarding hidden until the first check knows the setup", () => {
+	expect(needsOnboarding(EMPTY_CONNECTION_STATE, [], false)).toBe(false);
+	// A failed first check still offers the retry.
+	expect(
+		needsOnboarding(
+			{
+				...EMPTY_CONNECTION_STATE,
+				loading: false,
+				error: "설치 상태를 확인하지 못했습니다.",
+			},
+			[],
+			false,
+		),
+	).toBe(true);
+});
+
+it("opens Main onboarding until an agent has been observed", () => {
+	const ready = {
+		...EMPTY_CONNECTION_STATE,
+		loading: false,
+		status: readyStatus,
+	};
+	// readyStatus: CLI ready, Grok configured but never observed.
+	expect(needsOnboarding(ready, [], false)).toBe(true);
+	expect(needsOnboarding(ready, [{ provider: "grok" }], false)).toBe(false);
+	const observedStatus: SetupStatus = {
+		...readyStatus,
+		agents: readyStatus.agents.map((agent) =>
+			agent.provider === "grok" ? { ...agent, lastObservedAt: 1 } : agent,
+		),
+	};
+	const observed = { ...ready, status: observedStatus };
+	expect(needsOnboarding(observed, [], false)).toBe(false);
+	// A CLI that stops being ready brings the panel back.
+	expect(
+		needsOnboarding(
+			{ ...observed, status: { ...observedStatus, cli: status.cli } },
+			[],
+			false,
+		),
+	).toBe(true);
+});
+
+it("leaves results of Settings actions out of Main once setup is complete", () => {
+	const complete: ConnectionState = {
+		...EMPTY_CONNECTION_STATE,
+		loading: false,
+		status: readyStatus,
+		lastAction: { kind: "connectAgent", provider: "codex" },
+		notice: "설정 후 agent를 다시 시작하세요.",
+	};
+	const sessions = [{ provider: "grok" as const }];
+	expect(needsOnboarding(complete, sessions, false)).toBe(false);
+	expect(
+		needsOnboarding(
+			{ ...complete, notice: null, error: "실패" },
+			sessions,
+			false,
+		),
+	).toBe(false);
+	// An action started on Main keeps its progress and result in place.
+	expect(needsOnboarding(complete, sessions, true)).toBe(true);
+	expect(
+		needsOnboarding(
+			{ ...complete, notice: null, busy: { kind: "updateCli" } },
+			sessions,
+			true,
+		),
+	).toBe(true);
 });

@@ -168,7 +168,8 @@ export function UsageDayAxis({
 /**
  * Both agents per day on one scale, so each day's split reads directly.
  * The last `dayCount` days end with today; `showValues` prints each agent's
- * total under its day for the short Main window.
+ * total right under its own bar, above the day axis, for the short Main
+ * window.
  */
 export function UsageDailyComparison({
 	summaries,
@@ -235,7 +236,6 @@ export function UsageDailyComparison({
 					</span>
 				))}
 			</div>
-			<UsageDayAxis days={days} />
 			{showValues ? (
 				<div className="usage-values">
 					{days.map((day, index) => (
@@ -257,6 +257,7 @@ export function UsageDailyComparison({
 					))}
 				</div>
 			) : null}
+			<UsageDayAxis days={days} />
 		</section>
 	);
 }

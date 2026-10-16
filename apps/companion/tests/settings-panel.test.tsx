@@ -1,4 +1,9 @@
-import { Children, isValidElement, type ReactNode } from "react";
+import {
+	Children,
+	isValidElement,
+	type JSXElementConstructor,
+	type ReactNode,
+} from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
@@ -7,19 +12,27 @@ import {
 } from "../src/application/menuBar";
 import type {
 	CompanionFont,
-	CompanionFontSize,
 	CompanionPreferences,
 	CompanionTheme,
 } from "../src/application/preferences";
 import { DEFAULT_SCREENSAVER } from "../src/application/screensaver";
 import { AgentThemePicker } from "../src/ui/AgentThemePicker";
 import { MenuBarSettings } from "../src/ui/MenuBarSettings";
-import { SettingsPanel } from "../src/ui/SettingsPanel";
+import { SegmentedControl } from "../src/ui/SettingsLayout";
+import {
+	type SettingsCategory,
+	SettingsNav,
+	settingsEyebrow,
+} from "../src/ui/SettingsNav";
+import {
+	type PreferenceCategory,
+	SettingsPanel,
+} from "../src/ui/SettingsPanel";
+import { SettingsView } from "../src/ui/SettingsView";
 
 type InputProps = {
 	readonly id?: string;
 	readonly checked?: boolean;
-	readonly disabled?: boolean;
 	readonly onChange?: (event: {
 		readonly currentTarget: { readonly checked: boolean };
 	}) => void;
@@ -27,72 +40,44 @@ type InputProps = {
 
 type SelectProps = {
 	readonly id?: string;
-	readonly value?: string;
 	readonly onChange?: (event: {
 		readonly currentTarget: { readonly value: string };
 	}) => void;
+};
+
+type ButtonProps = {
+	readonly children?: ReactNode;
+	readonly onClick?: () => void;
+};
+
+type SegmentedProps = {
+	readonly label: string;
+	readonly onChange: (value: string) => void;
 };
 
 type TraversableProps = {
 	readonly children?: ReactNode;
 };
 
-type MenuBarPickerProps = {
-	readonly value: MenuBarConfig;
-	readonly onChange: (config: MenuBarConfig) => void;
-};
-
-type ThemePickerProps = {
-	readonly value: CompanionTheme;
-	readonly onChange: (theme: CompanionTheme) => void;
-};
-
-function collectByType<TProps>(
+/** Walks the returned element tree through `children`, without rendering. */
+function collect<TProps>(
 	node: ReactNode,
-	typeName: "button" | "input" | "select",
+	type: string | JSXElementConstructor<never>,
 ): readonly TProps[] {
-	const props: TProps[] = [];
+	const found: TProps[] = [];
 	const visit = (child: ReactNode): void => {
-		if (!isValidElement<TProps & TraversableProps>(child)) {
-			return;
-		}
-		if (child.type === typeName) {
-			props.push(child.props);
-		}
+		if (!isValidElement<TProps & TraversableProps>(child)) return;
+		if (child.type === type) found.push(child.props);
 		Children.forEach(child.props.children, visit);
 	};
 	visit(node);
-	return props;
+	return found;
 }
 
-function findThemePicker(node: ReactNode): ThemePickerProps | undefined {
-	let result: ThemePickerProps | undefined;
-	const visit = (child: ReactNode): void => {
-		if (!isValidElement<ThemePickerProps & TraversableProps>(child)) {
-			return;
-		}
-		if (child.type === AgentThemePicker) {
-			result = child.props;
-		}
-		Children.forEach(child.props.children, visit);
-	};
-	visit(node);
-	return result;
-}
-
-function findMenuBarPicker(node: ReactNode): MenuBarPickerProps | undefined {
-	let result: MenuBarPickerProps | undefined;
-	const visit = (child: ReactNode): void => {
-		if (!isValidElement<MenuBarPickerProps & TraversableProps>(child)) {
-			return;
-		}
-		if (child.type === MenuBarSettings) {
-			result = child.props;
-		}
-		Children.forEach(child.props.children, visit);
-	};
-	visit(node);
-	return result;
+function segmented(node: ReactNode, label: string): SegmentedProps | undefined {
+	return collect<SegmentedProps>(node, SegmentedControl).find(
+		(props) => props.label === label,
+	);
 }
 
 const preferences: CompanionPreferences = {
@@ -103,226 +88,183 @@ const preferences: CompanionPreferences = {
 	screensaver: DEFAULT_SCREENSAVER,
 };
 
-function renderSettingsPanel({
-	currentPreferences = preferences,
-	launchAtLoginLoading = false,
-}: {
-	readonly currentPreferences?: CompanionPreferences;
-	readonly launchAtLoginLoading?: boolean;
-} = {}): string {
+const relay = {
+	status: { enabled: false, previousCommand: null },
+	loading: false,
+	onChange: () => undefined,
+};
+
+function panelProps(
+	category: PreferenceCategory,
+	overrides: {
+		readonly preferences?: CompanionPreferences;
+		readonly launchAtLoginLoading?: boolean;
+		readonly onLaunchAtLoginChange?: (enabled: boolean) => void;
+		readonly onPreferencesChange?: (next: CompanionPreferences) => void;
+	} = {},
+) {
+	return {
+		category,
+		claudeLimitRelay: relay,
+		preferences: overrides.preferences ?? preferences,
+		launchAtLogin: false,
+		launchAtLoginLoading: overrides.launchAtLoginLoading ?? false,
+		onLaunchAtLoginChange: overrides.onLaunchAtLoginChange ?? (() => undefined),
+		onPreferencesChange: overrides.onPreferencesChange ?? (() => undefined),
+		onScreensaverPreview: () => undefined,
+	};
+}
+
+function renderPage(
+	category: PreferenceCategory,
+	overrides: Parameters<typeof panelProps>[1] = {},
+): string {
 	return renderToStaticMarkup(
-		<SettingsPanel
-			claudeLimitRelay={{
-				status: { enabled: false, previousCommand: null },
-				loading: false,
-				onChange: () => undefined,
-			}}
-			preferences={currentPreferences}
-			launchAtLogin={false}
-			launchAtLoginLoading={launchAtLoginLoading}
-			onLaunchAtLoginChange={() => undefined}
-			onPreferencesChange={() => undefined}
-			onScreensaverPreview={() => undefined}
-		/>,
+		<SettingsPanel {...panelProps(category, overrides)} />,
 	);
 }
 
 describe("SettingsPanel", () => {
-	it("renders Claude terminal panels and exactly two agent themes", () => {
-		const html = renderSettingsPanel();
+	it("opens General with the status slot first, then startup and limit switches", () => {
+		const html = renderToStaticMarkup(
+			<SettingsPanel {...panelProps("general")} status={<p>STATUS SLOT</p>} />,
+		);
 
-		expect(html).toContain('data-terminal-panel="claude"');
-		expect(html).toContain('data-terminal-panel-anatomy="claude"');
-		expect(html).toContain("<fieldset");
-		expect(html).toContain("<legend>Startup</legend>");
-		expect(html).toContain("<legend>Claude Limits</legend>");
-		expect(html).toContain('for="claude-limit-relay"');
-		expect(html).toContain("<legend>Menu Bar</legend>");
-		expect(html).toContain("<legend>Font</legend>");
-		expect(html).toContain("<legend>Text Size</legend>");
-		expect(html).toContain("<legend>Theme</legend>");
-		expect(html).not.toContain("Weekly Limits");
-		expect(html).toContain('aria-label="Menu bar items"');
+		expect(html).toContain('aria-label="01 · General"');
+		expect(html).toContain("<h2>Status, startup and limits</h2>");
+		expect(html.indexOf("STATUS SLOT")).toBeLessThan(
+			html.indexOf("Open at Login"),
+		);
+		expect(html).toContain('aria-label="Startup"');
+		expect(html).toContain('aria-label="Claude Limits"');
 		expect(html).toContain('for="launch-at-login"');
-		expect(html).toContain('for="companion-font"');
-		expect(html).toContain('for="companion-font-size"');
-		expect(html).toContain("Open at Login");
-		expect(html).toContain("System Mono");
-		expect(html).toContain("JetBrains Mono");
-		expect(html).toContain("Extra Large");
-		expect(html).toContain("Claude Code");
-		expect(html).toContain("Codex");
-		// Four menu bar items, two percent bases, two themes and the screen
-		// saver preview are the only buttons.
-		expect(html.match(/<button/g)).toHaveLength(9);
+		expect(html).toContain('for="claude-limit-relay"');
+		expect(html.match(/role="switch"/g)).toHaveLength(2);
+		expect(html).not.toContain("<legend");
+		expect(html).not.toContain("terminal-panel");
+	});
+
+	it("gives every preference page its numbered heading", () => {
+		const pages: readonly [PreferenceCategory, string, string][] = [
+			["menu-bar", "03 · Menu Bar", "What the menu bar shows"],
+			["screen-saver", "04 · Screen Saver", "Dashboard while agents work"],
+			["appearance", "05 · Appearance", "Theme, font and text size"],
+		];
+		for (const [category, eyebrow, title] of pages) {
+			const html = renderPage(category);
+			expect(html).toContain(`<p class="settings-page-eyebrow">${eyebrow}</p>`);
+			expect(html).toContain(`<h2>${title}</h2>`);
+		}
+	});
+
+	it("offers exactly the two agent themes as a segmented control", () => {
+		const html = renderPage("appearance", {
+			preferences: { ...preferences, theme: "codex" },
+		});
+
+		expect(html).toContain('aria-label="Agent theme"');
+		expect(html).toContain('aria-label="Use Claude Code theme"');
+		expect(html).toMatch(/aria-label="Use Codex theme" aria-pressed="true"/);
 		expect(html).not.toContain(">Light</button>");
 		expect(html).not.toContain(">Dark</button>");
 		expect(html).not.toContain(">System</button>");
-		expect(html).not.toContain("theme mode");
 	});
 
-	it("renders Codex settings with Claude fieldset sections", () => {
-		const html = renderSettingsPanel({
-			currentPreferences: {
-				font: "menlo",
-				fontSize: "medium",
-				theme: "codex",
-				menuBar: DEFAULT_MENU_BAR,
-				screensaver: DEFAULT_SCREENSAVER,
-			},
-		});
-
-		expect(html).toContain('data-terminal-panel="codex"');
-		expect(html).toContain('data-terminal-panel-anatomy="claude"');
-		expect(html).toContain("<fieldset");
-		expect(html).toContain("<legend>Startup</legend>");
-		expect(html).toContain("<legend>Font</legend>");
-		expect(html).toContain("<legend>Text Size</legend>");
-		expect(html).toContain("<legend>Theme</legend>");
-		expect(html).not.toContain('class="terminal-panel-heading"');
-		expect(html).toContain('aria-label="Use Codex theme"');
-		expect(html).toContain('aria-pressed="true"');
-	});
-
-	it("shows the selected font in a live preview sample", () => {
-		const html = renderSettingsPanel({
-			currentPreferences: {
-				font: "menlo",
-				fontSize: "medium",
-				theme: "claude",
-				menuBar: DEFAULT_MENU_BAR,
-				screensaver: DEFAULT_SCREENSAVER,
-			},
+	it("previews the selected font and text size together", () => {
+		const html = renderPage("appearance", {
+			preferences: { ...preferences, font: "menlo", fontSize: "large" },
 		});
 
 		expect(html).toContain('class="font-preview"');
 		expect(html).toContain("font-family:Menlo");
+		expect(html).toContain("Preview · Menlo · Large");
 		expect(html).toContain("workbranch feat/update-0619");
 		expect(html).toContain("1234567890");
-	});
-
-	it("previews the smallest scaled copy alongside the selected text size", () => {
-		const html = renderSettingsPanel({
-			currentPreferences: {
-				font: "menlo",
-				fontSize: "large",
-				theme: "claude",
-				menuBar: DEFAULT_MENU_BAR,
-				screensaver: DEFAULT_SCREENSAVER,
-			},
-		});
-
-		expect(html).toContain("Preview · Large");
 		expect(html).toContain('class="font-preview-meta"');
 		expect(html).toContain("ci: build signed macOS DMGs · 11d");
-		expect(html).toContain('value="large"');
+		expect(html).toContain("System Mono");
+		expect(html).toContain("JetBrains Mono");
+		expect(html).toContain('aria-label="Text size"');
+		expect(html).toMatch(/aria-pressed="true"[^>]*>Large<\/button>/);
+		expect(html).toContain(">Extra Large</button>");
 	});
 
 	it("disables launch-at-login while its state is loading", () => {
-		const html = renderSettingsPanel({ launchAtLoginLoading: true });
+		const html = renderPage("general", { launchAtLoginLoading: true });
 
-		expect(html).toContain('id="launch-at-login"');
-		expect(html).toContain('disabled=""');
+		expect(html).toMatch(/disabled=""[^>]*id="launch-at-login"/);
 		expect(html).toContain("Checking login item state");
 	});
 
 	it("delegates launch, font, size, and theme updates to app-shell callbacks", () => {
 		const launchCalls: boolean[] = [];
 		const preferenceCalls: CompanionPreferences[] = [];
-		const element = SettingsPanel({
-			preferences,
-			launchAtLogin: false,
-			launchAtLoginLoading: false,
-			onLaunchAtLoginChange: (enabled) => {
+		const overrides = {
+			onLaunchAtLoginChange: (enabled: boolean) => {
 				launchCalls.push(enabled);
 			},
-			onPreferencesChange: (next) => {
+			onPreferencesChange: (next: CompanionPreferences) => {
 				preferenceCalls.push(next);
 			},
-			onScreensaverPreview: () => undefined,
-		});
-		const launchToggle = collectByType<InputProps>(element, "input").find(
-			(input) => input.id === "launch-at-login",
-		);
-		const selects = collectByType<SelectProps>(element, "select");
-		const fontSelect = selects.find((select) => select.id === "companion-font");
-		const fontSizeSelect = selects.find(
-			(select) => select.id === "companion-font-size",
-		);
-		const themePicker = findThemePicker(element);
+		};
+		const general = SettingsPanel(panelProps("general", overrides));
+		const appearance = SettingsPanel(panelProps("appearance", overrides));
 
-		launchToggle?.onChange?.({ currentTarget: { checked: true } });
-		fontSelect?.onChange?.({
-			currentTarget: { value: "menlo" satisfies CompanionFont },
-		});
-		fontSizeSelect?.onChange?.({
-			currentTarget: { value: "large" satisfies CompanionFontSize },
-		});
-		themePicker?.onChange("codex");
+		collect<InputProps>(general, "input")
+			.find((input) => input.id === "launch-at-login")
+			?.onChange?.({ currentTarget: { checked: true } });
+		collect<SelectProps>(appearance, "select")
+			.find((select) => select.id === "companion-font")
+			?.onChange?.({
+				currentTarget: { value: "menlo" satisfies CompanionFont },
+			});
+		segmented(appearance, "Text size")?.onChange("large");
+		collect<{ readonly onChange: (theme: CompanionTheme) => void }>(
+			appearance,
+			AgentThemePicker,
+		)[0]?.onChange("codex");
 
 		expect(launchCalls).toEqual([true]);
 		expect(preferenceCalls).toEqual([
-			{
-				font: "menlo",
-				fontSize: "medium",
-				theme: "claude",
-				menuBar: DEFAULT_MENU_BAR,
-				screensaver: DEFAULT_SCREENSAVER,
-			},
-			{
-				font: "system-mono",
-				fontSize: "large",
-				theme: "claude",
-				menuBar: DEFAULT_MENU_BAR,
-				screensaver: DEFAULT_SCREENSAVER,
-			},
-			{
-				font: "system-mono",
-				fontSize: "medium",
-				theme: "codex",
-				menuBar: DEFAULT_MENU_BAR,
-				screensaver: DEFAULT_SCREENSAVER,
-			},
+			{ ...preferences, font: "menlo" },
+			{ ...preferences, fontSize: "large" },
+			{ ...preferences, theme: "codex" },
 		]);
+	});
+
+	it("ignores a font the preference contract does not know", () => {
+		const preferenceCalls: CompanionPreferences[] = [];
+		const appearance = SettingsPanel(
+			panelProps("appearance", {
+				onPreferencesChange: (next) => {
+					preferenceCalls.push(next);
+				},
+			}),
+		);
+
+		collect<SelectProps>(appearance, "select")
+			.find((select) => select.id === "companion-font")
+			?.onChange?.({ currentTarget: { value: "comic-sans" } });
+
+		expect(preferenceCalls).toEqual([]);
 	});
 
 	it("delegates the edited menu bar config", () => {
 		const preferenceCalls: CompanionPreferences[] = [];
-		const element = SettingsPanel({
-			preferences,
-			launchAtLogin: false,
-			launchAtLoginLoading: false,
-			onLaunchAtLoginChange: () => undefined,
-			onPreferencesChange: (next) => {
-				preferenceCalls.push(next);
-			},
-			onScreensaverPreview: () => undefined,
-		});
+		const element = SettingsPanel(
+			panelProps("menu-bar", {
+				onPreferencesChange: (next) => {
+					preferenceCalls.push(next);
+				},
+			}),
+		);
 		const edited = { ...DEFAULT_MENU_BAR, todayTokens: false };
-		findMenuBarPicker(element)?.onChange(edited);
+		collect<{ readonly onChange: (config: MenuBarConfig) => void }>(
+			element,
+			MenuBarSettings,
+		)[0]?.onChange(edited);
 
 		expect(preferenceCalls).toEqual([{ ...preferences, menuBar: edited }]);
-	});
-
-	it("ignores a text size the preference contract does not know", () => {
-		const preferenceCalls: CompanionPreferences[] = [];
-		const element = SettingsPanel({
-			preferences,
-			launchAtLogin: false,
-			launchAtLoginLoading: false,
-			onLaunchAtLoginChange: () => undefined,
-			onPreferencesChange: (next) => {
-				preferenceCalls.push(next);
-			},
-			onScreensaverPreview: () => undefined,
-		});
-		const fontSizeSelect = collectByType<SelectProps>(element, "select").find(
-			(select) => select.id === "companion-font-size",
-		);
-
-		fontSizeSelect?.onChange?.({ currentTarget: { value: "gigantic" } });
-
-		expect(preferenceCalls).toEqual([]);
 	});
 });
 
@@ -337,7 +279,8 @@ describe("MenuBarSettings", () => {
 		const html = render(DEFAULT_MENU_BAR);
 
 		expect(html).toContain(">CL 5h 42% · W 63%  CO W 18% · 31.0M<");
-		expect(html.match(/aria-pressed="true"/g)).toHaveLength(5);
+		expect(html.match(/aria-checked="true"/g)).toHaveLength(4);
+		expect(html).toMatch(/aria-pressed="true"[^>]*>Used %<\/button>/);
 		expect(html).toContain("5-hour limit, CL 5h");
 		expect(html).toContain("7-day limit, CO W");
 		expect(html).toContain("Both agents since midnight");
@@ -353,7 +296,7 @@ describe("MenuBarSettings", () => {
 
 		expect(html).toContain(">CL W 37%  CO W 82%<");
 		expect(html).toContain(
-			'aria-label="Show Claude 5h in the menu bar" aria-pressed="false"',
+			'aria-checked="false" aria-label="Show Claude 5h in the menu bar"',
 		);
 	});
 
@@ -381,23 +324,89 @@ describe("MenuBarSettings", () => {
 				calls.push(next);
 			},
 		});
-		const buttons = collectByType<{
-			readonly "aria-label"?: string;
-			readonly onClick?: () => void;
-		}>(element, "button");
-		buttons
-			.find(
-				(button) =>
-					button["aria-label"] === "Show Codex weekly in the menu bar",
-			)
-			?.onClick?.();
-		buttons
-			.find((button) => button["aria-label"] === "Show limits as Remaining %")
-			?.onClick?.();
+		collect<InputProps>(element, "input")
+			.find((input) => input.id === "menu-bar-codexWeekly")
+			?.onChange?.({ currentTarget: { checked: false } });
+		segmented(element, "Limit percent")?.onChange("remaining");
 
 		expect(calls).toEqual([
 			{ ...DEFAULT_MENU_BAR, codexWeekly: false },
 			{ ...DEFAULT_MENU_BAR, percent: "remaining" },
 		]);
+	});
+});
+
+describe("SettingsView", () => {
+	function render(
+		category: SettingsCategory,
+		attention: Partial<Record<SettingsCategory, boolean>> = {},
+	): string {
+		return renderToStaticMarkup(
+			<SettingsView
+				{...panelProps("general")}
+				attention={attention}
+				category={category}
+				connections={<p>CONNECTIONS PANEL</p>}
+				onCategoryChange={() => undefined}
+				status={<p>STATUS SLOT</p>}
+			/>,
+		);
+	}
+
+	it("shows the category tabs and only the current page", () => {
+		const html = render("menu-bar");
+
+		expect(html).toContain('aria-label="Settings categories"');
+		// Setup comes right after General, whose status links to it.
+		const order = [
+			"General",
+			"Connections",
+			"Menu Bar",
+			"Screen Saver",
+			"Appearance",
+		].map((label) => html.indexOf(`<span>${label}</span>`));
+		expect(order.every((index) => index >= 0)).toBe(true);
+		expect(order).toEqual([...order].sort((a, b) => a - b));
+		expect(settingsEyebrow("connections")).toBe("02 · Connections");
+		expect(html.match(/aria-current="page"/g)).toHaveLength(1);
+		expect(html).toMatch(/aria-current="page"[^>]*>.*?<span>Menu Bar<\/span>/);
+		expect(html).toContain("03 · Menu Bar");
+		expect(html).not.toContain("01 · General");
+		expect(html).not.toContain("STATUS SLOT");
+		expect(html).not.toContain("CONNECTIONS PANEL");
+	});
+
+	it("puts status on General and the connections panel on its own tab", () => {
+		expect(render("general")).toContain("STATUS SLOT");
+		const connections = render("connections");
+		expect(connections).toContain("CONNECTIONS PANEL");
+		expect(connections).not.toContain("STATUS SLOT");
+	});
+
+	it("marks only the tabs that need attention", () => {
+		const html = render("appearance", { general: true, connections: false });
+
+		expect(html).toContain('aria-label="General, needs attention"');
+		expect(html.match(/settings-nav-dot/g)).toHaveLength(1);
+	});
+
+	it("reports the picked tab", () => {
+		const picked: SettingsCategory[] = [];
+		const nav = SettingsNav({
+			current: "general",
+			attention: {},
+			onChange: (category) => picked.push(category),
+		});
+		collect<ButtonProps>(nav, "button")
+			.find((button) =>
+				Children.toArray(button.children).some(
+					(child) =>
+						isValidElement<TraversableProps>(child) &&
+						child.props.children === "Connections",
+				),
+			)
+			?.onClick?.();
+
+		expect(picked).toEqual(["connections"]);
 	});
 });

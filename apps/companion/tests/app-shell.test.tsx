@@ -346,22 +346,56 @@ describe("App shell settings wiring", () => {
 		);
 	});
 
-	it("right-aligns the settings font select without letting the chevron take layout space", () => {
+	it("keeps the settings select chevron an overlay that takes no layout space", () => {
 		// Given the settings stylesheet
-		// When the font select row CSS contract is inspected
+		// When the select wrapper CSS contract is inspected
 		const css = readCssContract("src/style.css");
 
-		// Then the select owns the right edge and the chevron is only an overlay
-		expect(css).toMatch(/\.settings-row-select\s*\{[^}]*position:\s*relative/s);
+		// Then the chevron sits over the select's own right padding
+		expect(css).toMatch(/\.settings-select\s*\{[^}]*position:\s*relative/s);
 		expect(css).toMatch(
-			/\.settings-row-select\s+select\s*\{[^}]*margin-left:\s*auto/s,
+			/\.settings-select select\s*\{[^}]*padding-right:\s*28px/s,
 		);
 		expect(css).toMatch(
-			/\.settings-row-select::after\s*\{[^}]*position:\s*absolute[^}]*right:\s*10px/s,
+			/\.settings-select::after\s*\{[^}]*pointer-events:\s*none[^}]*position:\s*absolute[^}]*right:\s*10px/s,
 		);
-		expect(css).not.toMatch(
-			/\.settings-row-select::after\s*\{[^}]*margin-left:\s*-32px/s,
+	});
+
+	it("draws settings switches from native checkboxes and theme tokens", () => {
+		const css = readCssContract("src/style.css");
+
+		expect(css).toMatch(/\.settings-switch\s*\{[^}]*appearance:\s*none/s);
+		expect(css).toMatch(
+			/\.settings-switch:checked\s*\{[^}]*background:\s*var\(--emphasis\)/s,
 		);
+		expect(css).toMatch(
+			/@media \(prefers-reduced-motion: reduce\)[\s\S]*\.settings-switch,\s*\.settings-switch::before\s*\{[^}]*transition:\s*none/s,
+		);
+	});
+
+	it("decides Main onboarding from setup state and where an action started", () => {
+		const source = readFileSync("src/App.tsx", "utf8");
+
+		expect(source).toContain(
+			"needsOnboarding(connections.state, sessions, setupStartedOnMain)",
+		);
+		expect(source).toContain(
+			"onAction={(action) => handleSetupAction(action, onboarding)}",
+		);
+		expect(source).not.toMatch(/connections\.state\.notice !== null \|\|/);
+	});
+
+	it("opens update status on Settings › General from the header control", () => {
+		const source = readFileSync("src/App.tsx", "utf8");
+		const handler = source.slice(
+			source.indexOf("const handleCheckUpdates"),
+			source.indexOf("const handleQuit"),
+		);
+
+		expect(source).not.toContain("UpdatePanel");
+		expect(handler).toContain('setCurrentView("settings")');
+		expect(handler).toContain('setSettingsCategory("general")');
+		expect(handler).toContain("updates.check()");
 	});
 
 	it("keeps the stage board framed and width-safe at the native boundary", () => {
@@ -431,7 +465,10 @@ describe("App shell settings wiring", () => {
 		expect(css).not.toContain("--faint: #626262");
 		expect(css).not.toContain("--faint: #5d5d5d");
 		expect(css).toMatch(
-			/\.settings-panel p,\s*\.settings-hint\s*\{[^}]*color:\s*var\(--muted\)/s,
+			/\.settings-page-description,\s*\.settings-hint\s*\{[^}]*color:\s*var\(--muted\)/s,
+		);
+		expect(css).toMatch(
+			/\.settings-row-description\s*\{[^}]*color:\s*var\(--muted\)/s,
 		);
 		expect(css).toMatch(
 			/\.font-preview-label\s*\{[^}]*color:\s*var\(--muted\)/s,
@@ -474,14 +511,20 @@ describe("App shell settings wiring", () => {
 			/\.error,\s*\.empty\s*\{[^}]*font-size:\s*var\(--fs-ui\)/s,
 			/\.task-action\s*\{[^}]*font-size:\s*var\(--fs-body\)/s,
 			/\.app-error\s*\{[^}]*font-size:\s*var\(--fs-ui\)/s,
-			/\.settings-panel h2\s*\{[^}]*font-size:\s*var\(--fs-title\)/s,
-			/\.settings-panel p,\s*\.settings-hint\s*\{[^}]*font-size:\s*var\(--fs-meta\)/s,
-			/\.settings-row label\s*\{[^}]*font-size:\s*var\(--fs-ui\)/s,
-			/\.settings-row-select::after\s*\{[^}]*font-size:\s*var\(--fs-ui\)/s,
+			/\.settings-nav-tab\s*\{[^}]*font-size:\s*var\(--fs-label\)/s,
+			/\.settings-page button,\s*\.settings-page select\s*\{[^}]*font-size:\s*var\(--fs-meta\)/s,
+			/\.settings-page-eyebrow\s*\{[^}]*font-size:\s*var\(--fs-meta\)/s,
+			/\.settings-page-header h2\s*\{[^}]*font-size:\s*var\(--fs-title\)/s,
+			/\.settings-page-description,\s*\.settings-hint\s*\{[^}]*font-size:\s*var\(--fs-meta\)/s,
+			/\.settings-group-header h3\s*\{[^}]*font-size:\s*var\(--fs-meta\)/s,
+			/\.settings-row-title strong,\s*\.settings-row-title label\s*\{[^}]*font-size:\s*var\(--fs-body\)/s,
+			/\.settings-row-description\s*\{[^}]*font-size:\s*var\(--fs-meta\)/s,
+			/\.settings-select::after\s*\{[^}]*font-size:\s*var\(--fs-ui\)/s,
+			/\.settings-badge\s*\{[^}]*font-size:\s*var\(--fs-label\)/s,
+			/\.settings-note\s*\{[^}]*font-size:\s*var\(--fs-meta\)/s,
 			/\.font-preview\s*\{[^}]*font-size:\s*var\(--fs-body\)/s,
 			/\.font-preview-label\s*\{[^}]*font-size:\s*var\(--fs-label\)/s,
 			/\.font-preview-meta\s*\{[^}]*font-size:\s*var\(--fs-meta\)/s,
-			/\.agent-theme-button\s*\{[^}]*font-size:\s*var\(--fs-body\)/s,
 			/\.usage-name\s*\{[^}]*font-size:\s*var\(--fs-meta\)/s,
 			/\.usage-limit\s*\{[^}]*font-size:\s*var\(--fs-meta\)/s,
 			/\.usage-limit-detail\s*\{[^}]*font-size:\s*var\(--fs-label\)/s,
@@ -605,6 +648,26 @@ describe("App shell settings wiring", () => {
 
 		expect(baseCss).not.toMatch(/body\s*\{[^}]*min-width:/s);
 		expect(baseCss).toMatch(/main\s*\{[^}]*max-width:\s*100%/s);
+	});
+
+	it("aligns each daily total under its own bar", () => {
+		const css = readCssContract("src/style.css");
+		const slot =
+			/\.usage-compare-day\s*\{\s*gap:\s*1px;\s*padding:\s*0 2px;\s*\}/s;
+		const values =
+			/\.usage-values-day\s*\{[^}]*display:\s*flex;[^}]*gap:\s*1px;[^}]*padding:\s*0 2px;/s;
+
+		// The totals row repeats the bar slot's padding and gap in equal parts
+		expect(css).toMatch(slot);
+		expect(css).toMatch(values);
+		expect(css).toMatch(
+			/\.usage-values-day > \[data-provider\]\s*\{[^}]*flex:\s*1 1 0/s,
+		);
+		expect(css).toMatch(/\.usage-compare-bar\s*\{[^}]*flex:\s*1 1 0/s);
+		// And stacks under the day once the slots are too narrow for both
+		expect(css).toMatch(
+			/@container usage \(max-width: 46em\)\s*\{\s*\.usage-values-day\s*\{[^}]*display:\s*grid/s,
+		);
 	});
 
 	it("defines only the fixed-dark Claude Code and Codex theme tokens", () => {
