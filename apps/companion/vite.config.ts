@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type ServerOptions } from "vite";
 
@@ -31,5 +32,12 @@ export default defineConfig({
 			process.env["TAURI_ENV_PLATFORM"] === "windows"
 				? "chrome105"
 				: "safari13",
+		rollupOptions: {
+			// The menu bar app and the full-screen dashboard windows (COMP001).
+			input: {
+				main: fileURLToPath(new URL("./index.html", import.meta.url)),
+				dashboard: fileURLToPath(new URL("./dashboard.html", import.meta.url)),
+			},
+		},
 	},
 });

@@ -11,6 +11,7 @@ import type {
 	CompanionPreferences,
 	CompanionTheme,
 } from "../src/application/preferences";
+import { DEFAULT_SCREENSAVER } from "../src/application/screensaver";
 import { AgentThemePicker } from "../src/ui/AgentThemePicker";
 import { MenuBarSettings } from "../src/ui/MenuBarSettings";
 import { SettingsPanel } from "../src/ui/SettingsPanel";
@@ -99,6 +100,7 @@ const preferences: CompanionPreferences = {
 	fontSize: "medium",
 	theme: "claude",
 	menuBar: DEFAULT_MENU_BAR,
+	screensaver: DEFAULT_SCREENSAVER,
 };
 
 function renderSettingsPanel({
@@ -120,6 +122,7 @@ function renderSettingsPanel({
 			launchAtLoginLoading={launchAtLoginLoading}
 			onLaunchAtLoginChange={() => undefined}
 			onPreferencesChange={() => undefined}
+			onScreensaverPreview={() => undefined}
 		/>,
 	);
 }
@@ -149,8 +152,9 @@ describe("SettingsPanel", () => {
 		expect(html).toContain("Extra Large");
 		expect(html).toContain("Claude Code");
 		expect(html).toContain("Codex");
-		// Four menu bar items, two percent bases and two themes are the only buttons.
-		expect(html.match(/<button/g)).toHaveLength(8);
+		// Four menu bar items, two percent bases, two themes and the screen
+		// saver preview are the only buttons.
+		expect(html.match(/<button/g)).toHaveLength(9);
 		expect(html).not.toContain(">Light</button>");
 		expect(html).not.toContain(">Dark</button>");
 		expect(html).not.toContain(">System</button>");
@@ -164,6 +168,7 @@ describe("SettingsPanel", () => {
 				fontSize: "medium",
 				theme: "codex",
 				menuBar: DEFAULT_MENU_BAR,
+				screensaver: DEFAULT_SCREENSAVER,
 			},
 		});
 
@@ -186,6 +191,7 @@ describe("SettingsPanel", () => {
 				fontSize: "medium",
 				theme: "claude",
 				menuBar: DEFAULT_MENU_BAR,
+				screensaver: DEFAULT_SCREENSAVER,
 			},
 		});
 
@@ -202,6 +208,7 @@ describe("SettingsPanel", () => {
 				fontSize: "large",
 				theme: "claude",
 				menuBar: DEFAULT_MENU_BAR,
+				screensaver: DEFAULT_SCREENSAVER,
 			},
 		});
 
@@ -232,6 +239,7 @@ describe("SettingsPanel", () => {
 			onPreferencesChange: (next) => {
 				preferenceCalls.push(next);
 			},
+			onScreensaverPreview: () => undefined,
 		});
 		const launchToggle = collectByType<InputProps>(element, "input").find(
 			(input) => input.id === "launch-at-login",
@@ -259,18 +267,21 @@ describe("SettingsPanel", () => {
 				fontSize: "medium",
 				theme: "claude",
 				menuBar: DEFAULT_MENU_BAR,
+				screensaver: DEFAULT_SCREENSAVER,
 			},
 			{
 				font: "system-mono",
 				fontSize: "large",
 				theme: "claude",
 				menuBar: DEFAULT_MENU_BAR,
+				screensaver: DEFAULT_SCREENSAVER,
 			},
 			{
 				font: "system-mono",
 				fontSize: "medium",
 				theme: "codex",
 				menuBar: DEFAULT_MENU_BAR,
+				screensaver: DEFAULT_SCREENSAVER,
 			},
 		]);
 	});
@@ -285,6 +296,7 @@ describe("SettingsPanel", () => {
 			onPreferencesChange: (next) => {
 				preferenceCalls.push(next);
 			},
+			onScreensaverPreview: () => undefined,
 		});
 		const edited = { ...DEFAULT_MENU_BAR, todayTokens: false };
 		findMenuBarPicker(element)?.onChange(edited);
@@ -302,6 +314,7 @@ describe("SettingsPanel", () => {
 			onPreferencesChange: (next) => {
 				preferenceCalls.push(next);
 			},
+			onScreensaverPreview: () => undefined,
 		});
 		const fontSizeSelect = collectByType<SelectProps>(element, "select").find(
 			(select) => select.id === "companion-font-size",

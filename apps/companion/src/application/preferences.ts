@@ -6,6 +6,12 @@ import {
 	sanitizeMenuBarConfig,
 } from "./menuBar";
 import {
+	DEFAULT_SCREENSAVER,
+	type ScreensaverConfig,
+	sameScreensaverConfig,
+	sanitizeScreensaverConfig,
+} from "./screensaver";
+import {
 	COMPANION_THEME_OPTIONS,
 	type CompanionTheme,
 	isCompanionTheme,
@@ -43,6 +49,7 @@ export type CompanionPreferences = {
 	readonly fontSize: CompanionFontSize;
 	readonly theme: CompanionTheme;
 	readonly menuBar: MenuBarConfig;
+	readonly screensaver: ScreensaverConfig;
 };
 
 export type CompanionFontOption = {
@@ -66,6 +73,7 @@ export type PreferenceStoreEntries = {
 	readonly fontSize: CompanionFontSize;
 	readonly theme: CompanionTheme;
 	readonly menuBar: MenuBarConfig;
+	readonly screensaver: ScreensaverConfig;
 };
 
 export type CompanionPreferenceStore = {
@@ -79,6 +87,7 @@ export const DEFAULT_COMPANION_PREFERENCES: CompanionPreferences = {
 	fontSize: "medium",
 	theme: "claude",
 	menuBar: DEFAULT_MENU_BAR,
+	screensaver: DEFAULT_SCREENSAVER,
 };
 
 export const COMPANION_FONT_OPTIONS: readonly CompanionFontOption[] = [
@@ -155,6 +164,7 @@ export function sanitizeCompanionPreferences(input: {
 	readonly themeFamily?: unknown;
 	readonly themeMode?: unknown;
 	readonly menuBar?: unknown;
+	readonly screensaver?: unknown;
 }): PreferenceSanitizationResult {
 	const font = isCompanionFont(input.font)
 		? input.font
@@ -168,13 +178,21 @@ export function sanitizeCompanionPreferences(input: {
 			? input.themeFamily
 			: DEFAULT_COMPANION_PREFERENCES.theme;
 	const menuBar = sanitizeMenuBarConfig(input.menuBar);
+	const screensaver = sanitizeScreensaverConfig(input.screensaver);
 	return {
-		preferences: { font, fontSize, theme, menuBar: menuBar.config },
+		preferences: {
+			font,
+			fontSize,
+			theme,
+			menuBar: menuBar.config,
+			screensaver: screensaver.config,
+		},
 		sanitized:
 			font !== input.font ||
 			fontSize !== input.fontSize ||
 			theme !== input.theme ||
-			menuBar.sanitized,
+			menuBar.sanitized ||
+			screensaver.sanitized,
 	};
 }
 
@@ -186,7 +204,8 @@ export function shouldRestoreFailedPreferenceUpdate(
 		current.font === attempted.font &&
 		current.fontSize === attempted.fontSize &&
 		current.theme === attempted.theme &&
-		sameMenuBarConfig(current.menuBar, attempted.menuBar)
+		sameMenuBarConfig(current.menuBar, attempted.menuBar) &&
+		sameScreensaverConfig(current.screensaver, attempted.screensaver)
 	);
 }
 
@@ -207,6 +226,7 @@ export function preferencesToStoreEntries(
 		fontSize: preferences.fontSize,
 		theme: preferences.theme,
 		menuBar: preferences.menuBar,
+		screensaver: preferences.screensaver,
 	};
 }
 
@@ -227,6 +247,7 @@ export async function readCompanionPreferences(
 		themeFamily: await store.get<unknown>("themeFamily"),
 		themeMode: await store.get<unknown>("themeMode"),
 		menuBar: await store.get<unknown>("menuBar"),
+		screensaver: await store.get<unknown>("screensaver"),
 	});
 }
 
@@ -239,5 +260,6 @@ export async function writeCompanionPreferences(
 	await store.set("fontSize", entries.fontSize);
 	await store.set("theme", entries.theme);
 	await store.set("menuBar", entries.menuBar);
+	await store.set("screensaver", entries.screensaver);
 	await store.save();
 }

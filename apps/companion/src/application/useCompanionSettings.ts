@@ -1,7 +1,10 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { refreshMenuBar } from "../infrastructure/tauriClient";
+import {
+	refreshMenuBar,
+	refreshScreensaver,
+} from "../infrastructure/tauriClient";
 import { sameMenuBarConfig } from "./menuBar";
 import {
 	type CompanionPreferenceStore,
@@ -13,6 +16,7 @@ import {
 	shouldRestoreFailedPreferenceUpdate,
 	writeCompanionPreferences,
 } from "./preferences";
+import { sameScreensaverConfig } from "./screensaver";
 
 export type CompanionSettingsState = {
 	readonly preferences: CompanionPreferences;
@@ -142,6 +146,11 @@ export function useCompanionSettings({
 			// one-minute tick picks it up anyway.
 			if (!sameMenuBarConfig(next.menuBar, previous.menuBar)) {
 				await refreshMenuBar().catch(onError);
+			}
+			// The screensaver has no periodic re-read, so it learns of a new
+			// choice only through this call.
+			if (!sameScreensaverConfig(next.screensaver, previous.screensaver)) {
+				await refreshScreensaver().catch(onError);
 			}
 		},
 		[onError, onStatus, preferenceStore, preferences, tauriRuntimeAvailable],

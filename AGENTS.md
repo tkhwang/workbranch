@@ -27,3 +27,9 @@ Use plain Conventional Commit style with scopes, without emoji prefixes, for exa
 
 For generated-surface changes, update source first, rebuild `bin/workbranch`, then verify both syntax and tests. Keep docs and specs synchronized when command behavior changes.
 Agent runtime status is collected through provider hooks, never by asking agents to maintain TASK-WORKBRANCH.md. Preserve Git safety and generated CLI parity. Use the explicit runtime migration to remove legacy data and generated status-reporting instructions; keep unrelated user and tool instructions intact.
+
+## Agent skills
+
+### tk-workflow
+
+Staged delivery workflow (intent → plan → implement → verify → signoff). Config: `docs/agents/tk-workflow.md`.
