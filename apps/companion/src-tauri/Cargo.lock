@@ -4729,9 +4729,15 @@ dependencies = [
 name = "workbranch-companion"
 version = "2.30.0"
 dependencies = [
+ "block2",
  "libc",
  "memchr",
  "notify",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-core-foundation",
+ "objc2-core-graphics",
+ "objc2-foundation",
  "serde",
  "serde_json",
  "tauri",

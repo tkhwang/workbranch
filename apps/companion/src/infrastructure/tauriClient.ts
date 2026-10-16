@@ -3,11 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import type { GlobalState, Project } from "../domain/model";
 import type { UsageSnapshot } from "../domain/usage";
 import { mapGlobalDocumentToState, mapListDocumentToProject } from "./acl";
-import {
-	parseGlobalDocument,
-	parseListDocument,
-	parseRuntimeDocument,
-} from "./parseContract";
+import { parseGlobalDocument, parseListDocument } from "./parseContract";
 import { parseUsageSnapshot } from "./usageSnapshot";
 
 export type RunResult = {
@@ -67,6 +63,33 @@ export async function refreshMenuBar(): Promise<void> {
 	await invoke("menu_bar_refresh");
 }
 
+/** Shows the dashboard now as a preview that input closes (COMP001 R12). */
+export async function previewScreensaver(): Promise<void> {
+	await invoke("screensaver_preview");
+}
+
+export type ScreensaverStatus = {
+	/** Whether input on the dashboard locks the Mac (COMP001 R7). */
+	readonly lockAvailable: boolean;
+};
+
+export async function readScreensaverStatus(): Promise<ScreensaverStatus> {
+	const value = await invoke<unknown>("screensaver_status");
+	if (
+		typeof value !== "object" ||
+		value === null ||
+		!("lockAvailable" in value) ||
+		typeof value.lockAvailable !== "boolean"
+	)
+		throw new Error("Invalid screensaver status; update companion");
+	return { lockAvailable: value.lockAvailable };
+}
+
+/** Makes the screensaver re-read its preference right after Settings saved it. */
+export async function refreshScreensaver(): Promise<void> {
+	await invoke("screensaver_refresh");
+}
+
 export async function runAction(
 	command: CompanionCommand,
 	cwd: string,
@@ -95,10 +118,51 @@ export async function onWindowFocused(
 	return listen("tauri://focus", () => callback());
 }
 
-export async function refreshRuntime(): Promise<
-	readonly import("../domain/model").AgentSession[]
-> {
-	return parseRuntimeDocument(await invoke<string>("workbranch_runtime"));
+/**
+ * One read of `workbranch runtime --json` by the Rust runtime service, which
+ * owns watching the collector store; `document` is validated by the caller.
+ */
+export type RuntimeSnapshot = {
+	readonly sequence: number;
+	readonly readAtMs: number;
+	readonly document: string | null;
+	readonly error: string | null;
+};
+
+function parseRuntimeSnapshot(value: unknown): RuntimeSnapshot {
+	if (
+		typeof value !== "object" ||
+		value === null ||
+		!("sequence" in value) ||
+		typeof value.sequence !== "number" ||
+		!("readAtMs" in value) ||
+		typeof value.readAtMs !== "number" ||
+		!("document" in value) ||
+		(value.document !== null && typeof value.document !== "string") ||
+		!("error" in value) ||
+		(value.error !== null && typeof value.error !== "string")
+	)
+		throw new Error("Invalid runtime snapshot; update companion");
+	return {
+		sequence: value.sequence,
+		readAtMs: value.readAtMs,
+		document: value.document,
+		error: value.error,
+	};
+}
+
+/** The latest snapshot, or null before the service finished its first read. */
+export async function readRuntimeSnapshot(): Promise<RuntimeSnapshot | null> {
+	const value = await invoke<unknown>("runtime_snapshot");
+	return value === null ? null : parseRuntimeSnapshot(value);
+}
+
+export async function onRuntimeSnapshot(
+	callback: (snapshot: RuntimeSnapshot) => void,
+): Promise<() => void> {
+	return listen<unknown>("runtime-snapshot", (event) =>
+		callback(parseRuntimeSnapshot(event.payload)),
+	);
 }
 export type MigrationReport = {
 	readonly schemaVersion: 1;

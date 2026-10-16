@@ -11,6 +11,7 @@ import {
 	ClaudeLimitRelaySettings,
 } from "./ClaudeLimitRelaySettings";
 import { MenuBarSettings } from "./MenuBarSettings";
+import { ScreensaverSettings } from "./ScreensaverSettings";
 import { TerminalPanel } from "./TerminalPanel";
 
 type Props = {
@@ -20,6 +21,7 @@ type Props = {
 	readonly launchAtLoginLoading: boolean;
 	readonly onLaunchAtLoginChange: (enabled: boolean) => void;
 	readonly onPreferencesChange: (preferences: CompanionPreferences) => void;
+	readonly onScreensaverPreview: () => void;
 };
 
 export function SettingsPanel({
@@ -29,6 +31,7 @@ export function SettingsPanel({
 	launchAtLoginLoading,
 	onLaunchAtLoginChange,
 	onPreferencesChange,
+	onScreensaverPreview,
 }: Props) {
 	const fontOption = COMPANION_FONT_OPTIONS.find(
 		(candidate) => candidate.value === preferences.font,
@@ -86,6 +89,19 @@ export function SettingsPanel({
 					onChange={(menuBar) =>
 						onPreferencesChange({ ...preferences, menuBar })
 					}
+				/>
+			</TerminalPanel>
+			<TerminalPanel
+				anatomy="claude"
+				label="Screen Saver"
+				theme={preferences.theme}
+			>
+				<ScreensaverSettings
+					value={preferences.screensaver}
+					onChange={(screensaver) =>
+						onPreferencesChange({ ...preferences, screensaver })
+					}
+					onPreview={onScreensaverPreview}
 				/>
 			</TerminalPanel>
 			<TerminalPanel anatomy="claude" label="Font" theme={preferences.theme}>

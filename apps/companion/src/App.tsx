@@ -11,9 +11,10 @@ import { useClaudeLimitRelay } from "./application/useClaudeLimitRelay";
 import { useCompanionSettings } from "./application/useCompanionSettings";
 import { useConnections } from "./application/useConnections";
 import { useRepoNotes } from "./application/useRepoNotes";
+import { useRuntimeSessions } from "./application/useRuntimeSessions";
 import { useUpdates } from "./application/useUpdates";
 import { useUsage } from "./application/useUsage";
-import type { AgentSession, GlobalState, Task } from "./domain/model";
+import type { GlobalState, Task } from "./domain/model";
 import {
 	type CompanionCommand,
 	companionErrorMessage,
@@ -22,9 +23,9 @@ import {
 	migrateRuntime,
 	onRootChanged,
 	onWindowFocused,
+	previewScreensaver,
 	quitCompanion,
 	refreshRoot,
-	refreshRuntime,
 	refreshStatus,
 	runAction,
 	watchRoots,
@@ -70,13 +71,10 @@ export function App() {
 		string | undefined
 	>(undefined);
 	const model: MenuModel = buildMenuModel(state);
-	const [sessions, setSessions] = useState<readonly AgentSession[]>([]);
-	const [runtimeError, setRuntimeError] = useState<string>();
 	const [cliCompatible, setCliCompatible] = useState(false);
 	const [migration, setMigration] = useState<MigrationReport>();
 	const [migrating, setMigrating] = useState(false);
 	const migrationInventoryRef = useRef<string>();
-	const main = buildMainViewModel(state, sessions);
 	const workspaceIdentity = JSON.stringify(
 		state.projects
 			.map((project) => [
@@ -86,6 +84,15 @@ export function App() {
 			.sort(),
 	);
 	const tauriRuntimeAvailable = isTauri();
+	const runtime = useRuntimeSessions(tauriRuntimeAvailable && cliCompatible);
+	const sessions = runtime.sessions;
+	const runtimeNeedsCliUpdate =
+		runtime.error !== undefined && isCliCompatibilityError(runtime.error);
+	const runtimeError =
+		runtime.error === undefined || runtimeNeedsCliUpdate
+			? undefined
+			: companionErrorMessage(runtime.error);
+	const main = buildMainViewModel(state, sessions);
 	const connections = useConnections(tauriRuntimeAvailable);
 	const [onboardingDismissed, setOnboardingDismissed] = useState(false);
 	const usage = useUsage(tauriRuntimeAvailable);
@@ -249,52 +256,28 @@ export function App() {
 		};
 	}, [applyState, showError, tauriRuntimeAvailable]);
 
+	// An incompatible CLI is a setup problem, shown like any other one; it
+	// also turns cliCompatible off, which pauses the runtime subscription.
 	useEffect(() => {
-		if (!tauriRuntimeAvailable || !cliCompatible) {
-			setRuntimeError(undefined);
-			return;
-		}
-		let cancelled = false;
-		let timer: number | undefined;
-		const poll = async () => {
-			try {
-				const next = await refreshRuntime();
-				if (!cancelled) {
-					setSessions(next);
-					setRuntimeError(undefined);
-				}
-			} catch (error) {
-				if (!cancelled) {
-					if (isCliCompatibilityError(error)) {
-						showError(error);
-						setRuntimeError(undefined);
-						return;
-					}
-					setRuntimeError(companionErrorMessage(error));
-					setSessions((previous) =>
-						previous.map((s) => ({ ...s, observation: "uncertain" })),
-					);
-				}
-			}
-			if (!cancelled) timer = window.setTimeout(() => void poll(), 1000);
-		};
-		void poll();
-		// Discovery is keyed by workspace identity, never by tool activity.
-		if (migrationInventoryRef.current !== workspaceIdentity) {
-			void refreshStatus()
-				.then(() => migrateRuntime(false))
-				.then((report) => {
-					if (!cancelled) {
-						setMigration(report);
-						migrationInventoryRef.current = workspaceIdentity;
-					}
-				})
-				.catch(showError);
-		}
+		if (runtimeNeedsCliUpdate) showError(runtime.error);
+	}, [runtimeNeedsCliUpdate, runtime.error, showError]);
 
+	// Discovery is keyed by workspace identity, never by tool activity.
+	useEffect(() => {
+		if (!tauriRuntimeAvailable || !cliCompatible) return;
+		if (migrationInventoryRef.current === workspaceIdentity) return;
+		let cancelled = false;
+		void refreshStatus()
+			.then(() => migrateRuntime(false))
+			.then((report) => {
+				if (!cancelled) {
+					setMigration(report);
+					migrationInventoryRef.current = workspaceIdentity;
+				}
+			})
+			.catch(showError);
 		return () => {
 			cancelled = true;
-			if (timer !== undefined) window.clearTimeout(timer);
 		};
 	}, [tauriRuntimeAvailable, cliCompatible, showError, workspaceIdentity]);
 	const handleMigration = async () => {
@@ -454,6 +437,13 @@ export function App() {
 					launchAtLoginLoading={launchAtLoginLoading}
 					onLaunchAtLoginChange={(enabled) => void updateLaunchAtLogin(enabled)}
 					onPreferencesChange={(next) => void updatePreferences(next)}
+					onScreensaverPreview={() => {
+						if (!tauriRuntimeAvailable) {
+							showStatus(TAURI_RUNTIME_UNAVAILABLE);
+							return;
+						}
+						void previewScreensaver().catch(showError);
+					}}
 				/>
 			) : null}
 			{model.errors.map((error) => (

@@ -18,6 +18,7 @@ import {
 	runtimeLabels,
 	sessionKey,
 } from "../domain/model";
+import { COLUMN_COPY, OUTCOME_LABELS, WAIT_REASON_LABELS } from "./boardCopy";
 import { PROVIDER_NAMES, ProviderIcon, sessionProviders } from "./ProviderIcon";
 import {
 	baseRepoFacts,
@@ -312,19 +313,6 @@ export type StageBoardProps = {
 const BOARD_COLUMNS = ["waiting", "running", "finished"] as const;
 type BoardColumn = (typeof BOARD_COLUMNS)[number];
 
-const COLUMN_COPY = {
-	waiting: { label: "내 응답 대기", code: "WAITING" },
-	running: { label: "실행 중", code: "RUNNING" },
-	finished: { label: "턴 종료 · 검토", code: "REVIEW" },
-} as const satisfies Record<BoardColumn, { label: string; code: string }>;
-
-const WAIT_REASON_LABELS: Readonly<Record<string, string>> = {
-	permission: "권한 승인 대기",
-	question: "질문 대기",
-	plan: "plan 승인 대기",
-	elicitation: "입력 대기",
-};
-
 type ChipTone = BoardColumn | "error" | "notify" | "neutral";
 type Chip = { readonly tone: ChipTone; readonly label: string };
 
@@ -348,9 +336,9 @@ function leadChip(role: BoardColumn, lead: AgentSession | undefined): Chip {
 			label: WAIT_REASON_LABELS[lead?.reason ?? ""] ?? runtimeLabels.waiting,
 		};
 	if (role === "finished" && lead?.outcome === "interrupted")
-		return { tone: "error", label: "중단됨" };
+		return { tone: "error", label: OUTCOME_LABELS.interrupted };
 	if (role === "finished" && lead?.outcome === "error")
-		return { tone: "error", label: "오류로 종료" };
+		return { tone: "error", label: OUTCOME_LABELS.error };
 	return { tone: role, label: runtimeLabels[role] };
 }
 

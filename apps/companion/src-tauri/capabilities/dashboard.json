@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "dashboard",
+  "description": "Read-only dashboard windows (COMP001): runtime and workspace events, and the theme preference.",
+  "windows": ["dashboard-*"],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "store:allow-load",
+    "store:allow-get"
+  ]
+}

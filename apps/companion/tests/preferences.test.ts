@@ -19,6 +19,12 @@ import {
 	shouldRestoreFailedPreferenceUpdate,
 	writeCompanionPreferences,
 } from "../src/application/preferences";
+import {
+	DEFAULT_SCREENSAVER,
+	type ScreensaverConfig,
+	sameScreensaverConfig,
+	sanitizeScreensaverConfig,
+} from "../src/application/screensaver";
 
 const CUSTOM_MENU_BAR: MenuBarConfig = {
 	claude5h: false,
@@ -26,6 +32,11 @@ const CUSTOM_MENU_BAR: MenuBarConfig = {
 	codexWeekly: true,
 	todayTokens: false,
 	percent: "remaining",
+};
+
+const CUSTOM_SCREENSAVER: ScreensaverConfig = {
+	enabled: true,
+	idleMinutes: 12,
 };
 
 vi.mock("@tauri-apps/plugin-store", () => ({ load: vi.fn() }));
@@ -37,6 +48,7 @@ describe("companion preferences", () => {
 			fontSize: "medium",
 			theme: "claude",
 			menuBar: DEFAULT_MENU_BAR,
+			screensaver: DEFAULT_SCREENSAVER,
 		});
 	});
 
@@ -47,6 +59,7 @@ describe("companion preferences", () => {
 				fontSize: "gigantic",
 				theme: "rainbow",
 				menuBar: { claude5h: "yes", percent: "left" },
+				screensaver: { enabled: "yes", idleMinutes: "ten" },
 			}),
 		).toEqual({
 			preferences: DEFAULT_COMPANION_PREFERENCES,
@@ -67,6 +80,7 @@ describe("companion preferences", () => {
 				fontSize: "medium",
 				theme: "claude",
 				menuBar: DEFAULT_MENU_BAR,
+				screensaver: DEFAULT_SCREENSAVER,
 			},
 			sanitized: true,
 		});
@@ -81,6 +95,7 @@ describe("companion preferences", () => {
 				fontSize: "medium",
 				theme: "codex",
 				menuBar: DEFAULT_MENU_BAR,
+				screensaver: DEFAULT_SCREENSAVER,
 			},
 			sanitized: true,
 		});
@@ -99,6 +114,7 @@ describe("companion preferences", () => {
 				fontSize: "large",
 				theme: "codex",
 				menuBar: DEFAULT_MENU_BAR,
+				screensaver: DEFAULT_SCREENSAVER,
 			},
 			sanitized: true,
 		});
@@ -135,6 +151,7 @@ describe("companion preferences", () => {
 					fontSize: "medium",
 					theme: "claude",
 					menuBar: DEFAULT_MENU_BAR,
+					screensaver: DEFAULT_SCREENSAVER,
 				},
 				sanitized: true,
 			});
@@ -148,6 +165,7 @@ describe("companion preferences", () => {
 				fontSize: "large",
 				theme: "codex",
 				menuBar: CUSTOM_MENU_BAR,
+				screensaver: CUSTOM_SCREENSAVER,
 			}),
 		).toEqual({
 			preferences: {
@@ -155,6 +173,7 @@ describe("companion preferences", () => {
 				fontSize: "large",
 				theme: "codex",
 				menuBar: CUSTOM_MENU_BAR,
+				screensaver: CUSTOM_SCREENSAVER,
 			},
 			sanitized: false,
 		});
@@ -208,12 +227,17 @@ describe("companion preferences", () => {
 			fontSize: "medium",
 			theme: "claude",
 			menuBar: DEFAULT_MENU_BAR,
+			screensaver: DEFAULT_SCREENSAVER,
 		} as const;
 		const newerCurrent = { ...failedAttempt, theme: "codex" } as const;
 		const newerSize = { ...failedAttempt, fontSize: "large" } as const;
 		const newerMenuBar = {
 			...failedAttempt,
 			menuBar: CUSTOM_MENU_BAR,
+		} as const;
+		const newerScreensaver = {
+			...failedAttempt,
+			screensaver: CUSTOM_SCREENSAVER,
 		} as const;
 
 		expect(
@@ -224,6 +248,9 @@ describe("companion preferences", () => {
 		);
 		expect(
 			shouldRestoreFailedPreferenceUpdate(newerMenuBar, failedAttempt),
+		).toBe(false);
+		expect(
+			shouldRestoreFailedPreferenceUpdate(newerScreensaver, failedAttempt),
 		).toBe(false);
 		expect(
 			shouldRestoreFailedPreferenceUpdate(failedAttempt, failedAttempt),
@@ -255,12 +282,13 @@ describe("companion preferences", () => {
 		expect(writes).toEqual(["font", "theme"]);
 	});
 
-	it("serializes only font, fontSize, theme, and menuBar store keys", () => {
+	it("serializes only font, fontSize, theme, menuBar, and screensaver store keys", () => {
 		const entries = preferencesToStoreEntries({
 			font: "menlo",
 			fontSize: "large",
 			theme: "codex",
 			menuBar: CUSTOM_MENU_BAR,
+			screensaver: CUSTOM_SCREENSAVER,
 		});
 
 		expect(entries).toEqual({
@@ -268,12 +296,14 @@ describe("companion preferences", () => {
 			fontSize: "large",
 			theme: "codex",
 			menuBar: CUSTOM_MENU_BAR,
+			screensaver: CUSTOM_SCREENSAVER,
 		});
 		expect(Object.keys(entries)).toEqual([
 			"font",
 			"fontSize",
 			"theme",
 			"menuBar",
+			"screensaver",
 		]);
 	});
 
@@ -295,6 +325,7 @@ describe("companion preferences", () => {
 			fontSize: "extra-large",
 			theme: "claude",
 			menuBar: CUSTOM_MENU_BAR,
+			screensaver: CUSTOM_SCREENSAVER,
 		});
 
 		expect(writes).toEqual([
@@ -302,7 +333,62 @@ describe("companion preferences", () => {
 			["fontSize", "extra-large"],
 			["theme", "claude"],
 			["menuBar", CUSTOM_MENU_BAR],
+			["screensaver", CUSTOM_SCREENSAVER],
 		]);
 		expect(saveCount).toBe(1);
+	});
+});
+
+describe("screensaver preference", () => {
+	it("defaults to off with dashboard after five idle minutes", () => {
+		expect(DEFAULT_SCREENSAVER).toEqual({ enabled: false, idleMinutes: 5 });
+		expect(DEFAULT_COMPANION_PREFERENCES.screensaver).toEqual(
+			DEFAULT_SCREENSAVER,
+		);
+	});
+
+	it("backfills the default on stores written before the screensaver existed", () => {
+		expect(sanitizeScreensaverConfig(undefined)).toEqual({
+			config: DEFAULT_SCREENSAVER,
+			sanitized: true,
+		});
+	});
+
+	it("keeps a valid config untouched", () => {
+		expect(sanitizeScreensaverConfig(CUSTOM_SCREENSAVER)).toEqual({
+			config: CUSTOM_SCREENSAVER,
+			sanitized: false,
+		});
+	});
+
+	it("clamps idle minutes to one through sixty whole minutes", () => {
+		expect(
+			sanitizeScreensaverConfig({ enabled: true, idleMinutes: 0 }).config,
+		).toEqual({ enabled: true, idleMinutes: 1 });
+		expect(
+			sanitizeScreensaverConfig({ enabled: true, idleMinutes: 600 }).config,
+		).toEqual({ enabled: true, idleMinutes: 60 });
+		expect(
+			sanitizeScreensaverConfig({ enabled: true, idleMinutes: 2.6 }),
+		).toEqual({ config: { enabled: true, idleMinutes: 3 }, sanitized: true });
+	});
+
+	it("falls back field by field for unusable values", () => {
+		expect(
+			sanitizeScreensaverConfig({ enabled: "yes", idleMinutes: 9 }).config,
+		).toEqual({ enabled: false, idleMinutes: 9 });
+		expect(
+			sanitizeScreensaverConfig({ enabled: true, idleMinutes: Number.NaN })
+				.config,
+		).toEqual({ enabled: true, idleMinutes: 5 });
+	});
+
+	it("compares configs by value", () => {
+		expect(
+			sameScreensaverConfig(CUSTOM_SCREENSAVER, { ...CUSTOM_SCREENSAVER }),
+		).toBe(true);
+		expect(sameScreensaverConfig(CUSTOM_SCREENSAVER, DEFAULT_SCREENSAVER)).toBe(
+			false,
+		);
 	});
 });

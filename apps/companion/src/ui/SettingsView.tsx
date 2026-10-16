@@ -11,6 +11,7 @@ type Props = {
 	readonly launchAtLoginLoading: boolean;
 	readonly onLaunchAtLoginChange: (enabled: boolean) => void;
 	readonly onPreferencesChange: (preferences: CompanionPreferences) => void;
+	readonly onScreensaverPreview: () => void;
 };
 
 export function SettingsView({
@@ -21,6 +22,7 @@ export function SettingsView({
 	launchAtLoginLoading,
 	onLaunchAtLoginChange,
 	onPreferencesChange,
+	onScreensaverPreview,
 }: Props) {
 	return (
 		<section className="settings-view view-panel" aria-label="Settings View">
@@ -32,6 +34,7 @@ export function SettingsView({
 				launchAtLoginLoading={launchAtLoginLoading}
 				onLaunchAtLoginChange={onLaunchAtLoginChange}
 				onPreferencesChange={onPreferencesChange}
+				onScreensaverPreview={onScreensaverPreview}
 			/>
 		</section>
 	);

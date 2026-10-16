@@ -8,6 +8,8 @@ use thiserror::Error;
 mod claude_statusline;
 mod menu_bar;
 mod process_env;
+mod runtime_service;
+mod screensaver;
 mod setup;
 mod tray;
 mod update;
@@ -109,19 +111,6 @@ fn workbranch_list_global_with_config_home(
     let bin = resolve_workbranch_bin(config_home)?;
     let cwd = std::env::var_os("HOME").map_or_else(|| PathBuf::from("/"), PathBuf::from);
     run_workbranch_global_json_stdout(&bin, &["list", "--global", "--json"], &cwd)
-}
-
-#[tauri::command]
-async fn workbranch_runtime() -> Result<String, CompanionError> {
-    tauri::async_runtime::spawn_blocking(|| {
-        let bin = resolve_workbranch_bin(None)?;
-        let cwd = std::env::var_os("HOME")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from("/"));
-        run_workbranch_stdout(&bin, &["runtime", "--json"], &cwd)
-    })
-    .await
-    .map_err(|e| std::io::Error::other(e.to_string()))?
 }
 
 #[tauri::command]
@@ -315,6 +304,9 @@ pub fn run() {
             tray::install(app)?;
             let refresher = menu_bar::start(app.handle(), usage_cache);
             app.manage(refresher);
+            let runtime = runtime_service::start(app.handle());
+            app.manage(screensaver::start(app.handle(), &runtime));
+            app.manage(runtime);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -325,7 +317,10 @@ pub fn run() {
             update::relaunch_companion,
             workbranch_list,
             workbranch_list_global,
-            workbranch_runtime,
+            runtime_service::runtime_snapshot,
+            screensaver::screensaver_refresh,
+            screensaver::screensaver_preview,
+            screensaver::screensaver_status,
             workbranch_migrate,
             workbranch_run,
             usage_snapshot,

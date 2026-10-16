@@ -15,7 +15,7 @@ use tauri_plugin_store::StoreExt;
 use crate::usage::{self, LimitWindow, ProviderLimits, ProviderUsage, UsageSnapshot};
 
 pub(crate) const TRAY_ID: &str = "workbranch-companion";
-const PREFERENCES_STORE_FILE: &str = "companion-preferences.json";
+pub(crate) const PREFERENCES_STORE_FILE: &str = "companion-preferences.json";
 const CONFIG_KEY: &str = "menuBar";
 const REFRESH_INTERVAL: Duration = Duration::from_secs(60);
 
