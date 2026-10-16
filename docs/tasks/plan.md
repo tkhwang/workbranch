@@ -17,7 +17,7 @@ intent: COMP001-screensaver-feature
 - 바뀌는 OS 상태는 알림으로 받는다: 화면 잠김·해제는 `NSDistributedNotificationCenter` 의 `com.apple.screenIsLocked` / `com.apple.screenIsUnlocked`, 모니터 구성 변경은 `NSApplicationDidChangeScreenParametersNotification`. polling 은 idle 시간뿐이다. (Q3)
 - 비공개 `SACLockScreenImmediate` 만 `dlopen`/`dlsym` 으로 찾는다. unsafe 는 이 한 곳에 SAFETY 주석과 함께 둔다. (Q3)
 - 모든 OS 동작은 `Platform` trait 뒤에 둔다. screensaver 는 순수 상태 기계(`step(상태, 입력) -> (상태, 동작들)`)이고, 전이는 가짜 Platform 으로 단위 테스트, OS 동작은 behaviour check 로 확인한다. (Q3)
-- 화면이 잠긴 동안(사용자가 잠갔든 R6 으로 잠겼든) companion 은 아무것도 하지 않는다: dashboard 없음, 전원 activity 해제 — macOS 기본 동작 그대로. 잠금이 풀리면 다시 판정한다. 잠자기 방지는 "작업 중 && 잠기지 않음 && 기능 켜짐" 일 때만이다. (Q4)
+- 전원 유지는 두 activity 로 나눈다: 시스템 잠자기 방지(`UserInitiated`)는 "기능 켜짐 && 작업 중" 이면 잠김과 상관없이, 디스플레이 잠자기 방지(`IdleDisplaySleepDisabled`)는 거기에 "잠기지 않음" 까지일 때만 건다. 화면이 잠긴 동안(사용자가 잠갔든 R6 으로 잠겼든)은 dashboard 없음, 디스플레이·잠금 화면은 macOS 그대로이고 agent 만 계속 돈다. 잠금이 풀리면 다시 판정한다. (Q4, 구현 중 변경)
 - dashboard 는 별도 Vite 진입점(`dashboard.html`, multi-page build)이다. dashboard 창은 dashboard 코드만 로드하고, capability 는 `dashboard-*` 창 전용으로 필요한 권한만 준다. 공통 로직은 application·domain·ui import 로 공유한다. (Q5)
 - dashboard 카드는 메뉴바 카드와 같은 원천(`buildMainViewModel()` 의 lead session·repo·알림)에서 프롬프트·도구 동작·마지막 응답·변경 상태를 받는다. 세부 줄은 줄 수를 고정해 자르고(line clamp) 크기는 화면 높이(vh)에 비례하므로, 카드 최대 높이가 화면 비율에 대해 일정하다. 그래서 열당 카드 수는 DOM 측정 없이 상수(3)로 둔다. 열·대기 이유·종료 결과의 문구는 `ui/boardCopy.ts` 하나를 메뉴바와 함께 쓴다. (Slice 5)
 
@@ -60,7 +60,7 @@ intent: COMP001-screensaver-feature
 Behaviour checks (실제 Mac, `pnpm companion:dev` 또는 빌드한 앱):
 - Slice 0: main 창을 숨긴 채 agent 를 돌리고 창을 열면, 열자마자 칸반이 최신이다. 창을 연 채로 hook 이 쓰이면 1초 안에 칸반이 바뀐다. 아무 일이 없을 때는 `workbranch runtime` 이 60초에 한 번만 실행된다.
 - R1: 새 설정 파일로 시작하면 스위치가 꺼져 있고, 꺼진 채로 agent 를 돌리고 비워 둬도 `pmset -g assertions` 에 companion 이 없고 dashboard 가 뜨지 않는다.
-- R2: 켜고 agent 를 돌리면 `pmset -g assertions` 에 companion activity 가 보이고, 턴 종료 후 또는 화면을 잠그면(Ctrl+Cmd+Q) 사라지며 잠금을 풀면 다시 보인다. `kill -9` 로 companion 을 죽이면 즉시 사라진다.
+- R2: 켜고 agent 를 돌리면 `pmset -g assertions` 에 companion 의 `PreventUserIdleSystemSleep` 과 `PreventUserIdleDisplaySleep` 이 보이고, 화면을 잠그면(Ctrl+Cmd+Q) 디스플레이 쪽만 사라지며 잠금을 풀면 다시 보인다. 턴 종료 후에는 둘 다 사라진다. `kill -9` 로 companion 을 죽이면 즉시 사라진다.
 - R3: companion 2분, macOS 화면보호기 1분으로 두고 작업 중에 비우면 2분에 dashboard, 그 전에 화면보호기 없음.
 - R4: macOS 디스플레이 꺼짐(이 Mac 10분)보다 오래 비워도 작업 중이면 dashboard 가 켜져 있다.
 - R5: 마지막 작업 중 세션이 턴 종료되면 dashboard 가 내려가고 macOS 설정대로 진행. 턴 종료만 남은 상태에서는 dashboard 가 뜨지 않는다.
@@ -77,7 +77,7 @@ Behaviour checks (실제 Mac, `pnpm companion:dev` 또는 빌드한 앱):
 | dashboard 가 뜬 직후 첫 키 입력이 밑의 앱(예: 승인 대기 중인 터미널)으로 감 | 보안: 잠기기 전 한 번의 입력이 agent 승인 등으로 이어질 수 있음 | dashboard 표시 시 companion 을 활성화하고 dashboard 창을 key window 로 만든다. R6 behaviour check 에 포함 |
 | 비공개 `SACLockScreenImmediate` 가 이후 macOS 에서 사라짐 | 잠금 불가 | 시작 시 probe, 실패 시 R7 경로(dashboard 만, 표시 숨김) |
 | 사용자가 직접 잠근 뒤 dashboard 가 떠 있다가 잠금 해제 직후 입력으로 다시 잠김 | 잠금 해제 반복 | 화면 잠김 동안 dashboard 를 띄우지 않음(Q4) |
-| R6 으로 잠긴 뒤(누군가 건드림) macOS 설정대로 Mac 이 잠들어 agent 가 멈춤 | 자리를 비운 동안 작업 중단 | 의도된 동작(Q4, intent R2·Non-goals). 잠금 해제 후 작업 중이면 다시 잠자기 방지 |
+| 잠긴 채 작업 중인 동안 노트북이 깨어 있어 배터리를 씀 | 배터리 소모 | 작업이 끝나면 바로 해제. 덮개를 닫으면 macOS 규칙대로 잠듦(intent Non-goals). 잠긴 동안 디스플레이는 꺼짐 |
 | SQLite 쓰기 방식(WAL·journal) 때문에 파일 이벤트가 몰리거나 빠짐 | 과도한 CLI 실행 또는 반영 지연 | 디렉터리 단위 감시 + debounce, 60초 보조 읽기로 최악 1분 지연 |
 | main 창 데이터 경로 변경으로 칸반 회귀(오류 표시, 호환성 안내, uncertain 처리) | 기존 기능 손상 | 기존 테스트 유지 + T0.2 에서 오류·호환성 경로 테스트 추가 |
 | 작업 중이 아닐 때 App Nap 으로 Rust 서비스 주기가 늦어짐 | 작업 중 판정이 몇 초 늦음 | 작업 중이 되면 activity 가 App Nap 을 끈다. 시작 지연은 허용 |
@@ -88,7 +88,7 @@ Behaviour checks (실제 Mac, `pnpm companion:dev` 또는 빌드한 앱):
 |---|---|---|
 | — | T0.1, T0.2 | Slice 0 prefactor: R2·R3·R5·R9 가 쓰는 runtime 데이터 경로 |
 | R1 | T1.1, T1.2, T1.3, T1.4 | |
-| R2 | T1.1, T1.2 | 잠김 시 해제 포함 |
+| R2 | T1.1, T1.2, F9 | 잠긴 동안 시스템 잠자기 방지 유지(F9) |
 | R3 | T2.1 | |
 | R4 | T2.1, T2.2 | |
 | R5 | T2.1 | |
@@ -118,6 +118,7 @@ Behaviour checks (실제 Mac, `pnpm companion:dev` 또는 빌드한 앱):
 - 2026-10-17 · (PR #236 리뷰) Rust 가 runtime 문서를 v1 계약 serde 타입으로 검사하고, `screensaver` 설정을 필드별로 읽는다 · board(`parseRuntimeDocument`)와 Settings(`sanitizeScreensaverConfig`)와 같은 문서·설정을 같은 뜻으로 읽어야 UI 와 서비스가 어긋나지 않음
 - 2026-10-17 · (PR #236 CodeRabbit 리뷰) runtime 읽기 실패 → 마지막 판단을 3분(`UNREADABLE_GRACE`, 60초 fallback 읽기 2번 이상) 유지한 뒤에야 작업 중이 아닌 것으로 본다 · 한 번의 timeout·업그레이드 중 실패로 잠자기 방지가 풀려 agent 가 멈추면 안 되고, 계속 실패하는 CLI 가 Mac 을 끝없이 깨워 두어서도 안 됨. 계약을 어긴 문서(읽기는 성공)는 지금처럼 바로 작업 중 아님
 - 2026-10-17 · (PR #236 CodeRabbit 리뷰) runtime 디렉터리가 지워졌다 다시 생길 때 watcher 재설정 → 고치지 않음, 근거만 코드 주석으로 남김 · companion 은 macOS 전용(CI·릴리스 macos-15)이고 FSEvents 는 경로 기준이라 같은 watcher 가 삭제·재생성 뒤에도 이벤트를 받음(notify 8.2.0 로 직접 확인). inotify 로 옮길 때만 필요
+- 2026-10-17 · (구현 중 변경) Q4 수정: 화면이 잠긴 동안에도 작업 중이면 시스템 잠자기 방지를 유지하고, 디스플레이 잠자기 방지와 dashboard 만 잠김에 따라 푼다. 전원 activity 를 시스템·디스플레이 둘로 나눈다(`HoldAwake`/`HoldDisplay`) · 잠금 화면은 agent 를 멈추지 않고 잠자기가 멈춘다. 기존 Q4 로는 R6 으로 잠긴 뒤 Mac 이 잠들어 agent 가 멈춤. 두 activity 가 각각 `PreventUserIdleSystemSleep`·`PreventUserIdleDisplaySleep` 하나씩만 만드는 것은 Swift probe 로 확인 · 사용자 선택
 
 ## Discovered
 - follow-up(COMP001 범위 밖): 목록 데이터(workspace monitor 의 root 별 갱신·오류 병합)도 Rust store 로 옮겨, 모든 창이 하나의 push 상태를 구독하는 순수 view 가 되게 한다.
@@ -171,7 +172,7 @@ Tests failed: 2
 | R-id | behaviour check | result | evidence |
 |---|---|---|---|
 | R1 (MUST) | 기본 꺼짐, 꺼진 채로는 잠자기 방지·dashboard 없음 | human | 설정 기본값·보정은 `tests/preferences.test.ts`, 꺼짐 전이는 `machine_tests.rs` 로 통과. 실제 앱은 Human check 1 |
-| R2 (MUST) | 작업 중·잠기지 않음에서만 잠자기 방지, 비정상 종료 시 사라짐 | human | 전이는 `machine_tests.rs` 통과, 같은 activity 가 PreventUserIdleSystemSleep·PreventUserIdleDisplaySleep 을 만드는 것은 구현 중 Swift probe 로 확인. Human check 2 |
+| R2 (MUST) | 작업 중이면 잠겨도 시스템 잠자기 방지, 잠긴 동안 디스플레이 쪽만 해제, 비정상 종료 시 사라짐 | human | 전이는 `machine_tests.rs` 통과, 같은 activity 가 PreventUserIdleSystemSleep·PreventUserIdleDisplaySleep 을 만드는 것은 구현 중 Swift probe 로 확인. Human check 2 |
 | R3 (MUST) | 설정 시간 뒤 dashboard, macOS 화면보호기보다 먼저 | human | Human check 3 |
 | R4 (MUST) | 디스플레이 꺼짐 시간보다 오래 dashboard 유지 | human | Human check 4 |
 | R5 (MUST) | 작업 중이 끝나면 dashboard 내림, 턴 종료만 있으면 안 뜸 | human | 전이는 `machine_tests.rs` 통과. Human check 5 |
@@ -188,7 +189,7 @@ Tests failed: 2
 준비: 설치된 Companion 을 종료한다(같은 `~/Library/Application Support/dev.tkhwang.workbranch.companion/companion-preferences.json` 을 쓴다). 방금 빌드한 앱을 `pnpm companion:run` 으로 연다(Slice 5 포함). Settings › Screen Saver 에서 "While agents work" 를 켜고 "Dashboard after" 를 1 min 으로 둔다. "작업 중" 은 터미널에서 Claude Code 등에 몇 분 걸리는 작업을 시켜 실행 중 또는 권한 승인 대기로 만든 상태다.
 
 1. (R1) Companion 을 끄고 위 preference 파일을 다른 이름으로 옮긴 뒤 다시 연다 → Settings 의 스위치가 꺼져 있다. 꺼진 채로 작업을 걸고 3분 비운다 → `pmset -g assertions | grep -i "Workbranch agents"` 결과 없음, dashboard 없음. 확인 후 파일을 되돌린다.
-2. (R2) 켠 상태에서 작업을 건다 → `pmset -g assertions | grep -i "Workbranch agents"` 에 보인다. 턴이 끝나면 사라진다. 작업 중에 Ctrl+Cmd+Q 로 잠그면 사라지고, 풀면 다시 보인다. `kill -9 $(pgrep -x workbranch-companion)` 뒤 즉시 사라진다.
+2. (R2) 켠 상태에서 작업을 건다 → `pmset -g assertions | grep -i "Workbranch agents"` 에 `PreventUserIdleSystemSleep` 과 `PreventUserIdleDisplaySleep` 두 줄이 보인다. 턴이 끝나면 둘 다 사라진다. 작업 중에 터미널에서 `(sleep 20; pmset -g assertions | grep -i "Workbranch agents" > /tmp/locked.txt) &` 를 실행하고 바로 Ctrl+Cmd+Q 로 잠근다 → 30초 뒤 풀고 `cat /tmp/locked.txt` 하면 `PreventUserIdleSystemSleep` 한 줄만 있다. 풀린 뒤에는 디스플레이 쪽이 다시 보인다. 잠긴 채 macOS 잠자기 시간보다 오래 둬도 agent 가 계속 진행된다. `kill -9 $(pgrep -x workbranch-companion)` 뒤 즉시 사라진다.
 3. (R3) Companion 2 min, 시스템 설정 › 잠금 화면 › 화면보호기 1분으로 두고 작업 중에 비운다 → 2분에 dashboard, 그 전에 macOS 화면보호기가 뜨지 않는다.
 4. (R4) 디스플레이 꺼짐 시간(이 Mac 10분)보다 오래(11분 이상) 비운다 → 작업 중이면 dashboard 가 켜져 있다.
 5. (R5) dashboard 가 떠 있을 때 마지막 실행 중·대기 세션의 턴이 끝나면 dashboard 가 내려가고 이후 macOS 설정대로 진행된다. 턴 종료만 남은 상태에서는 설정 시간이 지나도 dashboard 가 뜨지 않는다.

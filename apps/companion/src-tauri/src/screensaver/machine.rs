@@ -146,8 +146,14 @@ pub(crate) enum Event {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Action {
+    /// Keeps the system from idle sleep, so agents go on working, with the
+    /// screen locked or not (COMP001 R2).
     HoldAwake,
     ReleaseAwake,
+    /// Keeps the display on, which also holds off the macOS screen saver and
+    /// its lock, while the dashboard may show (R3, R4).
+    HoldDisplay,
+    ReleaseDisplay,
     ShowDashboard,
     HideDashboard,
     /// Hands the screen to the macOS lock (COMP001 R6).
@@ -187,7 +193,10 @@ pub(crate) struct Machine {
     /// When runtime reads started failing, while they keep failing.
     unreadable_since: Option<Duration>,
     locked: bool,
+    /// Whether the system is held awake.
     awake: bool,
+    /// Whether the display is held on.
+    display: bool,
     dashboard: bool,
     /// The latest idle sample; dropped whenever the machine disarms, since
     /// nothing is sampled meanwhile and an old reading would misfire.
@@ -208,10 +217,17 @@ impl Machine {
         }
     }
 
-    /// Armed: the feature is on, agents work and the screen is unlocked.
-    /// Anything else is left to the OS (COMP001 R2, R5).
+    /// The feature is on and agents work: the system stays awake, even with
+    /// the screen locked, since a lock stops no agent but sleep does (R2).
+    fn keeps_awake(&self) -> bool {
+        self.config.enabled && self.working
+    }
+
+    /// Armed: awake and the screen unlocked, so the display stays on and the
+    /// dashboard may show. The display, screen saver and lock screen are
+    /// otherwise left to the OS (R3, R5).
     fn armed(&self) -> bool {
-        self.config.enabled && self.working && !self.locked
+        self.keeps_awake() && !self.locked
     }
 
     pub(crate) fn step(&mut self, event: Event) -> Vec<Action> {
@@ -305,12 +321,21 @@ impl Machine {
             self.dashboard = true;
             actions.push(Action::ShowDashboard);
         }
-        if armed != self.awake {
-            self.awake = armed;
-            actions.push(if armed {
+        let awake = self.keeps_awake();
+        if awake != self.awake {
+            self.awake = awake;
+            actions.push(if awake {
                 Action::HoldAwake
             } else {
                 Action::ReleaseAwake
+            });
+        }
+        if armed != self.display {
+            self.display = armed;
+            actions.push(if armed {
+                Action::HoldDisplay
+            } else {
+                Action::ReleaseDisplay
             });
         }
         actions

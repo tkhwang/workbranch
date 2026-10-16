@@ -7,9 +7,12 @@ use super::machine::Action;
 use super::windows::Mode;
 
 pub(crate) trait Platform {
-    /// Keeps the display and the system from idle sleep, and the app out of
-    /// App Nap, while held.
+    /// Keeps the system from idle sleep, and the app out of App Nap, while
+    /// held.
     fn set_awake(&mut self, awake: bool);
+    /// Keeps the display from idle sleep, which also holds off the macOS
+    /// screen saver, while held.
+    fn set_display_on(&mut self, on: bool);
     /// Time since the last keyboard or mouse input, from any app.
     fn idle_time(&self) -> Duration;
     /// Whether the login session's screen is locked right now.
@@ -26,6 +29,8 @@ pub(crate) fn apply(platform: &mut impl Platform, actions: &[Action]) {
         match action {
             Action::HoldAwake => platform.set_awake(true),
             Action::ReleaseAwake => platform.set_awake(false),
+            Action::HoldDisplay => platform.set_display_on(true),
+            Action::ReleaseDisplay => platform.set_display_on(false),
             Action::ShowDashboard => platform.show_dashboard(Mode::Live),
             Action::ShowPreview => platform.show_dashboard(Mode::Preview),
             Action::HideDashboard => platform.hide_dashboard(),
@@ -42,6 +47,7 @@ pub(crate) struct NoopPlatform;
 #[cfg(not(target_os = "macos"))]
 impl Platform for NoopPlatform {
     fn set_awake(&mut self, _awake: bool) {}
+    fn set_display_on(&mut self, _on: bool) {}
     fn idle_time(&self) -> Duration {
         Duration::ZERO
     }
@@ -63,6 +69,9 @@ mod tests {
     impl Platform for Recording {
         fn set_awake(&mut self, awake: bool) {
             self.0.push(format!("awake={awake}"));
+        }
+        fn set_display_on(&mut self, on: bool) {
+            self.0.push(format!("display={on}"));
         }
         fn idle_time(&self) -> Duration {
             Duration::ZERO
@@ -88,10 +97,12 @@ mod tests {
             &mut platform,
             &[
                 Action::HoldAwake,
+                Action::HoldDisplay,
                 Action::ShowDashboard,
                 Action::ShowPreview,
                 Action::LockScreen,
                 Action::HideDashboard,
+                Action::ReleaseDisplay,
                 Action::ReleaseAwake,
             ],
         );
@@ -99,10 +110,12 @@ mod tests {
             platform.0,
             vec![
                 "awake=true",
+                "display=true",
                 "show=Live",
                 "show=Preview",
                 "lock",
                 "hide",
+                "display=false",
                 "awake=false"
             ]
         );

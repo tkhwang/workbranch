@@ -179,11 +179,14 @@ fn nothing_happens_until_the_feature_is_on() {
 fn working_with_the_feature_on_keeps_the_mac_awake() {
     let mut machine = Machine::default();
     assert_eq!(machine.step(Event::Config(enabled())), vec![]);
-    assert_eq!(machine.step(Event::Working(true)), vec![Action::HoldAwake]);
+    assert_eq!(
+        machine.step(Event::Working(true)),
+        vec![Action::HoldAwake, Action::HoldDisplay]
+    );
     assert_eq!(machine.step(Event::Working(true)), vec![]);
     assert_eq!(
         machine.step(Event::Working(false)),
-        vec![Action::ReleaseAwake]
+        vec![Action::ReleaseAwake, Action::ReleaseDisplay]
     );
 }
 
@@ -193,25 +196,49 @@ fn turning_the_feature_off_releases_at_once() {
     machine.step(Event::Working(true));
     assert_eq!(
         machine.step(Event::Config(enabled())),
-        vec![Action::HoldAwake]
+        vec![Action::HoldAwake, Action::HoldDisplay]
     );
     assert_eq!(
         machine.step(Event::Config(Config::default())),
-        vec![Action::ReleaseAwake]
+        vec![Action::ReleaseAwake, Action::ReleaseDisplay]
     );
 }
 
 #[test]
-fn a_locked_screen_follows_the_os() {
+fn a_locked_screen_keeps_the_system_awake_and_leaves_the_display_to_the_os() {
     let mut machine = Machine::default();
     machine.step(Event::Config(enabled()));
     machine.step(Event::Working(true));
     assert_eq!(
         machine.step(Event::Locked(true)),
-        vec![Action::ReleaseAwake]
+        vec![Action::ReleaseDisplay]
     );
     assert_eq!(machine.step(Event::Working(true)), vec![]);
-    assert_eq!(machine.step(Event::Locked(false)), vec![Action::HoldAwake]);
+    assert_eq!(
+        machine.step(Event::Locked(false)),
+        vec![Action::HoldDisplay]
+    );
+}
+
+#[test]
+fn work_ending_while_locked_releases_the_system() {
+    let mut machine = Machine::default();
+    machine.step(Event::Config(enabled()));
+    machine.step(Event::Working(true));
+    machine.step(Event::Locked(true));
+    assert_eq!(
+        machine.step(Event::Working(false)),
+        vec![Action::ReleaseAwake]
+    );
+}
+
+#[test]
+fn work_starting_while_locked_holds_only_the_system() {
+    let mut machine = Machine::default();
+    machine.step(Event::Config(enabled()));
+    machine.step(Event::Locked(true));
+    assert_eq!(machine.step(Event::Working(true)), vec![Action::HoldAwake]);
+    assert_eq!(machine.poll_interval(), None);
 }
 
 fn minutes(n: u64) -> Duration {
@@ -250,7 +277,11 @@ fn reads_that_keep_failing_never_pin_the_mac_awake() {
     machine.step(Event::Unreadable(at(0)));
     assert_eq!(
         machine.step(Event::Unreadable(at(UNREADABLE_GRACE.as_secs()))),
-        vec![Action::HideDashboard, Action::ReleaseAwake]
+        vec![
+            Action::HideDashboard,
+            Action::ReleaseAwake,
+            Action::ReleaseDisplay
+        ]
     );
 }
 
@@ -306,7 +337,11 @@ fn the_dashboard_comes_down_when_work_ends() {
     machine.step(Event::Idle(minutes(5)));
     assert_eq!(
         machine.step(Event::Working(false)),
-        vec![Action::HideDashboard, Action::ReleaseAwake]
+        vec![
+            Action::HideDashboard,
+            Action::ReleaseAwake,
+            Action::ReleaseDisplay
+        ]
     );
 }
 
@@ -316,14 +351,18 @@ fn the_dashboard_comes_down_when_the_screen_locks_or_the_feature_turns_off() {
     locked.step(Event::Idle(minutes(5)));
     assert_eq!(
         locked.step(Event::Locked(true)),
-        vec![Action::HideDashboard, Action::ReleaseAwake]
+        vec![Action::HideDashboard, Action::ReleaseDisplay]
     );
 
     let mut off = armed();
     off.step(Event::Idle(minutes(5)));
     assert_eq!(
         off.step(Event::Config(Config::default())),
-        vec![Action::HideDashboard, Action::ReleaseAwake]
+        vec![
+            Action::HideDashboard,
+            Action::ReleaseAwake,
+            Action::ReleaseDisplay
+        ]
     );
 }
 
@@ -350,7 +389,10 @@ fn a_reading_from_before_work_started_never_shows_the_dashboard() {
     machine.step(Event::Idle(minutes(9)));
     machine.step(Event::Working(false));
     // The user came back meanwhile; nothing sampled while work was off.
-    assert_eq!(machine.step(Event::Working(true)), vec![Action::HoldAwake]);
+    assert_eq!(
+        machine.step(Event::Working(true)),
+        vec![Action::HoldAwake, Action::HoldDisplay]
+    );
     assert_eq!(machine.step(Event::Idle(Duration::from_secs(3))), vec![]);
 }
 
@@ -387,9 +429,10 @@ fn input_locks_the_mac_and_the_dashboard_stays_until_the_lock_lands() {
     assert!(machine.awaiting_lock());
     // The lock screen is not up yet: nothing more is asked for.
     assert_eq!(machine.step(Event::LockSample(false)), vec![]);
+    // The agents go on behind the lock screen: only the display is let go.
     assert_eq!(
         machine.step(Event::Locked(true)),
-        vec![Action::HideDashboard, Action::ReleaseAwake]
+        vec![Action::HideDashboard, Action::ReleaseDisplay]
     );
     assert!(!machine.awaiting_lock());
 }
@@ -400,7 +443,7 @@ fn a_lock_read_from_the_session_counts_without_its_notification() {
     machine.step(Event::Idle(Duration::from_millis(100)));
     assert_eq!(
         machine.step(Event::LockSample(true)),
-        vec![Action::HideDashboard, Action::ReleaseAwake]
+        vec![Action::HideDashboard, Action::ReleaseDisplay]
     );
 }
 
@@ -504,6 +547,7 @@ fn a_preview_never_holds_the_mac_awake() {
     let mut machine = Machine::new(true);
     let actions = machine.step(Event::Preview);
     assert!(!actions.contains(&Action::HoldAwake));
+    assert!(!actions.contains(&Action::HoldDisplay));
     assert_eq!(machine.step(Event::Working(false)), vec![]);
     assert!(machine.showing());
 }

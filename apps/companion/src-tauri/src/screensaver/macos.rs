@@ -70,9 +70,15 @@ impl ScreenLock {
     }
 }
 
+/// A held `NSProcessInfo` activity, ended when let go.
+type Activity = Retained<ProtocolObject<dyn NSObjectProtocol>>;
+
 pub(crate) struct MacPlatform<R: Runtime> {
     app: AppHandle<R>,
-    activity: Option<Retained<ProtocolObject<dyn NSObjectProtocol>>>,
+    /// `PreventUserIdleSystemSleep`, held while agents work, locked or not.
+    system: Option<Activity>,
+    /// `PreventUserIdleDisplaySleep`, held while the dashboard may show.
+    display: Option<Activity>,
     lock: Option<ScreenLock>,
     /// The app menu, set aside while a dashboard covers the screen.
     menu: Option<Menu<R>>,
@@ -82,7 +88,8 @@ impl<R: Runtime> MacPlatform<R> {
     pub(crate) fn new(app: AppHandle<R>, lock: Option<ScreenLock>) -> Self {
         Self {
             app,
-            activity: None,
+            system: None,
+            display: None,
             lock,
             menu: None,
         }
@@ -91,21 +98,17 @@ impl<R: Runtime> MacPlatform<R> {
 
 impl<R: Runtime> Platform for MacPlatform<R> {
     fn set_awake(&mut self, awake: bool) {
-        match (awake, self.activity.take()) {
-            (true, None) => {
-                // UserInitiated keeps the system awake and the app out of App
-                // Nap; IdleDisplaySleepDisabled keeps the display on, which
-                // also holds off the macOS screen saver.
-                let options =
-                    NSActivityOptions::UserInitiated | NSActivityOptions::IdleDisplaySleepDisabled;
-                let reason = NSString::from_str(AWAKE_REASON);
-                self.activity = Some(
-                    NSProcessInfo::processInfo().beginActivityWithOptions_reason(options, &reason),
-                );
-            }
-            (false, Some(activity)) => end_activity(&activity),
-            (_, held) => self.activity = held,
-        }
+        // UserInitiated keeps the system awake and the app out of App Nap.
+        hold(&mut self.system, awake, NSActivityOptions::UserInitiated);
+    }
+
+    fn set_display_on(&mut self, on: bool) {
+        // Keeping the display on also holds off the macOS screen saver.
+        hold(
+            &mut self.display,
+            on,
+            NSActivityOptions::IdleDisplaySleepDisabled,
+        );
     }
 
     fn idle_time(&self) -> Duration {
@@ -149,9 +152,26 @@ impl<R: Runtime> Platform for MacPlatform<R> {
 
 impl<R: Runtime> Drop for MacPlatform<R> {
     fn drop(&mut self) {
-        if let Some(activity) = self.activity.take() {
+        for activity in [self.display.take(), self.system.take()]
+            .into_iter()
+            .flatten()
+        {
             end_activity(&activity);
         }
+    }
+}
+
+/// Begins or ends the activity in `slot` so it is held exactly when `held`.
+fn hold(slot: &mut Option<Activity>, held: bool, options: NSActivityOptions) {
+    match (held, slot.take()) {
+        (true, None) => {
+            let reason = NSString::from_str(AWAKE_REASON);
+            *slot = Some(
+                NSProcessInfo::processInfo().beginActivityWithOptions_reason(options, &reason),
+            );
+        }
+        (false, Some(activity)) => end_activity(&activity),
+        (_, current) => *slot = current,
     }
 }
 

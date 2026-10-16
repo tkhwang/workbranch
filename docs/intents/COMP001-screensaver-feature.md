@@ -2,7 +2,7 @@
 id: COMP001
 slug: screensaver-feature
 created: 2026-10-16T03:56:10.000Z
-updated: 2026-10-16T13:58:47.000Z
+updated: 2026-10-17T04:40:00.000Z
 ---
 # COMP001 · screensaver-feature
 
@@ -39,11 +39,11 @@ screen save 를 대체해도 좋고, 어렵다면 다음 기능만 만족하면 
 - 작업 중이 아닐 때 시계만 띄우는 화면보호기.
 - 기존 잠자기 방지 utility 를 감지하거나 끄는 것.
 - 배터리·전원 상태에 따라 다르게 동작하는 것.
-- 화면이 잠긴 동안의 잠자기 방지. 잠긴 동안(R6 으로 잠긴 경우 포함)은 macOS 기본 동작 그대로다.
+- 화면이 잠긴 동안 디스플레이를 켜 두는 것. 잠긴 동안(R6 으로 잠긴 경우 포함) 디스플레이 꺼짐과 잠금 화면은 macOS 기본 동작 그대로다. 시스템 잠자기만 R2 대로 막는다.
 - 관측 불명(15분 넘게 hook 이벤트가 없는) 세션을 작업 중으로 세는 것. companion 칸반과 같은 기준으로 작업 중에서 빠진다.
 
 ## Success criteria
-- 작업을 걸어 두고 화면을 잠그지 않은 채 자리를 비워도, 작업 중인 동안 Mac 이 잠들지 않는다.
+- 작업을 걸어 두고 자리를 비우면, 화면을 잠갔든(직접 또는 R6) 잠그지 않았든 작업 중인 동안 Mac 이 잠들지 않는다.
 - 자리를 비운 동안 멀리서 시계, 상태별 개수, 나를 기다리는 작업이 보인다.
 - 누가 키보드나 마우스를 건드리면 바로 macOS 잠금 화면이 되고, macOS 계정 인증 없이는 데스크톱이 보이지 않는다.
 - 작업 중이 끝나면 화면과 잠자기가 macOS 기본 동작으로 돌아간다.
@@ -59,7 +59,7 @@ screen save 를 대체해도 좋고, 어렵다면 다음 기능만 만족하면 
 "작업 중" = "실행 중" 또는 "내 응답 대기" 세션이 하나 이상 있는 상태(companion 칸반과 같은 판정).
 
 - R1 (MUST) 설정 화면에 이 기능 전체(잠자기 방지 · dashboard · 잠금)를 켜고 끄는 스위치가 하나 있고, 기본값은 꺼짐이다. 꺼져 있으면 companion 은 잠자기·화면보호기·잠금에 관여하지 않는다. — acceptance: 새로 설치하거나 업데이트한 직후 스위치가 꺼져 있고, 꺼진 상태에서는 작업 중에 오래 비워 둬도 잠자기 방지와 dashboard 가 없다.
-- R2 (MUST) 작업 중이고 화면이 잠기지 않은 동안 Mac 은 idle 잠자기에 들어가지 않는다. 작업 중이 끝나거나(턴 종료만 남거나 세션이 없으면) 화면이 잠기면(직접 잠갔든 R6 으로 잠겼든) 잠자기 방지를 풀고 macOS 기본 동작을 따른다. — acceptance: 작업 중이고 잠기지 않았으면 `pmset -g assertions` 에 companion 의 잠자기 방지가 보이고, 마지막 작업 중 세션이 턴 종료가 되거나 화면을 잠그면 사라진다.
+- R2 (MUST) 작업 중인 동안 Mac 은 idle 잠자기에 들어가지 않는다. 화면이 잠겨 있어도(직접 잠갔든 R6 으로 잠겼든) 마찬가지이고, 잠긴 동안에는 디스플레이만 macOS 기본 동작대로 꺼진다. 작업 중이 끝나면(턴 종료만 남거나 세션이 없으면) 잠자기 방지를 풀고 macOS 기본 동작을 따른다. — acceptance: 작업 중이면 잠김과 상관없이 `pmset -g assertions` 에 companion 의 시스템 잠자기 방지(`PreventUserIdleSystemSleep`)가 보이고, 마지막 작업 중 세션이 턴 종료가 되면 사라진다. 잠긴 동안에는 companion 의 디스플레이 잠자기 방지(`PreventUserIdleDisplaySleep`)가 없다.
 - R3 (MUST) 작업 중에 companion 설정의 시간(기본 5분, 1~60분) 동안 키보드·마우스 입력이 없으면 dashboard 가 macOS 화면보호기 대신 뜬다. 작업 중에는 이 시간이 macOS 화면보호기 시간보다 길어도 macOS 화면보호기가 먼저 뜨지 않는다. — acceptance: companion 을 2분, macOS 화면보호기를 1분으로 두고 작업 중에 비우면 2분에 dashboard 가 뜨고, 그 전에 macOS 화면보호기가 뜨지 않는다.
 - R4 (MUST) 작업 중이 유지되는 동안 디스플레이는 켜진 채 dashboard 가 계속 보이고, macOS 화면보호기가 그 위를 덮지 않는다. — acceptance: macOS 디스플레이 꺼짐 시간보다 오래 비워도 작업 중이면 dashboard 가 보인다.
 - R5 (MUST) 작업 중이 아니면 dashboard 를 띄우지 않고, 떠 있던 dashboard 는 작업 중이 끝나는 즉시 내린다. 이후 화면보호기·잠금·잠자기는 macOS 기본 동작에 맡긴다. — acceptance: 마지막 작업 중 세션이 턴 종료가 되면 dashboard 가 사라지고, 이후 macOS 설정대로 화면보호기·잠금·잠자기가 진행된다. 턴 종료만 있을 때는 설정 시간이 지나도 dashboard 가 뜨지 않는다.
@@ -81,7 +81,7 @@ _None._
 - 창: 지금 companion 은 Tauri 창 `main` 하나(`visible: false`, `alwaysOnTop`, `skipTaskbar`) + tray 다. 모니터마다 전체 화면 dashboard 창이 필요하다.
 - 즉시 잠금: 비공개 `login.framework` 의 `SACLockScreenImmediate`. 권한 요청 없음. macOS 27.2 에서 심볼 존재 확인(호출은 하지 않음). 비공개 API 라 Mac App Store 배포는 불가(companion 은 brew 배포라 무관)하고, 이후 macOS 에서 사라질 수 있다(R7).
 - 입력·idle 감지: `CGEventSourceSecondsSinceLastEventType(kCGEventSourceStateHIDSystemState, kCGAnyInputEventType)`. 손쉬운 사용·입력 모니터링 권한 불필요(실측 확인).
-- 잠자기 방지: `PreventUserIdleSystemSleep` power assertion. 시스템 잠자기만 막고 디스플레이 꺼짐·화면보호기·잠금은 허용한다. dashboard 가 떠 있는 동안 디스플레이를 켜 두는 것(R4)은 별도 디스플레이 assertion 이 필요하다. 모두 권한 불필요이고, 프로세스가 죽으면 OS 가 회수한다.
+- 잠자기 방지: `PreventUserIdleSystemSleep` power assertion. 시스템 잠자기만 막고 디스플레이 꺼짐·화면보호기·잠금은 허용한다. 작업 중이면 잠김과 상관없이 건다. dashboard 를 띄울 수 있는 동안(작업 중이고 잠기지 않음) 디스플레이를 켜 두는 것(R3·R4)은 별도 디스플레이 assertion(`PreventUserIdleDisplaySleep`)이다. 모두 권한 불필요이고, 프로세스가 죽으면 OS 가 회수한다.
 - 쓰지 않을 것: Ctrl+Cmd+Q 키 입력 흉내(손쉬운 사용 권한 필요). `pmset displaysleepnow` / 화면보호기 실행은 macOS 의 "암호 요구까지 지연" 설정을 따르므로 즉시 잠기지 않는다(이 Mac 은 300초, `sysadminctl -screenLock status`).
 - 이 Mac 의 현재 설정(참고): 화면보호기 300초, 디스플레이 꺼짐 10분.
 
@@ -102,3 +102,4 @@ _None._
 - 2026-10-16 · (plan Q4) 화면이 잠긴 동안 → companion 은 아무것도 하지 않고 macOS 기본 동작 그대로(잠자기 방지도 해제). R2 를 "잠기지 않은 동안"으로 좁힘 · 원칙: 잠자기 방지는 agent 가 동작하고 dashboard 가 동작할 수 있을 때만, 나머지는 OS 그대로
 - 2026-10-16 · (구현 중 추가) Settings 확인 버튼 → A. 미리 보기: 즉시 표시, 2초 입력 무시 후 입력 시 잠금 없이 닫힘, 기능 꺼짐에서도 동작, 잠자기 방지 없음. R12(SHOULD) 로 추가 · 작업을 걸고 N분 기다리지 않고 화면·데이터를 바로 확인. 잠금 동작은 실제 흐름으로 확인
 - 2026-10-16 · (구현 중 변경) dashboard 카드 정보 → 시안 E: 프롬프트 한 줄, 열별 세부(대기: 기다리는 대상, 실행 중: 도구 동작, 턴 종료: 마지막 응답·오류·중단), repo 변경 상태, 알림 수. R9 의 "프롬프트 제외" 를 뒤집고 R11 을 카드 제목 크기 + 세부 줄 수 제한으로 바꾸며, 열당 카드는 4장에서 3장으로 · 화면 전체를 쓰면서 메뉴바 카드보다 정보가 적었음. 민감 정보는 runtime 이 저장 단계에서 빼고, dashboard 가 없으면 그 자리에 터미널이 그대로 보였을 것이라 노출을 이유로 뺄 근거가 약함. 별도 표시 설정은 두지 않음(Q9 스위치 하나)
+- 2026-10-17 · (구현 중 변경) 화면이 잠긴 동안의 잠자기 방지 → 작업 중이면 잠겨 있어도 시스템 잠자기는 계속 막고, 디스플레이만 macOS 기본 동작대로 꺼지게 둔다. R2·Non-goals·Success criteria 수정 · 잠금 화면은 agent 를 멈추지 않지만 잠자기는 멈춘다. 잠기면 잠자기 방지를 풀던 기존 결정(plan Q4)으로는 R6 으로 잠긴 뒤나 직접 잠그고 자리를 뜬 뒤 Mac 이 잠들어 agent 가 멈춤 · 사용자 선택
