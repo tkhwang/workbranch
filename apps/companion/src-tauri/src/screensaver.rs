@@ -10,6 +10,7 @@ mod windows;
 
 use std::sync::Mutex;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
+use std::time::Duration;
 
 use tauri::{AppHandle, Runtime, State};
 use tauri_plugin_store::StoreExt;
@@ -118,9 +119,11 @@ fn run<R: Runtime>(
             },
         };
         let event = match message {
-            Some(Message::Runtime(snapshot)) => {
-                Event::Working(snapshot.document.as_deref().is_some_and(is_working))
-            }
+            Some(Message::Runtime(snapshot)) => match snapshot.document.as_deref() {
+                Some(document) => Event::Working(is_working(document)),
+                // A failed read says nothing new about the agents.
+                None => Event::Unreadable(Duration::from_millis(snapshot.read_at_ms)),
+            },
             Some(Message::ConfigChanged) => Event::Config(read_config(app)),
             Some(Message::Locked(locked)) => Event::Locked(locked),
             Some(Message::Preview) => Event::Preview,

@@ -10,6 +10,7 @@ vi.mock("@tauri-apps/api/event", () => ({ listen: tauri.listen }));
 
 import {
 	EMPTY_RUNTIME_SESSIONS,
+	type RuntimeSessions,
 	reduceRuntimeSnapshot,
 	startRuntimeSubscription,
 } from "../src/application/useRuntimeSessions";
@@ -151,6 +152,30 @@ describe("startRuntimeSubscription", () => {
 			onState: (state) => states.push(state.sequence),
 		});
 		expect(states).toEqual([]);
+	});
+
+	it("keeps listening when the first read fails, and reports the error", async () => {
+		let push: (value: RuntimeSnapshot) => void = () => undefined;
+		let listening = true;
+		const states: RuntimeSessions[] = [];
+		const failure = new Error("runtime_snapshot unavailable");
+		await startRuntimeSubscription({
+			listen: async (callback) => {
+				push = callback;
+				return () => {
+					listening = false;
+				};
+			},
+			read: async () => {
+				throw failure;
+			},
+			onState: (state) => states.push(state),
+		});
+		expect(listening).toBe(true);
+		expect(states.map((state) => state.error)).toEqual([failure]);
+		// The service's next push brings the window back.
+		push(snapshot(1, { document: document(session("running")) }));
+		expect(states.at(-1)).toMatchObject({ sequence: 1, error: undefined });
 	});
 
 	it("stops delivering once stopped", async () => {

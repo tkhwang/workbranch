@@ -130,7 +130,10 @@ pub(crate) fn is_working(document: &str) -> bool {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Event {
     Config(Config),
+    /// Whether agents work, from a runtime document that was read.
     Working(bool),
+    /// A runtime read failed, at this time since the Unix epoch.
+    Unreadable(Duration),
     Locked(bool),
     /// The session's lock state, read on each sample while a requested lock
     /// is awaited, so the lock is confirmed even when its notification is late.
@@ -157,6 +160,10 @@ pub(crate) enum Action {
 pub(crate) const IDLE_POLL: Duration = Duration::from_secs(1);
 /// How often it is sampled while the dashboard shows, to catch input quickly.
 pub(crate) const INPUT_POLL: Duration = Duration::from_millis(250);
+/// How long failed runtime reads keep the last reading of whether agents
+/// work. A read can fail for a moment (a timeout, the CLI mid-upgrade) while
+/// agents go on working; reads that keep failing must not pin the Mac awake.
+pub(crate) const UNREADABLE_GRACE: Duration = Duration::from_secs(180);
 /// Samples to wait for each lock request to land (~2 s).
 pub(crate) const LOCK_WAIT_SAMPLES: u8 = 8;
 /// Times the lock is asked for before this Mac counts as having none (~6 s).
@@ -177,6 +184,8 @@ struct LockWait {
 pub(crate) struct Machine {
     config: Config,
     working: bool,
+    /// When runtime reads started failing, while they keep failing.
+    unreadable_since: Option<Duration>,
     locked: bool,
     awake: bool,
     dashboard: bool,
@@ -209,7 +218,16 @@ impl Machine {
         let mut input = false;
         match event {
             Event::Config(config) => self.config = config,
-            Event::Working(working) => self.working = working,
+            Event::Working(working) => {
+                self.working = working;
+                self.unreadable_since = None;
+            }
+            Event::Unreadable(at) => {
+                let since = *self.unreadable_since.get_or_insert(at);
+                if at.saturating_sub(since) >= UNREADABLE_GRACE {
+                    self.working = false;
+                }
+            }
             Event::Locked(locked) | Event::LockSample(locked) => self.locked = locked,
             Event::Idle(idle) => {
                 input = self.idle.is_some_and(|previous| idle < previous);

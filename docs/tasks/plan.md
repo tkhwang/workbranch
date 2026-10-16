@@ -116,6 +116,8 @@ Behaviour checks (실제 Mac, `pnpm companion:dev` 또는 빌드한 앱):
 - 2026-10-17 · (PR #236 리뷰) 잠금이 오지 않을 때 → 알림만 기다리지 않고 세션 잠금 상태를 표본마다 읽어 확인하고, 2초마다 잠금을 다시 요청(모두 3번, 약 6초)하는 동안 dashboard 를 유지한다. 끝내 잠기지 않으면 잠금 없는 Mac 으로 보고 R7 처럼 닫는다 · 확인되지 않은 2초 타임아웃으로 데스크톱이 드러나는 것은 R6 위반. 잠기지 않는 Mac 에서 dashboard 를 끝없이 유지하면 Cmd-Q 도 막혀 강제 재시동 말고는 돌아갈 길이 없어 택하지 않음
 - 2026-10-17 · (PR #236 리뷰) dashboard 가 덮는 동안 앱 메인 메뉴를 떼어 둔다(`AppHandle::remove_menu`/`set_menu`) · Cmd-Q·Cmd-H 같은 메뉴 단축키는 250ms 입력 표본보다 먼저 처리돼 잠금 없이 앱을 끝낼 수 있다. Tauri 는 macOS Cmd-Q 에 `ExitRequested` 를 보장하지 않아(tauri-apps/tauri#9198) 종료 가로채기보다 단축키 자체를 없애는 쪽을 택함. dashboard 는 보기 전용이라 메뉴가 없어도 잃는 것이 없음
 - 2026-10-17 · (PR #236 리뷰) Rust 가 runtime 문서를 v1 계약 serde 타입으로 검사하고, `screensaver` 설정을 필드별로 읽는다 · board(`parseRuntimeDocument`)와 Settings(`sanitizeScreensaverConfig`)와 같은 문서·설정을 같은 뜻으로 읽어야 UI 와 서비스가 어긋나지 않음
+- 2026-10-17 · (PR #236 CodeRabbit 리뷰) runtime 읽기 실패 → 마지막 판단을 3분(`UNREADABLE_GRACE`, 60초 fallback 읽기 2번 이상) 유지한 뒤에야 작업 중이 아닌 것으로 본다 · 한 번의 timeout·업그레이드 중 실패로 잠자기 방지가 풀려 agent 가 멈추면 안 되고, 계속 실패하는 CLI 가 Mac 을 끝없이 깨워 두어서도 안 됨. 계약을 어긴 문서(읽기는 성공)는 지금처럼 바로 작업 중 아님
+- 2026-10-17 · (PR #236 CodeRabbit 리뷰) runtime 디렉터리가 지워졌다 다시 생길 때 watcher 재설정 → 고치지 않음, 근거만 코드 주석으로 남김 · companion 은 macOS 전용(CI·릴리스 macos-15)이고 FSEvents 는 경로 기준이라 같은 watcher 가 삭제·재생성 뒤에도 이벤트를 받음(notify 8.2.0 로 직접 확인). inotify 로 옮길 때만 필요
 
 ## Discovered
 - follow-up(COMP001 범위 밖): 목록 데이터(workspace monitor 의 root 별 갱신·오류 병합)도 Rust store 로 옮겨, 모든 창이 하나의 push 상태를 구독하는 순수 view 가 되게 한다.

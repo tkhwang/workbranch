@@ -65,7 +65,9 @@ export type RuntimeSubscriptionDeps = {
 
 /**
  * Listens before reading, so a push that lands between the two is not lost;
- * the sequence check drops whichever of the two arrives stale.
+ * the sequence check drops whichever of the two arrives stale. A failed read
+ * becomes the state's error and the listener stays, so the service's next
+ * push brings the window back.
  */
 export async function startRuntimeSubscription(
 	deps: RuntimeSubscriptionDeps,
@@ -84,8 +86,8 @@ export async function startRuntimeSubscription(
 		const latest = await deps.read();
 		if (latest !== null) apply(latest);
 	} catch (error) {
-		unlisten();
-		throw error;
+		state = { ...state, error };
+		deps.onState(state);
 	}
 	return () => {
 		stopped = true;

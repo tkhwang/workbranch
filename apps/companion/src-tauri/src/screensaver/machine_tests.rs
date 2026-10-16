@@ -225,6 +225,55 @@ fn armed() -> Machine {
     machine
 }
 
+/// A runtime read time, as seconds since the epoch.
+fn at(seconds: u64) -> Duration {
+    Duration::from_secs(1_760_000_000 + seconds)
+}
+
+#[test]
+fn a_failed_read_keeps_the_last_reading_for_a_while() {
+    let mut machine = armed();
+    machine.step(Event::Idle(minutes(5)));
+    // A timeout or a CLI mid-upgrade: the dashboard and the awake hold stay.
+    assert_eq!(machine.step(Event::Unreadable(at(0))), vec![]);
+    assert_eq!(
+        machine.step(Event::Unreadable(at(UNREADABLE_GRACE.as_secs() - 1))),
+        vec![]
+    );
+    assert!(machine.showing());
+}
+
+#[test]
+fn reads_that_keep_failing_never_pin_the_mac_awake() {
+    let mut machine = armed();
+    machine.step(Event::Idle(minutes(5)));
+    machine.step(Event::Unreadable(at(0)));
+    assert_eq!(
+        machine.step(Event::Unreadable(at(UNREADABLE_GRACE.as_secs()))),
+        vec![Action::HideDashboard, Action::ReleaseAwake]
+    );
+}
+
+#[test]
+fn a_good_read_ends_the_grace() {
+    let mut machine = armed();
+    machine.step(Event::Unreadable(at(0)));
+    machine.step(Event::Working(true));
+    // A new run of failures starts its own grace.
+    assert_eq!(
+        machine.step(Event::Unreadable(at(UNREADABLE_GRACE.as_secs()))),
+        vec![]
+    );
+}
+
+#[test]
+fn a_failed_read_never_starts_work() {
+    let mut machine = Machine::default();
+    machine.step(Event::Config(enabled()));
+    assert_eq!(machine.step(Event::Unreadable(at(0))), vec![]);
+    assert_eq!(machine.poll_interval(), None);
+}
+
 #[test]
 fn the_dashboard_shows_once_input_paused_for_the_configured_minutes() {
     let mut machine = armed();

@@ -213,6 +213,9 @@ fn watch_runtime_dir(wake: Sender<()>) -> Option<RecommendedWatcher> {
         std::env::var_os("WORKBRANCH_RUNTIME_DIR"),
         std::env::var_os("HOME"),
     )?;
+    // FSEvents watches by path, so this watch outlives the directory being
+    // removed and recreated (companion ships for macOS only). A port to a
+    // backend that watches by inode, such as inotify, must re-add it.
     let mut watcher = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
         if event.is_ok() {
             let _ = wake.send(());
