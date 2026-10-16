@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.31.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.30.0...workbranch-companion-v2.31.0) (2026-10-16)
+
+
+### Features
+
+* **companion:** implement screen saver feature ([36f80ab](https://github.com/tkhwang/workbranch/commit/36f80ab9b044b0069a8c038659d1d20448ba435a))
+* **dashboard:** 대시보드 메뉴 추가 및 화면 보호기 기능 구현하기 ([00ac05e](https://github.com/tkhwang/workbranch/commit/00ac05e81db5cc0864dfda6bdc7f5e6974d48961))
+* **screensaver:** 화면이 잠긴 동안에도 작업 중이면 잠자기 방지하기 ([202bd27](https://github.com/tkhwang/workbranch/commit/202bd274b5c3070f4984ca64c51d03cc38707238))
+
+
+### Bug Fixes
+
+* **dashboard:** 대시보드 종료 시 흰 화면 깜빡임 수정하기 ([066b90c](https://github.com/tkhwang/workbranch/commit/066b90cceff443c9cc04274d7da0c9ad378f1a18))
+* **screensaver:** CodeRabbit 리뷰 지적 사항 반영하기 ([10e5332](https://github.com/tkhwang/workbranch/commit/10e5332423233ae2359c0fb9a44ed517c2ed10f7))
+* **screensaver:** PR 리뷰 지적 사항 반영하기 ([02010b2](https://github.com/tkhwang/workbranch/commit/02010b206c2805c05114ba09c3c708561a8cf046))
+
 ## [2.30.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.29.0...workbranch-companion-v2.30.0) (2026-10-08)
 
 
