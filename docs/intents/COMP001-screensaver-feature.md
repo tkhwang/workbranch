@@ -105,7 +105,9 @@ _None._
 - 2026-10-17 · (구현 중 변경) 화면이 잠긴 동안의 잠자기 방지 → 작업 중이면 잠겨 있어도 시스템 잠자기는 계속 막고, 디스플레이만 macOS 기본 동작대로 꺼지게 둔다. R2·Non-goals·Success criteria 수정 · 잠금 화면은 agent 를 멈추지 않지만 잠자기는 멈춘다. 잠기면 잠자기 방지를 풀던 기존 결정(plan Q4)으로는 R6 으로 잠긴 뒤나 직접 잠그고 자리를 뜬 뒤 Mac 이 잠들어 agent 가 멈춤 · 사용자 선택
 
 ## Outcome
-- 2026-10-17 · **Go with follow-ups** · PR #236(`36f80ab`)으로 main 에 병합되어 workbranch-companion 2.31.0 으로 릴리스. 자동 검사는 2026-10-17 05:11 verify run 에서 통과했고(범위 밖 기존 실패 2건은 아래), Human check 1~11 은 실제 앱에서 모두 통과(사용자 확인, 2026-10-17).
+- 2026-10-17 · **Pending human verification** · 구현은 [PR #236](https://github.com/tkhwang/workbranch/pull/236)(`36f80ab`, 2026-10-16 20:03 UTC)으로 main 에 병합되었고, [workbranch-companion 2.31.0](https://github.com/tkhwang/workbranch/releases/tag/workbranch-companion-v2.31.0)은 2026-10-16 20:47 UTC 에 발행되었다. 이 문서 브랜치의 package·Tauri·Cargo·release-please 버전은 2.30.0 이므로 릴리스 근거는 해당 태그와 릴리스 기록이다.
+- 자동 검사: 이전 2026-10-17 05:11 verify run 의 통과 기록과 범위 밖 기존 실패는 아래에 남긴다. 이는 실제 앱에서의 수동 검증 완료를 뜻하지 않는다.
+- Human check 1~11: **확인 대기**. 기존의 "모두 통과(사용자 확인)" 문구를 뒷받침하는 항목별 실행 결과가 이 PR 에 없어 완료 판정을 보류한다. 실제 앱에서 잠금·잠금 불가 fallback·다중 모니터·잠자기 방지 등을 확인하고 결과를 기록한 뒤 최종 Go 를 갱신한다.
 - 출시된 동작 (현재 동작은 `docs/specs/comp/screensaver.md`, `docs/specs/comp/runtime-snapshot.md`):
   - R1: Settings › Screen Saver 의 "While agents work" 스위치 하나(기본 꺼짐)와 "Dashboard after"(기본 5분, 1~60분). 꺼져 있으면 잠자기·화면보호기·잠금에 관여하지 않는다. 설정은 Settings 와 Rust 서비스가 필드별로 같은 규칙으로 읽는다.
   - R2: 켜짐 && 작업 중이면 시스템 잠자기 방지(`PreventUserIdleSystemSleep`)를 화면 잠김과 상관없이 건다. 디스플레이 잠자기 방지(`PreventUserIdleDisplaySleep`)는 잠기지 않은 동안만 건다. runtime 읽기 실패는 3분 동안 마지막 판단을 유지한다.
@@ -119,7 +121,7 @@ _None._
   - R11 (SHOULD): 열당 카드 3장 + "+n more", 세부 줄 줄 수 제한, 화면 높이 비례 크기.
   - R12 (SHOULD): Settings › Screen Saver › Show now 미리 보기(2초 입력 무시, 잠금·잠자기 방지 없음).
   - Slice 0: runtime 데이터를 Rust `RuntimeService` 단일 출처로 옮겼다(디렉터리 감시 + 60초 보조 읽기, `runtime-snapshot` push). main 창의 1초 polling 은 없다.
-- Deferred: 없음(MUST·SHOULD 모두 전달). 의도적으로 하지 않은 것: runtime 디렉터리 삭제·재생성 시 watcher 재등록(FSEvents 는 경로 기준이라 불필요, inode 기준 backend 로 옮길 때만 필요).
+- 구현 범위의 Deferred: 없음. MUST·SHOULD 최종 acceptance 는 위 수동 검증 완료까지 대기한다. 의도적으로 하지 않은 것: runtime 디렉터리 삭제·재생성 시 watcher 재등록(FSEvents 는 경로 기준이라 불필요, inode 기준 backend 로 옮길 때만 필요).
 - 범위 밖 기존 실패(수용, 아래 follow-up 5·7): `pnpm --filter @workbranch/contract lint` 서식 오류 2건, macOS 로컬 CLI 테스트 2개.
 - Discovered follow-ups (새 intent 후보):
   1. 목록 데이터(workspace monitor 의 root 별 갱신·오류 병합)도 Rust store 로 옮겨 모든 창이 하나의 push 상태를 구독하는 순수 view 가 되게 한다.

@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="724" viewBox="0 0 1200 724" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
   <title id="title">Workbranch Companion 화면보호기 dashboard</title>
-  <desc id="desc">agent 가 작업 중이고 아무도 Mac 을 건드리지 않으면 Companion 이 모든 모니터를 보기 전용 dashboard 로 덮습니다: 7-segment 시계, 날짜, 입력 시 잠금 표시, 상태별 개수, 그리고 내 응답 대기 · 실행 중 · 턴 종료 · 검토 열에 task 마다 프롬프트, 도구 동작 또는 마지막 응답, repo 변경 상태. 입력이 들어오면 macOS 잠금 화면으로 넘어갑니다.</desc>
-  <rect width="1200" height="724" rx="24" fill="#13244B"/>
+  <desc id="desc">agent 가 작업 중이고 아무도 Mac 을 건드리지 않으면 Companion 이 모든 모니터를 보기 전용 dashboard 로 덮습니다: 7-segment 시계, 날짜, 입력 시 잠금 표시, 상태별 개수, 그리고 내 응답 대기 · 실행 중 · 턴 종료 · 검토 열에 task 마다 프롬프트, 도구 동작 또는 마지막 응답, repo 변경 상태. 입력이 들어오면 macOS 잠금 화면으로 넘어갑니다. 잠금 불가 시 잠금 표시를 숨기고 입력하면 잠금 없이 dashboard 만 닫습니다. 잠금 요청이 실패해도 잠금 없이 닫습니다.</desc>
+  <rect width="1200" height="760" rx="24" fill="#13244B"/>
   <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Apple SD Gothic Neo', 'Noto Sans KR', monospace">
     <text x="64" y="58" font-size="18" fill="#9AA5CE" letter-spacing="2.5">WORKBRANCH COMPANION · 화면보호기</text>
     <text x="1136" y="58" font-size="18" fill="#6F7FA8" text-anchor="end">opt-in · 작업 중에만</text>
@@ -126,7 +126,8 @@
       <text x="380" y="692" font-size="20" fill="#F4EAD5">모든 모니터에 dashboard</text>
       <circle cx="701" cy="685" r="13" fill="#A2583B"/>
       <text x="701" y="692" font-size="17" fill="#FDF4E2" font-weight="700" text-anchor="middle">3</text>
-      <text x="724" y="692" font-size="20" fill="#F4EAD5">입력하면 macOS 잠금 화면</text>
+      <text x="724" y="692" font-size="20" fill="#F4EAD5">잠금 가능 시 입력 → 잠금</text>
     </g>
+    <text x="600" y="736" font-size="18" fill="#9AA5CE" text-anchor="middle">잠금 불가 또는 요청 실패 시: 잠금 없이 dashboard 만 닫힘</text>
   </g>
 </svg>

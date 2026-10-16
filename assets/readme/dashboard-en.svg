@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="724" viewBox="0 0 1200 724" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
   <title id="title">Workbranch Companion screen saver dashboard</title>
-  <desc id="desc">While agents work and nobody touches the Mac, Companion covers every display with a view-only dashboard: a 7-segment clock, the date, 입력 시 잠금 (input locks), per-state counts, and the 내 응답 대기 (waiting on you), 실행 중 (running) and 턴 종료 · 검토 (turn ended, review) columns with each task's prompt, tool activity or last response, and repo changes. Any input hands over to the macOS lock screen.</desc>
-  <rect width="1200" height="724" rx="24" fill="#13244B"/>
+  <desc id="desc">While agents work and nobody touches the Mac, Companion covers every display with a view-only dashboard: a 7-segment clock, the date, 입력 시 잠금 (input locks), per-state counts, and the 내 응답 대기 (waiting on you), 실행 중 (running) and 턴 종료 · 검토 (turn ended, review) columns with each task's prompt, tool activity or last response, and repo changes. When locking is available, input requests the macOS lock screen. Without locking, the indicator is hidden and input only closes the dashboard. Failed lock requests also close it without locking.</desc>
+  <rect width="1200" height="760" rx="24" fill="#13244B"/>
   <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Apple SD Gothic Neo', 'Noto Sans KR', monospace">
     <text x="64" y="58" font-size="18" fill="#9AA5CE" letter-spacing="2.5">WORKBRANCH COMPANION · SCREEN SAVER</text>
     <text x="1136" y="58" font-size="18" fill="#6F7FA8" text-anchor="end">opt-in · while agents work</text>
@@ -126,7 +126,8 @@
       <text x="408" y="692" font-size="20" fill="#F4EAD5">Dashboard on every display</text>
       <circle cx="789" cy="685" r="13" fill="#A2583B"/>
       <text x="789" y="692" font-size="17" fill="#FDF4E2" font-weight="700" text-anchor="middle">3</text>
-      <text x="812" y="692" font-size="20" fill="#F4EAD5">Any input locks the Mac</text>
+      <text x="812" y="692" font-size="18" fill="#F4EAD5">Input → lock if available</text>
     </g>
+    <text x="600" y="736" font-size="18" fill="#9AA5CE" text-anchor="middle">No lock available or lock failed: dashboard closes without locking.</text>
   </g>
 </svg>
