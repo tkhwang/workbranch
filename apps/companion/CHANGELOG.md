@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.32.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.31.0...workbranch-companion-v2.32.0) (2026-10-16)
+
+
+### Features
+
+* **docs:** 화면보호기 대시보드에 대한 문서 추가하기 ([cc84a7e](https://github.com/tkhwang/workbranch/commit/cc84a7e39bcacdcfcffdcc5b71ef1924d4b97fd4))
+
+
+### Bug Fixes
+
+* **docs:** clarify screensaver lock fallback and verification ([89b55e0](https://github.com/tkhwang/workbranch/commit/89b55e0d539494dc37fa4665817090f666629493))
+
 ## [2.31.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.30.0...workbranch-companion-v2.31.0) (2026-10-16)
 
 
