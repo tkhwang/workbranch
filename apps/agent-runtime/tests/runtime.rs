@@ -115,6 +115,36 @@ fn concurrent_sessions_do_not_lose_updates() {
 }
 
 #[test]
+fn hook_writer_waits_out_a_slow_concurrent_commit() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("runtime/state.sqlite3");
+    let mut holder = store::open(&path).unwrap();
+    let transaction = holder
+        .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+        .unwrap();
+
+    // Another hook writes while this one holds the lock longer than a fast
+    // disk would, as fsync on a busy machine does.
+    let writer = {
+        let path = path.clone();
+        std::thread::spawn(move || {
+            let mut db = store::open(&path)?;
+            event::ingest(&mut db, "/p/t", "claude", &json!({"session_id":"s","hook_event_name":"UserPromptSubmit","prompt":"safe request"}), 100)
+        })
+    };
+    std::thread::sleep(std::time::Duration::from_millis(400));
+    transaction.commit().unwrap();
+
+    writer.join().unwrap().unwrap();
+    assert_eq!(
+        store::snapshot(&store::open(&path).unwrap(), 100)
+            .unwrap()
+            .len(),
+        1
+    );
+}
+
+#[test]
 fn migration_refuses_symlinked_archive_and_preserves_runtime() {
     let root = tempfile::tempdir().unwrap();
     let outside = tempfile::tempdir().unwrap();
