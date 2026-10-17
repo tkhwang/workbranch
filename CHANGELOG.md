@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.38.0](https://github.com/tkhwang/workbranch/compare/v2.37.0...v2.38.0) (2026-10-17)
+
+
+### Features
+
+* **agent-runtime:** 동시 작성자의 커밋 대기 시간 조정하기 ([eca58db](https://github.com/tkhwang/workbranch/commit/eca58db85b5af5d467b4df98ebe47b383a5da844))
+* **ui:** Settings 뷰를 카테고리 탭으로 나누어 구조 정리하기 ([a8af667](https://github.com/tkhwang/workbranch/commit/a8af667c13d735d938f52693c8cc1b5a57b9bf44))
+* **ui:** Settings 뷰를 카테고리 탭으로 나누어 구조 정리하기 ([68a166a](https://github.com/tkhwang/workbranch/commit/68a166a8449ab641990129c0c3c66b6505dba09a))
+
+
+### Bug Fixes
+
+* **connections:** Main에 상태 확인 실패 결과 표시하기 ([cb19819](https://github.com/tkhwang/workbranch/commit/cb198191b71f5bd0128cca94ea3bbcb3a59046bc))
+
 ## [2.37.0](https://github.com/tkhwang/workbranch/compare/v2.36.0...v2.37.0) (2026-10-16)
 
 
