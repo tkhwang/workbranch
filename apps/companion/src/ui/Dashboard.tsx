@@ -172,9 +172,9 @@ type DashboardProps = {
 	readonly now: Date;
 	readonly theme: CompanionTheme;
 	readonly font?: CompanionFont;
-	/** Shown only when input really locks the Mac (COMP001 R7). */
+	/** Shown only when the Mac really locks under the dashboard (COMP001 R7). */
 	readonly lockAvailable: boolean;
-	/** Opened from Settings: input closes it instead of locking (R12). */
+	/** Opened from Settings: input closes it, nothing locks (R12). */
 	readonly preview?: boolean;
 };
 
@@ -199,7 +199,7 @@ export function Dashboard({
 						) : lockAvailable ? (
 							<span className="dashboard-lock">
 								<LockIcon />
-								입력 시 잠금
+								화면 잠김
 							</span>
 						) : null}
 					</div>

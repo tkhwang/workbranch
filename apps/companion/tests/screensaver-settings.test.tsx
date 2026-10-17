@@ -72,7 +72,7 @@ const preferences: CompanionPreferences = {
 };
 
 describe("ScreensaverSettings", () => {
-	it("starts switched off with the idle choice parked at five minutes", () => {
+	it("starts switched off and leaves the Mac to macOS", () => {
 		const html = renderToStaticMarkup(
 			<ScreensaverSettings
 				value={DEFAULT_SCREENSAVER}
@@ -81,26 +81,24 @@ describe("ScreensaverSettings", () => {
 			/>,
 		);
 		expect(html).toMatch(/id="screensaver-enabled"(?![^>]*checked)/);
-		expect(html).toMatch(/<select[^>]*disabled[^>]*id="screensaver-idle"/);
-		expect(html).toContain('<option value="5" selected="">5 min</option>');
 		expect(html).toContain("macOS handles sleep");
 	});
 
-	it("offers every whole minute from one to sixty", () => {
+	it("has no idle-minutes choice: the macOS screen saver decides when", () => {
 		const html = renderToStaticMarkup(
 			<ScreensaverSettings
-				value={{ enabled: true, idleMinutes: 12 }}
+				value={{ enabled: true }}
 				onChange={() => undefined}
 				onPreview={() => undefined}
 			/>,
 		);
-		expect(html.match(/<option /g)).toHaveLength(60);
-		expect(html).toContain('<option value="1">1 min</option>');
-		expect(html).toContain('<option value="60">60 min</option>');
-		expect(html).toContain("after 12 min without input");
+		expect(html).not.toContain("<select");
+		expect(html).not.toContain('id="screensaver-idle"');
+		expect(html).toContain("macOS screen saver starts or the screen locks");
+		expect(html).toContain("over the lock screen");
 	});
 
-	it("turns the feature on and keeps the idle minutes", () => {
+	it("turns the feature on", () => {
 		const changes: ScreensaverConfig[] = [];
 		const element = ScreensaverSettings({
 			value: DEFAULT_SCREENSAVER,
@@ -110,20 +108,7 @@ describe("ScreensaverSettings", () => {
 		findField(element, "screensaver-enabled")?.onChange?.({
 			currentTarget: { checked: true, value: "on" },
 		});
-		expect(changes).toEqual([{ enabled: true, idleMinutes: 5 }]);
-	});
-
-	it("changes the idle minutes and keeps the switch", () => {
-		const changes: ScreensaverConfig[] = [];
-		const element = ScreensaverSettings({
-			value: { enabled: true, idleMinutes: 5 },
-			onChange: (config) => changes.push(config),
-			onPreview: () => undefined,
-		});
-		findField(element, "screensaver-idle")?.onChange?.({
-			currentTarget: { checked: false, value: "12" },
-		});
-		expect(changes).toEqual([{ enabled: true, idleMinutes: 12 }]);
+		expect(changes).toEqual([{ enabled: true }]);
 	});
 });
 
@@ -166,7 +151,7 @@ describe("SettingsPanel screen saver section", () => {
 			onPreferencesChange: (next) => calls.push(next),
 			onScreensaverPreview: () => undefined,
 		});
-		const edited = { enabled: true, idleMinutes: 2 };
+		const edited = { enabled: true };
 		findPicker(element)?.onChange(edited);
 		expect(calls).toEqual([{ ...preferences, screensaver: edited }]);
 	});

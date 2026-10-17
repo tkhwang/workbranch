@@ -4,51 +4,25 @@ use std::time::Duration;
 
 use serde::Deserialize;
 
-const DEFAULT_IDLE_MINUTES: u32 = 5;
-const MIN_IDLE_MINUTES: u32 = 1;
-const MAX_IDLE_MINUTES: u32 = 60;
-
 /// Mirrors `ScreensaverConfig` in application/screensaver.ts, stored under
 /// the `screensaver` preference key.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub(crate) struct Config {
     pub(crate) enabled: bool,
-    pub(crate) idle_minutes: u32,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            idle_minutes: DEFAULT_IDLE_MINUTES,
-        }
-    }
 }
 
 impl Config {
-    fn idle_after(self) -> Duration {
-        Duration::from_secs(u64::from(self.idle_minutes) * 60)
-    }
-
-    /// Reads each field on its own and falls back to that field's default,
-    /// as `sanitizeScreensaverConfig()` does, so Settings and this service
-    /// always read a damaged value the same way.
+    /// Reads the switch and falls back to off, as
+    /// `sanitizeScreensaverConfig()` does, so Settings and this service
+    /// always read a damaged value the same way. Fields the feature no longer
+    /// uses (`idleMinutes`) are ignored.
     pub(crate) fn from_store_value(value: Option<serde_json::Value>) -> Self {
-        let defaults = Self::default();
-        let field = |name: &str| value.as_ref().and_then(|value| value.get(name));
         Self {
-            enabled: field("enabled")
+            enabled: value
+                .as_ref()
+                .and_then(|value| value.get("enabled"))
                 .and_then(serde_json::Value::as_bool)
-                .unwrap_or(defaults.enabled),
-            // Rounded, then held to the bounds, like Math.round there.
-            idle_minutes: field("idleMinutes")
-                .and_then(serde_json::Value::as_f64)
-                .map_or(defaults.idle_minutes, |minutes| {
-                    minutes
-                        .round()
-                        .clamp(f64::from(MIN_IDLE_MINUTES), f64::from(MAX_IDLE_MINUTES))
-                        as u32
-                }),
+                .unwrap_or_default(),
         }
     }
 }
@@ -134,12 +108,20 @@ pub(crate) enum Event {
     Working(bool),
     /// A runtime read failed, at this time since the Unix epoch.
     Unreadable(Duration),
-    Locked(bool),
-    /// The session's lock state, read on each sample while a requested lock
-    /// is awaited, so the lock is confirmed even when its notification is late.
-    LockSample(bool),
-    /// How long since the last keyboard or mouse input, sampled while armed.
-    Idle(Duration),
+    /// The macOS screen saver started (`true`) or stopped (`false`), as its
+    /// notifications tell, where the session cannot be asked.
+    Saver(bool),
+    /// A reading of the session, taken on every poll and whenever macOS says
+    /// the screen locked or unlocked or the screen saver started or stopped:
+    /// time since the last keyboard or mouse input, whether the session reads
+    /// as locked, and whether its screen saver runs (`None` where macOS
+    /// cannot be asked). The session, not a notification, is the truth, so a
+    /// stray or missed notification never misleads the machine.
+    Sample {
+        idle: Duration,
+        locked: bool,
+        saver: Option<bool>,
+    },
     /// Settings asked to show the dashboard now (COMP001 R12).
     Preview,
 }
@@ -150,40 +132,66 @@ pub(crate) enum Action {
     /// screen locked or not (COMP001 R2).
     HoldAwake,
     ReleaseAwake,
-    /// Keeps the display on, which also holds off the macOS screen saver and
-    /// its lock, while the dashboard may show (R3, R4).
+    /// Keeps the display on while the screen saver or the lock screen is up,
+    /// so the dashboard stays in view (COMP002 R2).
     HoldDisplay,
     ReleaseDisplay,
+    /// Shows the dashboard above the screen saver and the lock screen.
     ShowDashboard,
     HideDashboard,
-    /// Hands the screen to the macOS lock (COMP001 R6).
+    /// Asks for the session lock, so the dashboard never covers a screen
+    /// saver that would end without a password (COMP002 R3).
     LockScreen,
     /// Shows the dashboard as a preview: input closes it, nothing locks.
     ShowPreview,
 }
 
-/// How often idle time is sampled while waiting to show the dashboard.
+/// How often the session is read while agents work.
 pub(crate) const IDLE_POLL: Duration = Duration::from_secs(1);
-/// How often it is sampled while the dashboard shows, to catch input quickly.
+/// How often it is read while the dashboard shows or a lock is awaited, to
+/// catch input and the lock quickly.
 pub(crate) const INPUT_POLL: Duration = Duration::from_millis(250);
+/// How long input must pause, with the screen saver or the lock screen up,
+/// before the dashboard shows. Someone typing the password keeps it away;
+/// the screen saver itself starts after a far longer pause, so it is
+/// covered at once.
+pub(crate) const SHOW_AFTER: Duration = Duration::from_secs(15);
 /// How long failed runtime reads keep the last reading of whether agents
 /// work. A read can fail for a moment (a timeout, the CLI mid-upgrade) while
 /// agents go on working; reads that keep failing must not pin the Mac awake.
 pub(crate) const UNREADABLE_GRACE: Duration = Duration::from_secs(180);
 /// Samples to wait for each lock request to land (~2 s).
 pub(crate) const LOCK_WAIT_SAMPLES: u8 = 8;
-/// Times the lock is asked for before this Mac counts as having none (~6 s).
+/// Times the lock is asked for before giving up on it for this screen saver
+/// (~6 s).
 pub(crate) const LOCK_ATTEMPTS: u8 = 3;
+/// Samples the dashboard ignores input for once it shows over the lock
+/// screen (~1 s), so a stray reading while macOS raises the lock screen
+/// never takes it straight down again.
+pub(crate) const LIVE_GRACE_SAMPLES: u8 = 4;
 /// Samples a preview ignores input for, so the click that opened it and the
 /// hand still on the mouse do not close it at once (~2 s).
 pub(crate) const PREVIEW_GRACE_SAMPLES: u8 = 8;
 
-#[derive(Clone, Copy, Debug)]
-struct LockWait {
-    /// Lock requests made so far.
-    attempts: u8,
-    /// Samples taken since the latest request.
-    samples: u8,
+/// What covers the screen, with the samples taken since it showed.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+enum Shown {
+    #[default]
+    Nothing,
+    Live(u8),
+    Preview(u8),
+}
+
+/// Where the lock asked for under a running screen saver stands.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+enum LockRequest {
+    /// Nothing asked for.
+    #[default]
+    None,
+    /// Asked for `attempts` times, the latest `samples` readings ago.
+    Awaiting { attempts: u8, samples: u8 },
+    /// Never landed: left to macOS until this screen saver ends.
+    GaveUp,
 }
 
 #[derive(Debug, Default)]
@@ -192,21 +200,26 @@ pub(crate) struct Machine {
     working: bool,
     /// When runtime reads started failing, while they keep failing.
     unreadable_since: Option<Duration>,
+    /// Whether the login session reads as locked.
     locked: bool,
+    /// Whether the macOS screen saver runs.
+    saver: bool,
+    /// Set when someone signs in. A reading that the screen saver still runs
+    /// is not believed again until one reads it stopped or a new one starts,
+    /// so a late reading never locks the Mac just after it was unlocked
+    /// (Touch ID leaves no keyboard or mouse input to hold the lock off).
+    saver_stale: bool,
     /// Whether the system is held awake.
     awake: bool,
     /// Whether the display is held on.
     display: bool,
-    dashboard: bool,
-    /// The latest idle sample; dropped whenever the machine disarms, since
-    /// nothing is sampled meanwhile and an old reading would misfire.
+    shown: Shown,
+    lock_request: LockRequest,
+    /// The latest idle sample; dropped whenever nothing is sampled, since an
+    /// old reading would look like input.
     idle: Option<Duration>,
     /// Whether macOS offers an immediate lock here (COMP001 R7).
     lock_available: bool,
-    /// A lock asked for and not confirmed yet.
-    lock_wait: Option<LockWait>,
-    /// Samples taken since a preview opened, while it shows.
-    preview: Option<u8>,
 }
 
 impl Machine {
@@ -218,16 +231,48 @@ impl Machine {
     }
 
     /// The feature is on and agents work: the system stays awake, even with
-    /// the screen locked, since a lock stops no agent but sleep does (R2).
+    /// the screen locked, since a lock stops no agent but sleep does.
     fn keeps_awake(&self) -> bool {
         self.config.enabled && self.working
     }
 
-    /// Armed: awake and the screen unlocked, so the display stays on and the
-    /// dashboard may show. The display, screen saver and lock screen are
-    /// otherwise left to the OS (R3, R5).
-    fn armed(&self) -> bool {
-        self.keeps_awake() && !self.locked
+    /// Covered: agents work and macOS has put up its screen saver or its
+    /// lock screen. The display then stays on and the dashboard shows on
+    /// top. Until then nothing here holds the display, so the screen saver,
+    /// the lock and display sleep follow the macOS settings.
+    fn covered(&self) -> bool {
+        self.keeps_awake() && (self.locked || self.saver)
+    }
+
+    /// Whether the dashboard may show now. Where the Mac can lock, only over
+    /// a session that reads as locked, so the dashboard never claims a lock
+    /// that is not there and input never reveals the desktop without a
+    /// password (COMP002 R3).
+    fn may_show(&self) -> bool {
+        self.covered() && (self.locked || !self.lock_available)
+    }
+
+    fn read_session(&mut self, idle: Duration, locked: bool, saver: Option<bool>) -> bool {
+        let input = self.idle.is_some_and(|previous| idle < previous);
+        self.idle = Some(idle);
+        if self.locked && !locked {
+            // Someone signed in: no screen saver runs behind the desktop.
+            self.saver = false;
+            self.saver_stale = true;
+        }
+        self.locked = locked;
+        if let Some(saver) = saver {
+            if !saver {
+                self.saver_stale = false;
+            }
+            self.saver = saver && !self.saver_stale;
+        }
+        if input && !self.locked {
+            // Input ends a screen saver that has no lock behind it, even if
+            // its stop notification never comes.
+            self.saver = false;
+        }
+        input
     }
 
     pub(crate) fn step(&mut self, event: Event) -> Vec<Action> {
@@ -244,83 +289,73 @@ impl Machine {
                     self.working = false;
                 }
             }
-            Event::Locked(locked) | Event::LockSample(locked) => self.locked = locked,
-            Event::Idle(idle) => {
-                input = self.idle.is_some_and(|previous| idle < previous);
-                self.idle = Some(idle);
+            Event::Saver(running) => {
+                if running {
+                    // A new screen saver, not a late reading of the old one.
+                    self.saver_stale = false;
+                }
+                self.saver = running;
             }
+            Event::Sample {
+                idle,
+                locked,
+                saver,
+            } => input = self.read_session(idle, locked, saver),
             Event::Preview => {}
         }
-        let armed = self.armed();
-        if !armed && self.preview.is_none() {
-            self.idle = None;
+        let covered = self.covered();
+        let sampled = matches!(event, Event::Sample { .. });
+        if !covered || self.locked {
+            // A lock request ends with the lock or with the screen saver.
+            self.lock_request = LockRequest::None;
         }
 
         let mut actions = Vec::new();
-        if let Some(samples) = self.preview {
-            // A preview answers only to input after its grace, and to a lock.
-            let closes = match event {
-                Event::Idle(_) => {
-                    let samples = samples.saturating_add(1);
-                    self.preview = Some(samples);
-                    input && samples > PREVIEW_GRACE_SAMPLES
-                }
-                Event::Locked(true) | Event::LockSample(true) => true,
-                _ => false,
-            };
-            if closes {
-                self.preview = None;
-                self.dashboard = false;
-                actions.push(Action::HideDashboard);
-            }
-        } else if matches!(event, Event::Preview) && !self.dashboard {
-            self.preview = Some(0);
-            self.dashboard = true;
-            // The first sample sets the baseline that input is measured from.
-            self.idle = None;
-            actions.push(Action::ShowPreview);
-        } else if self.dashboard && armed && self.lock_wait.is_some() {
-            // The dashboard stays up until the session reads as locked, so the
-            // desktop never shows and no key reaches the app underneath (R6).
-            // A lock that has not landed is asked for again. One that never
-            // lands means this Mac offers no lock after all: the dashboard
-            // closes as it does without one (R7), rather than cover the
-            // screen with no way back.
-            if let (Event::LockSample(_), Some(wait)) = (event, self.lock_wait) {
-                let samples = wait.samples.saturating_add(1);
-                if samples < LOCK_WAIT_SAMPLES {
-                    self.lock_wait = Some(LockWait { samples, ..wait });
-                } else if wait.attempts < LOCK_ATTEMPTS {
-                    self.lock_wait = Some(LockWait {
-                        attempts: wait.attempts + 1,
-                        samples: 0,
-                    });
-                    actions.push(Action::LockScreen);
-                } else {
-                    self.lock_wait = None;
-                    self.dashboard = false;
+        match self.shown {
+            Shown::Preview(samples) if sampled => {
+                // A preview answers only to input after its grace, and to a
+                // lock.
+                let samples = samples.saturating_add(1);
+                self.shown = Shown::Preview(samples);
+                if (input && samples > PREVIEW_GRACE_SAMPLES) || self.locked {
+                    self.shown = Shown::Nothing;
                     actions.push(Action::HideDashboard);
                 }
             }
-        } else if self.dashboard && armed && input && self.lock_available {
-            self.lock_wait = Some(LockWait {
-                attempts: 1,
-                samples: 0,
-            });
-            actions.push(Action::LockScreen);
-        } else if self.dashboard && (!armed || input) {
-            self.lock_wait = None;
-            self.dashboard = false;
-            actions.push(Action::HideDashboard);
-        } else if !self.dashboard
-            && armed
-            && self
-                .idle
-                .is_some_and(|idle| idle >= self.config.idle_after())
-        {
-            self.dashboard = true;
-            actions.push(Action::ShowDashboard);
+            Shown::Preview(_) => {}
+            Shown::Live(_) if !self.may_show() => {
+                self.shown = Shown::Nothing;
+                actions.push(Action::HideDashboard);
+            }
+            Shown::Live(samples) if sampled => {
+                // Input uncovers the lock screen, so its owner can sign in.
+                let samples = samples.saturating_add(1);
+                self.shown = Shown::Live(samples);
+                if input && samples > LIVE_GRACE_SAMPLES {
+                    self.shown = Shown::Nothing;
+                    actions.push(Action::HideDashboard);
+                }
+            }
+            Shown::Live(_) => {}
+            Shown::Nothing if matches!(event, Event::Preview) => {
+                self.shown = Shown::Preview(0);
+                // The first sample sets the baseline input is measured from.
+                self.idle = None;
+                actions.push(Action::ShowPreview);
+            }
+            Shown::Nothing => {
+                let paused = self.idle.is_some_and(|idle| idle >= SHOW_AFTER);
+                if paused && self.may_show() {
+                    self.shown = Shown::Live(0);
+                    actions.push(Action::ShowDashboard);
+                } else if paused && covered && sampled {
+                    // The screen saver runs and macOS has not locked yet:
+                    // lock first, and show once the lock reads as landed.
+                    self.ask_for_lock(&mut actions);
+                }
+            }
         }
+
         let awake = self.keeps_awake();
         if awake != self.awake {
             self.awake = awake;
@@ -330,41 +365,67 @@ impl Machine {
                 Action::ReleaseAwake
             });
         }
-        if armed != self.display {
-            self.display = armed;
-            actions.push(if armed {
+        if covered != self.display {
+            self.display = covered;
+            actions.push(if covered {
                 Action::HoldDisplay
             } else {
                 Action::ReleaseDisplay
             });
         }
+        if self.poll_interval().is_none() {
+            self.idle = None;
+        }
         actions
     }
 
+    /// Asks for the lock, again every `LOCK_WAIT_SAMPLES` readings that do
+    /// not find it, up to `LOCK_ATTEMPTS` times. A lock that never lands is
+    /// left to macOS, which locks on its own once its password delay ends;
+    /// the dashboard waits for that, with the display kept on.
+    fn ask_for_lock(&mut self, actions: &mut Vec<Action>) {
+        self.lock_request = match self.lock_request {
+            LockRequest::None => {
+                actions.push(Action::LockScreen);
+                LockRequest::Awaiting {
+                    attempts: 1,
+                    samples: 0,
+                }
+            }
+            LockRequest::Awaiting { attempts, samples } => {
+                let samples = samples.saturating_add(1);
+                if samples < LOCK_WAIT_SAMPLES {
+                    LockRequest::Awaiting { attempts, samples }
+                } else if attempts < LOCK_ATTEMPTS {
+                    actions.push(Action::LockScreen);
+                    LockRequest::Awaiting {
+                        attempts: attempts + 1,
+                        samples: 0,
+                    }
+                } else {
+                    LockRequest::GaveUp
+                }
+            }
+            LockRequest::GaveUp => LockRequest::GaveUp,
+        };
+    }
+
     pub(crate) fn showing(&self) -> bool {
-        self.dashboard
+        self.shown != Shown::Nothing
     }
 
     pub(crate) fn previewing(&self) -> bool {
-        self.preview.is_some()
+        matches!(self.shown, Shown::Preview(_))
     }
 
-    /// A lock was asked for and has not landed: the service then samples the
-    /// session's lock state instead of idle time.
-    pub(crate) fn awaiting_lock(&self) -> bool {
-        self.lock_wait.is_some()
-    }
-
-    /// When to sample idle time next; `None` while there is nothing to show.
+    /// When to read the session next; `None` while nothing could change.
     pub(crate) fn poll_interval(&self) -> Option<Duration> {
-        if self.preview.is_some() {
+        if self.showing() || matches!(self.lock_request, LockRequest::Awaiting { .. }) {
             Some(INPUT_POLL)
-        } else if !self.armed() {
-            None
-        } else if self.dashboard {
-            Some(INPUT_POLL)
-        } else {
+        } else if self.keeps_awake() {
             Some(IDLE_POLL)
+        } else {
+            None
         }
     }
 }

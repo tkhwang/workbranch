@@ -1,6 +1,8 @@
-//! Keeps the Mac awake while agents work (COMP001). `machine` decides,
+//! Keeps the Mac awake while agents work and shows the dashboard over the
+//! macOS screen saver and lock screen (COMP001, COMP002). `machine` decides,
 //! `platform` acts; this module feeds the machine from the runtime service,
-//! the preference store and screen-lock notifications, on one thread.
+//! the preference store, screen-lock and screen-saver notifications and
+//! readings of the session, on one thread.
 
 mod machine;
 #[cfg(target_os = "macos")]
@@ -10,7 +12,7 @@ mod windows;
 
 use std::sync::Mutex;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Runtime, State};
 use tauri_plugin_store::StoreExt;
@@ -26,7 +28,11 @@ const CONFIG_KEY: &str = "screensaver";
 enum Message {
     Runtime(RuntimeSnapshot),
     ConfigChanged,
-    Locked(bool),
+    /// macOS said the screen locked or unlocked; the session is read for
+    /// the state itself.
+    LockChanged,
+    /// The macOS screen saver started or stopped.
+    Saver(bool),
     DisplaysChanged,
     Preview,
 }
@@ -34,7 +40,7 @@ enum Message {
 pub(crate) struct Screensaver {
     /// Wakes the screensaver thread, e.g. right after Settings changes.
     wake: Mutex<Sender<Message>>,
-    /// Whether input on the dashboard can lock the Mac (COMP001 R7).
+    /// Whether the dashboard can lock the Mac (COMP001 R7).
     lock_available: bool,
 }
 
@@ -60,9 +66,15 @@ pub(crate) fn start<R: Runtime>(app: &AppHandle<R>, runtime: &RuntimeService) ->
     #[cfg(target_os = "macos")]
     {
         let on_lock = Mutex::new(sender.clone());
-        macos::watch_screen_lock(app, move |locked| {
+        macos::watch_screen_lock(app, move || {
             if let Ok(sender) = on_lock.lock() {
-                let _ = sender.send(Message::Locked(locked));
+                let _ = sender.send(Message::LockChanged);
+            }
+        });
+        let on_saver = Mutex::new(sender.clone());
+        macos::watch_screen_saver(app, move |running| {
+            if let Ok(sender) = on_saver.lock() {
+                let _ = sender.send(Message::Saver(running));
             }
         });
         let on_displays = Mutex::new(sender.clone());
@@ -96,27 +108,39 @@ fn run<R: Runtime>(
 ) {
     let mut machine = Machine::new(lock_available);
 
-    let locked = platform.screen_locked();
-    apply(&mut platform, &machine.step(Event::Locked(locked)));
+    let first = sample(&platform);
+    apply(&mut platform, &machine.step(first));
     apply(
         &mut platform,
         &machine.step(Event::Config(read_config(app))),
     );
 
+    // When the session is read next. Messages in between never push it back,
+    // so runtime snapshots arriving faster than the poll (agents at work)
+    // cannot starve the readings.
+    let mut due: Option<Instant> = None;
     loop {
-        // Idle time has no notification, so it is sampled, and only while
-        // the machine could act on it. While a lock is awaited, the lock
-        // state is sampled instead, since its notification can come late.
+        // Idle time has no notification, and the lock notification can come
+        // late or stray, so the session is read on a timer, only while the
+        // machine could act on it.
         let message = match machine.poll_interval() {
-            Some(interval) => match messages.recv_timeout(interval) {
-                Ok(message) => Some(message),
-                Err(RecvTimeoutError::Timeout) => None,
-                Err(RecvTimeoutError::Disconnected) => return,
-            },
-            None => match messages.recv() {
-                Ok(message) => Some(message),
-                Err(_) => return,
-            },
+            Some(interval) => {
+                let now = Instant::now();
+                let deadline = due.map_or(now + interval, |due| due.min(now + interval));
+                due = Some(deadline);
+                match messages.recv_timeout(deadline.saturating_duration_since(now)) {
+                    Ok(message) => Some(message),
+                    Err(RecvTimeoutError::Timeout) => None,
+                    Err(RecvTimeoutError::Disconnected) => return,
+                }
+            }
+            None => {
+                due = None;
+                match messages.recv() {
+                    Ok(message) => Some(message),
+                    Err(_) => return,
+                }
+            }
         };
         let event = match message {
             Some(Message::Runtime(snapshot)) => match snapshot.document.as_deref() {
@@ -125,7 +149,12 @@ fn run<R: Runtime>(
                 None => Event::Unreadable(Duration::from_millis(snapshot.read_at_ms)),
             },
             Some(Message::ConfigChanged) => Event::Config(read_config(app)),
-            Some(Message::Locked(locked)) => Event::Locked(locked),
+            Some(Message::LockChanged) | None => sample(&platform),
+            // Where the session can be asked, it is the truth.
+            Some(Message::Saver(running)) => match platform.screen_saver_running() {
+                Some(_) => sample(&platform),
+                None => Event::Saver(running),
+            },
             Some(Message::Preview) => Event::Preview,
             Some(Message::DisplaysChanged) => {
                 // A display came or went: rebuild the windows to match.
@@ -136,10 +165,21 @@ fn run<R: Runtime>(
                 }
                 continue;
             }
-            None if machine.awaiting_lock() => Event::LockSample(platform.screen_locked()),
-            None => Event::Idle(platform.idle_time()),
         };
+        if matches!(event, Event::Sample { .. }) {
+            // This turn read the session; the next reading is a full
+            // interval away.
+            due = None;
+        }
         apply(&mut platform, &machine.step(event));
+    }
+}
+
+fn sample(platform: &impl Platform) -> Event {
+    Event::Sample {
+        idle: platform.idle_time(),
+        locked: platform.screen_locked(),
+        saver: platform.screen_saver_running(),
     }
 }
 
@@ -164,7 +204,7 @@ pub(crate) struct ScreensaverStatus {
     lock_available: bool,
 }
 
-/// Lets the dashboard tell whether input will lock the Mac (COMP001 R7).
+/// Lets the dashboard tell whether it shows over a locked Mac (COMP001 R7).
 #[tauri::command]
 pub(crate) fn screensaver_status(screensaver: State<'_, Screensaver>) -> ScreensaverStatus {
     ScreensaverStatus {

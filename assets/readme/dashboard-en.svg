@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
   <title id="title">Workbranch Companion screen saver dashboard</title>
-  <desc id="desc">While agents work and nobody touches the Mac, Companion covers every display with a view-only dashboard: a 7-segment clock, the date, 입력 시 잠금 (input locks), per-state counts, and the 내 응답 대기 (waiting on you), 실행 중 (running) and 턴 종료 · 검토 (turn ended, review) columns with each task's prompt, tool activity or last response, and repo changes. When locking is available, input requests the macOS lock screen. Without locking, the indicator is hidden and input only closes the dashboard. Failed lock requests also close it without locking.</desc>
+  <desc id="desc">While agents work and the macOS screen saver or lock screen is up, Companion shows a view-only dashboard on every display above the lock screen: a 7-segment clock, the date, 화면 잠김 (screen locked), per-state counts, and the 내 응답 대기 (waiting on you), 실행 중 (running) and 턴 종료 · 검토 (turn ended, review) columns with each task's prompt, tool activity or last response, and repo changes. Input moves it aside to reveal the macOS lock screen. Without locking, the indicator is hidden.</desc>
   <rect width="1200" height="760" rx="24" fill="#13244B"/>
   <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Apple SD Gothic Neo', 'Noto Sans KR', monospace">
     <text x="64" y="58" font-size="18" fill="#9AA5CE" letter-spacing="2.5">WORKBRANCH COMPANION · SCREEN SAVER</text>
@@ -52,7 +52,7 @@
       </g>
       <text x="372" y="160" font-size="24" fill="#9AA5CE">10월 17일 금요일</text>
       <g transform="translate(372 178)" fill="none" stroke="#9AA5CE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="8" width="16" height="12" rx="2.5"/><path d="M4.5 8V5a4.5 4.5 0 0 1 9 0v3"/></g>
-      <text x="398" y="197" font-size="20" fill="#9AA5CE">입력 시 잠금</text>
+      <text x="398" y="197" font-size="20" fill="#9AA5CE">화면 잠김</text>
       <text x="1124" y="176" font-size="68" fill="#DFC075" font-weight="700" text-anchor="end">1</text>
       <text x="1124" y="206" font-size="18" fill="#9AA5CE" text-anchor="end">턴 종료</text>
       <text x="974" y="176" font-size="68" fill="#74C99B" font-weight="700" text-anchor="end">2</text>

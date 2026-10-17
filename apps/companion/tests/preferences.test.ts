@@ -36,7 +36,6 @@ const CUSTOM_MENU_BAR: MenuBarConfig = {
 
 const CUSTOM_SCREENSAVER: ScreensaverConfig = {
 	enabled: true,
-	idleMinutes: 12,
 };
 
 vi.mock("@tauri-apps/plugin-store", () => ({ load: vi.fn() }));
@@ -59,7 +58,7 @@ describe("companion preferences", () => {
 				fontSize: "gigantic",
 				theme: "rainbow",
 				menuBar: { claude5h: "yes", percent: "left" },
-				screensaver: { enabled: "yes", idleMinutes: "ten" },
+				screensaver: { enabled: "yes" },
 			}),
 		).toEqual({
 			preferences: DEFAULT_COMPANION_PREFERENCES,
@@ -340,8 +339,8 @@ describe("companion preferences", () => {
 });
 
 describe("screensaver preference", () => {
-	it("defaults to off with dashboard after five idle minutes", () => {
-		expect(DEFAULT_SCREENSAVER).toEqual({ enabled: false, idleMinutes: 5 });
+	it("defaults to off", () => {
+		expect(DEFAULT_SCREENSAVER).toEqual({ enabled: false });
 		expect(DEFAULT_COMPANION_PREFERENCES.screensaver).toEqual(
 			DEFAULT_SCREENSAVER,
 		);
@@ -361,26 +360,20 @@ describe("screensaver preference", () => {
 		});
 	});
 
-	it("clamps idle minutes to one through sixty whole minutes", () => {
+	it("keeps the switch and drops the idle minutes of older stores", () => {
 		expect(
-			sanitizeScreensaverConfig({ enabled: true, idleMinutes: 0 }).config,
-		).toEqual({ enabled: true, idleMinutes: 1 });
-		expect(
-			sanitizeScreensaverConfig({ enabled: true, idleMinutes: 600 }).config,
-		).toEqual({ enabled: true, idleMinutes: 60 });
-		expect(
-			sanitizeScreensaverConfig({ enabled: true, idleMinutes: 2.6 }),
-		).toEqual({ config: { enabled: true, idleMinutes: 3 }, sanitized: true });
+			sanitizeScreensaverConfig({ enabled: true, idleMinutes: 12 }),
+		).toEqual({ config: { enabled: true }, sanitized: true });
 	});
 
-	it("falls back field by field for unusable values", () => {
-		expect(
-			sanitizeScreensaverConfig({ enabled: "yes", idleMinutes: 9 }).config,
-		).toEqual({ enabled: false, idleMinutes: 9 });
-		expect(
-			sanitizeScreensaverConfig({ enabled: true, idleMinutes: Number.NaN })
-				.config,
-		).toEqual({ enabled: true, idleMinutes: 5 });
+	it("falls back to off for an unusable switch", () => {
+		expect(sanitizeScreensaverConfig({ enabled: "yes" })).toEqual({
+			config: { enabled: false },
+			sanitized: true,
+		});
+		expect(sanitizeScreensaverConfig("on").config).toEqual({
+			enabled: false,
+		});
 	});
 
 	it("compares configs by value", () => {
