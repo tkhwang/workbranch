@@ -21,7 +21,9 @@ Add integration coverage in `apps/cli/tests/run.sh` for CLI behavior, Git safety
 
 ## Commit & Pull Request Guidelines
 
-Use plain Conventional Commit style with scopes, without emoji prefixes, for example `feat(config): add repo-level setup commands` and `fix(validation): improve name validation`. Keep commit subjects short and action-oriented. Pull requests should state the user-visible behavior, list touched commands or files, and include verification output from `./apps/cli/tests/run.sh` plus any syntax or diff checks.
+Use plain Conventional Commit style with scopes, without emoji prefixes, for example `feat(config): add repo-level setup commands` and `fix(validation): improve name validation`. Keep commit subjects short and action-oriented.
+
+Releases are cut by release-please from the paths a commit changes, not from its scope. The repository root is the CLI package (tag `vX.Y.Z`, Homebrew formula, agent-runtime binaries); `apps/companion` is the companion package. A `feat` or `fix` commit releases every package it touches. The root's `exclude-paths` only match directories (`apps/companion`, `packages/contract`, `.github`, `docs`, `assets/readme`); top-level files such as `README.md`, `README.ko.md`, `DESIGN.md`, `AGENTS.md`, `package.json` and `pnpm-lock.yaml` always count as CLI changes. So commit edits to those files on their own with a type that publishes nothing (`docs`, `chore`, `build`), never inside a `feat` or `fix` commit and never as `feat(docs)` or `fix(docs)`; otherwise companion-only work publishes an empty CLI release. If such a commit already merged, add a `BEGIN_COMMIT_OVERRIDE` / `END_COMMIT_OVERRIDE` block with a `docs:` message to its pull request body before release-please runs again. Pull requests should state the user-visible behavior, list touched commands or files, and include verification output from `./apps/cli/tests/run.sh` plus any syntax or diff checks.
 
 ## Agent-Specific Instructions
 
