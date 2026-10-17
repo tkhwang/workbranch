@@ -154,6 +154,13 @@ describe("usage surfaces", () => {
 		).toHaveLength(2);
 		// Each day lists both agents' totals; empty days read as a dash.
 		expect(week.match(/class="usage-values-day"/g)).toHaveLength(7);
+		// The totals sit right under the bars, and the day axis under them.
+		expect(week.indexOf('class="usage-compare"')).toBeLessThan(
+			week.indexOf('class="usage-values"'),
+		);
+		expect(week.indexOf('class="usage-values"')).toBeLessThan(
+			week.indexOf('class="usage-axis"'),
+		);
 		expect(week).toMatch(
 			/data-provider="claude"><span class="usage-sr">claude <\/span>338M<\/span><span data-provider="codex"><span class="usage-sr">codex <\/span>587k</,
 		);

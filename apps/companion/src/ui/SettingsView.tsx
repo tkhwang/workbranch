@@ -1,11 +1,21 @@
 import type { ReactNode } from "react";
 import type { CompanionPreferences } from "../application/preferences";
 import type { ClaudeLimitRelayProps } from "./ClaudeLimitRelaySettings";
+import {
+	type SettingsAttention,
+	type SettingsCategory,
+	SettingsNav,
+} from "./SettingsNav";
 import { SettingsPanel } from "./SettingsPanel";
 
 type Props = {
-	readonly claudeLimitRelay: ClaudeLimitRelayProps;
+	readonly category: SettingsCategory;
+	readonly onCategoryChange: (category: SettingsCategory) => void;
+	/** Tabs that hold something to act on get a dot. */
+	readonly attention?: SettingsAttention;
+	readonly status?: ReactNode;
 	readonly connections?: ReactNode;
+	readonly claudeLimitRelay: ClaudeLimitRelayProps;
 	readonly preferences: CompanionPreferences;
 	readonly launchAtLogin: boolean;
 	readonly launchAtLoginLoading: boolean;
@@ -15,8 +25,12 @@ type Props = {
 };
 
 export function SettingsView({
-	claudeLimitRelay,
+	category,
+	onCategoryChange,
+	attention = {},
+	status,
 	connections,
+	claudeLimitRelay,
 	preferences,
 	launchAtLogin,
 	launchAtLoginLoading,
@@ -26,16 +40,26 @@ export function SettingsView({
 }: Props) {
 	return (
 		<section className="settings-view view-panel" aria-label="Settings View">
-			{connections}
-			<SettingsPanel
-				claudeLimitRelay={claudeLimitRelay}
-				preferences={preferences}
-				launchAtLogin={launchAtLogin}
-				launchAtLoginLoading={launchAtLoginLoading}
-				onLaunchAtLoginChange={onLaunchAtLoginChange}
-				onPreferencesChange={onPreferencesChange}
-				onScreensaverPreview={onScreensaverPreview}
+			<SettingsNav
+				attention={attention}
+				current={category}
+				onChange={onCategoryChange}
 			/>
+			{category === "connections" ? (
+				connections
+			) : (
+				<SettingsPanel
+					category={category}
+					claudeLimitRelay={claudeLimitRelay}
+					launchAtLogin={launchAtLogin}
+					launchAtLoginLoading={launchAtLoginLoading}
+					onLaunchAtLoginChange={onLaunchAtLoginChange}
+					onPreferencesChange={onPreferencesChange}
+					onScreensaverPreview={onScreensaverPreview}
+					preferences={preferences}
+					status={status}
+				/>
+			)}
 		</section>
 	);
 }

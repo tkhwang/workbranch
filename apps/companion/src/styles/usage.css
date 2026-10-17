@@ -370,14 +370,34 @@
 .usage-values {
 	font-size: var(--fs-label);
 	font-variant-numeric: tabular-nums;
-	margin-top: 4px;
+	margin-bottom: 4px;
 	text-align: center;
 }
 
+/* Each total sits under its own bar: the day slot's padding and gap,
+   split into the same equal parts as the bars. */
 .usage-values-day {
-	display: grid;
+	display: flex;
+	gap: 1px;
 	line-height: 1.35;
 	min-width: 0;
+	padding: 0 2px;
+}
+
+.usage-values-day > [data-provider] {
+	flex: 1 1 0;
+	min-width: 0;
+	white-space: nowrap;
+}
+
+/* Too narrow for two totals side by side (about five characters each at
+   the label size, so em tracks Text Size): stack them under the day. */
+@container usage (max-width: 46em) {
+	.usage-values-day {
+		display: grid;
+		gap: 0;
+		padding: 0;
+	}
 }
 
 .usage-values-day [data-provider="claude"] {

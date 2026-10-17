@@ -241,3 +241,38 @@ export function receiptState(
 	if (observedAt <= 0) return "waiting";
 	return after !== undefined && observedAt > after ? "verified" : "historical";
 }
+
+/**
+ * Whether Main shows the setup panel. It stays hidden while the first check
+ * runs, so it never flashes on launch. A failed status check shows it with
+ * the retry whoever ran the check, even when an earlier ready status is
+ * still cached: the setup itself may have broken, as after a CLI update.
+ * Once setup is known, an unready CLI or no agent with an observed event
+ * keeps it open. An action's progress and result keep it open only when the
+ * action was started there; results of actions run from Settings ›
+ * Connections stay in Settings.
+ */
+export function needsOnboarding(
+	state: ConnectionState,
+	sessions: readonly { readonly provider: Provider }[],
+	actionStartedOnMain: boolean,
+): boolean {
+	// A check failure clears `lastAction`; an action's failure keeps it.
+	if (state.error !== null && state.lastAction === null) return true;
+	if (
+		actionStartedOnMain &&
+		(state.busy !== null || state.notice !== null || state.error !== null)
+	)
+		return true;
+	const { status } = state;
+	if (status === null) return false;
+	return (
+		status.cli.state !== "ready" ||
+		!status.agents.some(
+			(agent) =>
+				agent.state === "configured" &&
+				((agent.lastObservedAt ?? 0) > 0 ||
+					sessions.some((session) => session.provider === agent.provider)),
+		)
+	);
+}

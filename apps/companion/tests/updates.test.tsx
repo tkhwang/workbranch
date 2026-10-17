@@ -1,5 +1,10 @@
+import { Children, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import {
+	type ConnectionState,
+	EMPTY_CONNECTION_STATE,
+} from "../src/application/connections";
 import {
 	companionRestartPending,
 	createUpdateController,
@@ -10,7 +15,7 @@ import {
 	updateActionLabel,
 	updateTargets,
 } from "../src/application/updates";
-import { UpdatePanel } from "../src/ui/UpdatePanel";
+import { StatusSettings } from "../src/ui/StatusSettings";
 
 const current: UpdateStatus = {
 	brewPath: "/opt/homebrew/bin/brew",
@@ -43,14 +48,17 @@ function services(overrides: {
 	};
 }
 
-function render(state: Partial<UpdateState>) {
+function render(
+	state: Partial<UpdateState>,
+	connections: ConnectionState = EMPTY_CONNECTION_STATE,
+) {
 	return renderToStaticMarkup(
-		<UpdatePanel
-			theme="claude"
-			state={{ ...EMPTY_UPDATE_STATE, ...state }}
-			onCheck={() => {}}
-			onApply={() => {}}
-			onClose={() => {}}
+		<StatusSettings
+			connections={connections}
+			onApplyUpdates={() => {}}
+			onCheckUpdates={() => {}}
+			onOpenConnections={() => {}}
+			updates={{ ...EMPTY_UPDATE_STATE, ...state }}
 		/>,
 	);
 }
@@ -174,7 +182,7 @@ describe("update controller", () => {
 	});
 });
 
-describe("update panel", () => {
+describe("settings status", () => {
 	it("shows installed and latest versions with one update action", () => {
 		const html = render({ status: outdated });
 		expect(html).toContain("설치 2.25.1 → 최신 2.26.0");
@@ -199,9 +207,7 @@ describe("update panel", () => {
 			},
 		});
 		expect(html).toContain("Homebrew 미설치");
-		expect(html).toContain(
-			"Settings의 설치 및 agent 연결에서 CLI를 설치하세요.",
-		);
+		expect(html).toContain("Connections에서 CLI를 설치하세요.");
 		expect(html).toContain(
 			"개발 빌드에서는 Companion을 업데이트하지 않습니다.",
 		);
@@ -223,5 +229,102 @@ describe("update panel", () => {
 		expect(updating.match(/aria-busy="true"/g)).toHaveLength(1);
 		expect(updating).toMatch(/aria-busy="true"[^>]*>.*업데이트 중…<\/button>/);
 		expect(updating).not.toContain("모두 업데이트 후 재시작");
+	});
+	it("asks for the first check instead of running brew update on open", () => {
+		const html = render({});
+		expect(html).toMatch(/<button[^>]*>업데이트 확인<\/button>/);
+		expect(html).toContain(
+			"Homebrew로 설치한 CLI와 Companion의 최신 버전을 확인합니다.",
+		);
+		expect(html).not.toContain("업데이트 있음");
+	});
+
+	it("puts available updates first with the one button that applies them", () => {
+		const html = render({ status: outdated });
+		expect(html.indexOf("업데이트 있음 · CLI, Companion")).toBeLessThan(
+			html.indexOf("Workbranch CLI"),
+		);
+		expect(html.match(/모두 업데이트 후 재시작/g)).toHaveLength(1);
+	});
+
+	it("orders the check outcome, CLI then Companion, the log, then agents", () => {
+		const idle = render({ status: current });
+		expect(idle.indexOf("업데이트할 항목이 없습니다.")).toBeLessThan(
+			idle.indexOf("<strong>Workbranch CLI</strong>"),
+		);
+		const failed = render({
+			status: outdated,
+			error: "업데이트를 완료하지 못했습니다.",
+			logs: "brew upgrade log",
+		});
+		const positions = [
+			"업데이트를 완료하지 못했습니다.",
+			"<strong>Workbranch CLI</strong>",
+			"<strong>Workbranch Companion</strong>",
+			"brew upgrade log",
+			"<strong>Agent 연결</strong>",
+		].map((text) => failed.indexOf(text));
+		expect(positions.every((index) => index >= 0)).toBe(true);
+		expect(positions).toEqual([...positions].sort((a, b) => a - b));
+	});
+
+	it("summarizes CLI and agent readiness with a way to Connections", () => {
+		const html = render(
+			{ status: current },
+			{
+				...EMPTY_CONNECTION_STATE,
+				loading: false,
+				status: {
+					brewPath: "/opt/homebrew/bin/brew",
+					formulaInstalled: true,
+					cli: {
+						state: "ready",
+						path: "/opt/homebrew/bin/workbranch",
+						version: "2.37.0",
+						message: "CLI와 수집기를 사용할 수 있습니다.",
+					},
+					agents: [
+						{
+							provider: "claude",
+							executablePath: "/bin/claude",
+							state: "configured",
+							lastObservedAt: 1,
+							message: "설정됨",
+						},
+						{
+							provider: "codex",
+							executablePath: "/bin/codex",
+							state: "disconnected",
+							lastObservedAt: null,
+							message: "연결 필요",
+						},
+					],
+				},
+			},
+		);
+		expect(html).toContain("CLI 준비됨 · Claude Code 설정됨 · Codex 미연결");
+
+		let opened = 0;
+		const element = StatusSettings({
+			connections: EMPTY_CONNECTION_STATE,
+			onApplyUpdates: () => {},
+			onCheckUpdates: () => {},
+			onOpenConnections: () => {
+				opened += 1;
+			},
+			updates: EMPTY_UPDATE_STATE,
+		});
+		const buttons: { children?: ReactNode; onClick?: () => void }[] = [];
+		const visit = (child: ReactNode): void => {
+			if (
+				!isValidElement<{ children?: ReactNode; onClick?: () => void }>(child)
+			)
+				return;
+			if (child.type === "button") buttons.push(child.props);
+			Children.forEach(child.props.children, visit);
+		};
+		visit(element);
+		buttons.find((button) => button.children === "연결 관리")?.onClick?.();
+		expect(opened).toBe(1);
 	});
 });

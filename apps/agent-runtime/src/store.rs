@@ -33,8 +33,15 @@ pub struct Session {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub completed_tools: Vec<String>,
 }
+/// How long a hook writer waits for another writer's commit. Hooks from
+/// several sessions serialize on one database, and each commit fsyncs, so on
+/// a busy disk the queue outlasts a short timeout and the event is lost.
+/// Snapshot readers keep the short timeout in `open_read` and retry on the
+/// next poll instead.
+const WRITE_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
+
 fn initialize(db: &Connection) -> Result<()> {
-    db.busy_timeout(Duration::from_millis(150))?;
+    db.busy_timeout(WRITE_BUSY_TIMEOUT)?;
     let version: u32 = db.query_row("PRAGMA user_version", [], |r| r.get(0))?;
     if version > 1 {
         return Err("Runtime database is newer; update workbranch".into());
