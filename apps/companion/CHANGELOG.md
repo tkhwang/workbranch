@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.33.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.32.0...workbranch-companion-v2.33.0) (2026-10-17)
+
+
+### Features
+
+* **ui:** Settings 뷰를 카테고리 탭으로 나누어 구조 정리하기 ([a8af667](https://github.com/tkhwang/workbranch/commit/a8af667c13d735d938f52693c8cc1b5a57b9bf44))
+* **ui:** Settings 뷰를 카테고리 탭으로 나누어 구조 정리하기 ([68a166a](https://github.com/tkhwang/workbranch/commit/68a166a8449ab641990129c0c3c66b6505dba09a))
+
+
+### Bug Fixes
+
+* **connections:** Main에 상태 확인 실패 결과 표시하기 ([cb19819](https://github.com/tkhwang/workbranch/commit/cb198191b71f5bd0128cca94ea3bbcb3a59046bc))
+
 ## [2.32.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.31.0...workbranch-companion-v2.32.0) (2026-10-16)
 
 
