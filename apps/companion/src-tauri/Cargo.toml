@@ -40,12 +40,12 @@ undocumented_unsafe_blocks = "deny"
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2"
 
-# Typed AppKit/Foundation bindings for the screensaver (COMP001); the same
-# versions Tauri already pulls in, so no new crates enter the build.
+# Typed AppKit/Foundation bindings for the screensaver (COMP001, COMP002); the
+# same versions Tauri already pulls in, so no new crates enter the build.
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = "0.6.2"
 objc2 = "0.6.4"
-objc2-core-foundation = { version = "0.3.2", default-features = false, features = ["std", "CFDictionary", "CFNumber", "CFString"] }
+objc2-core-foundation = { version = "0.3.2", default-features = false, features = ["std", "CFArray", "CFDictionary", "CFNumber", "CFString"] }
 objc2-core-graphics = { version = "0.3.2", default-features = false, features = ["std", "CGEventSource", "CGEventTypes", "CGSession"] }
 objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "block2", "NSDistributedNotificationCenter", "NSNotification", "NSObject", "NSOperation", "NSProcessInfo", "NSString"] }
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSApplication", "NSResponder", "NSWindow"] }

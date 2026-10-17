@@ -134,12 +134,12 @@ describe("Dashboard", () => {
 		expect(html).toMatch(/<main[^>]*class="dashboard"[^>]*data-theme="claude"/);
 		expect(html).toContain('aria-label="09:05"');
 		expect(html).toContain("10월 16일 금요일");
-		expect(html).toContain("입력 시 잠금");
+		expect(html).toContain("화면 잠김");
 	});
 
-	it("hides the lock hint where input cannot lock the Mac", () => {
+	it("hides the lock hint where the Mac cannot lock", () => {
 		const html = render(false);
-		expect(html).not.toContain("입력 시 잠금");
+		expect(html).not.toContain("화면 잠김");
 		expect(html).not.toContain("dashboard-lock");
 	});
 
@@ -154,7 +154,7 @@ describe("Dashboard", () => {
 			/>,
 		);
 		expect(html).toContain("미리 보기 · 입력하면 닫힘");
-		expect(html).not.toContain("입력 시 잠금");
+		expect(html).not.toContain("화면 잠김");
 	});
 
 	it("shows a big count per live state", () => {

@@ -10,14 +10,14 @@ pub(crate) trait Platform {
     /// Keeps the system from idle sleep, and the app out of App Nap, while
     /// held.
     fn set_awake(&mut self, awake: bool);
-    /// Keeps the display from idle sleep, which also holds off the macOS
-    /// screen saver, while held.
+    /// Keeps the display from idle sleep while held, so the dashboard stays
+    /// in view over the screen saver or the lock screen.
     fn set_display_on(&mut self, on: bool);
     /// Time since the last keyboard or mouse input, from any app.
     fn idle_time(&self) -> Duration;
     /// Whether the login session's screen is locked right now.
     fn screen_locked(&self) -> bool;
-    /// Covers every display with the dashboard.
+    /// Covers every display with the dashboard, above the lock screen.
     fn show_dashboard(&mut self, mode: Mode);
     fn hide_dashboard(&mut self);
     /// Locks the login session at once, as Ctrl-Cmd-Q would.
