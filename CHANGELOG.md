@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.39.0](https://github.com/tkhwang/workbranch/compare/v2.38.0...v2.39.0) (2026-10-17)
+
+
+### Features
+
+* **screensaver:** macOS 화면보호기와 잠금화면 위에 대시보드 표시하기 ([3516bb9](https://github.com/tkhwang/workbranch/commit/3516bb9544b23e351e9879a8501fe032bdeb9777))
+* **screensaver:** macOS 화면보호기와 잠금화면 위에 대시보드 표시하기 ([f17d0c8](https://github.com/tkhwang/workbranch/commit/f17d0c896360ec91ffd04e70f773ba7d4dc9cab4))
+
 ## [2.38.0](https://github.com/tkhwang/workbranch/compare/v2.37.0...v2.38.0) (2026-10-17)
 
 
