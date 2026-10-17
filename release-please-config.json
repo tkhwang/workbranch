@@ -14,16 +14,7 @@
         "packages/contract",
         ".github",
         "docs",
-        "assets/readme",
-        "AGENTS.md",
-        "DESIGN.md",
-        "README.md",
-        "README.ko.md",
-        "package.json",
-        "pnpm-lock.yaml",
-        "pnpm-workspace.yaml",
-        "release-please-config.json",
-        ".release-please-manifest.json"
+        "assets/readme"
       ],
       "extra-files": [
         {
