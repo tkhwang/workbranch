@@ -105,7 +105,20 @@ jobs:
             --key-id "$APPLE_NOTARY_KEY_ID" \
             --issuer "$APPLE_NOTARY_ISSUER_ID" \
             --wait
-          xcrun stapler staple "$APP_BUNDLE_PATH"
+          # stapler fetches the ticket from Apple's CDN, which sometimes drops
+          # the connection (exit 68) right after notarization is accepted.
+          max_attempts=5
+          for attempt in $(seq 1 "$max_attempts"); do
+            if xcrun stapler staple "$APP_BUNDLE_PATH"; then
+              break
+            fi
+            if [ "$attempt" -eq "$max_attempts" ]; then
+              echo "stapler failed after $max_attempts attempts" >&2
+              exit 1
+            fi
+            echo "stapler attempt $attempt failed; retrying in 30s"
+            sleep 30
+          done
           ditto -c -k --keepParent "$APP_BUNDLE_PATH" "$ZIP_NAME"
           echo "APPLE_RELEASE_NOTARIZED=1" >> "$GITHUB_ENV"
 
