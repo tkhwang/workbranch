@@ -418,3 +418,40 @@ it("leaves results of Settings actions out of Main once setup is complete", () =
 		),
 	).toBe(true);
 });
+
+it("surfaces a failed status check on Main even with a ready status cached", async () => {
+	let current = EMPTY_CONNECTION_STATE;
+	const complete: SetupStatus = {
+		...readyStatus,
+		agents: readyStatus.agents.map((agent) =>
+			agent.provider === "grok" ? { ...agent, lastObservedAt: 1 } : agent,
+		),
+	};
+	const inspect = vi.fn(async () => complete);
+	const controller = createConnectionController(
+		{
+			inspect,
+			run: async () => ({ exit_code: 0, stdout: "", stderr: "" }),
+			subscribe: async () => () => {},
+			id: () => "op",
+		},
+		(value) => {
+			current = value;
+		},
+	);
+	await controller.refresh();
+	expect(needsOnboarding(current, [], false)).toBe(false);
+
+	// A later check fails, such as the refresh after a CLI update; the ready
+	// status stays cached, but the failure and its retry must still show.
+	inspect.mockRejectedValueOnce(new Error("offline"));
+	await controller.refresh();
+	expect(current.status).toBe(complete);
+	expect(current.lastAction).toBeNull();
+	expect(needsOnboarding(current, [], false)).toBe(true);
+
+	// A passing check clears it again.
+	await controller.refresh();
+	expect(needsOnboarding(current, [], false)).toBe(false);
+	controller.dispose();
+});
