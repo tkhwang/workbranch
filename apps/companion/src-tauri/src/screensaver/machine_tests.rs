@@ -128,15 +128,31 @@ fn minutes(n: u64) -> Duration {
     Duration::from_secs(n * 60)
 }
 
+/// A reading where macOS cannot be asked about its screen saver, so its
+/// notifications alone tell.
 fn unlocked(idle: Duration) -> Event {
     Event::Sample {
         idle,
         locked: false,
+        saver: None,
     }
 }
 
 fn locked(idle: Duration) -> Event {
-    Event::Sample { idle, locked: true }
+    Event::Sample {
+        idle,
+        locked: true,
+        saver: None,
+    }
+}
+
+/// A reading that also asks whether the screen saver runs.
+fn read(idle: Duration, locked: bool, saver: bool) -> Event {
+    Event::Sample {
+        idle,
+        locked,
+        saver: Some(saver),
+    }
 }
 
 /// A runtime read time, as seconds since the epoch.
@@ -207,21 +223,135 @@ fn turning_the_feature_off_releases_at_once() {
 }
 
 #[test]
-fn the_screen_saver_gets_the_dashboard_on_top_and_a_lock_behind_it() {
+fn the_screen_saver_gets_a_lock_behind_it_then_the_dashboard_on_top() {
     let mut machine = working(true);
     assert_eq!(machine.step(Event::Saver(true)), vec![Action::HoldDisplay]);
-    // The screen saver starts only after a long pause: the dashboard covers
-    // it on the next reading, and the session locks at once even when macOS
-    // would wait before asking for the password.
-    assert_eq!(
-        machine.step(unlocked(minutes(5))),
-        vec![Action::ShowDashboard, Action::LockScreen]
-    );
+    // The screen saver starts only after a long pause, and macOS may wait
+    // before asking for the password: the session locks first.
+    assert_eq!(machine.step(unlocked(minutes(5))), vec![Action::LockScreen]);
+    assert!(!machine.showing());
     assert_eq!(machine.poll_interval(), Some(INPUT_POLL));
-    assert_eq!(machine.step(locked(minutes(5) + ms(250))), vec![]);
+    // The dashboard shows once the lock reads as landed.
+    assert_eq!(
+        machine.step(locked(minutes(5) + ms(250))),
+        vec![Action::ShowDashboard]
+    );
     // The screen saver stopping behind the lock changes nothing.
     assert_eq!(machine.step(Event::Saver(false)), vec![]);
     assert!(machine.showing());
+}
+
+/// Steps unlocked readings under a running screen saver until something
+/// happens, returning how many readings it took and the actions.
+fn until_action(machine: &mut Machine, from: Duration) -> (u8, Vec<Action>) {
+    for sample in 1..=LOCK_WAIT_SAMPLES {
+        let actions = machine.step(unlocked(from + ms(250 * u64::from(sample))));
+        if !actions.is_empty() {
+            return (sample, actions);
+        }
+    }
+    (LOCK_WAIT_SAMPLES + 1, vec![])
+}
+
+#[test]
+fn a_lock_that_has_not_landed_is_asked_for_again_without_the_dashboard() {
+    let mut machine = working(true);
+    machine.step(Event::Saver(true));
+    machine.step(unlocked(minutes(5)));
+    for attempt in 1..LOCK_ATTEMPTS {
+        assert_eq!(
+            until_action(&mut machine, minutes(5) + secs(u64::from(attempt) * 2)),
+            (LOCK_WAIT_SAMPLES, vec![Action::LockScreen])
+        );
+        // Nothing claims a lock that is not there.
+        assert!(!machine.showing());
+    }
+}
+
+#[test]
+fn a_lock_that_never_lands_leaves_the_screen_saver_to_macos() {
+    let mut machine = working(true);
+    machine.step(Event::Saver(true));
+    machine.step(unlocked(minutes(5)));
+    for attempt in 1..LOCK_ATTEMPTS {
+        until_action(&mut machine, minutes(5) + secs(u64::from(attempt) * 2));
+    }
+    // Given up: no more requests and no dashboard over an unlocked screen,
+    // but the display stays on for macOS to lock after its password delay.
+    assert_eq!(
+        until_action(&mut machine, minutes(6)),
+        (LOCK_WAIT_SAMPLES + 1, vec![])
+    );
+    assert_eq!(machine.step(unlocked(minutes(7))), vec![]);
+    assert!(!machine.showing());
+    assert_eq!(machine.poll_interval(), Some(IDLE_POLL));
+    // macOS locks on its own: the dashboard comes.
+    assert_eq!(
+        machine.step(locked(minutes(10))),
+        vec![Action::ShowDashboard]
+    );
+}
+
+#[test]
+fn signing_in_never_locks_again_on_a_late_screen_saver_reading() {
+    let mut machine = working(true);
+    machine.step(read(minutes(5), false, true));
+    machine.step(read(minutes(5) + ms(250), true, true));
+    assert!(machine.showing());
+    // Touch ID: the session unlocks with no keyboard or mouse input, and the
+    // screen saver still reads as running for a moment.
+    assert_eq!(
+        machine.step(read(minutes(5) + ms(500), false, true)),
+        vec![Action::HideDashboard, Action::ReleaseDisplay]
+    );
+    assert_eq!(
+        machine.step(read(minutes(5) + secs(1), false, true)),
+        vec![]
+    );
+    assert_eq!(
+        machine.step(read(minutes(5) + secs(2), false, false)),
+        vec![]
+    );
+    // A screen saver that starts afterwards is a new one.
+    assert_eq!(
+        machine.step(read(minutes(15), false, true)),
+        vec![Action::LockScreen, Action::HoldDisplay]
+    );
+}
+
+#[test]
+fn a_new_screen_saver_after_signing_in_is_believed_from_its_notification() {
+    let mut machine = working(true);
+    machine.step(read(minutes(5), false, true));
+    machine.step(read(minutes(5) + ms(250), true, true));
+    machine.step(read(minutes(5) + ms(500), false, true));
+    assert_eq!(machine.step(Event::Saver(true)), vec![Action::HoldDisplay]);
+}
+
+#[test]
+fn a_screen_saver_already_running_is_read_from_the_session() {
+    // Started (or restarted) mid screen saver: no notification will come.
+    let mut machine = working(true);
+    assert_eq!(
+        machine.step(read(minutes(5), false, true)),
+        vec![Action::LockScreen, Action::HoldDisplay]
+    );
+    assert_eq!(
+        machine.step(read(minutes(5) + ms(250), true, true)),
+        vec![Action::ShowDashboard]
+    );
+}
+
+#[test]
+fn the_session_corrects_a_screen_saver_notification() {
+    let mut machine = working(true);
+    machine.step(Event::Saver(true));
+    // The session says no screen saver runs: nothing is held or shown.
+    assert_eq!(
+        machine.step(read(minutes(5), false, false)),
+        vec![Action::ReleaseDisplay]
+    );
+    assert!(!machine.showing());
 }
 
 #[test]
@@ -267,6 +397,7 @@ fn signing_in_hands_the_screen_and_the_display_back() {
     machine.step(Event::Saver(true));
     machine.step(unlocked(minutes(5)));
     machine.step(locked(minutes(5) + ms(250)));
+    assert!(machine.showing());
     assert_eq!(
         machine.step(unlocked(ms(100))),
         vec![Action::HideDashboard, Action::ReleaseDisplay]

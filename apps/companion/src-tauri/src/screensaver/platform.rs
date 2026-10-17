@@ -17,6 +17,9 @@ pub(crate) trait Platform {
     fn idle_time(&self) -> Duration;
     /// Whether the login session's screen is locked right now.
     fn screen_locked(&self) -> bool;
+    /// Whether the macOS screen saver runs right now; `None` where macOS
+    /// cannot be asked, and its notifications alone tell.
+    fn screen_saver_running(&self) -> Option<bool>;
     /// Covers every display with the dashboard, above the lock screen.
     fn show_dashboard(&mut self, mode: Mode);
     fn hide_dashboard(&mut self);
@@ -54,6 +57,9 @@ impl Platform for NoopPlatform {
     fn screen_locked(&self) -> bool {
         false
     }
+    fn screen_saver_running(&self) -> Option<bool> {
+        None
+    }
     fn show_dashboard(&mut self, _mode: Mode) {}
     fn hide_dashboard(&mut self) {}
     fn lock_screen(&mut self) {}
@@ -78,6 +84,9 @@ mod tests {
         }
         fn screen_locked(&self) -> bool {
             false
+        }
+        fn screen_saver_running(&self) -> Option<bool> {
+            None
         }
         fn show_dashboard(&mut self, mode: Mode) {
             self.0.push(format!("show={mode:?}"));

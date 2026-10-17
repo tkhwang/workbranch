@@ -142,11 +142,6 @@ fn run<R: Runtime>(
                 }
             }
         };
-        if matches!(message, None | Some(Message::LockChanged)) {
-            // This turn reads the session; the next reading is a full
-            // interval away.
-            due = None;
-        }
         let event = match message {
             Some(Message::Runtime(snapshot)) => match snapshot.document.as_deref() {
                 Some(document) => Event::Working(is_working(document)),
@@ -155,7 +150,11 @@ fn run<R: Runtime>(
             },
             Some(Message::ConfigChanged) => Event::Config(read_config(app)),
             Some(Message::LockChanged) | None => sample(&platform),
-            Some(Message::Saver(running)) => Event::Saver(running),
+            // Where the session can be asked, it is the truth.
+            Some(Message::Saver(running)) => match platform.screen_saver_running() {
+                Some(_) => sample(&platform),
+                None => Event::Saver(running),
+            },
             Some(Message::Preview) => Event::Preview,
             Some(Message::DisplaysChanged) => {
                 // A display came or went: rebuild the windows to match.
@@ -167,6 +166,11 @@ fn run<R: Runtime>(
                 continue;
             }
         };
+        if matches!(event, Event::Sample { .. }) {
+            // This turn read the session; the next reading is a full
+            // interval away.
+            due = None;
+        }
         apply(&mut platform, &machine.step(event));
     }
 }
@@ -175,6 +179,7 @@ fn sample(platform: &impl Platform) -> Event {
     Event::Sample {
         idle: platform.idle_time(),
         locked: platform.screen_locked(),
+        saver: platform.screen_saver_running(),
     }
 }
 

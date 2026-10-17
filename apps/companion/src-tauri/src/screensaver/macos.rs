@@ -33,6 +33,7 @@ const ANY_INPUT_EVENT: CGEventType = CGEventType(u32::MAX);
 const LOGIN_FRAMEWORK: &CStr =
     c"/System/Library/PrivateFrameworks/login.framework/Versions/Current/login";
 const LOCK_SYMBOL: &CStr = c"SACLockScreenImmediate";
+const SAVER_SYMBOL: &CStr = c"SACScreenSaverIsRunning";
 /// Set to any value to make the lock probe fail, which exercises the
 /// no-lock path (COMP001 R7) on a Mac that has the lock.
 const NO_LOCK_ENV: &str = "WORKBRANCH_SCREENSAVER_NO_LOCK";
@@ -73,6 +74,28 @@ impl ScreenLock {
 
     fn lock(self) {
         let _status = (self.0)();
+    }
+}
+
+/// `SACScreenSaverIsRunning` from the same private framework: asks
+/// loginwindow, which runs the screen saver, whether it runs now. Reading it
+/// with every sample covers a screen saver that started before the app did
+/// or whose notification was missed.
+#[derive(Clone, Copy)]
+struct ScreenSaverQuery(extern "C" fn() -> u8);
+
+impl ScreenSaverQuery {
+    fn probe() -> Option<Self> {
+        // SAFETY: a valid C path and symbol name; the framework stays open.
+        let symbol = unsafe { private_symbol(LOGIN_FRAMEWORK, SAVER_SYMBOL) }?;
+        // SAFETY: SACScreenSaverIsRunning takes no arguments and returns a
+        // BOOL in the low byte of the return register.
+        let query = unsafe { std::mem::transmute::<*mut c_void, extern "C" fn() -> u8>(symbol) };
+        Some(Self(query))
+    }
+
+    fn running(self) -> bool {
+        (self.0)() != 0
     }
 }
 
@@ -201,6 +224,7 @@ pub(crate) struct MacPlatform<R: Runtime> {
     /// lock screen is up and agents work.
     display: Option<Activity>,
     lock: Option<ScreenLock>,
+    saver: Option<ScreenSaverQuery>,
 }
 
 impl<R: Runtime> MacPlatform<R> {
@@ -210,6 +234,7 @@ impl<R: Runtime> MacPlatform<R> {
             system: None,
             display: None,
             lock,
+            saver: ScreenSaverQuery::probe(),
         }
     }
 }
@@ -240,6 +265,10 @@ impl<R: Runtime> Platform for MacPlatform<R> {
 
     fn screen_locked(&self) -> bool {
         screen_locked()
+    }
+
+    fn screen_saver_running(&self) -> Option<bool> {
+        self.saver.map(ScreenSaverQuery::running)
     }
 
     fn show_dashboard(&mut self, mode: Mode) {

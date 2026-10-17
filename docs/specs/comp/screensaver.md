@@ -30,13 +30,14 @@
 - 노트북 덮개를 닫으면 macOS 규칙대로 잠든다. 배터리·전원 상태에 따라 다르게 동작하지 않는다.
 
 ## 세션 읽기
-- 작업 중인 동안 1초마다(`IDLE_POLL`), dashboard 가 떠 있는 동안 0.25초마다(`INPUT_POLL`) 세션을 읽는다: idle 시간은 `CGEventSourceSecondsSinceLastEventType`(HID 시스템 상태, 모든 입력 종류), 잠김은 세션 사전의 `CGSSessionScreenIsLocked`. 작업 중이 아니면 읽지 않고, 지난 idle 표본을 버린다.
+- 작업 중인 동안 1초마다(`IDLE_POLL`), dashboard 가 떠 있거나 잠금을 기다리는 동안 0.25초마다(`INPUT_POLL`) 세션을 읽는다: idle 시간은 `CGEventSourceSecondsSinceLastEventType`(HID 시스템 상태, 모든 입력 종류), 잠김은 세션 사전의 `CGSSessionScreenIsLocked`, 화면보호기 실행 여부는 비공개 `login.framework` 의 `SACScreenSaverIsRunning`(loginwindow 에 묻는 동기 호출, 약 0.2ms). 작업 중이 아니면 읽지 않고, 지난 idle 표본을 버린다. runtime snapshot 이 읽기 주기보다 자주 와도 다음 읽기 시각은 밀리지 않는다.
 - `NSDistributedNotificationCenter` 의 `com.apple.screenIsLocked` / `com.apple.screenIsUnlocked` 는 바로 다시 읽으라는 신호로만 쓴다. 잠김 여부는 언제나 세션에서 읽으므로, 잘못 온 알림이 쓰고 있는 데스크톱 위에 dashboard 를 띄우지 않는다.
-- 화면보호기 실행 여부는 `com.apple.screensaver.didstart` / `com.apple.screensaver.didstop` 로 안다. 멈춤 알림을 놓쳐도 잠금이 풀리거나, 잠기지 않은 상태에서 입력이 오면 화면보호기는 끝난 것으로 본다.
+- `com.apple.screensaver.didstart` / `com.apple.screensaver.didstop` 도 바로 다시 읽으라는 신호다. 그래서 companion 이 화면보호기가 이미 돌고 있을 때 시작되거나 알림을 놓쳐도 다음 읽기에서 안다. `SACScreenSaverIsRunning` 을 찾지 못하면 이 알림으로만 알고, 멈춤 알림을 놓쳐도 잠금이 풀리거나 잠기지 않은 상태에서 입력이 오면 화면보호기는 끝난 것으로 본다.
+- 잠금이 풀리면 화면보호기가 멈춤으로 읽히거나 새로 시작(`didstart`)될 때까지 "실행 중" 판독을 믿지 않는다. Touch ID 로 풀면 키보드·마우스 입력이 없어 idle 이 큰 채로 남으므로, 늦게 온 "실행 중" 판독이 방금 푼 Mac 을 다시 잠그지 않게 하기 위해서다.
 
 ## Dashboard 표시와 내림
 - 덮임 동안 idle 시간이 15초(`SHOW_AFTER`) 이상이면 dashboard 를 띄운다. 화면보호기는 그보다 훨씬 긴 idle 뒤에 시작하므로 바로 덮이고, 직접 잠근 경우(Ctrl+Cmd+Q)에는 손을 뗀 뒤 15초 뒤에 뜬다.
-- 띄울 때 아직 잠기지 않았으면(화면보호기만 시작되었고 macOS 의 "암호 요구까지 지연"이 남은 경우) 바로 잠근다. 잠금은 비공개 `login.framework` 의 `SACLockScreenImmediate`(Ctrl+Cmd+Q 와 같은 잠금)이고, 시작할 때 `dlopen`/`dlsym` 으로 찾는다. 그래서 dashboard 가 보이는 동안 Mac 은 잠겨 있고, 입력해도 암호 없이 데스크톱이 드러나지 않는다.
+- 잠금이 가능한 Mac 에서 dashboard 는 세션이 잠김으로 읽힐 때만 보인다. 화면보호기만 시작되었고 아직 잠기지 않았으면(macOS 의 "암호 요구까지 지연"이 남은 경우) 먼저 잠그고, 잠김이 확인되면 띄운다. 잠금은 비공개 `login.framework` 의 `SACLockScreenImmediate`(Ctrl+Cmd+Q 와 같은 잠금)이고, 시작할 때 `dlopen`/`dlsym` 으로 찾는다. 2초(8 표본) 안에 잠기지 않으면 다시 요청하고, 모두 3번(약 6초) 요청해도 잠기지 않으면 이번 화면보호기 동안에는 더 요청하지 않는다. 그때는 디스플레이를 켜 둔 채 dashboard 없이 기다리다가, macOS 가 지연 시간 뒤 스스로 잠그면 띄운다. 그래서 dashboard 가 보이는 동안 Mac 은 잠겨 있고 "화면 잠김" 표시가 거짓이 되지 않으며, 입력해도 암호 없이 데스크톱이 드러나지 않는다. 떠 있는 dashboard 도 세션이 잠김이 아니게 읽히면 바로 내린다.
 - 입력이 오면(idle 이 직전 표본보다 줄면) dashboard 만 내린다. 그 아래 잠금 화면에서 암호나 Touch ID 로 잠금을 푼다. 디스플레이 유지는 잠긴 동안 계속되므로 잠금 화면이 켜진 채 남고, 잠금을 풀지 않고 15초 동안 입력이 없으면 dashboard 가 다시 뜬다. 잠긴 상태에서는 띄운 직후 1초(4 표본) 동안의 입력을 무시한다. 잠금 화면이 올라오며 생기는 순간적인 표본이 dashboard 를 바로 내리지 않게 하기 위해서다.
 - 잠금이 풀리면(덮임이 끝나면) dashboard 를 내리고 디스플레이 유지를 푼다. 작업 중이 끝나거나 기능을 꺼도 마찬가지다.
 - **잠금 불가**: 잠금 심볼을 찾지 못하면 dashboard 는 똑같이 화면보호기와 잠금 화면 위에 뜨되 "화면 잠김" 표시를 숨기고, 직접 잠그지 않는다. 화면보호기만 떠 있을 때 입력이 오면 dashboard 가 내려가고 macOS 설정대로(지연 시간 안이면 암호 없이) 화면보호기가 끝난다. `screensaver_status` command 가 `{ lockAvailable }` 을 돌려준다. 개발용 환경 변수 `WORKBRANCH_SCREENSAVER_NO_LOCK`(값 무관)이 있으면 잠금 불가로 시작한다.
@@ -67,7 +68,7 @@
 - 미리 보기 자체는 잠자기 방지와 디스플레이 유지를 걸지 않는다.
 
 ## 구조
-- `src-tauri/src/screensaver/machine.rs`: 순수 상태 기계. `Machine::step(Event) -> Vec<Action>` 이 설정·작업 중·읽기 실패·화면보호기·세션 표본(idle, 잠김)·미리 보기를 받아 전원 유지·창·잠금 동작을 낸다. 전이는 `machine_tests.rs` 가 OS 없이 검사한다.
+- `src-tauri/src/screensaver/machine.rs`: 순수 상태 기계. `Machine::step(Event) -> Vec<Action>` 이 설정·작업 중·읽기 실패·화면보호기 알림·세션 표본(idle, 잠김, 화면보호기)·미리 보기를 받아 전원 유지·창·잠금 동작을 낸다. 전이는 `machine_tests.rs` 가 OS 없이 검사한다.
 - `screensaver/platform.rs`: OS 동작을 감싼 `Platform` trait. `screensaver/macos.rs`: objc2 typed binding(`objc2-foundation`·`objc2-app-kit`·`objc2-core-graphics`·`objc2-core-foundation`)과 잠금·SkyLight `dlopen` 구현. unsafe 블록마다 SAFETY 주석을 둔다. `screensaver/windows.rs`: 모니터별 창 배치.
 - `src-tauri/src/screensaver.rs`: 한 스레드에서 runtime snapshot·설정 변경·잠김 알림·화면보호기 알림·모니터 변경·미리 보기 요청을 받아 상태 기계에 넣고, 상태 기계가 원하는 주기로 세션을 읽는다. command 는 `screensaver_refresh`, `screensaver_status`, `screensaver_preview`.
-- 비공개 API(`SACLockScreenImmediate`, SkyLight space, webview `drawsBackground`)를 쓰므로 Mac App Store 로는 배포할 수 없다. companion 은 Homebrew cask 로 배포한다. 이후 macOS 에서 사라지거나 바뀔 수 있다.
+- 비공개 API(`SACLockScreenImmediate`, `SACScreenSaverIsRunning`, SkyLight space, webview `drawsBackground`)를 쓰므로 Mac App Store 로는 배포할 수 없다. companion 은 Homebrew cask 로 배포한다. 이후 macOS 에서 사라지거나 바뀔 수 있다.
