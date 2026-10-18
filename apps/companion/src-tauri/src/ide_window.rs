@@ -13,7 +13,7 @@
 #[cfg(target_os = "macos")]
 mod macos;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::{Receiver, TryRecvError};
 use std::time::{Duration, Instant};
 
@@ -43,12 +43,15 @@ pub(crate) const IDE_BUNDLE_IDS: [&str; 6] = [
     "com.google.antigravity-ide",
 ];
 
-/// How long after `workbranch ide` finishes a new window is still awaited:
-/// long enough for an IDE that was not running to start.
+/// How long after `workbranch ide` finishes the first new window is still
+/// awaited: long enough for an IDE that was not running to start.
 const WAIT_FOR_FIRST: Duration = Duration::from_secs(10);
 /// Once a new window arrived and the command finished, how long to wait for
-/// the windows of a task's other repos.
+/// the windows of a task's other repos, however late the first one came.
 const WAIT_FOR_MORE: Duration = Duration::from_secs(3);
+/// How many times a new window's move is tried. A busy IDE can let an
+/// Accessibility call time out, and the next poll may get through.
+const MAX_MOVE_ATTEMPTS: u32 = 5;
 /// Stops following even if the command never finishes.
 const MAX_FOLLOW: Duration = Duration::from_secs(120);
 const POLL: Duration = Duration::from_millis(100);
@@ -149,45 +152,66 @@ pub(crate) trait Desktop {
     /// The supported IDEs' standard windows that can be moved now, so not
     /// minimized or full screen.
     fn ide_windows(&self) -> Vec<OpenWindow<Self::Handle>>;
-    fn move_window(&self, handle: &Self::Handle, frame: Frame);
+    /// Returns whether the window took the new position.
+    fn move_window(&self, handle: &Self::Handle, frame: Frame) -> bool;
 }
 
 /// Moves each IDE window that did not exist when the command started onto
 /// the companion's screen, once, so the user can move it away again.
 pub(crate) struct Follower {
     screen: Frame,
-    /// Window numbers that existed before the command, or were handled.
-    seen: HashSet<u32>,
+    /// Window numbers that existed before the command, or are done: moved,
+    /// already on the screen, or out of attempts.
+    settled: HashSet<u32>,
+    /// New windows whose move failed, with the attempts made so far.
+    retrying: HashMap<u32, u32>,
 }
 
 impl Follower {
     pub(crate) fn new(screen: Frame, existing: HashSet<u32>) -> Self {
         Self {
             screen,
-            seen: existing,
+            settled: existing,
+            retrying: HashMap::new(),
         }
     }
 
-    /// One look at the IDE windows; returns how many were new.
+    /// One look at the IDE windows; returns how many were new. A window
+    /// whose move failed is tried again on the next look, up to
+    /// `MAX_MOVE_ATTEMPTS` times, and counts as new only the first time.
     pub(crate) fn step(&mut self, desktop: &impl Desktop) -> usize {
         let mut new_windows = 0;
         for window in desktop.ide_windows() {
-            if !self.seen.insert(window.id) {
+            if self.settled.contains(&window.id) {
                 continue;
             }
-            new_windows += 1;
-            if let Some(frame) = placement(window.frame, self.screen) {
-                desktop.move_window(&window.handle, frame);
+            let attempts = self.retrying.remove(&window.id).unwrap_or_else(|| {
+                new_windows += 1;
+                0
+            }) + 1;
+            let placed = placement(window.frame, self.screen)
+                .is_none_or(|frame| desktop.move_window(&window.handle, frame));
+            if placed || attempts >= MAX_MOVE_ATTEMPTS {
+                self.settled.insert(window.id);
+            } else {
+                self.retrying.insert(window.id, attempts);
             }
         }
         new_windows
+    }
+
+    /// Whether a new window still waits for another try at its move.
+    pub(crate) fn retrying(&self) -> bool {
+        !self.retrying.is_empty()
     }
 }
 
 /// Whether to keep looking for new windows, given the time since the
 /// command finished (`None` while it runs) and since the last new window
-/// (`None` before the first). A window can open before the command ends,
-/// so the quiet time counts from whichever came later.
+/// (`None` before the first). Before the first window an IDE that is still
+/// starting gets `WAIT_FOR_FIRST`; after it, the other repos' windows get
+/// `WAIT_FOR_MORE` of quiet, counted from whichever came later, since a
+/// window can open before the command ends.
 pub(crate) fn keep_following(
     since_finished: Option<Duration>,
     since_new_window: Option<Duration>,
@@ -195,12 +219,15 @@ pub(crate) fn keep_following(
     let Some(since_finished) = since_finished else {
         return true;
     };
-    since_finished < WAIT_FOR_FIRST
-        && since_new_window.is_none_or(|since_new| since_new.min(since_finished) < WAIT_FOR_MORE)
+    match since_new_window {
+        None => since_finished < WAIT_FOR_FIRST,
+        Some(since_new) => since_new.min(since_finished) < WAIT_FOR_MORE,
+    }
 }
 
-/// Looks for new IDE windows until `keep_following` says to stop. The
-/// command counts as finished once `command_running` disconnects.
+/// Looks for new IDE windows until `keep_following` says to stop and no
+/// move waits for another try. The command counts as finished once
+/// `command_running` disconnects.
 pub(crate) fn run(desktop: &impl Desktop, mut follower: Follower, command_running: &Receiver<()>) {
     let started = Instant::now();
     let mut finished_at = None;
@@ -217,7 +244,8 @@ pub(crate) fn run(desktop: &impl Desktop, mut follower: Follower, command_runnin
         let now = Instant::now();
         let since = |at: Instant| now.duration_since(at);
         if since(started) >= MAX_FOLLOW
-            || !keep_following(finished_at.map(since), new_window_at.map(since))
+            || !(keep_following(finished_at.map(since), new_window_at.map(since))
+                || follower.retrying())
         {
             return;
         }

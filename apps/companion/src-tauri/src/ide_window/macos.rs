@@ -153,7 +153,7 @@ impl Desktop for MacDesktop {
             .collect()
     }
 
-    fn move_window(&self, window: &Self::Handle, frame: Frame) {
+    fn move_window(&self, window: &Self::Handle, frame: Frame) -> bool {
         let origin = CGPoint {
             x: frame.x,
             y: frame.y,
@@ -164,10 +164,11 @@ impl Desktop for MacDesktop {
         };
         // Moving first lets the window take a size that only fits on the
         // new screen; moving again settles an origin macOS adjusted for the
-        // old size.
-        write_value(window, "AXPosition", origin);
-        write_value(window, "AXSize", size);
-        write_value(window, "AXPosition", origin);
+        // old size. A window that cannot be resized keeps its size, so only
+        // the moves decide whether it got there.
+        let moved = write_value(window, "AXPosition", origin);
+        let _resized = write_value(window, "AXSize", size);
+        moved && write_value(window, "AXPosition", origin)
     }
 }
 
@@ -296,16 +297,18 @@ fn read_value<T: AxGeometry>(element: &CFType, name: &'static str, mut out: T) -
     (read != 0).then_some(out)
 }
 
-fn write_value<T: AxGeometry>(element: &CFType, name: &'static str, geometry: T) {
+/// Returns whether the app took the value.
+fn write_value<T: AxGeometry>(element: &CFType, name: &'static str, geometry: T) -> bool {
     // SAFETY: `T::KIND` names the C type of `T`, which the call copies.
     let value = unsafe { AXValueCreate(T::KIND, (&raw const geometry).cast()) };
     let Some(value) = NonNull::new(value) else {
-        return;
+        return false;
     };
     // SAFETY: AXValueCreate returns a new reference.
     let value = unsafe { CFRetained::from_raw(value) };
     // SAFETY: a live element, an attribute name and an AXValue of the type
     // the attribute takes.
-    let _error =
+    let error =
         unsafe { AXUIElementSetAttributeValue(element, &CFString::from_static_str(name), &value) };
+    error == AX_SUCCESS
 }

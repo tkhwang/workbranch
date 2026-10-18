@@ -1,5 +1,5 @@
 import { isTauri } from "@tauri-apps/api/core";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
 	onWindowFocused,
 	openIdeWindowAccessSettings,
@@ -20,6 +20,36 @@ type Options = {
 	readonly onStatus: (status: string) => void;
 };
 
+export type AccessAnswers = {
+	/** Call as a read starts; the returned function applies its answer. */
+	readonly read: () => (granted: boolean) => void;
+	/** Applies a request's answer and outdates the reads still running. */
+	readonly request: (granted: boolean) => void;
+};
+
+/**
+ * Tauri does not order the answers of separate calls, so a read that
+ * started before a request can answer after it with the older state. Such a
+ * read is dropped.
+ */
+export function accessAnswers(
+	apply: (granted: boolean) => void,
+): AccessAnswers {
+	let generation = 0;
+	return {
+		read: () => {
+			const started = generation;
+			return (granted) => {
+				if (started === generation) apply(granted);
+			};
+		},
+		request: (granted) => {
+			generation += 1;
+			apply(granted);
+		},
+	};
+}
+
 /**
  * Reads the Accessibility permission each time Settings opens and each time
  * the window comes back, because it is granted in System Settings, outside
@@ -31,6 +61,7 @@ export function useIdeWindowAccess(
 ): IdeWindowAccessState {
 	const [granted, setGranted] = useState<boolean>();
 	const [loading, setLoading] = useState(false);
+	const answers = useMemo(() => accessAnswers(setGranted), []);
 	const tauriRuntimeAvailable = isTauri();
 
 	useEffect(() => {
@@ -38,10 +69,11 @@ export function useIdeWindowAccess(
 		let cancelled = false;
 		let stop: (() => void) | undefined;
 		const read = () => {
+			const answer = answers.read();
 			setLoading(true);
 			readIdeWindowAccess()
 				.then((access) => {
-					if (!cancelled) setGranted(access.granted);
+					if (!cancelled) answer(access.granted);
 				})
 				.catch((error: unknown) => {
 					if (!cancelled) onError(error);
@@ -59,7 +91,7 @@ export function useIdeWindowAccess(
 			cancelled = true;
 			stop?.();
 		};
-	}, [active, onError, tauriRuntimeAvailable]);
+	}, [active, answers, onError, tauriRuntimeAvailable]);
 
 	const request = useCallback(async () => {
 		if (!tauriRuntimeAvailable) {
@@ -68,11 +100,11 @@ export function useIdeWindowAccess(
 		}
 		try {
 			const access = await requestIdeWindowAccess();
-			setGranted(access.granted);
+			answers.request(access.granted);
 		} catch (error) {
 			onError(error);
 		}
-	}, [onError, onStatus, tauriRuntimeAvailable]);
+	}, [answers, onError, onStatus, tauriRuntimeAvailable]);
 
 	const openSettings = useCallback(async () => {
 		if (!tauriRuntimeAvailable) {

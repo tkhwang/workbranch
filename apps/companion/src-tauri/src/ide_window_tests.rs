@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
 use std::time::Duration;
 
@@ -32,6 +32,9 @@ const EXTERNAL: Frame = Frame {
 struct FakeDesktop {
     windows: RefCell<Vec<(u32, Frame)>>,
     moves: RefCell<Vec<(u32, Frame)>>,
+    /// How many of the next moves fail, as when a busy IDE lets the
+    /// Accessibility call time out.
+    failing_moves: Cell<u32>,
 }
 
 impl FakeDesktop {
@@ -59,8 +62,11 @@ impl Desktop for FakeDesktop {
             .collect()
     }
 
-    fn move_window(&self, handle: &u32, frame: Frame) {
+    fn move_window(&self, handle: &u32, frame: Frame) -> bool {
         self.moves.borrow_mut().push((*handle, frame));
+        let failing = self.failing_moves.get();
+        self.failing_moves.set(failing.saturating_sub(1));
+        failing == 0
     }
 }
 
@@ -195,6 +201,14 @@ fn following_waits_for_a_starting_ide_until_the_limit() {
 }
 
 #[test]
+fn a_late_first_window_still_gives_the_other_repos_their_quiet_time() {
+    // The first window came 9.5 seconds after the command; the next one may
+    // open past the 10-second wait for the first.
+    assert!(keep_following(Some(seconds(11.0)), Some(seconds(1.5))));
+    assert!(!keep_following(Some(seconds(12.5)), Some(seconds(3.0))));
+}
+
+#[test]
 fn following_stops_once_new_windows_stop_arriving() {
     assert!(keep_following(Some(seconds(5.0)), Some(seconds(2.9))));
     assert!(!keep_following(Some(seconds(5.0)), Some(seconds(3.0))));
@@ -238,4 +252,37 @@ fn the_settings_switch_is_on_only_when_stored_as_true() {
     }
     // Stores from before the switch existed have no key at all.
     assert!(!enabled_in_store_value(None));
+}
+
+#[test]
+fn follower_tries_a_failed_move_again_without_counting_the_window_twice() {
+    let desktop = FakeDesktop::default();
+    desktop.failing_moves.set(1);
+    desktop.open(7, frame(-2400.0, -300.0, 1200.0, 800.0));
+    let mut follower = Follower::new(LAPTOP, HashSet::new());
+
+    assert_eq!(follower.step(&desktop), 1);
+    assert!(follower.retrying());
+    assert_eq!(follower.step(&desktop), 0);
+    assert!(!follower.retrying());
+    // Moved now, so a later look leaves it alone.
+    assert_eq!(follower.step(&desktop), 0);
+
+    let target = frame(156.0, 108.0, 1200.0, 800.0);
+    assert_eq!(desktop.moves(), vec![(7, target), (7, target)]);
+}
+
+#[test]
+fn follower_gives_up_on_a_window_that_never_moves() {
+    let desktop = FakeDesktop::default();
+    desktop.failing_moves.set(u32::MAX);
+    desktop.open(7, frame(-2400.0, -300.0, 1200.0, 800.0));
+    let mut follower = Follower::new(LAPTOP, HashSet::new());
+
+    for _ in 0..10 {
+        follower.step(&desktop);
+    }
+
+    assert!(!follower.retrying());
+    assert_eq!(desktop.moves().len(), 5);
 }
