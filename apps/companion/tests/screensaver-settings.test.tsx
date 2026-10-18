@@ -6,6 +6,7 @@ const tauri = vi.hoisted(() => ({ invoke: vi.fn(), listen: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: tauri.invoke }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: tauri.listen }));
 
+import { DEFAULT_IDE_WINDOW } from "../src/application/ideWindow";
 import { DEFAULT_MENU_BAR } from "../src/application/menuBar";
 import type { CompanionPreferences } from "../src/application/preferences";
 import {
@@ -69,6 +70,14 @@ const preferences: CompanionPreferences = {
 	theme: "claude",
 	menuBar: DEFAULT_MENU_BAR,
 	screensaver: DEFAULT_SCREENSAVER,
+	ideWindow: DEFAULT_IDE_WINDOW,
+};
+
+const ideWindowAccess = {
+	granted: true,
+	loading: false,
+	onRequest: () => undefined,
+	onOpenSettings: () => undefined,
 };
 
 describe("ScreensaverSettings", () => {
@@ -122,6 +131,7 @@ describe("SettingsPanel screen saver section", () => {
 					loading: false,
 					onChange: () => undefined,
 				}}
+				ideWindowAccess={ideWindowAccess}
 				preferences={preferences}
 				launchAtLogin={false}
 				launchAtLoginLoading={false}
@@ -144,6 +154,7 @@ describe("SettingsPanel screen saver section", () => {
 				loading: false,
 				onChange: () => undefined,
 			},
+			ideWindowAccess,
 			preferences,
 			launchAtLogin: false,
 			launchAtLoginLoading: false,
@@ -242,6 +253,7 @@ describe("Screen saver preview", () => {
 				loading: false,
 				onChange: () => undefined,
 			},
+			ideWindowAccess,
 			preferences,
 			launchAtLogin: false,
 			launchAtLoginLoading: false,

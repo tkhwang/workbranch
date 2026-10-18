@@ -1,5 +1,11 @@
 import { load } from "@tauri-apps/plugin-store";
 import {
+	DEFAULT_IDE_WINDOW,
+	type IdeWindowConfig,
+	sameIdeWindowConfig,
+	sanitizeIdeWindowConfig,
+} from "./ideWindow";
+import {
 	DEFAULT_MENU_BAR,
 	type MenuBarConfig,
 	sameMenuBarConfig,
@@ -50,6 +56,7 @@ export type CompanionPreferences = {
 	readonly theme: CompanionTheme;
 	readonly menuBar: MenuBarConfig;
 	readonly screensaver: ScreensaverConfig;
+	readonly ideWindow: IdeWindowConfig;
 };
 
 export type CompanionFontOption = {
@@ -74,6 +81,7 @@ export type PreferenceStoreEntries = {
 	readonly theme: CompanionTheme;
 	readonly menuBar: MenuBarConfig;
 	readonly screensaver: ScreensaverConfig;
+	readonly ideWindow: IdeWindowConfig;
 };
 
 export type CompanionPreferenceStore = {
@@ -88,6 +96,7 @@ export const DEFAULT_COMPANION_PREFERENCES: CompanionPreferences = {
 	theme: "claude",
 	menuBar: DEFAULT_MENU_BAR,
 	screensaver: DEFAULT_SCREENSAVER,
+	ideWindow: DEFAULT_IDE_WINDOW,
 };
 
 export const COMPANION_FONT_OPTIONS: readonly CompanionFontOption[] = [
@@ -165,6 +174,7 @@ export function sanitizeCompanionPreferences(input: {
 	readonly themeMode?: unknown;
 	readonly menuBar?: unknown;
 	readonly screensaver?: unknown;
+	readonly ideWindow?: unknown;
 }): PreferenceSanitizationResult {
 	const font = isCompanionFont(input.font)
 		? input.font
@@ -179,6 +189,7 @@ export function sanitizeCompanionPreferences(input: {
 			: DEFAULT_COMPANION_PREFERENCES.theme;
 	const menuBar = sanitizeMenuBarConfig(input.menuBar);
 	const screensaver = sanitizeScreensaverConfig(input.screensaver);
+	const ideWindow = sanitizeIdeWindowConfig(input.ideWindow);
 	return {
 		preferences: {
 			font,
@@ -186,13 +197,15 @@ export function sanitizeCompanionPreferences(input: {
 			theme,
 			menuBar: menuBar.config,
 			screensaver: screensaver.config,
+			ideWindow: ideWindow.config,
 		},
 		sanitized:
 			font !== input.font ||
 			fontSize !== input.fontSize ||
 			theme !== input.theme ||
 			menuBar.sanitized ||
-			screensaver.sanitized,
+			screensaver.sanitized ||
+			ideWindow.sanitized,
 	};
 }
 
@@ -205,7 +218,8 @@ export function shouldRestoreFailedPreferenceUpdate(
 		current.fontSize === attempted.fontSize &&
 		current.theme === attempted.theme &&
 		sameMenuBarConfig(current.menuBar, attempted.menuBar) &&
-		sameScreensaverConfig(current.screensaver, attempted.screensaver)
+		sameScreensaverConfig(current.screensaver, attempted.screensaver) &&
+		sameIdeWindowConfig(current.ideWindow, attempted.ideWindow)
 	);
 }
 
@@ -227,6 +241,7 @@ export function preferencesToStoreEntries(
 		theme: preferences.theme,
 		menuBar: preferences.menuBar,
 		screensaver: preferences.screensaver,
+		ideWindow: preferences.ideWindow,
 	};
 }
 
@@ -248,6 +263,7 @@ export async function readCompanionPreferences(
 		themeMode: await store.get<unknown>("themeMode"),
 		menuBar: await store.get<unknown>("menuBar"),
 		screensaver: await store.get<unknown>("screensaver"),
+		ideWindow: await store.get<unknown>("ideWindow"),
 	});
 }
 
@@ -261,5 +277,6 @@ export async function writeCompanionPreferences(
 	await store.set("theme", entries.theme);
 	await store.set("menuBar", entries.menuBar);
 	await store.set("screensaver", entries.screensaver);
+	await store.set("ideWindow", entries.ideWindow);
 	await store.save();
 }

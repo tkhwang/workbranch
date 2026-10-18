@@ -286,3 +286,21 @@ export async function setClaudeLimitRelay(
 ): Promise<ClaudeLimitRelayStatus> {
 	return invoke("claude_limit_relay_set", { enabled });
 }
+
+/** Whether macOS lets Companion move the IDE's new windows. */
+export type IdeWindowAccess = {
+	readonly granted: boolean;
+};
+
+export async function readIdeWindowAccess(): Promise<IdeWindowAccess> {
+	return invoke("ide_window_access");
+}
+
+/** Shows macOS's Accessibility prompt unless the permission is granted. */
+export async function requestIdeWindowAccess(): Promise<IdeWindowAccess> {
+	return invoke("ide_window_request_access");
+}
+
+export async function openIdeWindowAccessSettings(): Promise<void> {
+	await invoke("ide_window_open_access_settings");
+}

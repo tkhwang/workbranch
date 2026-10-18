@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { CompanionPreferences } from "../application/preferences";
 import type { ClaudeLimitRelayProps } from "./ClaudeLimitRelaySettings";
+import type { IdeWindowAccessProps } from "./IdeWindowSettings";
 import {
 	type SettingsAttention,
 	type SettingsCategory,
@@ -16,6 +17,7 @@ type Props = {
 	readonly status?: ReactNode;
 	readonly connections?: ReactNode;
 	readonly claudeLimitRelay: ClaudeLimitRelayProps;
+	readonly ideWindowAccess: IdeWindowAccessProps;
 	readonly preferences: CompanionPreferences;
 	readonly launchAtLogin: boolean;
 	readonly launchAtLoginLoading: boolean;
@@ -31,6 +33,7 @@ export function SettingsView({
 	status,
 	connections,
 	claudeLimitRelay,
+	ideWindowAccess,
 	preferences,
 	launchAtLogin,
 	launchAtLoginLoading,
@@ -51,6 +54,7 @@ export function SettingsView({
 				<SettingsPanel
 					category={category}
 					claudeLimitRelay={claudeLimitRelay}
+					ideWindowAccess={ideWindowAccess}
 					launchAtLogin={launchAtLogin}
 					launchAtLoginLoading={launchAtLoginLoading}
 					onLaunchAtLoginChange={onLaunchAtLoginChange}

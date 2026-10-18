@@ -2,6 +2,12 @@ import assert from "node:assert/strict";
 import { load } from "@tauri-apps/plugin-store";
 import { describe, expect, it, vi } from "vitest";
 import {
+	DEFAULT_IDE_WINDOW,
+	type IdeWindowConfig,
+	sameIdeWindowConfig,
+	sanitizeIdeWindowConfig,
+} from "../src/application/ideWindow";
+import {
 	DEFAULT_MENU_BAR,
 	type MenuBarConfig,
 } from "../src/application/menuBar";
@@ -38,6 +44,10 @@ const CUSTOM_SCREENSAVER: ScreensaverConfig = {
 	enabled: true,
 };
 
+const CUSTOM_IDE_WINDOW: IdeWindowConfig = {
+	enabled: true,
+};
+
 vi.mock("@tauri-apps/plugin-store", () => ({ load: vi.fn() }));
 
 describe("companion preferences", () => {
@@ -48,6 +58,7 @@ describe("companion preferences", () => {
 			theme: "claude",
 			menuBar: DEFAULT_MENU_BAR,
 			screensaver: DEFAULT_SCREENSAVER,
+			ideWindow: DEFAULT_IDE_WINDOW,
 		});
 	});
 
@@ -80,6 +91,7 @@ describe("companion preferences", () => {
 				theme: "claude",
 				menuBar: DEFAULT_MENU_BAR,
 				screensaver: DEFAULT_SCREENSAVER,
+				ideWindow: DEFAULT_IDE_WINDOW,
 			},
 			sanitized: true,
 		});
@@ -95,6 +107,7 @@ describe("companion preferences", () => {
 				theme: "codex",
 				menuBar: DEFAULT_MENU_BAR,
 				screensaver: DEFAULT_SCREENSAVER,
+				ideWindow: DEFAULT_IDE_WINDOW,
 			},
 			sanitized: true,
 		});
@@ -114,6 +127,7 @@ describe("companion preferences", () => {
 				theme: "codex",
 				menuBar: DEFAULT_MENU_BAR,
 				screensaver: DEFAULT_SCREENSAVER,
+				ideWindow: DEFAULT_IDE_WINDOW,
 			},
 			sanitized: true,
 		});
@@ -151,6 +165,7 @@ describe("companion preferences", () => {
 					theme: "claude",
 					menuBar: DEFAULT_MENU_BAR,
 					screensaver: DEFAULT_SCREENSAVER,
+					ideWindow: DEFAULT_IDE_WINDOW,
 				},
 				sanitized: true,
 			});
@@ -165,6 +180,7 @@ describe("companion preferences", () => {
 				theme: "codex",
 				menuBar: CUSTOM_MENU_BAR,
 				screensaver: CUSTOM_SCREENSAVER,
+				ideWindow: CUSTOM_IDE_WINDOW,
 			}),
 		).toEqual({
 			preferences: {
@@ -173,6 +189,7 @@ describe("companion preferences", () => {
 				theme: "codex",
 				menuBar: CUSTOM_MENU_BAR,
 				screensaver: CUSTOM_SCREENSAVER,
+				ideWindow: CUSTOM_IDE_WINDOW,
 			},
 			sanitized: false,
 		});
@@ -227,6 +244,7 @@ describe("companion preferences", () => {
 			theme: "claude",
 			menuBar: DEFAULT_MENU_BAR,
 			screensaver: DEFAULT_SCREENSAVER,
+			ideWindow: DEFAULT_IDE_WINDOW,
 		} as const;
 		const newerCurrent = { ...failedAttempt, theme: "codex" } as const;
 		const newerSize = { ...failedAttempt, fontSize: "large" } as const;
@@ -237,6 +255,10 @@ describe("companion preferences", () => {
 		const newerScreensaver = {
 			...failedAttempt,
 			screensaver: CUSTOM_SCREENSAVER,
+		} as const;
+		const newerIdeWindow = {
+			...failedAttempt,
+			ideWindow: CUSTOM_IDE_WINDOW,
 		} as const;
 
 		expect(
@@ -250,6 +272,9 @@ describe("companion preferences", () => {
 		).toBe(false);
 		expect(
 			shouldRestoreFailedPreferenceUpdate(newerScreensaver, failedAttempt),
+		).toBe(false);
+		expect(
+			shouldRestoreFailedPreferenceUpdate(newerIdeWindow, failedAttempt),
 		).toBe(false);
 		expect(
 			shouldRestoreFailedPreferenceUpdate(failedAttempt, failedAttempt),
@@ -281,13 +306,14 @@ describe("companion preferences", () => {
 		expect(writes).toEqual(["font", "theme"]);
 	});
 
-	it("serializes only font, fontSize, theme, menuBar, and screensaver store keys", () => {
+	it("serializes only font, fontSize, theme, menuBar, screensaver, and ideWindow store keys", () => {
 		const entries = preferencesToStoreEntries({
 			font: "menlo",
 			fontSize: "large",
 			theme: "codex",
 			menuBar: CUSTOM_MENU_BAR,
 			screensaver: CUSTOM_SCREENSAVER,
+			ideWindow: CUSTOM_IDE_WINDOW,
 		});
 
 		expect(entries).toEqual({
@@ -296,6 +322,7 @@ describe("companion preferences", () => {
 			theme: "codex",
 			menuBar: CUSTOM_MENU_BAR,
 			screensaver: CUSTOM_SCREENSAVER,
+			ideWindow: CUSTOM_IDE_WINDOW,
 		});
 		expect(Object.keys(entries)).toEqual([
 			"font",
@@ -303,6 +330,7 @@ describe("companion preferences", () => {
 			"theme",
 			"menuBar",
 			"screensaver",
+			"ideWindow",
 		]);
 	});
 
@@ -325,6 +353,7 @@ describe("companion preferences", () => {
 			theme: "claude",
 			menuBar: CUSTOM_MENU_BAR,
 			screensaver: CUSTOM_SCREENSAVER,
+			ideWindow: CUSTOM_IDE_WINDOW,
 		});
 
 		expect(writes).toEqual([
@@ -333,6 +362,7 @@ describe("companion preferences", () => {
 			["theme", "claude"],
 			["menuBar", CUSTOM_MENU_BAR],
 			["screensaver", CUSTOM_SCREENSAVER],
+			["ideWindow", CUSTOM_IDE_WINDOW],
 		]);
 		expect(saveCount).toBe(1);
 	});
@@ -381,6 +411,47 @@ describe("screensaver preference", () => {
 			sameScreensaverConfig(CUSTOM_SCREENSAVER, { ...CUSTOM_SCREENSAVER }),
 		).toBe(true);
 		expect(sameScreensaverConfig(CUSTOM_SCREENSAVER, DEFAULT_SCREENSAVER)).toBe(
+			false,
+		);
+	});
+});
+
+describe("IDE window preference", () => {
+	it("defaults to off", () => {
+		expect(DEFAULT_IDE_WINDOW).toEqual({ enabled: false });
+		expect(DEFAULT_COMPANION_PREFERENCES.ideWindow).toEqual(DEFAULT_IDE_WINDOW);
+	});
+
+	it("backfills the default on stores written before the switch existed", () => {
+		expect(sanitizeIdeWindowConfig(undefined)).toEqual({
+			config: DEFAULT_IDE_WINDOW,
+			sanitized: true,
+		});
+	});
+
+	it("keeps a valid config untouched", () => {
+		expect(sanitizeIdeWindowConfig(CUSTOM_IDE_WINDOW)).toEqual({
+			config: CUSTOM_IDE_WINDOW,
+			sanitized: false,
+		});
+	});
+
+	it("falls back to off for an unusable switch and drops unknown keys", () => {
+		expect(sanitizeIdeWindowConfig({ enabled: "yes" })).toEqual({
+			config: { enabled: false },
+			sanitized: true,
+		});
+		expect(sanitizeIdeWindowConfig({ enabled: true, screen: 2 })).toEqual({
+			config: { enabled: true },
+			sanitized: true,
+		});
+	});
+
+	it("compares configs by value", () => {
+		expect(
+			sameIdeWindowConfig(CUSTOM_IDE_WINDOW, { ...CUSTOM_IDE_WINDOW }),
+		).toBe(true);
+		expect(sameIdeWindowConfig(CUSTOM_IDE_WINDOW, DEFAULT_IDE_WINDOW)).toBe(
 			false,
 		);
 	});
