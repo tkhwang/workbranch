@@ -7,6 +7,10 @@ import {
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
+	DEFAULT_IDE_WINDOW,
+	type IdeWindowConfig,
+} from "../src/application/ideWindow";
+import {
 	DEFAULT_MENU_BAR,
 	type MenuBarConfig,
 } from "../src/application/menuBar";
@@ -17,6 +21,10 @@ import type {
 } from "../src/application/preferences";
 import { DEFAULT_SCREENSAVER } from "../src/application/screensaver";
 import { AgentThemePicker } from "../src/ui/AgentThemePicker";
+import {
+	type IdeWindowAccessProps,
+	IdeWindowSettings,
+} from "../src/ui/IdeWindowSettings";
 import { MenuBarSettings } from "../src/ui/MenuBarSettings";
 import { SegmentedControl } from "../src/ui/SettingsLayout";
 import {
@@ -86,6 +94,7 @@ const preferences: CompanionPreferences = {
 	theme: "claude",
 	menuBar: DEFAULT_MENU_BAR,
 	screensaver: DEFAULT_SCREENSAVER,
+	ideWindow: DEFAULT_IDE_WINDOW,
 };
 
 const relay = {
@@ -94,6 +103,18 @@ const relay = {
 	onChange: () => undefined,
 };
 
+function access(
+	granted: boolean | undefined,
+	calls: string[] = [],
+): IdeWindowAccessProps {
+	return {
+		granted,
+		loading: false,
+		onRequest: () => calls.push("request"),
+		onOpenSettings: () => calls.push("open settings"),
+	};
+}
+
 function panelProps(
 	category: PreferenceCategory,
 	overrides: {
@@ -101,11 +122,13 @@ function panelProps(
 		readonly launchAtLoginLoading?: boolean;
 		readonly onLaunchAtLoginChange?: (enabled: boolean) => void;
 		readonly onPreferencesChange?: (next: CompanionPreferences) => void;
+		readonly ideWindowAccess?: IdeWindowAccessProps;
 	} = {},
 ) {
 	return {
 		category,
 		claudeLimitRelay: relay,
+		ideWindowAccess: overrides.ideWindowAccess ?? access(true),
 		preferences: overrides.preferences ?? preferences,
 		launchAtLogin: false,
 		launchAtLoginLoading: overrides.launchAtLoginLoading ?? false,
@@ -136,10 +159,15 @@ describe("SettingsPanel", () => {
 			html.indexOf("Open at Login"),
 		);
 		expect(html).toContain('aria-label="Startup"');
+		expect(html).toContain('aria-label="IDE Windows"');
 		expect(html).toContain('aria-label="Claude Limits"');
 		expect(html).toContain('for="launch-at-login"');
+		expect(html).toContain('for="ide-window-enabled"');
 		expect(html).toContain('for="claude-limit-relay"');
-		expect(html.match(/role="switch"/g)).toHaveLength(2);
+		expect(html.indexOf('aria-label="Startup"')).toBeLessThan(
+			html.indexOf('aria-label="IDE Windows"'),
+		);
+		expect(html.match(/role="switch"/g)).toHaveLength(3);
 		expect(html).not.toContain("<legend");
 		expect(html).not.toContain("terminal-panel");
 	});
@@ -265,6 +293,119 @@ describe("SettingsPanel", () => {
 		)[0]?.onChange(edited);
 
 		expect(preferenceCalls).toEqual([{ ...preferences, menuBar: edited }]);
+	});
+});
+
+describe("IdeWindowSettings", () => {
+	function render(
+		value: IdeWindowConfig,
+		granted: boolean | undefined,
+		loading = false,
+	): string {
+		return renderToStaticMarkup(
+			<IdeWindowSettings
+				{...access(granted)}
+				loading={loading}
+				onChange={() => undefined}
+				value={value}
+			/>,
+		);
+	}
+
+	it("starts switched off and leaves window placement to the IDE", () => {
+		const html = render(DEFAULT_IDE_WINDOW, false);
+
+		expect(html).toMatch(/id="ide-window-enabled"(?![^>]*checked)/);
+		expect(html).toContain("open a new window where they choose");
+		expect(html).not.toContain("Open System Settings");
+	});
+
+	it("explains the move once the switch is on and access is granted", () => {
+		const html = render({ enabled: true }, true);
+
+		expect(html).toMatch(/id="ide-window-enabled"[^>]*checked=""/);
+		expect(html).toContain("moves to the middle of the screen Companion is on");
+		expect(html).not.toContain("Open System Settings");
+	});
+
+	it("offers System Settings while the switch waits for access", () => {
+		const html = render({ enabled: true }, false);
+
+		expect(html).toContain("Waiting for the Accessibility permission");
+		expect(html).toContain("Privacy &amp; Security › Accessibility");
+		expect(html).toContain(">Open System Settings</button>");
+	});
+
+	it("says when the permission is still being read", () => {
+		expect(render({ enabled: true }, undefined, true)).toContain(
+			"Checking the Accessibility permission",
+		);
+	});
+
+	it("asks macOS for access when switched on without it", () => {
+		const changes: IdeWindowConfig[] = [];
+		const calls: string[] = [];
+		const element = IdeWindowSettings({
+			...access(false, calls),
+			onChange: (config) => changes.push(config),
+			value: DEFAULT_IDE_WINDOW,
+		});
+		collect<InputProps>(element, "input")
+			.find((input) => input.id === "ide-window-enabled")
+			?.onChange?.({ currentTarget: { checked: true } });
+
+		expect(changes).toEqual([{ enabled: true }]);
+		expect(calls).toEqual(["request"]);
+	});
+
+	it("does not ask again when access is granted or the switch turns off", () => {
+		const calls: string[] = [];
+		for (const [granted, value, checked] of [
+			[true, DEFAULT_IDE_WINDOW, true],
+			[false, { enabled: true }, false],
+		] as const) {
+			const element = IdeWindowSettings({
+				...access(granted, calls),
+				onChange: () => undefined,
+				value,
+			});
+			collect<InputProps>(element, "input")
+				.find((input) => input.id === "ide-window-enabled")
+				?.onChange?.({ currentTarget: { checked } });
+		}
+
+		expect(calls).toEqual([]);
+	});
+
+	it("opens System Settings from the waiting row", () => {
+		const calls: string[] = [];
+		const element = IdeWindowSettings({
+			...access(false, calls),
+			onChange: () => undefined,
+			value: { enabled: true },
+		});
+		collect<ButtonProps>(element, "button")[0]?.onClick?.();
+
+		expect(calls).toEqual(["open settings"]);
+	});
+
+	it("saves the switch through the General page", () => {
+		const preferenceCalls: CompanionPreferences[] = [];
+		const general = SettingsPanel(
+			panelProps("general", {
+				onPreferencesChange: (next) => {
+					preferenceCalls.push(next);
+				},
+			}),
+		);
+		collect<{ readonly onChange: (config: IdeWindowConfig) => void }>(
+			general,
+			IdeWindowSettings,
+		)[0]?.onChange({ enabled: true });
+
+		expect(preferenceCalls).toEqual([
+			{ ...preferences, ideWindow: { enabled: true } },
+		]);
 	});
 });
 

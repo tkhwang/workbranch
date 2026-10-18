@@ -6,6 +6,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use thiserror::Error;
 
 mod claude_statusline;
+mod ide_window;
 mod menu_bar;
 mod process_env;
 mod runtime_service;
@@ -162,9 +163,16 @@ async fn usage_snapshot(
 
 #[tauri::command]
 async fn workbranch_run(
+    window: tauri::WebviewWindow,
     action: CompanionCommand,
     cwd: String,
 ) -> Result<RunResult, CompanionError> {
+    // Read while the companion still shows on the screen the user looks at;
+    // the IDE's new windows move there when Settings turned that on.
+    let ide_screen = match action {
+        CompanionCommand::Ide { .. } => ide_window::screen_to_follow(&window),
+        _ => None,
+    };
     tauri::async_runtime::spawn_blocking(move || {
         let cwd_path = PathBuf::from(cwd);
         match action {
@@ -173,7 +181,11 @@ async fn workbranch_run(
                 let args = workbranch_args_for(&command).ok_or_else(|| {
                     std::io::Error::other("companion command has no workbranch argv")
                 })?;
-                run_workbranch(&resolve_workbranch_bin(None)?, &args, &cwd_path)
+                let bin = resolve_workbranch_bin(None)?;
+                let following = ide_screen.map(ide_window::follow);
+                let result = run_workbranch(&bin, &args, &cwd_path);
+                drop(following);
+                result
             }
         }
     })
@@ -326,6 +338,9 @@ pub fn run() {
             usage_snapshot,
             claude_statusline::claude_limit_relay_status,
             claude_statusline::claude_limit_relay_set,
+            ide_window::ide_window_access,
+            ide_window::ide_window_request_access,
+            ide_window::ide_window_open_access_settings,
             menu_bar::menu_bar_refresh,
             watch_roots,
             quit_app,

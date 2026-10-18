@@ -10,6 +10,7 @@ import { updateTargets } from "./application/updates";
 import { useClaudeLimitRelay } from "./application/useClaudeLimitRelay";
 import { useCompanionSettings } from "./application/useCompanionSettings";
 import { useConnections } from "./application/useConnections";
+import { useIdeWindowAccess } from "./application/useIdeWindowAccess";
 import { useRepoNotes } from "./application/useRepoNotes";
 import { useRuntimeSessions } from "./application/useRuntimeSessions";
 import { useUpdates } from "./application/useUpdates";
@@ -129,6 +130,10 @@ export function App() {
 		updatePreferences,
 	} = useCompanionSettings({ onError: showError, onStatus: showStatus });
 	const claudeLimitRelay = useClaudeLimitRelay(currentView === "settings", {
+		onError: showError,
+		onStatus: showStatus,
+	});
+	const ideWindowAccess = useIdeWindowAccess(currentView === "settings", {
 		onError: showError,
 		onStatus: showStatus,
 	});
@@ -437,6 +442,12 @@ export function App() {
 						onChange: (enabled) => void claudeLimitRelay.update(enabled),
 					}}
 					connections={connectionPanel(false)}
+					ideWindowAccess={{
+						granted: ideWindowAccess.granted,
+						loading: ideWindowAccess.loading,
+						onRequest: () => void ideWindowAccess.request(),
+						onOpenSettings: () => void ideWindowAccess.openSettings(),
+					}}
 					preferences={preferences}
 					launchAtLogin={launchAtLogin}
 					launchAtLoginLoading={launchAtLoginLoading}

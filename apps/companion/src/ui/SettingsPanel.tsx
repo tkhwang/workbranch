@@ -10,6 +10,10 @@ import {
 	type ClaudeLimitRelayProps,
 	ClaudeLimitRelaySettings,
 } from "./ClaudeLimitRelaySettings";
+import {
+	type IdeWindowAccessProps,
+	IdeWindowSettings,
+} from "./IdeWindowSettings";
 import { MenuBarSettings } from "./MenuBarSettings";
 import { ScreensaverSettings } from "./ScreensaverSettings";
 import {
@@ -28,6 +32,7 @@ type Props = {
 	/** Update and connection status, shown first on General. */
 	readonly status?: ReactNode;
 	readonly claudeLimitRelay: ClaudeLimitRelayProps;
+	readonly ideWindowAccess: IdeWindowAccessProps;
 	readonly preferences: CompanionPreferences;
 	readonly launchAtLogin: boolean;
 	readonly launchAtLoginLoading: boolean;
@@ -80,14 +85,17 @@ export function SettingsPanel(props: Props) {
 function generalPage({
 	status,
 	claudeLimitRelay,
+	ideWindowAccess,
+	preferences,
 	launchAtLogin,
 	launchAtLoginLoading,
 	onLaunchAtLoginChange,
+	onPreferencesChange,
 }: Props) {
 	return (
 		<SettingsPage
 			category="general"
-			description="What needs attention, when Companion opens, and where Claude limits come from."
+			description="What needs attention, when Companion opens, where IDE windows open, and where Claude limits come from."
 			title="Status, startup and limits"
 		>
 			{status}
@@ -117,6 +125,13 @@ function generalPage({
 					/>
 				</SettingsRow>
 			</SettingsGroup>
+			<IdeWindowSettings
+				{...ideWindowAccess}
+				onChange={(ideWindow) =>
+					onPreferencesChange({ ...preferences, ideWindow })
+				}
+				value={preferences.ideWindow}
+			/>
 			<SettingsGroup label="Claude Limits">
 				<ClaudeLimitRelaySettings {...claudeLimitRelay} />
 			</SettingsGroup>
