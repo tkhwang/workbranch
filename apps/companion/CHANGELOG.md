@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.35.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.34.0...workbranch-companion-v2.35.0) (2026-10-18)
+
+
+### Features
+
+* **ide_window:** IDE 창 위치 자동 이동 기능 추가하기 ([0fb094f](https://github.com/tkhwang/workbranch/commit/0fb094fbba183d7bb8a81adb9c1b26e1d1f1cc28))
+* **ide_window:** IDE 창 위치 자동 이동 기능 추가하기 ([fb63bdd](https://github.com/tkhwang/workbranch/commit/fb63bdd3c546dc71022c8e392e54f6ba54ca1e94))
+
+
+### Bug Fixes
+
+* **ide_window:** 늦게 열린 창 대기와 창 이동 재시도, 권한 상태 경합 처리하기 ([28f2b81](https://github.com/tkhwang/workbranch/commit/28f2b817811f515730efab2d403b1fe483e76884))
+
 ## [2.34.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.33.0...workbranch-companion-v2.34.0) (2026-10-17)
 
 
