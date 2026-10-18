@@ -4728,7 +4728,7 @@ dependencies = [
 
 [[package]]
 name = "workbranch-companion"
-version = "2.34.0"
+version = "2.35.0"
 dependencies = [
  "block2",
  "libc",
