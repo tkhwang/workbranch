@@ -157,7 +157,10 @@ fn run<R: Runtime>(
             },
             Some(Message::Preview) => Event::Preview,
             Some(Message::DisplaysChanged) => {
-                // A display came or went: rebuild the windows to match.
+                // A display came, went or moved, or macOS re-announced the
+                // screens (it does on every brightness ramp of an XDR
+                // display): line the windows up with the displays, which
+                // leaves them alone when the layout is the same.
                 if machine.previewing() {
                     platform.show_dashboard(Mode::Preview);
                 } else if machine.showing() {

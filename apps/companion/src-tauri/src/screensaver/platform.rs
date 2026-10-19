@@ -21,6 +21,8 @@ pub(crate) trait Platform {
     /// cannot be asked, and its notifications alone tell.
     fn screen_saver_running(&self) -> Option<bool>;
     /// Covers every display with the dashboard, above the lock screen.
+    /// Windows already covering their display are left as they are, so
+    /// calling it again with the same displays changes nothing on screen.
     fn show_dashboard(&mut self, mode: Mode);
     fn hide_dashboard(&mut self);
     /// Locks the login session at once, as Ctrl-Cmd-Q would.

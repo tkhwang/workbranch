@@ -43,11 +43,11 @@
 - **잠금 불가**: 잠금 심볼을 찾지 못하면 dashboard 는 똑같이 화면보호기와 잠금 화면 위에 뜨되 "화면 잠김" 표시를 숨기고, 직접 잠그지 않는다. 화면보호기만 떠 있을 때 입력이 오면 dashboard 가 내려가고 macOS 설정대로(지연 시간 안이면 암호 없이) 화면보호기가 끝난다. `screensaver_status` command 가 `{ lockAvailable }` 을 돌려준다. 개발용 환경 변수 `WORKBRANCH_SCREENSAVER_NO_LOCK`(값 무관)이 있으면 잠금 불가로 시작한다.
 
 ## 창
-- 모니터마다 창 하나: 라벨 `dashboard-<n>`, 미리 보기는 `dashboard-preview-<n>`. 모니터 전체 크기, 테두리·그림자 없음, 크기 변경·최소화·닫기 불가, Dock·창 순환에 나오지 않음.
+- 모니터마다 창 하나: 라벨 `dashboard-<n>-<번호>`, 미리 보기는 `dashboard-preview-<n>-<번호>`. `<n>` 은 모니터 순서, `<번호>` 는 창을 열 때마다 1씩 늘어난다. Tauri 는 창이 destroy 를 마친 뒤에야 라벨을 놓아 주므로, 새 창이 destroy 중인 창과 라벨이 겹쳐 열리지 못하는 일이 없다. 모니터 전체 크기, 테두리·그림자 없음, 크기 변경·최소화·닫기 불가, Dock·창 순환에 나오지 않음.
 - 잠금 화면 위에 그리기 위해 비공개 SkyLight space 를 쓴다. 처음 띄울 때 `SLSSpaceCreate` 로 space 를 하나 만들고 `SLSSpaceSetAbsoluteLevel` 로 절대 level 400(macOS 가 잠금 화면 위 알림에 쓰는 level, 잠금 화면은 300)을 준 뒤 `SLSShowSpaces` 로 보이고, 창을 `SLSSpaceAddWindowsAndRemoveFromSpaces` 로 그 space 에 옮긴다. space 는 앱이 끝날 때까지 둔다. SkyLight 함수를 하나라도 찾지 못하면 창은 화면보호기 위에만 뜨고 잠금 화면 아래에 가려진다.
 - 창 level 은 `CGShieldingWindowLevel() + 1`, collection behavior 는 `CanJoinAllSpaces | FullScreenAuxiliary | Stationary | IgnoresCycle`, `canBecomeVisibleWithoutLogin` 은 참이다.
 - dashboard 창은 키보드를 받지 않는다(focus 없음, app 활성화 없음). 잠긴 동안 키 입력은 잠금 화면의 암호 칸으로 간다. 실제 dashboard 는 마우스도 통과시켜 클릭이 잠금 화면에 닿는다. 미리 보기 창은 클릭을 받아, 밑에 있는 앱에 클릭이 가지 않는다.
-- 모니터 구성이 바뀌면(`NSApplicationDidChangeScreenParametersNotification`) 지금 모니터 목록에 맞춰 창을 다시 만든다.
+- 모니터 구성 알림(`NSApplicationDidChangeScreenParametersNotification`)이 오면 지금 모니터 목록과 떠 있는 창을 비교해, 창이 없는 모니터에만 창을 열고, 사라진 모니터의 창은 닫고, 위치·크기가 바뀐 모니터의 창만 옮긴다. 그대로인 창은 건드리지 않는다. macOS 는 XDR 디스플레이의 밝기가 바뀔 때마다(EDR headroom 변화) 이 알림을 초당 수십 번 보내므로, 알림마다 창을 다시 만들면 dashboard 가 깜빡이고, 같은 라벨의 창이 아직 destroy 중일 때 새 창을 못 만들어 dashboard 가 잠금 해제 때까지 사라진다. companion 이 직접 열고 아직 닫지 않은 창만 비교 대상으로 삼으므로 destroy 중인 창을 다시 쓰지 않는다. 모니터 목록을 읽지 못하면 떠 있는 창을 그대로 둔다. 창을 열거나 옮기지 못했거나 창이 사라졌으면, 다음 알림이나 다음 표시 때 다시 연다(옮기기는 위치와 크기가 둘 다 바뀌었을 때만 끝난 것으로 본다).
 - 창과 webview 배경은 `#131313`(Claude 테마 `--surface-0`)이다. Tauri `macOSPrivateApi` 를 켜 webview 의 기본 흰 배경을 그리지 않는다. 내릴 때는 모든 dashboard 창을 먼저 숨긴 뒤 destroy 하므로 열고 닫을 때 흰 화면이 비치지 않는다.
 - capability `dashboard`(`dashboard-*` 창 전용)는 `core:event:allow-listen`, `core:event:allow-unlisten`, `store:allow-load`, `store:allow-get` 만 준다.
 
