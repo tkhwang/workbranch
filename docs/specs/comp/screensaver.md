@@ -47,7 +47,7 @@
 - 잠금 화면 위에 그리기 위해 비공개 SkyLight space 를 쓴다. 처음 띄울 때 `SLSSpaceCreate` 로 space 를 하나 만들고 `SLSSpaceSetAbsoluteLevel` 로 절대 level 400(macOS 가 잠금 화면 위 알림에 쓰는 level, 잠금 화면은 300)을 준 뒤 `SLSShowSpaces` 로 보이고, 창을 `SLSSpaceAddWindowsAndRemoveFromSpaces` 로 그 space 에 옮긴다. space 는 앱이 끝날 때까지 둔다. SkyLight 함수를 하나라도 찾지 못하면 창은 화면보호기 위에만 뜨고 잠금 화면 아래에 가려진다.
 - 창 level 은 `CGShieldingWindowLevel() + 1`, collection behavior 는 `CanJoinAllSpaces | FullScreenAuxiliary | Stationary | IgnoresCycle`, `canBecomeVisibleWithoutLogin` 은 참이다.
 - dashboard 창은 키보드를 받지 않는다(focus 없음, app 활성화 없음). 잠긴 동안 키 입력은 잠금 화면의 암호 칸으로 간다. 실제 dashboard 는 마우스도 통과시켜 클릭이 잠금 화면에 닿는다. 미리 보기 창은 클릭을 받아, 밑에 있는 앱에 클릭이 가지 않는다.
-- 모니터 구성이 바뀌면(`NSApplicationDidChangeScreenParametersNotification`) 지금 모니터 목록에 맞춰 창을 다시 만든다.
+- 모니터 구성 알림(`NSApplicationDidChangeScreenParametersNotification`)이 오면 지금 모니터 목록과 떠 있는 창을 비교해, 창이 없는 모니터에만 창을 열고, 사라진 모니터의 창은 닫고, 위치·크기가 바뀐 모니터의 창만 옮긴다. 그대로인 창은 건드리지 않는다. macOS 는 XDR 디스플레이의 밝기가 바뀔 때마다(EDR headroom 변화) 이 알림을 초당 수십 번 보내므로, 알림마다 창을 다시 만들면 dashboard 가 깜빡이고, 같은 라벨의 창이 아직 destroy 중일 때 새 창을 못 만들어 dashboard 가 잠금 해제 때까지 사라진다. 모니터 목록을 읽지 못하면 떠 있는 창을 그대로 둔다. 창을 열지 못하면 다음 알림이나 다음 표시 때 다시 연다.
 - 창과 webview 배경은 `#131313`(Claude 테마 `--surface-0`)이다. Tauri `macOSPrivateApi` 를 켜 webview 의 기본 흰 배경을 그리지 않는다. 내릴 때는 모든 dashboard 창을 먼저 숨긴 뒤 destroy 하므로 열고 닫을 때 흰 화면이 비치지 않는다.
 - capability `dashboard`(`dashboard-*` 창 전용)는 `core:event:allow-listen`, `core:event:allow-unlisten`, `store:allow-load`, `store:allow-get` 만 준다.
 

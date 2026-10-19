@@ -24,7 +24,7 @@ use objc2_foundation::{
 use tauri::{AppHandle, Runtime, WebviewWindow};
 
 use super::platform::Platform;
-use super::windows::{self, Mode};
+use super::windows::{Dashboard, Mode};
 
 const AWAKE_REASON: &str = "Workbranch agents are working";
 /// `kCGAnyInputEventType` (~0); the bindings have no name for it.
@@ -225,6 +225,7 @@ pub(crate) struct MacPlatform<R: Runtime> {
     display: Option<Activity>,
     lock: Option<ScreenLock>,
     saver: Option<ScreenSaverQuery>,
+    dashboard: Dashboard,
 }
 
 impl<R: Runtime> MacPlatform<R> {
@@ -235,6 +236,7 @@ impl<R: Runtime> MacPlatform<R> {
             display: None,
             lock,
             saver: ScreenSaverQuery::probe(),
+            dashboard: Dashboard::default(),
         }
     }
 }
@@ -272,11 +274,11 @@ impl<R: Runtime> Platform for MacPlatform<R> {
     }
 
     fn show_dashboard(&mut self, mode: Mode) {
-        windows::show(&self.app, mode, raise);
+        self.dashboard.show(&self.app, mode, raise);
     }
 
     fn hide_dashboard(&mut self) {
-        windows::hide(&self.app);
+        self.dashboard.hide(&self.app);
     }
 
     fn lock_screen(&mut self) {
