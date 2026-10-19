@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.36.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.35.0...workbranch-companion-v2.36.0) (2026-10-19)
+
+
+### Features
+
+* **screensaver:** 모니터 구성 변경 시 대시보드 창 관리하기 ([e770725](https://github.com/tkhwang/workbranch/commit/e7707251286f8f01b1edfc079f174f73c2366e64))
+* **screensaver:** 모니터 구성 변경 시 대시보드 창 관리하기 ([827dc40](https://github.com/tkhwang/workbranch/commit/827dc40086cbb2b228d5da67932e67e081d8123c))
+
+
+### Bug Fixes
+
+* **screensaver:** 닫히는 중인 창을 다시 쓰지 않고 창 이동 실패 시 다시 시도하기 ([198c847](https://github.com/tkhwang/workbranch/commit/198c847c2a278930bca3f085724fad1eed8be3f4))
+
 ## [2.35.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.34.0...workbranch-companion-v2.35.0) (2026-10-18)
 
 
