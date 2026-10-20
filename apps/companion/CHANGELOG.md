@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.37.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.36.0...workbranch-companion-v2.37.0) (2026-10-20)
+
+
+### Features
+
+* **screensaver:** 화면 보호기 동안 대시보드 표시하기 및 세부 정보 수정하기 ([8d6143c](https://github.com/tkhwang/workbranch/commit/8d6143ce0b9f682a674a83acf7e571ff60357e6b))
+* **screensaver:** 화면 보호기 동안 대시보드 표시하기 및 세부 정보 수정하기 ([f01f3e7](https://github.com/tkhwang/workbranch/commit/f01f3e7f12e3efefa9eca4e6593d6cab4865c154))
+
+
+### Bug Fixes
+
+* **screensaver:** 기능을 껐다 켜도 다 쓴 무작업 덮임 유지하기 ([8ea559a](https://github.com/tkhwang/workbranch/commit/8ea559aa68eab56e71fc8ba2910514a5369e2e33))
+
 ## [2.36.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.35.0...workbranch-companion-v2.36.0) (2026-10-19)
 
 
