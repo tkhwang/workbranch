@@ -175,7 +175,7 @@ describe("SettingsPanel", () => {
 	it("gives every preference page its numbered heading", () => {
 		const pages: readonly [PreferenceCategory, string, string][] = [
 			["menu-bar", "03 · Menu Bar", "What the menu bar shows"],
-			["screen-saver", "04 · Screen Saver", "Dashboard while agents work"],
+			["screen-saver", "04 · Screen Saver", "Dashboard over the lock screen"],
 			["appearance", "05 · Appearance", "Theme, font and text size"],
 		];
 		for (const [category, eyebrow, title] of pages) {

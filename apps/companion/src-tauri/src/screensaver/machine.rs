@@ -113,11 +113,13 @@ pub(crate) enum Event {
     Saver(bool),
     /// A reading of the session, taken on every poll and whenever macOS says
     /// the screen locked or unlocked or the screen saver started or stopped:
-    /// time since the last keyboard or mouse input, whether the session reads
-    /// as locked, and whether its screen saver runs (`None` where macOS
-    /// cannot be asked). The session, not a notification, is the truth, so a
-    /// stray or missed notification never misleads the machine.
+    /// when it was taken (on a monotonic clock), time since the last keyboard
+    /// or mouse input, whether the session reads as locked, and whether its
+    /// screen saver runs (`None` where macOS cannot be asked). The session,
+    /// not a notification, is the truth, so a stray or missed notification
+    /// never misleads the machine.
     Sample {
+        at: Duration,
         idle: Duration,
         locked: bool,
         saver: Option<bool>,
@@ -129,7 +131,8 @@ pub(crate) enum Event {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Action {
     /// Keeps the system from idle sleep, so agents go on working, with the
-    /// screen locked or not (COMP001 R2).
+    /// screen locked or not (COMP001 R2), and so a covering dashboard stays
+    /// up after the work is done (COMP002 R8).
     HoldAwake,
     ReleaseAwake,
     /// Keeps the display on while the screen saver or the lock screen is up,
@@ -156,6 +159,12 @@ pub(crate) const INPUT_POLL: Duration = Duration::from_millis(250);
 /// the screen saver itself starts after a far longer pause, so it is
 /// covered at once.
 pub(crate) const SHOW_AFTER: Duration = Duration::from_secs(15);
+/// How long the screen saver or the lock screen stays covered, and the Mac
+/// awake, with no agent at work (COMP002 R8). It counts from the later of
+/// the cover starting and the last agent stopping, so stepping away right
+/// after the agents finished still shows their results; past it macOS takes
+/// the display and sleep back, so a night away never pins the Mac awake.
+pub(crate) const COVER_WITHOUT_WORK: Duration = Duration::from_secs(30 * 60);
 /// How long failed runtime reads keep the last reading of whether agents
 /// work. A read can fail for a moment (a timeout, the CLI mid-upgrade) while
 /// agents go on working; reads that keep failing must not pin the Mac awake.
@@ -209,6 +218,13 @@ pub(crate) struct Machine {
     /// so a late reading never locks the Mac just after it was unlocked
     /// (Touch ID leaves no keyboard or mouse input to hold the lock off).
     saver_stale: bool,
+    /// When this cover first had no agent at work: the screen saver or the
+    /// lock came with nothing at work, or the work ended under it. Set on the
+    /// next reading, cleared once work resumes or the cover ends.
+    without_work_since: Option<Duration>,
+    /// Set once `COVER_WITHOUT_WORK` has run out for this cover; nothing is
+    /// covered again until work resumes or the screen is unlocked.
+    cover_spent: bool,
     /// Whether the system is held awake.
     awake: bool,
     /// Whether the display is held on.
@@ -236,12 +252,41 @@ impl Machine {
         self.config.enabled && self.working
     }
 
-    /// Covered: agents work and macOS has put up its screen saver or its
-    /// lock screen. The display then stays on and the dashboard shows on
-    /// top. Until then nothing here holds the display, so the screen saver,
-    /// the lock and display sleep follow the macOS settings.
+    /// Whether macOS has put up its screen saver or its lock screen.
+    fn away(&self) -> bool {
+        self.locked || self.saver
+    }
+
+    /// Covered: the feature is on, macOS has put up its screen saver or its
+    /// lock screen, and agents work or `COVER_WITHOUT_WORK` has not run out
+    /// (COMP002 R8). The display and the system then stay awake and the
+    /// dashboard shows on top. At the desk nothing here holds the display,
+    /// so the screen saver, the lock and display sleep follow the macOS
+    /// settings.
     fn covered(&self) -> bool {
-        self.keeps_awake() && (self.locked || self.saver)
+        self.config.enabled && self.away() && (self.working || !self.cover_spent)
+    }
+
+    /// Starts, runs out or clears the time this cover may last with no agent
+    /// at work. Only a reading of the session carries the time (`at`), so the
+    /// clock starts on the first reading after the cover lost its work. Only
+    /// work or signing in clears it: turning the feature off and on under the
+    /// same lock keeps a spent cover spent.
+    fn track_cover_without_work(&mut self, at: Option<Duration>) {
+        if !self.away() || self.working {
+            self.without_work_since = None;
+            self.cover_spent = false;
+            return;
+        }
+        if !self.config.enabled {
+            return;
+        }
+        if let Some(at) = at {
+            let since = *self.without_work_since.get_or_insert(at);
+            if at.saturating_sub(since) >= COVER_WITHOUT_WORK {
+                self.cover_spent = true;
+            }
+        }
     }
 
     /// Whether the dashboard may show now. Where the Mac can lock, only over
@@ -277,6 +322,7 @@ impl Machine {
 
     pub(crate) fn step(&mut self, event: Event) -> Vec<Action> {
         let mut input = false;
+        let mut sampled_at = None;
         match event {
             Event::Config(config) => self.config = config,
             Event::Working(working) => {
@@ -297,12 +343,17 @@ impl Machine {
                 self.saver = running;
             }
             Event::Sample {
+                at,
                 idle,
                 locked,
                 saver,
-            } => input = self.read_session(idle, locked, saver),
+            } => {
+                input = self.read_session(idle, locked, saver);
+                sampled_at = Some(at);
+            }
             Event::Preview => {}
         }
+        self.track_cover_without_work(sampled_at);
         let covered = self.covered();
         let sampled = matches!(event, Event::Sample { .. });
         if !covered || self.locked {
@@ -356,7 +407,9 @@ impl Machine {
             }
         }
 
-        let awake = self.keeps_awake();
+        // Work keeps the system awake at the desk; a cover keeps it awake
+        // for the dashboard even once the work is done.
+        let awake = self.keeps_awake() || covered;
         if awake != self.awake {
             self.awake = awake;
             actions.push(if awake {
@@ -422,7 +475,7 @@ impl Machine {
     pub(crate) fn poll_interval(&self) -> Option<Duration> {
         if self.showing() || matches!(self.lock_request, LockRequest::Awaiting { .. }) {
             Some(INPUT_POLL)
-        } else if self.keeps_awake() {
+        } else if self.keeps_awake() || self.covered() {
             Some(IDLE_POLL)
         } else {
             None

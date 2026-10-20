@@ -64,8 +64,8 @@ export function SettingsPanel(props: Props) {
 			return (
 				<SettingsPage
 					category="screen-saver"
-					description="Keeps the Mac awake while agents work, then covers every screen with the board."
-					title="Dashboard while agents work"
+					description="Keeps the Mac awake while agents work, and covers every screen with the board when macOS locks."
+					title="Dashboard over the lock screen"
 				>
 					<ScreensaverSettings
 						onChange={(screensaver) =>
