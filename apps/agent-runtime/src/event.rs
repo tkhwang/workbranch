@@ -405,6 +405,7 @@ pub fn ingest(
     s.updated_at = now;
     if s.state != before {
         s.state_changed_at = now;
+        store::record_transition(&tx, &s, now)?;
     }
     store::save(&tx, &s)?;
     tx.commit()?;

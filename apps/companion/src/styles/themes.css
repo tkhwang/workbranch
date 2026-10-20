@@ -43,6 +43,11 @@ main[data-theme="claude"] {
 	--provider-codex-line: rgba(92, 194, 224, 0.45);
 	--provider-grok: #c7c7d1;
 	--provider-grok-line: rgba(199, 199, 209, 0.42);
+	/* Repo name tints: palette hues kept apart from every state color. */
+	--repo-1: #74b9ff;
+	--repo-2: #a29bfe;
+	--repo-3: #fd79a8;
+	--repo-4: #81ecec;
 }
 
 main[data-theme="codex"] {
@@ -88,6 +93,11 @@ main[data-theme="codex"] {
 	--provider-codex-line: rgba(92, 194, 224, 0.45);
 	--provider-grok: #c7c7d1;
 	--provider-grok-line: rgba(199, 199, 209, 0.42);
+	/* Repo name tints: palette hues kept apart from every state color. */
+	--repo-1: #74b9ff;
+	--repo-2: #a29bfe;
+	--repo-3: #fd79a8;
+	--repo-4: #81ecec;
 }
 
 main[data-font-size="small"] {

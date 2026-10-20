@@ -401,3 +401,109 @@ fn empty_runtime_override_uses_home_and_nonempty_override_needs_no_home() {
     assert!(status.success());
     assert!(override_dir.join("hook-collector").is_symlink());
 }
+
+fn hook(db: &mut rusqlite::Connection, event: &str, tool: &str, at: u64) {
+    event::ingest(db, "/p/t", "claude", &json!({"session_id":"s","hook_event_name":event,"tool_use_id":"q","tool_name":tool,"tool_input":{"command":tool}}), at).unwrap();
+}
+
+fn log(states: &[(&str, u64, &str)]) -> Vec<store::Transition> {
+    states
+        .iter()
+        .map(|(state, at, outcome)| store::Transition { state: (*state).into(), at: *at, outcome: (*outcome).into() })
+        .collect()
+}
+
+#[test]
+fn state_changes_are_logged_with_turn_outcomes_and_totals() {
+    let mut db = store::open_memory().unwrap();
+    hook(&mut db, "UserPromptSubmit", "", 10);
+    hook(&mut db, "PreToolUse", "AskUserQuestion", 40);
+    hook(&mut db, "PostToolUse", "AskUserQuestion", 100);
+    hook(&mut db, "PreToolUse", "Bash", 120); // still running: not a change
+    hook(&mut db, "Stop", "", 160);
+    let s = &store::snapshot(&db, 200).unwrap()[0];
+    assert_eq!(
+        s.transitions,
+        log(&[("running", 10, ""), ("waiting", 40, ""), ("running", 100, ""), ("finished", 160, "turn-ended")])
+    );
+    assert_eq!(s.totals, Some(store::Totals { running: 90, waiting: 60, finished: 40 }));
+    let json = serde_json::to_value(s).unwrap();
+    assert_eq!(json["totals"], json!({"running": 90, "waiting": 60, "finished": 40}));
+    assert_eq!(json["transitions"][0], json!({"state": "running", "at": 10}));
+}
+
+#[test]
+fn a_failed_turn_logs_its_error_outcome() {
+    let mut db = store::open_memory().unwrap();
+    hook(&mut db, "UserPromptSubmit", "", 10);
+    hook(&mut db, "StopFailure", "", 30);
+    let s = &store::snapshot(&db, 40).unwrap()[0];
+    assert_eq!(s.transitions.last(), log(&[("finished", 30, "error")]).last());
+}
+
+#[test]
+fn a_stale_session_stops_counting_at_its_last_event() {
+    let mut db = store::open_memory().unwrap();
+    hook(&mut db, "UserPromptSubmit", "", 10);
+    hook(&mut db, "PreToolUse", "Bash", 50);
+    let s = &store::snapshot(&db, 1000).unwrap()[0];
+    assert_eq!(s.observation, "stale");
+    assert_eq!(s.totals, Some(store::Totals { running: 40, waiting: 0, finished: 0 }));
+}
+
+#[test]
+fn snapshot_keeps_a_day_of_changes_led_by_the_state_in_force() {
+    let full = log(&[("running", 0, ""), ("finished", 100, "turn-ended"), ("running", 90_000, "")]);
+    assert_eq!(store::recent(&full, 13_600), full[1..].to_vec());
+    assert_eq!(store::recent(&full, 0), full);
+    assert!(store::recent(&[], 50).is_empty());
+    assert_eq!(
+        store::totals(&full, 100_000),
+        store::Totals { running: 100 + 10_000, waiting: 0, finished: 89_900 }
+    );
+    let many: Vec<_> = (0..600).map(|i| store::Transition { state: "running".into(), at: 1000 + i, outcome: String::new() }).collect();
+    let kept = store::recent(&many, 0);
+    assert_eq!(kept.len(), 500);
+    assert_eq!(kept.last(), many.last());
+}
+
+#[test]
+fn history_is_never_stored_in_session_data_and_ages_out() {
+    let mut db = store::open_memory().unwrap();
+    hook(&mut db, "UserPromptSubmit", "", 10);
+    hook(&mut db, "Stop", "", 20);
+    let data: String = db.query_row("SELECT data FROM sessions", [], |r| r.get(0)).unwrap();
+    assert!(!data.contains("transitions") && !data.contains("totals"));
+    // A week later, another session's write purges the old log with the old session.
+    event::ingest(&mut db, "/p/t", "claude", &json!({"session_id":"later","hook_event_name":"UserPromptSubmit"}), 20 + 7 * 86400 + 1).unwrap();
+    let old: i64 = db.query_row("SELECT count(*) FROM transitions WHERE session='s'", [], |r| r.get(0)).unwrap();
+    assert_eq!(old, 0);
+}
+
+#[test]
+fn version_1_store_is_readable_and_upgrades_on_write() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("state.sqlite3");
+    {
+        let v1 = rusqlite::Connection::open(&path).unwrap();
+        v1.execute_batch("CREATE TABLE sessions (workspace TEXT NOT NULL, provider TEXT NOT NULL, session TEXT NOT NULL, agent TEXT NOT NULL, data TEXT NOT NULL, updated INTEGER NOT NULL, PRIMARY KEY(workspace,provider,session,agent)); PRAGMA user_version=1;").unwrap();
+        let s = store::Session { workspace: "/p/t".into(), provider: "claude".into(), session_id: "s".into(), state: "running".into(), observation: "observed".into(), updated_at: 10, state_changed_at: 10, ..Default::default() };
+        v1.execute(
+            "INSERT INTO sessions VALUES (?,?,?,?,?,?)",
+            rusqlite::params![s.workspace, s.provider, s.session_id, s.agent_id, serde_json::to_string(&s).unwrap(), 10],
+        )
+        .unwrap();
+    }
+    let before = store::snapshot(&store::open_read(&path).unwrap(), 20).unwrap();
+    assert_eq!(before[0].state, "running");
+    assert!(before[0].transitions.is_empty() && before[0].totals.is_none());
+
+    let mut db = store::open(&path).unwrap();
+    let version: u32 = db.query_row("PRAGMA user_version", [], |r| r.get(0)).unwrap();
+    assert_eq!(version, 2);
+    hook(&mut db, "Stop", "", 30);
+    let after = store::snapshot(&store::open_read(&path).unwrap(), 40).unwrap();
+    assert_eq!(after[0].transitions, log(&[("finished", 30, "turn-ended")]));
+    // Time before the log began is unknown, so only logged time counts.
+    assert_eq!(after[0].totals, Some(store::Totals { running: 0, waiting: 0, finished: 10 }));
+}

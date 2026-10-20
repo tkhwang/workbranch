@@ -209,5 +209,7 @@ test("runtime collector snapshot satisfies its independent schema", () => {
   validateOrThrow(ajv.compile(readJson("schema/workbranch-runtime.schema.json")),snapshot);
   assert.equal(snapshot.sessions.length,1);
   assert.equal(snapshot.sessions[0].prompt,"Contract fixture");
+  assert.equal(snapshot.sessions[0].transitions[0].state,"running");
+  assert.equal(typeof snapshot.sessions[0].totals.running,"number");
  } finally {rmSync(dir,{recursive:true,force:true});}
 });

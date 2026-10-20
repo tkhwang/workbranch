@@ -367,4 +367,43 @@ describe("runtime UI", () => {
 			),
 		).toThrow();
 	});
+	it("keeps the transition log and totals when the collector sends them", () => {
+		const history = {
+			transitions: [
+				{ state: "running", at: 10 },
+				{ state: "finished", at: 40, outcome: "error" },
+			],
+			totals: { running: 30, waiting: 0, finished: 5 },
+		};
+		const [parsed] = parseRuntimeDocument(
+			JSON.stringify({
+				schemaVersion: 1,
+				sessions: [{ ...session, ...history }],
+			}),
+		);
+		expect(parsed?.transitions).toEqual(history.transitions);
+		expect(parsed?.totals).toEqual(history.totals);
+		// An older collector sends neither.
+		const [plain] = parseRuntimeDocument(
+			JSON.stringify({ schemaVersion: 1, sessions: [session] }),
+		);
+		expect(plain?.transitions).toBeUndefined();
+	});
+	it("rejects a malformed transition log or totals", () => {
+		for (const bad of [
+			{ transitions: [{ state: "complete", at: 1 }] },
+			{ transitions: [{ state: "running", at: -1 }] },
+			{ transitions: { state: "running", at: 1 } },
+			{ totals: { running: 1, waiting: 0 } },
+			{ totals: { running: 1.5, waiting: 0, finished: 0 } },
+		])
+			expect(() =>
+				parseRuntimeDocument(
+					JSON.stringify({
+						schemaVersion: 1,
+						sessions: [{ ...session, ...bad }],
+					}),
+				),
+			).toThrow();
+	});
 });

@@ -63,5 +63,21 @@ export type WorkbranchAgentSession = {
  readonly updatedAt: number;
  readonly stateChangedAt: number;
  readonly outcome: string;
+ /** The last 24 hours of state changes; absent from older collectors. */
+ readonly transitions?: readonly WorkbranchRuntimeTransition[];
+ /** Seconds per state over the retained log; absent when nothing is logged. */
+ readonly totals?: WorkbranchRuntimeTotals;
+};
+export type WorkbranchRuntimeTransition = {
+ readonly state: "running" | "waiting" | "finished" | "idle";
+ /** Epoch seconds the state was entered. */
+ readonly at: number;
+ /** How a turn ended, on `finished` changes only. */
+ readonly outcome?: string;
+};
+export type WorkbranchRuntimeTotals = {
+ readonly running: number;
+ readonly waiting: number;
+ readonly finished: number;
 };
 export type WorkbranchRuntimeDocument = { readonly schemaVersion: 1; readonly sessions: readonly WorkbranchAgentSession[] };

@@ -158,231 +158,478 @@ body {
 	color: var(--runtime-finished);
 }
 
-.dashboard-board {
-	align-items: start;
-	display: grid;
-	gap: var(--dashboard-gap);
-	grid-template-columns: repeat(3, minmax(0, 1fr));
+/* The timeline (who is doing what, and how the work flowed). One grid
+   template lines up the head, every row, the guides and the axis:
+   agent icon | label | track | running | waiting | finished. Sizes follow
+   the screen height like the rest of the dashboard, so eight rows fit under
+   the header on any display (DASHBOARD_TIMELINE_ROWS). */
+.timeline {
+	--timeline-columns: 4.6vh minmax(0, 22vw) minmax(0, 1fr) repeat(3, 7.6vh);
+	--timeline-gap: 1.4vh;
+	display: flex;
+	flex-direction: column;
+	gap: 1.6vh;
 	min-height: 0;
 }
 
-.dashboard-column {
-	display: flex;
-	flex-direction: column;
-	gap: 1.3vh;
-	min-width: 0;
-}
-
-.dashboard-column-head {
+.timeline-grid {
 	align-items: center;
+	column-gap: var(--timeline-gap);
+	display: grid;
+	grid-template-columns: var(--timeline-columns);
+}
+
+.timeline-head {
+	align-items: end;
 	border-bottom: 1px solid var(--line);
-	color: var(--dashboard-ink);
-	display: flex;
-	font-size: clamp(16px, 2.4vh, 34px);
-	font-weight: 600;
-	gap: 1.3vh;
-	margin: 0;
-	padding-bottom: 1.3vh;
+	padding-bottom: 1.2vh;
+	row-gap: 0.6vh;
 }
 
-.dashboard-column-code {
-	color: var(--faint);
-	font-size: clamp(10px, 1.4vh, 18px);
-	font-weight: 400;
-	letter-spacing: 0.14em;
-	margin-left: auto;
-}
-
-.dashboard-dot {
-	background: var(--runtime-unknown);
-	border-radius: 50%;
-	flex: none;
-	height: 1.5vh;
-	width: 1.5vh;
-}
-
-.dashboard-dot[data-state="waiting"] {
-	background: var(--runtime-waiting);
-}
-
-.dashboard-dot[data-state="running"] {
-	background: var(--runtime-running);
-}
-
-.dashboard-dot[data-state="finished"] {
-	background: var(--runtime-finished);
-}
-
-/* Card height budget: the board gets about 72vh under the header; a column
-   head, three cards and a "+n more" line must fit in it, so the tallest card
-   (a waiting card with two detail lines) stays under about 19.5vh. Every line
-   below is sized in vh with a fixed line height and a fixed line count, which
-   keeps that budget on any display (DASHBOARD_CARDS_PER_COLUMN). */
-.dashboard-card {
-	background: var(--surface-1);
-	border: 1px solid var(--line);
-	border-radius: 1.6vh;
+.timeline-heading {
 	display: flex;
 	flex-direction: column;
-	gap: 0.7vh;
-	min-width: 0;
-	padding: 1.5vh 1.4vw;
+	gap: 1.1vh;
+	grid-column: 1 / 4;
+	grid-row: 1 / 3;
 }
 
-.dashboard-card[data-state="waiting"] {
-	border-color: var(--runtime-waiting-ring);
-}
-
-.dashboard-card-head,
-.dashboard-card-meta {
-	align-items: baseline;
-	display: flex;
-	gap: 1.2vh;
-	min-width: 0;
-}
-
-.dashboard-card-task {
+.timeline-title {
 	color: var(--dashboard-ink);
-	flex: 1;
-	font-size: clamp(18px, 2.8vh, 40px);
+	font-size: clamp(13px, 1.7vh, 24px);
 	font-weight: 700;
-	line-height: 1.2;
-	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.dashboard-card-time {
-	color: var(--muted);
-	font-size: clamp(13px, 1.9vh, 26px);
-	line-height: 1.2;
-	white-space: nowrap;
-}
-
-.dashboard-card[data-state="waiting"] .dashboard-card-time {
-	color: var(--runtime-waiting);
-}
-
-.dashboard-card-prompt {
-	color: var(--text);
-	font-size: clamp(12px, 1.75vh, 24px);
-	line-height: 1.35;
+	letter-spacing: 0.14em;
 	margin: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
 }
 
-.dashboard-card-prompt::before {
-	color: var(--line-strong);
-	content: "› ";
+.timeline-window {
+	color: var(--faint);
+	font-weight: 400;
+	letter-spacing: 0;
+	margin-left: 1.2vh;
 }
 
-.dashboard-card-detail {
-	color: var(--text);
-	font-size: clamp(12px, 1.65vh, 23px);
-	line-height: 1.38;
+.timeline-legend {
+	align-items: center;
+	color: var(--muted);
+	display: flex;
+	flex-wrap: wrap;
+	font-size: clamp(11px, 1.35vh, 19px);
+	gap: 0.6vh 2.2vh;
+	list-style: none;
+	margin: 0;
+	padding: 0;
 }
 
-.dashboard-card-detail[data-state="waiting"] {
-	background: var(--runtime-waiting-soft);
-	border-radius: 1vh;
-	padding: 0.7vh 1vh;
+.timeline-legend li {
+	align-items: center;
+	display: flex;
+	gap: 0.7vh;
 }
 
-.dashboard-card-detail[data-state="running"] {
+.timeline-key {
+	display: inline-flex;
+	flex: none;
+}
+
+.timeline-key[data-key="running"] {
+	background: var(--runtime-running);
+	border-radius: 0.3vh;
+	height: 0.6vh;
+	width: 2vh;
+}
+
+.timeline-key[data-key="waiting"] {
+	background: var(--runtime-waiting);
+	border-radius: 0.3vh;
+	height: 1.4vh;
+	width: 1.2vh;
+}
+
+.timeline-key[data-key="end"] {
+	background: var(--runtime-finished);
+	border-radius: 50%;
+	height: 1.1vh;
+	width: 1.1vh;
+}
+
+.timeline-key[data-key="review"] {
+	background: repeating-linear-gradient(
+		90deg,
+		var(--runtime-finished) 0 0.4vh,
+		transparent 0.4vh 0.8vh
+	);
+	height: 0.2vh;
+	opacity: 0.7;
+	width: 2vh;
+}
+
+.timeline-key[data-key="error"] {
+	align-items: center;
+	background: var(--blocked);
+	border-radius: 50%;
+	height: 1.4vh;
+	justify-content: center;
+	width: 1.4vh;
+}
+
+.timeline-note {
+	color: var(--faint);
+	font-size: clamp(11px, 1.3vh, 18px);
+	margin: 0;
+}
+
+.timeline-caption {
+	color: var(--faint);
+	font-size: clamp(10px, 1.15vh, 16px);
+	grid-column: 4 / 7;
+	grid-row: 1;
+	letter-spacing: 0.08em;
+	text-align: right;
+}
+
+/* The totals sit in the time columns themselves. */
+.timeline-totals {
+	display: contents;
+}
+
+.timeline-total {
+	align-items: flex-end;
+	display: flex;
+	flex-direction: column;
+	gap: 0.3vh;
+	grid-row: 2;
+}
+
+.timeline-total dt {
+	color: var(--muted);
+	font-size: clamp(10px, 1.25vh, 17px);
+}
+
+.timeline-total dd {
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: clamp(13px, 1.75vh, 24px);
+	font-variant-numeric: tabular-nums;
+	font-weight: 700;
+	margin: 0;
+}
+
+.timeline-total[data-state="running"] dd {
 	color: var(--runtime-running);
 }
 
-.dashboard-card-detail-text {
-	-webkit-box-orient: vertical;
-	-webkit-line-clamp: 2;
-	display: -webkit-box;
-	margin: 0;
-	overflow: hidden;
-	overflow-wrap: anywhere;
-}
-
-.dashboard-card-detail[data-state="running"] .dashboard-card-detail-text {
-	-webkit-line-clamp: 1;
-}
-
-.dashboard-card-detail[data-state="running"]
-	.dashboard-card-detail-text::before {
-	content: "▸ ";
-}
-
-.dashboard-card-label {
-	color: var(--faint);
-	font-weight: 700;
-	margin-right: 1vh;
-}
-
-.dashboard-card-detail[data-state="waiting"] .dashboard-card-label {
+.timeline-total[data-state="waiting"] dd {
 	color: var(--runtime-waiting);
 }
 
-.dashboard-card-detail[data-outcome] .dashboard-card-label {
-	color: var(--blocked);
+.timeline-total[data-state="finished"] dd {
+	color: var(--runtime-finished);
 }
 
-.dashboard-card-meta {
+.timeline-body {
+	position: relative;
+}
+
+/* Tick lines, the now line and the dotted column guides, drawn once behind
+   all rows in the same grid columns. */
+.timeline-guides {
+	align-items: stretch;
+	bottom: -0.6vh;
+	left: 0;
+	pointer-events: none;
+	position: absolute;
+	right: 0;
+	top: -0.6vh;
+}
+
+.timeline-ticks {
+	grid-column: 3;
+	position: relative;
+}
+
+.timeline-tick {
+	background: rgba(223, 230, 233, 0.07);
+	bottom: 0;
+	position: absolute;
+	top: 0;
+	width: 1px;
+}
+
+.timeline-now {
+	background: var(--dashboard-ink);
+	bottom: 0;
+	opacity: 0.7;
+	position: absolute;
+	right: 0;
+	top: 0;
+	width: 0.2vh;
+}
+
+.timeline-guide {
+	border-left: 1px dotted rgba(223, 230, 233, 0.14);
+	margin-left: calc(var(--timeline-gap) / -2);
+}
+
+.timeline-guide[data-first="true"] {
+	border-left-color: rgba(223, 230, 233, 0.28);
+	grid-column: 4;
+}
+
+.timeline-rows {
+	display: flex;
+	flex-direction: column;
+	gap: 1vh;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.timeline-row {
+	height: 5.2vh;
+}
+
+.timeline-agent {
 	align-items: center;
+	border-radius: 1vh;
 	color: var(--faint);
-	font-size: clamp(11px, 1.55vh, 21px);
-	line-height: 1.3;
+	display: flex;
+	height: 4.4vh;
+	justify-content: center;
+	width: 4.4vh;
 }
 
-.dashboard-card-agent {
-	color: var(--muted);
+.timeline-agent[data-provider="claude"] {
+	background: color-mix(in srgb, var(--provider-claude) 12%, transparent);
+	color: var(--provider-claude);
 }
 
-.dashboard-card-where {
-	flex: 1;
+.timeline-agent[data-provider="codex"] {
+	background: color-mix(in srgb, var(--provider-codex) 12%, transparent);
+	color: var(--provider-codex);
+}
+
+.timeline-agent[data-provider="grok"] {
+	background: color-mix(in srgb, var(--provider-grok) 12%, transparent);
+	color: var(--provider-grok);
+}
+
+.timeline-agent .provider-icon {
+	height: 2.8vh;
+	width: 2.8vh;
+}
+
+.timeline-label {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5vh;
 	min-width: 0;
+}
+
+.timeline-name {
+	color: var(--dashboard-ink);
+	font-size: clamp(14px, 2.05vh, 28px);
+	font-weight: 600;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 
-.dashboard-card-agent + .dashboard-card-where::before {
-	color: var(--line-strong);
-	content: "· ";
-}
-
-.dashboard-card-changes {
+.timeline-meta {
+	align-items: center;
+	color: var(--muted);
 	display: flex;
-	font-variant-numeric: tabular-nums;
-	gap: 0.8vh;
+	font-size: clamp(11px, 1.4vh, 19px);
+	gap: 0.9vh;
+	min-width: 0;
 	white-space: nowrap;
 }
 
-.dashboard-card-changes [data-tone="dirty"] {
-	color: var(--notify);
+.timeline-status {
+	flex: none;
 }
 
-.dashboard-card-changes [data-tone="behind"] {
+.timeline-status[data-state="running"] {
+	color: var(--runtime-running);
+}
+
+.timeline-status[data-state="waiting"] {
 	color: var(--runtime-waiting);
 }
 
-.dashboard-card-notify {
-	background: var(--notify-soft);
-	border-radius: 999px;
-	color: var(--notify);
-	font-weight: 600;
-	padding: 0.2vh 0.9vh;
-	white-space: nowrap;
+.timeline-status[data-state="finished"] {
+	color: var(--runtime-finished);
 }
 
-.dashboard-more,
-.dashboard-empty {
+.timeline-repo {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* Each repo keeps one tint, so rows of the same repo read as a group. */
+.timeline-repo-name {
+	font-weight: 600;
+}
+
+.timeline-repo-name[data-tone="1"] {
+	color: var(--repo-1);
+}
+
+.timeline-repo-name[data-tone="2"] {
+	color: var(--repo-2);
+}
+
+.timeline-repo-name[data-tone="3"] {
+	color: var(--repo-3);
+}
+
+.timeline-repo-name[data-tone="4"] {
+	color: var(--repo-4);
+}
+
+.timeline-repo-more {
+	color: var(--faint);
+}
+
+.timeline-repo::before {
+	background: var(--line);
+	content: "";
+	display: inline-block;
+	height: 1.2vh;
+	margin-right: 0.9vh;
+	vertical-align: -0.1vh;
+	width: 1px;
+}
+
+.timeline-track {
+	height: 3vh;
+	position: relative;
+}
+
+/* Running is the flow line; waiting on me rises above it as a block; review
+   waiting after a turn end is a faint dotted line. */
+.timeline-segment {
+	box-sizing: border-box;
+	min-width: 0.2vh;
+	position: absolute;
+	top: 50%;
+	transform: translateY(-50%);
+}
+
+.timeline-segment[data-state="running"] {
+	background: var(--runtime-running);
+	border-radius: 0.5vh;
+	height: 1vh;
+}
+
+.timeline-segment[data-state="waiting"] {
+	align-items: center;
+	background: var(--runtime-waiting);
+	border-radius: 0.5vh;
+	box-shadow: 0 0 1.4vh
+		color-mix(in srgb, var(--runtime-waiting) 40%, transparent);
+	color: var(--surface-0);
+	display: flex;
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: clamp(10px, 1.2vh, 16px);
+	font-weight: 700;
+	height: 3vh;
+	justify-content: center;
+	overflow: hidden;
+	white-space: nowrap;
+	z-index: 1;
+}
+
+.timeline-segment[data-state="finished"] {
+	background: repeating-linear-gradient(
+		90deg,
+		var(--runtime-finished) 0 0.4vh,
+		transparent 0.4vh 0.9vh
+	);
+	height: 0.2vh;
+	opacity: 0.6;
+}
+
+.timeline-end {
+	background: var(--runtime-finished);
+	border-radius: 50%;
+	box-shadow: 0 0 0 0.2vh var(--surface-0);
+	height: 1.2vh;
+	position: absolute;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	width: 1.2vh;
+	z-index: 2;
+}
+
+.timeline-end[data-error="true"] {
+	align-items: center;
+	background: var(--blocked);
+	display: flex;
+	height: 1.6vh;
+	justify-content: center;
+	width: 1.6vh;
+}
+
+.timeline-error-mark {
+	fill: none;
+	height: 55%;
+	stroke: var(--surface-0);
+	stroke-linecap: round;
+	stroke-width: 1.8;
+	width: 55%;
+}
+
+/* Only waiting carries color in the row cells: it is the time I held up. */
+.timeline-cell {
+	color: var(--muted);
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: clamp(11px, 1.5vh, 20px);
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+}
+
+.timeline-cell[data-state="waiting"] {
+	color: var(--runtime-waiting);
+}
+
+.timeline-cell[data-empty="true"] {
+	color: var(--line-strong);
+}
+
+.timeline-empty {
 	color: var(--faint);
 	font-size: clamp(13px, 2vh, 26px);
 	margin: 0;
-	padding: 0.2vh 0.4vh;
+	padding: 2vh 0;
 }
 
-.dashboard-empty {
-	color: var(--line-strong);
+.timeline-axis {
+	color: var(--faint);
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: clamp(10px, 1.3vh, 18px);
+}
+
+.timeline-more {
+	grid-column: 1 / 3;
+}
+
+.timeline-axis-track {
+	grid-column: 3;
+	height: 3.6vh;
+	position: relative;
+}
+
+.timeline-tick-label,
+.timeline-now-label {
+	position: absolute;
+	top: 0;
+	transform: translateX(-50%);
+	white-space: nowrap;
+}
+
+.timeline-now-label {
+	color: var(--dashboard-ink);
+	font-weight: 700;
+	left: 100%;
+	top: 1.8vh;
 }

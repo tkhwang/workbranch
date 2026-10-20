@@ -19,7 +19,7 @@ import {
 	refreshStatus,
 } from "./infrastructure/tauriClient";
 import { startWorkspaceMonitor } from "./infrastructure/workspaceMonitor";
-import { DASHBOARD_CARDS_PER_COLUMN, Dashboard } from "./ui/Dashboard";
+import { DASHBOARD_TIMELINE_ROWS, Dashboard } from "./ui/Dashboard";
 
 /** Mirrors the preview label prefix in src-tauri/src/screensaver/windows.rs. */
 const PREVIEW_LABEL_PREFIX = "dashboard-preview-";
@@ -108,10 +108,17 @@ export function DashboardApp() {
 		};
 	}, [tauriAvailable]);
 
+	// The timeline moves with the clock, so the model follows each tick.
+	const nowSeconds = Math.floor(now.getTime() / 1000);
 	const model = useMemo(
 		() =>
-			buildDashboardModel(state, runtime.sessions, DASHBOARD_CARDS_PER_COLUMN),
-		[state, runtime.sessions],
+			buildDashboardModel(
+				state,
+				runtime.sessions,
+				nowSeconds,
+				DASHBOARD_TIMELINE_ROWS,
+			),
+		[state, runtime.sessions, nowSeconds],
 	);
 	return (
 		<Dashboard
