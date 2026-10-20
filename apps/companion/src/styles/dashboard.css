@@ -9,7 +9,7 @@ body,
 }
 
 body {
-	background: var(--dashboard-ground, #131313);
+	background: var(--dashboard-ground, #131516);
 	cursor: none;
 	overflow: hidden;
 	user-select: none;
@@ -17,7 +17,7 @@ body {
 
 .dashboard {
 	--dashboard-gap: clamp(12px, 2.4vh, 36px);
-	--dashboard-ink: #eef0fb;
+	--dashboard-ink: #dfe6e9;
 	background: var(--surface-0);
 	color: var(--text);
 	display: flex;
@@ -57,7 +57,7 @@ body {
 }
 
 .segment {
-	fill: rgba(192, 202, 245, 0.06);
+	fill: rgba(223, 230, 233, 0.06);
 }
 
 .segment[data-on="true"] {
