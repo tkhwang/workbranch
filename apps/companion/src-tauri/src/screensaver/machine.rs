@@ -269,11 +269,16 @@ impl Machine {
 
     /// Starts, runs out or clears the time this cover may last with no agent
     /// at work. Only a reading of the session carries the time (`at`), so the
-    /// clock starts on the first reading after the cover lost its work.
+    /// clock starts on the first reading after the cover lost its work. Only
+    /// work or signing in clears it: turning the feature off and on under the
+    /// same lock keeps a spent cover spent.
     fn track_cover_without_work(&mut self, at: Option<Duration>) {
-        if !(self.config.enabled && self.away() && !self.working) {
+        if !self.away() || self.working {
             self.without_work_since = None;
             self.cover_spent = false;
+            return;
+        }
+        if !self.config.enabled {
             return;
         }
         if let Some(at) = at {

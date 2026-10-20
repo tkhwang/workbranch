@@ -506,6 +506,23 @@ fn a_cover_with_no_work_gives_way_to_macos_and_stays_down() {
 }
 
 #[test]
+fn switching_off_and_on_under_the_same_lock_keeps_a_spent_cover_down() {
+    let mut machine = Machine::new(true);
+    machine.step(Event::Config(enabled()));
+    let start = minutes(1);
+    machine.step(locked_at(start, minutes(5)));
+    machine.step(locked_at(start + COVER_WITHOUT_WORK, minutes(35)));
+    assert!(!machine.showing());
+    machine.step(Event::Config(Config::default()));
+    assert_eq!(machine.step(Event::Config(enabled())), vec![]);
+    assert_eq!(
+        machine.step(read_at(start + minutes(40), minutes(45), true, true)),
+        vec![]
+    );
+    assert!(!machine.showing());
+}
+
+#[test]
 fn signing_in_starts_a_new_cover_time() {
     let mut machine = Machine::new(true);
     machine.step(Event::Config(enabled()));

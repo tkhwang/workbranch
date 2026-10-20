@@ -2,7 +2,7 @@
 id: COMP002
 slug: lock-screen-dashboard
 created: 2026-10-18T04:20:00.000Z
-updated: 2026-10-21T06:30:00.000Z
+updated: 2026-10-20T21:40:00.000Z
 ---
 # COMP002 · lock-screen-dashboard
 
@@ -49,7 +49,7 @@ COMP001 의 흐름은 "화면을 쓰는 동안 디스플레이를 붙잡아 macO
 - R6 (MUST) Settings › Screen Saver 에는 스위치와 Show now 만 있고, "Dashboard after" 는 없다. 이전 store 의 `idleMinutes` 는 무시하고 지운다. — acceptance: Settings 에 분 선택이 없고, 시작 후 store 의 `screensaver` 가 `{ "enabled": … }` 만 갖는다.
 - R7 (MUST) companion 이 화면보호기가 이미 도는 중에 시작되거나 화면보호기 알림을 놓쳐도, 다음 세션 읽기(작업 중이면 1초 안)에서 화면보호기를 알아본다. — acceptance: 화면보호기가 도는 중(암호 요구 지연 안)에 companion 을 다시 시작하면 잠기고 dashboard 가 뜬다.
 
-- R8 (MUST) 자리 비움(화면 잠김 || 화면보호기) 중 작업 중이 아니어도 dashboard·디스플레이 유지·시스템 잠자기 방지를 최대 30분(`COVER_WITHOUT_WORK`) 유지한다. 30분은 "자리 비움이 시작된 시각"과 "자리 비움 중 작업 중이 끝난 시각" 중 늦은 쪽부터 잰다. 다하면 dashboard 를 내리고 둘 다 풀며, 같은 자리 비움 동안에는 다시 덮지 않는다. 작업 중이 다시 시작되면 바로 다시 덮고, 다시 끝나면 그때부터 새로 잰다. 잠금이 풀리면 초기화된다. 작업 중의 정의(COMP001, `stale` 900초 포함)는 바꾸지 않는다. — acceptance: 모든 세션이 턴 종료인 상태에서 화면보호기가 시작되면 잠금 화면 위에 dashboard 가 뜨고 `pmset -g assertions` 에 companion 의 두 assertion 이 있다. 30분 뒤 dashboard 가 내려가고 두 assertion 이 사라지며, 이후 macOS 설정대로 디스플레이가 꺼지고 잠든다.
+- R8 (MUST) 자리 비움(화면 잠김 || 화면보호기) 중 작업 중이 아니어도 dashboard·디스플레이 유지·시스템 잠자기 방지를 최대 30분(`COVER_WITHOUT_WORK`) 유지한다. 30분은 "자리 비움이 시작된 시각"과 "자리 비움 중 작업 중이 끝난 시각" 중 늦은 쪽부터 잰다. 다하면 dashboard 를 내리고 둘 다 풀며, 같은 자리 비움 동안에는 기능을 껐다 켜도 다시 덮지 않는다. 작업 중이 다시 시작되면 바로 다시 덮고, 다시 끝나면 그때부터 새로 잰다. 잠금이 풀리면 초기화된다. 작업 중의 정의(COMP001, `stale` 900초 포함)는 바꾸지 않는다. — acceptance: 모든 세션이 턴 종료인 상태에서 화면보호기가 시작되면 잠금 화면 위에 dashboard 가 뜨고 `pmset -g assertions` 에 companion 의 두 assertion 이 있다. 30분 뒤 dashboard 가 내려가고 두 assertion 이 사라지며, 이후 macOS 설정대로 디스플레이가 꺼지고 잠든다.
 
 COMP001 의 R1(스위치), R2(시스템 잠자기 방지), R8~R12(화면 구성·카드·모니터·미리 보기)는 그대로다. R3·R4·R6·R7 은 이 intent 의 R1~R5 로, R5(작업 중이 끝나면 내림)는 R8 로 바뀐다.
 
