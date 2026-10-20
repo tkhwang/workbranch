@@ -129,9 +129,11 @@ fn minutes(n: u64) -> Duration {
 }
 
 /// A reading where macOS cannot be asked about its screen saver, so its
-/// notifications alone tell.
+/// notifications alone tell. Readings default to the clock's start; tests
+/// that measure `COVER_WITHOUT_WORK` pass their own time.
 fn unlocked(idle: Duration) -> Event {
     Event::Sample {
+        at: Duration::ZERO,
         idle,
         locked: false,
         saver: None,
@@ -139,7 +141,13 @@ fn unlocked(idle: Duration) -> Event {
 }
 
 fn locked(idle: Duration) -> Event {
+    locked_at(Duration::ZERO, idle)
+}
+
+/// A locked reading taken `at` on the service's clock.
+fn locked_at(at: Duration, idle: Duration) -> Event {
     Event::Sample {
+        at,
         idle,
         locked: true,
         saver: None,
@@ -148,7 +156,12 @@ fn locked(idle: Duration) -> Event {
 
 /// A reading that also asks whether the screen saver runs.
 fn read(idle: Duration, locked: bool, saver: bool) -> Event {
+    read_at(Duration::ZERO, idle, locked, saver)
+}
+
+fn read_at(at: Duration, idle: Duration, locked: bool, saver: bool) -> Event {
     Event::Sample {
+        at,
         idle,
         locked,
         saver: Some(saver),
@@ -409,10 +422,21 @@ fn signing_in_hands_the_screen_and_the_display_back() {
 }
 
 #[test]
-fn work_ending_under_the_dashboard_hands_everything_back_to_macos() {
+fn work_ending_under_the_dashboard_keeps_it_up_for_the_cover_time() {
     let mut machine = covering_the_lock_screen();
+    // The results stay in view: nothing is taken down or released.
+    assert_eq!(machine.step(Event::Working(false)), vec![]);
+    assert!(machine.showing());
+    // The clock starts on the next reading, not at the service's start.
+    let ended = minutes(40);
+    assert_eq!(machine.step(locked_at(ended, minutes(20))), vec![]);
     assert_eq!(
-        machine.step(Event::Working(false)),
+        machine.step(locked_at(ended + COVER_WITHOUT_WORK - secs(1), minutes(50))),
+        vec![]
+    );
+    assert!(machine.showing());
+    assert_eq!(
+        machine.step(locked_at(ended + COVER_WITHOUT_WORK, minutes(50))),
         vec![
             Action::HideDashboard,
             Action::ReleaseAwake,
@@ -423,18 +447,123 @@ fn work_ending_under_the_dashboard_hands_everything_back_to_macos() {
 }
 
 #[test]
-fn work_starting_behind_the_lock_screen_brings_the_dashboard() {
+fn work_starting_behind_a_spent_cover_brings_the_dashboard_back() {
     let mut machine = Machine::new(true);
     machine.step(Event::Config(enabled()));
-    assert_eq!(machine.step(locked(minutes(3))), vec![]);
+    machine.step(locked_at(minutes(1), minutes(3)));
+    machine.step(locked_at(minutes(1) + COVER_WITHOUT_WORK, minutes(33)));
+    assert!(!machine.showing());
     assert_eq!(
         machine.step(Event::Working(true)),
         vec![Action::HoldAwake, Action::HoldDisplay]
     );
     assert_eq!(
-        machine.step(locked(minutes(3))),
+        machine.step(locked_at(minutes(32), minutes(34))),
         vec![Action::ShowDashboard]
     );
+}
+
+#[test]
+fn a_screen_saver_with_no_work_still_gets_the_lock_and_the_dashboard() {
+    let mut machine = Machine::new(true);
+    machine.step(Event::Config(enabled()));
+    assert_eq!(machine.poll_interval(), None);
+    // The screen saver's notification brings a reading.
+    assert_eq!(
+        machine.step(read_at(minutes(1), minutes(5), false, true)),
+        vec![Action::LockScreen, Action::HoldAwake, Action::HoldDisplay]
+    );
+    assert_eq!(
+        machine.step(read_at(minutes(1) + ms(250), minutes(5), true, true)),
+        vec![Action::ShowDashboard]
+    );
+    assert_eq!(machine.poll_interval(), Some(INPUT_POLL));
+}
+
+#[test]
+fn a_cover_with_no_work_gives_way_to_macos_and_stays_down() {
+    let mut machine = Machine::new(true);
+    machine.step(Event::Config(enabled()));
+    let start = minutes(1);
+    machine.step(locked_at(start, minutes(5)));
+    assert!(machine.showing());
+    assert_eq!(
+        machine.step(locked_at(start + COVER_WITHOUT_WORK, minutes(35))),
+        vec![
+            Action::HideDashboard,
+            Action::ReleaseAwake,
+            Action::ReleaseDisplay
+        ]
+    );
+    // Nothing is read until macOS says something changed, and a reading
+    // under the same lock covers nothing again.
+    assert_eq!(machine.poll_interval(), None);
+    assert_eq!(
+        machine.step(read_at(start + minutes(40), minutes(45), true, true)),
+        vec![]
+    );
+    assert!(!machine.showing());
+}
+
+#[test]
+fn signing_in_starts_a_new_cover_time() {
+    let mut machine = Machine::new(true);
+    machine.step(Event::Config(enabled()));
+    machine.step(locked_at(minutes(1), minutes(5)));
+    machine.step(locked_at(minutes(1) + COVER_WITHOUT_WORK, minutes(35)));
+    machine.step(unlocked(ms(100)));
+    // Locked again later: covered again, with the whole cover time ahead.
+    assert_eq!(
+        machine.step(locked_at(minutes(60), minutes(5))),
+        vec![
+            Action::ShowDashboard,
+            Action::HoldAwake,
+            Action::HoldDisplay
+        ]
+    );
+    assert_eq!(
+        machine.step(locked_at(
+            minutes(60) + COVER_WITHOUT_WORK - secs(1),
+            minutes(35)
+        )),
+        vec![]
+    );
+}
+
+#[test]
+fn work_resuming_and_ending_again_under_a_cover_restarts_its_time() {
+    let mut machine = Machine::new(true);
+    machine.step(Event::Config(enabled()));
+    machine.step(locked_at(minutes(1), minutes(5)));
+    machine.step(locked_at(minutes(20), minutes(24)));
+    machine.step(Event::Working(true));
+    machine.step(Event::Working(false));
+    // The time counts from this reading, not from the cover's start.
+    machine.step(locked_at(minutes(25), minutes(29)));
+    assert_eq!(
+        machine.step(locked_at(
+            minutes(25) + COVER_WITHOUT_WORK - secs(1),
+            minutes(59)
+        )),
+        vec![]
+    );
+    assert!(machine.showing());
+    assert_eq!(
+        machine.step(locked_at(minutes(25) + COVER_WITHOUT_WORK, minutes(60))),
+        vec![
+            Action::HideDashboard,
+            Action::ReleaseAwake,
+            Action::ReleaseDisplay
+        ]
+    );
+}
+
+#[test]
+fn the_desk_with_no_work_is_left_to_macos() {
+    let mut machine = Machine::new(true);
+    machine.step(Event::Config(enabled()));
+    assert_eq!(machine.step(unlocked(minutes(30))), vec![]);
+    assert_eq!(machine.poll_interval(), None);
 }
 
 #[test]
@@ -495,8 +624,14 @@ fn a_failed_read_keeps_the_last_reading_for_a_while() {
 fn reads_that_keep_failing_never_pin_the_mac_awake() {
     let mut machine = covering_the_lock_screen();
     machine.step(Event::Unreadable(at(0)));
+    // No longer working: the cover runs on its own time, then gives way.
     assert_eq!(
         machine.step(Event::Unreadable(at(UNREADABLE_GRACE.as_secs()))),
+        vec![]
+    );
+    machine.step(locked_at(minutes(3), minutes(3)));
+    assert_eq!(
+        machine.step(locked_at(minutes(3) + COVER_WITHOUT_WORK, minutes(33))),
         vec![
             Action::HideDashboard,
             Action::ReleaseAwake,
@@ -530,11 +665,13 @@ fn a_reading_from_before_work_started_never_counts() {
     let mut machine = Machine::new(true);
     machine.step(Event::Config(enabled()));
     machine.step(Event::Working(true));
-    machine.step(locked(minutes(9)));
+    machine.step(unlocked(minutes(9)));
     machine.step(Event::Working(false));
-    // Nothing is read while no agent works, so the old baseline is gone.
+    // Nothing is read at the desk while no agent works, so the old baseline
+    // is gone and the next reading is not taken for input.
+    assert_eq!(machine.poll_interval(), None);
     machine.step(Event::Working(true));
-    assert_eq!(machine.step(locked(secs(3))), vec![]);
+    assert_eq!(machine.step(locked(secs(3))), vec![Action::HoldDisplay]);
     assert!(!machine.showing());
 }
 
@@ -547,7 +684,11 @@ fn the_session_is_read_while_agents_work_and_faster_under_the_dashboard() {
     assert_eq!(machine.poll_interval(), Some(IDLE_POLL));
     machine.step(locked(SHOW_AFTER));
     assert_eq!(machine.poll_interval(), Some(INPUT_POLL));
+    // Work ended, the cover has not: its time is read off the readings.
     machine.step(Event::Working(false));
+    assert_eq!(machine.poll_interval(), Some(INPUT_POLL));
+    machine.step(locked_at(minutes(1), minutes(1)));
+    machine.step(locked_at(minutes(1) + COVER_WITHOUT_WORK, minutes(31)));
     assert_eq!(machine.poll_interval(), None);
 }
 

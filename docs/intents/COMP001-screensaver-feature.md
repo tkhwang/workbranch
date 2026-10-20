@@ -104,6 +104,7 @@ _None._
 - 2026-10-16 · (구현 중 변경) dashboard 카드 정보 → 시안 E: 프롬프트 한 줄, 열별 세부(대기: 기다리는 대상, 실행 중: 도구 동작, 턴 종료: 마지막 응답·오류·중단), repo 변경 상태, 알림 수. R9 의 "프롬프트 제외" 를 뒤집고 R11 을 카드 제목 크기 + 세부 줄 수 제한으로 바꾸며, 열당 카드는 4장에서 3장으로 · 화면 전체를 쓰면서 메뉴바 카드보다 정보가 적었음. 민감 정보는 runtime 이 저장 단계에서 빼고, dashboard 가 없으면 그 자리에 터미널이 그대로 보였을 것이라 노출을 이유로 뺄 근거가 약함. 별도 표시 설정은 두지 않음(Q9 스위치 하나)
 - 2026-10-18 · R3·R4·R6·R7 과 Non-goal "화면이 잠긴 동안 디스플레이를 켜 두는 것" → [COMP002](COMP002-lock-screen-dashboard.md) 로 대체 · dashboard 를 companion idle 시간 대신 macOS 화면보호기·잠금 화면이 뜰 때 잠금 화면 위에 띄우고, 그동안 디스플레이를 켜 둔다
 - 2026-10-17 · (구현 중 변경) 화면이 잠긴 동안의 잠자기 방지 → 작업 중이면 잠겨 있어도 시스템 잠자기는 계속 막고, 디스플레이만 macOS 기본 동작대로 꺼지게 둔다. R2·Non-goals·Success criteria 수정 · 잠금 화면은 agent 를 멈추지 않지만 잠자기는 멈춘다. 잠기면 잠자기 방지를 풀던 기존 결정(plan Q4)으로는 R6 으로 잠긴 뒤나 직접 잠그고 자리를 뜬 뒤 Mac 이 잠들어 agent 가 멈춤 · 사용자 선택
+- 2026-10-21 · R5(작업 중이 끝나면 즉시 내림) → [COMP002](COMP002-lock-screen-dashboard.md) R8 로 대체 · 자리를 비운 동안에는 작업이 없어도 최대 30분 dashboard 와 깨움을 유지한다. 작업 중 정의와 Q5·Q6 의 "턴 종료로 상시 깨움이 되지 않게" 는 상한으로 지킨다
 
 ## Outcome
 - 2026-10-17 · **Pending human verification** · 구현은 [PR #236](https://github.com/tkhwang/workbranch/pull/236)(`36f80ab`, 2026-10-16 20:03 UTC)으로 main 에 병합되었고, [workbranch-companion 2.31.0](https://github.com/tkhwang/workbranch/releases/tag/workbranch-companion-v2.31.0)은 2026-10-16 20:47 UTC 에 발행되었다. 이 문서 브랜치의 package·Tauri·Cargo·release-please 버전은 2.30.0 이므로 릴리스 근거는 해당 태그와 릴리스 기록이다.

@@ -2,7 +2,7 @@
 id: COMP002
 slug: lock-screen-dashboard
 created: 2026-10-18T04:20:00.000Z
-updated: 2026-10-18T05:30:00.000Z
+updated: 2026-10-21T06:30:00.000Z
 ---
 # COMP002 · lock-screen-dashboard
 
@@ -38,18 +38,20 @@ COMP001 의 흐름은 "화면을 쓰는 동안 디스플레이를 붙잡아 macO
 - 작업 중에 자리를 비우면 macOS 화면보호기 시간에 Mac 이 잠기고, 잠금 화면 위에 dashboard 가 뜬다.
 - dashboard 가 뜬 채로 macOS 디스플레이 끄기 시간보다 오래 두어도 디스플레이와 dashboard 가 켜져 있고, Mac 이 잠들지 않는다.
 - 입력하면 dashboard 가 비켜 macOS 잠금 화면이 보이고, 암호나 Touch ID 로만 데스크톱으로 돌아온다. 풀지 않고 두면 dashboard 가 다시 뜬다.
-- 작업 중이 끝나면 dashboard 가 내려가고 잠금 화면·디스플레이·잠자기가 macOS 기본 동작으로 돌아간다.
+- 작업이 없을 때 자리를 비우거나 자리를 비운 동안 작업이 끝나도, 30분 동안은 dashboard 와 디스플레이가 켜져 있고 Mac 이 잠들지 않는다. 그 뒤에는 dashboard 가 내려가고 잠금 화면·디스플레이·잠자기가 macOS 기본 동작으로 돌아간다.
 
 ## Requirements
-- R1 (MUST) 켜짐 && 작업 중 && (화면 잠김 || macOS 화면보호기 실행 중) 이면 모든 모니터에서 잠금 화면과 화면보호기 **위에** dashboard 가 보인다. — acceptance: 작업 중에 Ctrl+Cmd+Q 로 잠그고 15초 기다리면 모든 모니터에 dashboard 가 보인다.
-- R2 (MUST) 화면을 쓰는 동안에는 디스플레이를 붙잡지 않아 macOS 화면보호기와 잠금이 macOS 설정대로 시작되고, 화면보호기나 잠금 화면이 뜬 뒤 작업 중인 동안에는 디스플레이를 붙잡는다. 시스템 잠자기 방지는 COMP001 R2 그대로다. — acceptance: 잠기지 않은 상태에서 `pmset -g assertions` 에 companion 의 `PreventUserIdleDisplaySleep` 이 없고, 잠긴 뒤에는 있다.
+- R1 (MUST) 켜짐 && (화면 잠김 || macOS 화면보호기 실행 중) && (작업 중 || R8 의 무작업 덮임 시간 안) 이면 모든 모니터에서 잠금 화면과 화면보호기 **위에** dashboard 가 보인다. — acceptance: 작업 중에 Ctrl+Cmd+Q 로 잠그고 15초 기다리면 모든 모니터에 dashboard 가 보인다.
+- R2 (MUST) 화면을 쓰는 동안에는 디스플레이를 붙잡지 않아 macOS 화면보호기와 잠금이 macOS 설정대로 시작되고, 화면보호기나 잠금 화면이 뜬 뒤 작업 중이거나 R8 의 무작업 덮임 시간 안인 동안에는 디스플레이와 시스템을 붙잡는다. 화면을 쓰는 동안의 시스템 잠자기 방지는 COMP001 R2 그대로다. — acceptance: 잠기지 않은 상태에서 `pmset -g assertions` 에 companion 의 `PreventUserIdleDisplaySleep` 이 없고, 잠긴 뒤에는 있다.
 - R3 (MUST) 잠금이 가능한 Mac 에서 dashboard 는 세션이 잠김으로 읽힐 때만 보인다. 화면보호기만 시작되었고 아직 잠기지 않았으면(macOS 의 "암호 요구까지 지연") 먼저 잠그고 잠김이 확인되면 띄운다. 잠금 요청이 끝내 안 되면(2초 간격 3번) dashboard 없이 macOS 가 스스로 잠글 때까지 기다린다. — acceptance: "암호 요구" 지연을 5분으로 둔 Mac 에서 화면보호기 위에 dashboard 가 뜬 직후 입력하면 잠금 화면이 나온다. 잠금이 안 되게 만든 환경에서는 "화면 잠김" 표시를 단 dashboard 가 잠기지 않은 화면 위에 뜨지 않는다.
 - R4 (MUST) dashboard 위에서 입력하면 dashboard 만 내려가 잠금 화면이 보인다. 잠금을 풀지 않고 15초 동안 입력이 없으면 다시 뜬다. 잠금이 풀리면 내려가고 디스플레이 유지도 푼다. — acceptance: dashboard 상태에서 마우스를 움직이면 잠금 화면이 보이고, 그대로 두면 15초 뒤 dashboard 가 돌아온다.
 - R5 (MUST) 잠금 불가 환경에서는 dashboard 가 같은 조건에 뜨되 "화면 잠김" 표시를 숨기고 직접 잠그지 않는다(COMP001 R7 의 갱신). — acceptance: `WORKBRANCH_SCREENSAVER_NO_LOCK=1` 로 실행하면 "화면 잠김" 표시가 없다.
 - R6 (MUST) Settings › Screen Saver 에는 스위치와 Show now 만 있고, "Dashboard after" 는 없다. 이전 store 의 `idleMinutes` 는 무시하고 지운다. — acceptance: Settings 에 분 선택이 없고, 시작 후 store 의 `screensaver` 가 `{ "enabled": … }` 만 갖는다.
 - R7 (MUST) companion 이 화면보호기가 이미 도는 중에 시작되거나 화면보호기 알림을 놓쳐도, 다음 세션 읽기(작업 중이면 1초 안)에서 화면보호기를 알아본다. — acceptance: 화면보호기가 도는 중(암호 요구 지연 안)에 companion 을 다시 시작하면 잠기고 dashboard 가 뜬다.
 
-COMP001 의 R1(스위치), R2(시스템 잠자기 방지), R5(작업 중이 끝나면 내림), R8~R12(화면 구성·카드·모니터·미리 보기)는 그대로다. R3·R4·R6·R7 은 이 intent 의 R1~R5 로 바뀐다.
+- R8 (MUST) 자리 비움(화면 잠김 || 화면보호기) 중 작업 중이 아니어도 dashboard·디스플레이 유지·시스템 잠자기 방지를 최대 30분(`COVER_WITHOUT_WORK`) 유지한다. 30분은 "자리 비움이 시작된 시각"과 "자리 비움 중 작업 중이 끝난 시각" 중 늦은 쪽부터 잰다. 다하면 dashboard 를 내리고 둘 다 풀며, 같은 자리 비움 동안에는 다시 덮지 않는다. 작업 중이 다시 시작되면 바로 다시 덮고, 다시 끝나면 그때부터 새로 잰다. 잠금이 풀리면 초기화된다. 작업 중의 정의(COMP001, `stale` 900초 포함)는 바꾸지 않는다. — acceptance: 모든 세션이 턴 종료인 상태에서 화면보호기가 시작되면 잠금 화면 위에 dashboard 가 뜨고 `pmset -g assertions` 에 companion 의 두 assertion 이 있다. 30분 뒤 dashboard 가 내려가고 두 assertion 이 사라지며, 이후 macOS 설정대로 디스플레이가 꺼지고 잠든다.
+
+COMP001 의 R1(스위치), R2(시스템 잠자기 방지), R8~R12(화면 구성·카드·모니터·미리 보기)는 그대로다. R3·R4·R6·R7 은 이 intent 의 R1~R5 로, R5(작업 중이 끝나면 내림)는 R8 로 바뀐다.
 
 ## Decision Log
 - 2026-10-18 · 트리거 → macOS 화면보호기 시작(`com.apple.screensaver.didstart`)과 화면 잠김 · 사용자 요구 "OS screen saver 동작 시에 dashboard 그 위에 뜸". companion 의 idle 시간 설정(Dashboard after)은 없앤다
@@ -63,6 +65,7 @@ COMP001 의 R1(스위치), R2(시스템 잠자기 방지), R5(작업 중이 끝�
 - 2026-10-18 · (PR #245 리뷰 반영 중 발견) 잠금 해제 직후의 "실행 중" 판독 → 멈춤으로 읽히거나 새로 시작될 때까지 믿지 않음 · Touch ID 로 풀면 HID 입력이 없어 idle 이 크게 남아, 늦은 판독 하나가 방금 푼 Mac 을 다시 잠글 수 있음
 - 2026-10-19 · (실사용 중 발견) 모니터 구성 알림 → 창을 다시 만들지 않고 모니터 목록과 비교해 바뀐 창만 열고·옮기고·닫는다 · dashboard 가 뜬 지 16초쯤 뒤 깜빡이다 사라지고 잠금 화면만 남았다. 2026-10-19 10:20·10:30 두 번 모두 내장 XDR 디스플레이의 EDR 밝기 램프와 같은 시각에 dashboard 창이 2초 동안 약 30번 다시 만들어졌고(WebKit 로그), 마지막 회차에 새 창을 못 만들어 창 0개로 끝났다. 상태 기계는 표시 중으로 남아(0.25초 읽기 지속) 잠금 해제 때까지 다시 띄우지 않았다. Tauri `destroy()` 는 비동기라 같은 라벨로 바로 만들면 실패할 수 있고, 그 실패를 무시하고 있었다
 - 2026-10-19 · (PR #254 리뷰) 창 라벨과 추적 → 창마다 번호를 붙인 새 라벨을 쓰고, companion 이 열고 아직 닫지 않은 창만 추적한다. 옮기기는 위치·크기가 둘 다 성공했을 때만 기록한다 · 모니터가 빠졌다 곧 다시 붙으면 destroy 중인 창이 열린 창으로 잡혀 옮겨진 것으로 기록되고, 그 창이 사라진 뒤에는 같은 알림이 와도 아무것도 하지 않아 그 모니터가 비었다. 옮기기 실패를 성공으로 기록해도 같은 일이 생겼다
+- 2026-10-21 · (실사용 중 발견, 토론 Q1) 작업 중이 아닐 때의 자리 비움 → D. 자리 비움 동안은 작업과 무관하게 덮고, 작업이 없으면 30분 상한(R8 추가, COMP001 R5 대체) · 사용자 보고 "화면보호기 시점에 검은 화면만 나옴". 10-18~10-21 화면보호기 시작 26건 중 dashboard 가 뜬 10건은 모두 작업 중, 안 뜬 16건은 모두 작업 중이 아니었고, 그때는 화면보호기 → 2~5분 뒤 디스플레이 꺼짐 → 20초 뒤 잠자기였다. 작업 중인 실제 잠금 테스트 2회는 두 모니터 모두 정상 표시. codex 는 A(유지), grok 은 D 를 권했고 사용자가 D 를 골랐다. 상한은 COMP001 Q5 의 "상시 깨움 utility 화" 를 막기 위함이고 30분은 초깃값이다. 후속 후보: hook 없이 15분 넘는 도구 호출·대기가 `stale` 로 작업 중에서 빠지는 경로, 창 열기 실패 시 재시도 없음
 
 ## Outcome
 - 2026-10-18 · **Pending human verification** · 비공개 API 동작(잠금 화면 위 SkyLight space, 잠금 화면에서의 디스플레이 유지, 잠긴 동안의 webview 갱신)은 실제 잠금으로만 확인할 수 있다.

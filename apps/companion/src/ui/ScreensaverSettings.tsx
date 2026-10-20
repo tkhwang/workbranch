@@ -19,11 +19,11 @@ export function ScreensaverSettings({
 			<SettingsRow
 				description={
 					value.enabled
-						? "On: keeps the Mac awake while an agent runs or waits for you. When the macOS screen saver starts or the screen locks, the Mac locks and a dashboard shows over the lock screen with the display kept on; any input reveals the lock screen."
+						? "On: keeps the Mac awake while an agent runs or waits for you. When the macOS screen saver starts or the screen locks, the Mac locks and a dashboard shows over the lock screen with the display kept on, while agents work and for up to 30 minutes after they stop; any input reveals the lock screen."
 						: "Off: macOS handles sleep, screen saver and lock as usual."
 				}
 				htmlFor="screensaver-enabled"
-				title="While agents work"
+				title="Cover the lock screen"
 			>
 				<input
 					aria-checked={value.enabled}

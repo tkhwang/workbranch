@@ -107,8 +107,11 @@ fn run<R: Runtime>(
     lock_available: bool,
 ) {
     let mut machine = Machine::new(lock_available);
+    // Readings carry time on a monotonic clock, for how long a cover may
+    // last with no agent at work.
+    let started = Instant::now();
 
-    let first = sample(&platform);
+    let first = sample(&platform, started);
     apply(&mut platform, &machine.step(first));
     apply(
         &mut platform,
@@ -149,10 +152,10 @@ fn run<R: Runtime>(
                 None => Event::Unreadable(Duration::from_millis(snapshot.read_at_ms)),
             },
             Some(Message::ConfigChanged) => Event::Config(read_config(app)),
-            Some(Message::LockChanged) | None => sample(&platform),
+            Some(Message::LockChanged) | None => sample(&platform, started),
             // Where the session can be asked, it is the truth.
             Some(Message::Saver(running)) => match platform.screen_saver_running() {
-                Some(_) => sample(&platform),
+                Some(_) => sample(&platform, started),
                 None => Event::Saver(running),
             },
             Some(Message::Preview) => Event::Preview,
@@ -178,8 +181,9 @@ fn run<R: Runtime>(
     }
 }
 
-fn sample(platform: &impl Platform) -> Event {
+fn sample(platform: &impl Platform, started: Instant) -> Event {
     Event::Sample {
+        at: started.elapsed(),
         idle: platform.idle_time(),
         locked: platform.screen_locked(),
         saver: platform.screen_saver_running(),
