@@ -293,5 +293,24 @@ describe("buildDashboardModel", () => {
 			4,
 		);
 		expect(model.counts).toEqual({ waiting: 1, running: 1, finished: 0 });
+		expect(model.active).toBe(2);
+	});
+
+	it("counts every live task in the active total, beyond the cards shown", () => {
+		const names = ["a", "b", "c", "d", "e", "f"];
+		const model = buildDashboardModel(
+			state([...names.map((name) => task(name)), task("done")]),
+			[
+				...names.map((name) => session(name, "running")),
+				session("done", "finished"),
+			],
+			4,
+		);
+		expect(model.columns[1]?.cards).toHaveLength(4);
+		expect(model.active).toBe(7);
+	});
+
+	it("has no active tasks when nothing is in play", () => {
+		expect(buildDashboardModel(state([]), [], 3).active).toBe(0);
 	});
 });

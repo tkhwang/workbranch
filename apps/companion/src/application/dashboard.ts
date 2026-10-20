@@ -58,6 +58,8 @@ export type DashboardColumn = {
 export type DashboardModel = {
 	readonly columns: readonly DashboardColumn[];
 	readonly counts: Readonly<Record<DashboardColumnKey, number>>;
+	/** Tasks in any live column: the header's "활성 세션" total. */
+	readonly active: number;
 };
 
 function detailOf(
@@ -145,5 +147,6 @@ export function buildDashboardModel(
 			running: columns[1]?.count ?? 0,
 			finished: columns[2]?.count ?? 0,
 		},
+		active: columns.reduce((sum, column) => sum + column.count, 0),
 	};
 }

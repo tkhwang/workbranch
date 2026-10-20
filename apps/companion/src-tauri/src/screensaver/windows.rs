@@ -11,9 +11,9 @@ use tauri::{
 const LABEL_PREFIX: &str = "dashboard-";
 const PREVIEW_PREFIX: &str = "dashboard-preview-";
 const ENTRY: &str = "dashboard.html";
-/// The Claude theme's `--surface-0`, so a window never flashes white while
+/// Both themes' `--surface-0` (`#131516`), so a window never flashes white while
 /// its page loads.
-const BACKGROUND: Color = Color(0x13, 0x13, 0x13, 0xff);
+const BACKGROUND: Color = Color(0x13, 0x15, 0x16, 0xff);
 
 /// A live dashboard covers the screen saver and the lock screen and steps
 /// aside on input; a preview from Settings only closes on input (COMP001

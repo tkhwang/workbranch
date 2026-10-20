@@ -44,11 +44,14 @@ body {
 	gap: calc(var(--dashboard-gap) * 1.2);
 }
 
+/* A classic seven-segment display: 8vh tall, slanted like LED clocks. The
+   colon dots match the segment thickness (9 of the digit's 100 units). */
 .segment-clock {
 	align-items: center;
 	display: flex;
-	gap: 1.2vh;
-	height: 11.5vh;
+	gap: 1vh;
+	height: 8vh;
+	transform: skewX(-6deg);
 }
 
 .segment-digit {
@@ -67,16 +70,15 @@ body {
 .segment-colon {
 	display: flex;
 	flex-direction: column;
-	gap: 2.8vh;
-	padding: 0 0.3vh;
+	gap: 1.9vh;
+	padding: 0 0.2vh;
 }
 
 .segment-colon i {
 	background: var(--dashboard-ink);
-	border-radius: 50%;
 	display: block;
-	height: 1.3vh;
-	width: 1.3vh;
+	height: 0.72vh;
+	width: 0.72vh;
 }
 
 .segment-colon[data-on="false"] i {
@@ -122,6 +124,12 @@ body {
 	gap: 0.9vh;
 }
 
+/* The active total leads, set off from the per-state counts by a rule. */
+.dashboard-count[data-state="active"] {
+	border-right: 1px solid var(--line);
+	padding-right: 5vh;
+}
+
 .dashboard-count-value {
 	font-size: clamp(36px, 6.6vh, 96px);
 	font-weight: 700;
@@ -132,6 +140,10 @@ body {
 .dashboard-count-label {
 	color: var(--muted);
 	font-size: clamp(12px, 1.8vh, 24px);
+}
+
+.dashboard-count[data-state="active"] .dashboard-count-value {
+	color: var(--dashboard-ink);
 }
 
 .dashboard-count[data-state="waiting"] .dashboard-count-value {

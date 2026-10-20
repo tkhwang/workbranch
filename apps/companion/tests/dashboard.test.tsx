@@ -35,6 +35,7 @@ function card(
 
 const MODEL: DashboardModel = {
 	counts: { waiting: 1, running: 6, finished: 0 },
+	active: 7,
 	columns: [
 		{
 			key: "waiting",
@@ -73,6 +74,7 @@ const MODEL: DashboardModel = {
 
 const FINISHED_MODEL: DashboardModel = {
 	counts: { waiting: 0, running: 0, finished: 2 },
+	active: 2,
 	columns: [
 		{ key: "waiting", count: 0, more: 0, cards: [] },
 		{ key: "running", count: 0, more: 0, cards: [] },
@@ -126,6 +128,23 @@ describe("SegmentClock", () => {
 		expect(html).toContain('aria-label="09:05"');
 		expect(html.match(/class="segment-digit"/g)).toHaveLength(4);
 	});
+
+	it("draws pointed seven-segment hexagons, lit per digit", () => {
+		// 09:05 lights 6 + 6 + 6 + 5 segments of the 28 drawn.
+		const html = renderToStaticMarkup(<SegmentClock now={NOW} />);
+		expect(html.match(/<polygon /g)).toHaveLength(28);
+		expect(html).not.toContain("<rect");
+		expect(html.match(/<polygon [^>]*data-on="true"/g)).toHaveLength(23);
+		for (const polygon of html.match(/points="[^"]+"/g) ?? []) {
+			expect(polygon.split(" ")).toHaveLength(6);
+		}
+	});
+
+	it("sizes the clock smaller and slants it like a classic display", () => {
+		expect(css()).toMatch(
+			/\.segment-clock\s*\{[^}]*height:\s*8vh;[^}]*transform:\s*skewX\(-6deg\)/s,
+		);
+	});
 });
 
 describe("Dashboard", () => {
@@ -164,6 +183,26 @@ describe("Dashboard", () => {
 		);
 		expect(html).toMatch(
 			/data-state="running"[^>]*>[\s\S]*?class="dashboard-count-value">6</,
+		);
+	});
+
+	it("leads with the active total, then running, waiting and finished", () => {
+		const html = render();
+		const counts = html.slice(
+			html.indexOf('class="dashboard-counts"'),
+			html.indexOf("</dl>"),
+		);
+		expect(counts.match(/data-state="(\w+)"/g)).toEqual([
+			'data-state="active"',
+			'data-state="running"',
+			'data-state="waiting"',
+			'data-state="finished"',
+		]);
+		expect(counts).toMatch(
+			/data-state="active"[^>]*>[\s\S]*?활성 세션[\s\S]*?class="dashboard-count-value">7</,
+		);
+		expect(render(true, FINISHED_MODEL)).toMatch(
+			/data-state="active"[^>]*>[\s\S]*?class="dashboard-count-value">2</,
 		);
 	});
 

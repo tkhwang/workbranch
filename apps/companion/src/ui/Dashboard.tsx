@@ -1,13 +1,13 @@
 // The full-screen dashboard (COMP001, design D with the detailed cards of E):
-// a clock and the live counts on top, the board's three columns below.
+// a clock and the active total with per-state counts on top, the board's three
+// columns below.
 // View-only: any input locks the Mac before this page could act on it, so it
 // renders no controls.
-import {
-	DASHBOARD_COLUMNS,
-	type DashboardCard,
-	type DashboardChanges,
-	type DashboardColumnKey,
-	type DashboardModel,
+import type {
+	DashboardCard,
+	DashboardChanges,
+	DashboardColumnKey,
+	DashboardModel,
 } from "../application/dashboard";
 import type { CompanionFont, CompanionTheme } from "../application/preferences";
 import { COLUMN_COPY, OUTCOME_LABELS, WAIT_REASON_LABELS } from "./boardCopy";
@@ -20,6 +20,13 @@ import { formatRelativeTime } from "./TaskRow";
  * display and the count needs no measuring.
  */
 export const DASHBOARD_CARDS_PER_COLUMN = 3;
+
+/** Header counts follow the work's flow: running, then waiting on me, then done. */
+const COUNT_ORDER: readonly DashboardColumnKey[] = [
+	"running",
+	"waiting",
+	"finished",
+];
 
 const COUNT_LABELS: Readonly<Record<DashboardColumnKey, string>> = {
 	waiting: "내 응답 대기",
@@ -205,7 +212,11 @@ export function Dashboard({
 					</div>
 				</div>
 				<dl className="dashboard-counts">
-					{DASHBOARD_COLUMNS.map((key) => (
+					<div className="dashboard-count" data-state="active">
+						<dt className="dashboard-count-label">활성 세션</dt>
+						<dd className="dashboard-count-value">{model.active}</dd>
+					</div>
+					{COUNT_ORDER.map((key) => (
 						<div className="dashboard-count" data-state={key} key={key}>
 							<dt className="dashboard-count-label">{COUNT_LABELS[key]}</dt>
 							<dd className="dashboard-count-value">{model.counts[key]}</dd>
