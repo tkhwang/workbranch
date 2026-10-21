@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.39.0...workbranch-companion-v2.40.0) (2026-10-21)
+
+
+### Features
+
+* **companion:** 대시보드 메시지 스타일 및 라벨 수정하기 ([78da66d](https://github.com/tkhwang/workbranch/commit/78da66d1590fe95dffa680d760e1a60e4c754577))
+* **companion:** 대시보드 메시지 스타일 및 라벨 수정하기 ([ff980ef](https://github.com/tkhwang/workbranch/commit/ff980ef13b9ec68149740e97138641886e1e5acd))
+
 ## [2.39.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.38.0...workbranch-companion-v2.39.0) (2026-10-21)
 
 
