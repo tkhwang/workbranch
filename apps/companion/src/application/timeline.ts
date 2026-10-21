@@ -230,24 +230,76 @@ function turnStart(session: AgentSession): number {
 		: session.updatedAt;
 }
 
+/** A dashboard line needs only the start of a message (the collector's cap). */
+export const MESSAGE_CHARS = 300;
+const SENSITIVE = "[sensitive content omitted]";
+// The collector's markers (agent-runtime `clipped`): any of them, or URI
+// userinfo, withholds the whole text, since piecewise redaction can leak.
+const SENSITIVE_MARKERS: readonly string[] = [
+	"authorization",
+	"bearer ",
+	"password",
+	"--token",
+	"token=",
+	"api_key",
+	"api-key",
+	"secret",
+	"token",
+	"sk-",
+	"ghp_",
+];
+
+function hasUriCredentials(text: string): boolean {
+	return text
+		.split("://")
+		.slice(1)
+		.some((tail) => (tail.split(/[/?#\s]/)[0] ?? "").includes("@"));
+}
+
 /**
- * A session from before the collector kept messages, or one that has sent
- * nothing since, still holds its latest request and reply: those stand in.
- * The reply is dated when the turn ended; the request when the turn began,
- * and never after its reply.
+ * Text bound for the lock screen, cleaned by the collector's rule: whitespace
+ * folded, credential-looking text withheld whole, at most `limit` characters.
+ * Commit subjects come from the CLI unscrubbed, so they pass through here.
+ */
+export function scrubMessage(text: string, limit = MESSAGE_CHARS): string {
+	const clean = text.split(/\s+/).filter(Boolean).join(" ");
+	const lower = clean.toLowerCase();
+	if (
+		hasUriCredentials(clean) ||
+		SENSITIVE_MARKERS.some((marker) => lower.includes(marker))
+	)
+		return SENSITIVE;
+	const chars = Array.from(clean);
+	return chars.length > limit ? `${chars.slice(0, limit).join("")}…` : clean;
+}
+
+// The collector clips a kept message shorter than the latest prompt and
+// response it also keeps; a clipped message still stands for the full text.
+function sameText(full: string, kept: string): boolean {
+	return (
+		full === kept || (kept.endsWith("…") && full.startsWith(kept.slice(0, -1)))
+	);
+}
+
+/**
+ * A session's requests and replies, oldest first. The collector's kept
+ * messages lead; the latest request and reply, which every collector stores,
+ * fill in what they lack: all of it for a session from before messages were
+ * kept, and the request of a turn that was under way when the collector was
+ * upgraded. The reply is dated when the turn ended; the request when the turn
+ * began, and never after its reply.
  */
 export function sessionMessages(
 	session: AgentSession,
 ): readonly TimelineMessage[] {
-	if (session.messages !== undefined && session.messages.length > 0)
-		return session.messages;
+	const kept = session.messages ?? [];
 	const replied = session.state === "finished" && session.response !== "";
 	const repliedAt = session.stateChangedAt;
 	const askedAt = Math.min(
 		turnStart(session),
 		replied ? repliedAt - 1 : Number.POSITIVE_INFINITY,
 	);
-	return [
+	const latest: TimelineMessage[] = [
 		...(session.prompt === ""
 			? []
 			: [{ kind: "prompt" as const, text: session.prompt, at: askedAt }]),
@@ -255,33 +307,51 @@ export function sessionMessages(
 			? [{ kind: "response" as const, text: session.response, at: repliedAt }]
 			: []),
 	];
+	const missing = latest.filter(
+		(fallback) =>
+			!kept.some(
+				(message) =>
+					message.kind === fallback.kind &&
+					sameText(fallback.text, message.text),
+			),
+	);
+	// Stable: on a tie a stand-in, the older record, stays first.
+	return [...missing, ...kept].sort((a, b) => a.at - b.at);
 }
 
 /**
  * The task's last few requests, replies and commits, newest first. Every
  * session and repo of the task contributes; a commit made in several repos
- * under the same subject at the same time is listed once.
+ * under the same subject at the same time is listed once. Times are whole
+ * seconds, so a tie keeps each source's own order: a reply recorded in the
+ * same second as its request still comes first.
  */
 export function recentMessages(
 	row: MainTaskRow,
 	limit = TIMELINE_MESSAGES,
 ): readonly TimelineMessage[] {
-	const all: TimelineMessage[] = [
-		...row.sessions.flatMap(sessionMessages),
+	const entries = [
+		// Sessions keep messages oldest first: later ones rank higher.
+		...row.sessions.flatMap((session) =>
+			sessionMessages(session).map((message, order) => ({ message, order })),
+		),
+		// The CLI lists commits newest first.
 		...row.repos.flatMap((repo) =>
-			repo.recentCommits.map(
-				(commit): TimelineMessage => ({
-					kind: "commit",
-					text: commit.subject,
+			repo.recentCommits.map((commit, index, all) => ({
+				message: {
+					kind: "commit" as const,
+					text: scrubMessage(commit.subject),
 					at: commit.at,
-				}),
-			),
+				},
+				order: all.length - 1 - index,
+			})),
 		),
 	];
 	const seen = new Set<string>();
-	return all
-		.filter((message) => message.text !== "")
-		.sort((a, b) => b.at - a.at)
+	return entries
+		.filter(({ message }) => message.text !== "")
+		.sort((a, b) => b.message.at - a.message.at || b.order - a.order)
+		.map(({ message }) => message)
 		.filter((message) => {
 			const key = `${message.kind}\u0000${message.at}\u0000${message.text}`;
 			if (seen.has(key)) return false;

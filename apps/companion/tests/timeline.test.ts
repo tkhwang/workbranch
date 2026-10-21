@@ -5,6 +5,7 @@ import {
 	buildTimelineRow,
 	mergeIntervals,
 	recentMessages,
+	scrubMessage,
 	sessionIntervals,
 	turnEnds,
 } from "../src/application/timeline";
@@ -429,5 +430,97 @@ describe("recentMessages", () => {
 		expect(buildTimelineRow(r, "running", NOW).messages).toEqual([
 			{ kind: "prompt", text: "go", at: 9_000 },
 		]);
+	});
+});
+
+describe("review fixes for recent messages", () => {
+	function commitRepo(subjects: readonly [string, number][]): Repo {
+		return {
+			name: "app",
+			branch: "feat/x",
+			dirty: false,
+			activityAvailable: true,
+			ahead: subjects.length,
+			behind: 0,
+			changedFiles: 0,
+			lastCommitSubject: "",
+			lastCommitAt: 0,
+			recentCommits: subjects.map(([subject, at]) => ({ subject, at })),
+		};
+	}
+
+	it("scrubs commit subjects like the collector scrubs messages", () => {
+		const r = {
+			...row([session()]),
+			repos: [
+				commitRepo([
+					["rotate token=abc", 30],
+					["deploy  to\nhttps://me:pw@db.local", 20],
+					["x".repeat(400), 10],
+				]),
+			],
+		};
+		const [secret, uri, long] = recentMessages(r);
+		expect(secret?.text).toBe("[sensitive content omitted]");
+		expect(uri?.text).toBe("[sensitive content omitted]");
+		expect(long?.text).toBe(`${"x".repeat(300)}…`);
+		expect(scrubMessage("fix:  the\n  chart")).toBe("fix: the chart");
+	});
+
+	it("keeps the current request when history began mid-turn", () => {
+		// Upgraded during a turn: the row kept its prompt, the new collector
+		// then recorded only the reply.
+		const s = session({
+			state: "finished",
+			prompt: "add the chart",
+			response: "Chart added.",
+			stateChangedAt: 5_000,
+			transitions: [
+				{ state: "running", at: 4_000 },
+				{ state: "finished", at: 5_000, outcome: "turn-ended" },
+			],
+			messages: [{ kind: "response", text: "Chart added.", at: 5_000 }],
+		});
+		expect(recentMessages(row([s]))).toEqual([
+			{ kind: "response", text: "Chart added.", at: 5_000 },
+			{ kind: "prompt", text: "add the chart", at: 4_000 },
+		]);
+	});
+
+	it("does not repeat a request the collector kept clipped", () => {
+		const long = "y".repeat(400);
+		const s = session({
+			prompt: long,
+			messages: [{ kind: "prompt", text: `${"y".repeat(300)}…`, at: 4_000 }],
+		});
+		expect(recentMessages(row([s]))).toHaveLength(1);
+	});
+
+	it("lists a reply before its request recorded in the same second", () => {
+		const s = session({
+			state: "finished",
+			response: "done",
+			prompt: "go",
+			stateChangedAt: 100,
+			messages: [
+				{ kind: "prompt", text: "go", at: 100 },
+				{ kind: "response", text: "done", at: 100 },
+			],
+		});
+		expect(recentMessages(row([s])).map((m) => m.kind)).toEqual([
+			"response",
+			"prompt",
+		]);
+		// Commits keep the CLI's newest-first order on a tie, too.
+		const r = {
+			...row([session()]),
+			repos: [
+				commitRepo([
+					["second", 50],
+					["first", 50],
+				]),
+			],
+		};
+		expect(recentMessages(r).map((m) => m.text)).toEqual(["second", "first"]);
 	});
 });
