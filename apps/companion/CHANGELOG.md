@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.39.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.38.0...workbranch-companion-v2.39.0) (2026-10-21)
+
+
+### Features
+
+* **dashboard:** 최근 커밋 및 메시지 표시 기능 추가하기 ([327dc15](https://github.com/tkhwang/workbranch/commit/327dc15d5d8487f048a10ab3f9f19eb092d212fa))
+* **dashboard:** 최근 커밋 및 메시지 표시 기능 추가하기 ([0754f3c](https://github.com/tkhwang/workbranch/commit/0754f3cd0cc540a1372c8cd1e018de92b791214c))
+* **timeline:** 메시지 정제 및 최근 메시지 정렬 로직 추가하기 ([ceab437](https://github.com/tkhwang/workbranch/commit/ceab437030c48a999ffb1a9c7a1d972623787c53))
+
 ## [2.38.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.37.0...workbranch-companion-v2.38.0) (2026-10-21)
 
 
