@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.39.0](https://github.com/tkhwang/workbranch/compare/v2.38.0...v2.39.0) (2026-10-21)
+
+
+### Features
+
+* **dashboard:** 대시보드 타임라인으로 상태 전환 로그 추가하기 ([13eeb3e](https://github.com/tkhwang/workbranch/commit/13eeb3e68a0a410543c2f6f74d390750cd3e1df9))
+* **dashboard:** 화면 보호기 대시보드 디자인 개편하기 ([5a537ef](https://github.com/tkhwang/workbranch/commit/5a537efcef120ac46d941fb5cff527ab0118819f))
+* **runtime:** 재생성된 작업 공간이 이전 타임라인을 상속받지 않도록 수정하기 ([16f53e2](https://github.com/tkhwang/workbranch/commit/16f53e27cb82d7ac2fac8ac11c5ff4085b979ed0))
+* **styles:** Flat UI "US" 팔레트로 색상 조정하기 ([879428c](https://github.com/tkhwang/workbranch/commit/879428c35107825a498d50d11497b94e8fbf8e7d))
+* **ui:** update dashboard UI ([4e684d4](https://github.com/tkhwang/workbranch/commit/4e684d40e6ecefaa96867f1a2e32e2e888f611c7))
+
 ## [2.38.0](https://github.com/tkhwang/workbranch/compare/v2.37.0...v2.38.0) (2026-10-17)
 
 
