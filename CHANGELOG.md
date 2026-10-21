@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.0](https://github.com/tkhwang/workbranch/compare/v2.39.0...v2.40.0) (2026-10-21)
+
+
+### Features
+
+* **dashboard:** 최근 커밋 및 메시지 표시 기능 추가하기 ([327dc15](https://github.com/tkhwang/workbranch/commit/327dc15d5d8487f048a10ab3f9f19eb092d212fa))
+* **dashboard:** 최근 커밋 및 메시지 표시 기능 추가하기 ([0754f3c](https://github.com/tkhwang/workbranch/commit/0754f3cd0cc540a1372c8cd1e018de92b791214c))
+
 ## [2.39.0](https://github.com/tkhwang/workbranch/compare/v2.38.0...v2.39.0) (2026-10-21)
 
 
