@@ -389,6 +389,39 @@ describe("runtime UI", () => {
 		);
 		expect(plain?.transitions).toBeUndefined();
 	});
+	it("keeps recent messages when the collector sends them", () => {
+		const messages = [
+			{ kind: "prompt", text: "add the chart", at: 10 },
+			{ kind: "response", text: "Chart added.", at: 20 },
+		];
+		const [parsed] = parseRuntimeDocument(
+			JSON.stringify({
+				schemaVersion: 1,
+				sessions: [{ ...session, messages }],
+			}),
+		);
+		expect(parsed?.messages).toEqual(messages);
+		const [plain] = parseRuntimeDocument(
+			JSON.stringify({ schemaVersion: 1, sessions: [session] }),
+		);
+		expect(plain?.messages).toBeUndefined();
+	});
+	it("rejects malformed messages", () => {
+		for (const messages of [
+			[{ kind: "commit", text: "x", at: 1 }],
+			[{ kind: "prompt", text: 1, at: 1 }],
+			[{ kind: "prompt", text: "x", at: -1 }],
+			{ kind: "prompt", text: "x", at: 1 },
+		])
+			expect(() =>
+				parseRuntimeDocument(
+					JSON.stringify({
+						schemaVersion: 1,
+						sessions: [{ ...session, messages }],
+					}),
+				),
+			).toThrow();
+	});
 	it("rejects a malformed transition log or totals", () => {
 		for (const bad of [
 			{ transitions: [{ state: "complete", at: 1 }] },

@@ -19,7 +19,7 @@ import {
 	refreshStatus,
 } from "./infrastructure/tauriClient";
 import { startWorkspaceMonitor } from "./infrastructure/workspaceMonitor";
-import { DASHBOARD_TIMELINE_ROWS, Dashboard } from "./ui/Dashboard";
+import { Dashboard, dashboardTimelineRows } from "./ui/Dashboard";
 
 /** Mirrors the preview label prefix in src-tauri/src/screensaver/windows.rs. */
 const PREVIEW_LABEL_PREFIX = "dashboard-preview-";
@@ -110,15 +110,17 @@ export function DashboardApp() {
 
 	// The timeline moves with the clock, so the model follows each tick.
 	const nowSeconds = Math.floor(now.getTime() / 1000);
+	const { showMessages } = preferences.screensaver;
 	const model = useMemo(
 		() =>
 			buildDashboardModel(
 				state,
 				runtime.sessions,
 				nowSeconds,
-				DASHBOARD_TIMELINE_ROWS,
+				dashboardTimelineRows(showMessages),
+				showMessages,
 			),
-		[state, runtime.sessions, nowSeconds],
+		[state, runtime.sessions, nowSeconds, showMessages],
 	);
 	return (
 		<Dashboard
@@ -127,6 +129,7 @@ export function DashboardApp() {
 			model={model}
 			now={now}
 			preview={preview}
+			showMessages={showMessages}
 			theme={preferences.theme}
 		/>
 	);

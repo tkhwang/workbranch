@@ -8,6 +8,7 @@ companion 이 agent runtime 상태를 읽는 곳은 Rust `RuntimeService`(`apps/
 - 감시 디렉터리는 `WORKBRANCH_RUNTIME_DIR` 이 있으면 그 경로, 없으면 `$HOME/.workbranch/runtime` 이다(agent-runtime 의 `runtime_dir()` 과 같은 규칙).
 
 - 세션은 선택 필드 `transitions`(최근 24시간 상태 전환, 그 시작 시점에 유효했던 전환부터, 최대 500개)와 `totals`(보관된 기록 전체의 상태별 초)를 가질 수 있다. 이전 수집기는 둘 다 보내지 않으므로 소비자는 없을 때를 다뤄야 한다(dashboard timeline 은 현재 상태만 그린다). 문서 schema 는 1 그대로다.
+- 세션은 선택 필드 `messages`(최근 요청 `prompt` 와 턴을 끝낸 응답 `response`, 오래된 것부터 최대 3개, 각각 `kind`·`text`·`at`)도 가질 수 있다. 글은 `prompt`·`response` 와 같은 규칙으로 정리하고 300자로 자른다. 이전 수집기는 보내지 않는다.
 
 ## 읽는 시점
 - 디렉터리에 변경 이벤트가 오면, 마지막 이벤트 뒤 200ms 동안 조용할 때 한 번 읽는다. 쓰기가 이어져도 첫 이벤트 뒤 1초 안에는 읽는다. hook 이벤트 하나가 저장소를 여러 번 건드려도 읽기는 한 번이다.

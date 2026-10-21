@@ -6,6 +6,9 @@ use rusqlite::{Connection, TransactionBehavior};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
+/// A dashboard line needs only the start of a message.
+const MESSAGE_CHARS: usize = 300;
+
 fn string<'a>(v: &'a Value, key: &str) -> &'a str {
     v.get(key).and_then(Value::as_str).unwrap_or("")
 }
@@ -263,12 +266,17 @@ pub fn ingest(
             s.activity.clear();
             s.reason.clear();
             s.outcome.clear();
-            s.prompt = clipped(
-                v.get("prompt")
-                    .or_else(|| v.get("user_prompt"))
-                    .and_then(Value::as_str)
-                    .unwrap_or(""),
-                500,
+            let prompt = v
+                .get("prompt")
+                .or_else(|| v.get("user_prompt"))
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            s.prompt = clipped(prompt, 500);
+            store::remember(
+                &mut s.messages,
+                "prompt",
+                &clipped(prompt, MESSAGE_CHARS),
+                now,
             );
         }
         "PreToolUse" => {
@@ -386,7 +394,14 @@ pub fn ingest(
             s.state = "finished".into();
             s.waits.clear();
             s.active_tools.clear();
-            s.response = clipped(string(v, "last_assistant_message"), 2000);
+            let response = string(v, "last_assistant_message");
+            s.response = clipped(response, 2000);
+            store::remember(
+                &mut s.messages,
+                "response",
+                &clipped(response, MESSAGE_CHARS),
+                now,
+            );
             s.outcome = match event {
                 "Interrupt" => "interrupted",
                 "StopFailure" => "error",

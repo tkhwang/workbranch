@@ -11,9 +11,9 @@
 - **덮임(covered)**: 기능 켜짐 && 자리 비움 && (작업 중 || 무작업 덮임 시간이 남음). dashboard 와 디스플레이 유지는 덮임 동안에만 있다.
 
 ## 설정
-- 저장 위치: `companion-preferences.json` 의 `screensaver` 키, `{ enabled: boolean }`. 기본값 `{ enabled: false }`.
-- `enabled` 가 boolean 이 아니면 `false` 로 읽는다. COMP002 이전 store 의 `idleMinutes` 는 무시하고, main 창이 시작할 때 키를 지워 다시 저장한다. Settings(`application/screensaver.ts` 의 `sanitizeScreensaverConfig`)와 Rust 서비스(`Config::from_store_value`)가 같은 규칙으로 읽는다.
-- Settings › Screen Saver(페이지 제목 "Dashboard over the lock screen"): "Cover the lock screen" 스위치와 Preview 의 "Show now" 버튼. dashboard 를 띄우는 시간 설정은 없다. macOS 화면보호기 시간(시스템 설정 › 잠금 화면)이 그 역할을 한다. 바꾸면 저장한 뒤 `screensaver_refresh` 로 서비스가 설정을 다시 읽는다.
+- 저장 위치: `companion-preferences.json` 의 `screensaver` 키, `{ enabled: boolean, showMessages: boolean }`. 기본값 `{ enabled: false, showMessages: false }`.
+- `enabled`·`showMessages` 가 없거나 boolean 이 아니면 `false` 로 읽는다(`showMessages` 가 없던 store 는 main 창이 시작할 때 채워 다시 저장한다). `showMessages` 는 dashboard 창만 읽고, Rust 서비스는 `enabled` 만 읽는다. COMP002 이전 store 의 `idleMinutes` 는 무시하고, main 창이 시작할 때 키를 지워 다시 저장한다. Settings(`application/screensaver.ts` 의 `sanitizeScreensaverConfig`)와 Rust 서비스(`Config::from_store_value`)가 같은 규칙으로 읽는다.
+- Settings › Screen Saver(페이지 제목 "Dashboard over the lock screen"): "Cover the lock screen" 스위치, "Show recent messages" 스위치(기본 꺼짐, `screensaver.showMessages`), Preview 의 "Show now" 버튼. dashboard 를 띄우는 시간 설정은 없다. macOS 화면보호기 시간(시스템 설정 › 잠금 화면)이 그 역할을 한다. 바꾸면 저장한 뒤 `screensaver_refresh` 로 서비스가 설정을 다시 읽는다.
 
 ## 전원 유지
 `NSProcessInfo` activity 두 개를 따로 건다. 이유 문자열은 "Workbranch agents are working" 이다.
@@ -57,10 +57,12 @@
 - 별도 Vite 진입점 `dashboard.html`(`src/dashboardMain.tsx` → `src/DashboardApp.tsx`)이라 dashboard 창은 dashboard 코드만 로드한다. 버튼·링크·입력이 없다.
 - 상단 왼쪽: 7-segment 시계(현재 시각, 분 단위. 끝이 뾰족한 segment, 화면 높이의 8%, 6° 기울임), 날짜, "화면 잠김" 표시. 표시는 잠금 가능할 때만 보이고, 잠금 가능 여부를 읽기 전에는 숨긴다. 미리 보기에서는 대신 "미리 보기 · 입력하면 닫힘" 을 보인다.
 - 상단 오른쪽: 활성 세션(세 열의 task 수 합계)을 먼저 보이고, 구분선 뒤에 상태별 task 개수를 일의 흐름 순서(실행 중 · 내 응답 대기 · 턴 종료)로 보인다. 상태별 개수는 companion 칸반의 열별 개수와 같다.
-- 하단: 최근 3시간 timeline. 행은 `buildMainViewModel()` 이 칸반 3열에 넣는 task 와 같고(세션 없는·관측 불명·비활성 task 는 없다), 칸반 순서(내 응답 대기 → 실행 중 → 턴 종료, 각 열 안에서는 최근 활동 순)로 최대 8행, 나머지는 "+n more" 다. 각 행은 왼쪽부터 lead session 의 agent 아이콘, worktree branch(첫 repo 의 branch, 없으면 task 이름)와 그 아래 "현재 상태 경과 시간 | repo(여러 개면 +n)"(repo 이름은 이름으로 정해지는 4가지 색 `--repo-1`~`--repo-4` 중 하나라 같은 repo 는 어느 행에서나 같은 색이고, "+n" 은 흐리게 보인다), 시간 막대, 실행·대기·종료 시간 칸이다.
+- 하단: 최근 3시간 timeline. 행은 `buildMainViewModel()` 이 칸반 3열에 넣는 task 와 같고(세션 없는·관측 불명·비활성 task 는 없다), 칸반 순서(내 응답 대기 → 실행 중 → 턴 종료, 각 열 안에서는 최근 활동 순)로 최대 8행(최근 메시지를 보이면 4행), 나머지는 "+n more" 다. 각 행은 왼쪽부터 lead session 의 agent 아이콘, worktree branch(첫 repo 의 branch, 없으면 task 이름)와 그 아래 "현재 상태 경과 시간 | repo(여러 개면 +n)"(repo 이름은 이름으로 정해지는 4가지 색 `--repo-1`~`--repo-4` 중 하나라 같은 repo 는 어느 행에서나 같은 색이고, "+n" 은 흐리게 보인다), 시간 막대, 실행·대기·종료 시간 칸이다.
 - 시간 막대는 runtime 의 상태 전환 기록(`transitions`)으로 그린다. 실행 중은 얇은 흐름 줄, 내 응답 대기는 그 위로 솟은 블록(9분 이상이면 길이 표시), 턴 종료는 원(turn 이 오류(`StopFailure`)로 끝나면 × 표시. 중간에 도구가 실패했어도 agent 가 이어서 정상 종료했으면, 그리고 중단이면 보통 원), 그 뒤 검토 대기는 점선이다. 한 task 의 세션(subagent 포함)이 겹치면 칸반과 같은 우선순위(대기 > 실행 > 종료)로 하나의 막대로 합친다. 칸반처럼 확인되지 않은 현재는 그리지 않는다: stale 세션은 마지막 이벤트 시각에서 막대를 끊고, 관측 불명(uncertain) 세션은 현재 상태를 그리지 않아 관측된 다른 세션보다 우선하지 못한다. 기록이 없는 세션(이전 수집기)은 현재 상태만 상태 시작 시각부터 그리고, 기록이 하나도 없으면 "CLI 업데이트 뒤부터 쌓인다"는 안내를 보인다. 오른쪽 끝에 "지금" 선, 아래에 30분 눈금이 있다.
 - 시간 칸은 header 숫자와 같은 순서(실행 · 대기 · 종료)의 `h:mm` 이고, 세션 전체(보관된 7일 기록) 기준 `totals` 를 task 의 세션마다 더한 값이다. 대기만 상태 색으로 강조한다. 모르면 "–". timeline 제목 줄 오른쪽에 모든 활성 task 의 합계를 보인다.
-- 세션 글(prompt·응답·도구 동작)은 dashboard 에 나오지 않는다. 잠금 화면 위에 보이는 것은 branch·repo 이름과 상태·시간뿐이다.
+- 세션 글은 기본으로 dashboard 에 나오지 않는다. 잠금 화면 위에 보이는 것은 branch·repo 이름과 상태·시간뿐이다.
+- Settings 의 "Show recent messages" 를 켜면 각 행의 branch·상태 줄 아래에 task 의 최근 메시지 3개를 최신 순으로 들여 쓴다(왼쪽 얇은 세로선으로 행 이름과 구분). 메시지는 task 의 모든 세션이 보낸 요청(`요청`, runtime `messages` 의 `prompt`)과 턴을 끝낸 응답(`응답`, `response`), 모든 repo 의 이 task 커밋(`커밋`, list 의 `recentCommits`)을 합친 것이다. 같은 시각·같은 제목의 커밋이 여러 repo 에 있으면 한 번만 보인다. 맨 위 메시지는 크고 밝게, 나머지는 작고 흐리게 보이고, 각 줄 끝에 "12분 전" 같은 경과 시간을 붙인다. 메시지가 없으면 "최근 메시지 없음" 을 보인다. 행이 높아지므로 label 칸을 넓히고 행 수를 4개(`DASHBOARD_TIMELINE_ROWS_WITH_MESSAGES`)로 줄여 화면 아래로 넘치지 않는다. 도구 동작은 보이지 않는다.
+- 메시지 글은 줄바꿈을 접고 300자로 자르며, 자격 증명처럼 보이는 글은 통째로 "[sensitive content omitted]" 로 바꾼다. 요청·응답은 수집 단계에서, CLI 가 그대로 내는 커밋 제목은 companion 이 같은 규칙(`scrubMessage`)으로 정리한다. 수집기가 메시지를 남기기 전의 세션이나, 턴 도중에 수집기가 바뀌어 요청이 빠진 세션은 저장된 마지막 요청·응답으로 채운다(같은 글이면 한 번만). 시각이 같은 초이면 나중에 기록된 것(요청 뒤의 응답, CLI 의 더 새 커밋)이 위에 온다. 켜 두면 자리를 비운 동안 화면 앞의 누구나 읽을 수 있으므로 기본은 꺼짐이다.
 - 열당 카드는 3장(`DASHBOARD_CARDS_PER_COLUMN`)이고 나머지는 "+n more" 로 줄인다. 세부 줄은 줄 수를 고정해 자르고 크기는 화면 높이(vh)에 비례하므로, 카드가 잘리거나 화면 아래로 넘치지 않고 스크롤이 생기지 않는다.
 - 테마와 글꼴은 companion preference 를 따른다.
 - 데이터는 main 창과 같은 원천이다: runtime 은 `useRuntimeSessions` 구독, 목록은 workspace monitor 이벤트.

@@ -1,6 +1,7 @@
 cmd_list_json() {
   local first_task first_repo path task name repo_path branch title plan_title dirty status counts progress_done progress_total current_item updated_at
   local i base_commit status_output changed_files ahead behind last_commit last_commit_at last_commit_subject record_separator
+  local recent_commits commit_line first_commit
   local -a base_commits
   local first_base_repo base_branch present remote_available remote_commit remote_ref inspection_error
   local canonical_repo_path canonical_top_level inside_work_tree top_level git_status
@@ -199,7 +200,24 @@ cmd_list_json() {
       printf ',"changedFiles":%s' "$changed_files"
       printf ',"lastCommitSubject":'
       json_string "$last_commit_subject"
-      printf ',"lastCommitAt":%s}' "$last_commit_at"
+      printf ',"lastCommitAt":%s' "$last_commit_at"
+      recent_commits=$(recent_commit_records "$repo_path" "$base_commit" 3) || recent_commits=""
+      printf ',"recentCommits":['
+      first_commit=1
+      while IFS= read -r commit_line; do
+        [ -n "$commit_line" ] || continue
+        if [ $first_commit -eq 1 ]; then
+          first_commit=0
+        else
+          printf ','
+        fi
+        printf '{"subject":'
+        json_string "${commit_line#*"$record_separator"}"
+        printf ',"at":%s}' "${commit_line%%"$record_separator"*}"
+      done <<EOF_COMMITS
+$recent_commits
+EOF_COMMITS
+      printf ']}'
       i=$((i + 1))
     done
     printf ']}'

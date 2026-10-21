@@ -15,6 +15,15 @@ import { SegmentClock } from "./SegmentClock";
  * many fit under the header on any display and the count needs no measuring.
  */
 export const DASHBOARD_TIMELINE_ROWS = 8;
+/** Rows when each one also lists its recent messages, so it stands taller. */
+export const DASHBOARD_TIMELINE_ROWS_WITH_MESSAGES = 4;
+
+/** How many rows fit, with or without the messages under each. */
+export function dashboardTimelineRows(showMessages: boolean): number {
+	return showMessages
+		? DASHBOARD_TIMELINE_ROWS_WITH_MESSAGES
+		: DASHBOARD_TIMELINE_ROWS;
+}
 
 /** Header counts follow the work's flow: running, then waiting on me, then done. */
 const COUNT_ORDER: readonly DashboardColumnKey[] = [
@@ -62,6 +71,8 @@ type DashboardProps = {
 	readonly lockAvailable: boolean;
 	/** Opened from Settings: input closes it, nothing locks (R12). */
 	readonly preview?: boolean;
+	/** Lists each task's recent messages; off unless Settings turns it on. */
+	readonly showMessages?: boolean;
 };
 
 export function Dashboard({
@@ -71,6 +82,7 @@ export function Dashboard({
 	font,
 	lockAvailable,
 	preview = false,
+	showMessages = false,
 }: DashboardProps) {
 	return (
 		<main className="dashboard" data-font={font} data-theme={theme}>
@@ -105,6 +117,7 @@ export function Dashboard({
 			<DashboardTimeline
 				model={model.timeline}
 				now={Math.floor(now.getTime() / 1000)}
+				showMessages={showMessages}
 			/>
 		</main>
 	);

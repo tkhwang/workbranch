@@ -33,7 +33,8 @@ assert login["path"] == f"{expected_root}/login", login
 assert login["notiCount"] == 2, login
 assert [r["name"] for r in login["repos"]] == ["frontend", "backend"], login
 for repo in login["repos"]:
-    assert set(repo) == {"name", "branch", "dirty", "ahead", "behind", "changedFiles", "lastCommitSubject", "lastCommitAt"}, repo
+    assert set(repo) == {"name", "branch", "dirty", "ahead", "behind", "changedFiles", "lastCommitSubject", "lastCommitAt", "recentCommits"}, repo
+    assert repo["recentCommits"] == [], repo
     assert repo["branch"] == "feature/login", repo
     assert repo["dirty"] is False, repo
     assert repo["ahead"] == 0, repo
@@ -71,13 +72,42 @@ assert frontend["dirty"] is True, frontend
 assert frontend["changedFiles"] == 1, frontend
 assert frontend["lastCommitSubject"] == "implement \"activity\" facts", frontend
 assert isinstance(frontend["lastCommitAt"], int) and frontend["lastCommitAt"] > 0, frontend
+assert [c["subject"] for c in frontend["recentCommits"]] == ["implement \"activity\" facts"], frontend
+assert set(frontend["recentCommits"][0]) == {"subject", "at"}, frontend
+assert frontend["recentCommits"][0]["at"] == frontend["lastCommitAt"], frontend
 backend = repos["backend"]
 assert backend["ahead"] == 0, backend
 assert backend["behind"] == 0, backend
 assert backend["dirty"] is False, backend
 assert backend["changedFiles"] == 0, backend
 assert backend["lastCommitSubject"] == "initial backend", backend
-assert isinstance(backend["lastCommitAt"], int) and backend["lastCommitAt"] > 0, backend'
+assert isinstance(backend["lastCommitAt"], int) and backend["lastCommitAt"] > 0, backend
+assert backend["recentCommits"] == [], backend'
+}
+
+test_list_json_recent_commits_are_the_tasks_newest_three() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+
+  frontend="$project/login/frontend"
+  git -C "$frontend" config user.name "Workbranch Test"
+  git -C "$frontend" config user.email "workbranch-test@example.com"
+  for n in 1 2 3 4; do
+    printf '%s\n' "$n" > "$frontend/step.txt"
+    git -C "$frontend" add step.txt
+    git -C "$frontend" commit -m "step $n" >/dev/null
+  done
+
+  out=$(run_expect_success "$WORKBRANCH" list --json)
+  printf '%s' "$out" | python3 -c 'import json, sys
+repos = {repo["name"]: repo for repo in json.load(sys.stdin)["tasks"][0]["repos"]}
+commits = repos["frontend"]["recentCommits"]
+assert [c["subject"] for c in commits] == ["step 4", "step 3", "step 2"], commits
+assert all(isinstance(c["at"], int) and c["at"] > 0 for c in commits), commits
+assert repos["backend"]["recentCommits"] == [], repos["backend"]'
 }
 
 test_list_json_repo_activity_missing_base_commit_falls_back() {
@@ -99,7 +129,8 @@ assert backend["ahead"] == 0, backend
 assert backend["behind"] == 0, backend
 assert backend["changedFiles"] == 0, backend
 assert backend["lastCommitSubject"] == "initial backend", backend
-assert backend["lastCommitAt"] > 0, backend'
+assert backend["lastCommitAt"] > 0, backend
+assert backend["recentCommits"] == [], backend'
 }
 
 test_list_json_no_color_no_log_noise() {

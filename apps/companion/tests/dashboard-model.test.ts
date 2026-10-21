@@ -18,6 +18,7 @@ function repo(name: string, branch: string): Repo {
 		changedFiles: 0,
 		lastCommitSubject: "",
 		lastCommitAt: 0,
+		recentCommits: [],
 	};
 }
 
@@ -116,16 +117,23 @@ describe("buildDashboardModel", () => {
 		expect(model.timeline.more).toBe(2);
 	});
 
-	it("never carries session ids or the agent's turn text", () => {
-		const model = buildDashboardModel(
-			state([task("busy")]),
-			[session("busy", "running", { sessionId: "sess-secret-id" })],
-			NOW,
-			8,
+	it("never carries session ids, nor turn text while messages are off", () => {
+		const sessions = [
+			session("busy", "running", {
+				sessionId: "sess-secret-id",
+				messages: [{ kind: "prompt", text: "secret prompt text", at: NOW }],
+			}),
+		];
+		const json = JSON.stringify(
+			buildDashboardModel(state([task("busy")]), sessions, NOW, 8),
 		);
-		const json = JSON.stringify(model);
 		expect(json).not.toContain("sess-secret-id");
 		expect(json).not.toContain("secret prompt text");
+		const shown = JSON.stringify(
+			buildDashboardModel(state([task("busy")]), sessions, NOW, 4, true),
+		);
+		expect(shown).not.toContain("sess-secret-id");
+		expect(shown).toContain("secret prompt text");
 	});
 
 	it("titles a row by its worktree branch and names extra repos by count", () => {

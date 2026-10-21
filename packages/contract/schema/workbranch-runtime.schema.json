@@ -143,6 +143,35 @@
                 "minimum": 0
               }
             }
+          },
+          "messages": {
+            "description": "Optional. The session's last few requests (prompt) and turn-ending replies (response), newest last; at most 3.",
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "text",
+                "at"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "prompt",
+                    "response"
+                  ]
+                },
+                "text": {
+                  "type": "string"
+                },
+                "at": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
           }
         }
       }
