@@ -259,3 +259,55 @@ describe("buildTimeline", () => {
 		expect(model.totals).toBe(undefined);
 	});
 });
+
+describe("unconfirmed sessions", () => {
+	it("does not draw an uncertain session's current state", () => {
+		const uncertain = session({
+			observation: "uncertain",
+			state: "waiting",
+			transitions: [
+				{ state: "running", at: 1_000 },
+				{ state: "waiting", at: 8_000 },
+			],
+		});
+		expect(sessionIntervals(uncertain, NOW)).toEqual([
+			{ state: "running", start: 1_000, end: 8_000, outcome: "" },
+		]);
+		expect(
+			sessionIntervals(session({ observation: "uncertain" }), NOW),
+		).toEqual([]);
+	});
+
+	it("lets an observed running session decide the task, as the board does", () => {
+		const timelineRow = buildTimelineRow(
+			row([
+				session({ transitions: [{ state: "running", at: 9_000 }] }),
+				session({
+					sessionId: "other",
+					observation: "uncertain",
+					state: "waiting",
+					transitions: [{ state: "waiting", at: 9_500 }],
+				}),
+			]),
+			"running",
+			NOW,
+		);
+		expect(timelineRow.segments).toEqual([
+			{ state: "running", start: 9_000, end: NOW },
+		]);
+	});
+});
+
+describe("turn outcomes", () => {
+	it("crosses out only a failed turn, not a tool that failed along the way", () => {
+		const segments = [
+			{ state: "running", start: 0, end: 40 },
+			{ state: "finished", start: 40, end: 100 },
+		] as const;
+		expect(
+			turnEnds(segments, [
+				{ state: "finished", start: 40, end: 100, outcome: "tool-error" },
+			]),
+		).toEqual([{ at: 40, error: false }]);
+	});
+});

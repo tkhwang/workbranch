@@ -191,7 +191,12 @@ pub fn ingest(
     let agent = string(v, "agent_id");
     let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
     let stamp = store::workspace_stamp(std::path::Path::new(workspace));
-    let mut s = store::load(&tx, workspace, provider, sid, agent)?
+    let stored = store::load(&tx, workspace, provider, sid, agent)?;
+    if stored.as_ref().is_some_and(|s| s.workspace_stamp != stamp) {
+        // A recreated workspace starts over, its predecessor's timeline too.
+        store::forget_transitions(&tx, workspace, provider, sid, agent)?;
+    }
+    let mut s = stored
         .filter(|s| s.workspace_stamp == stamp)
         .unwrap_or_else(|| Session {
             workspace: workspace.into(),

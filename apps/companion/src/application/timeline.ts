@@ -63,7 +63,10 @@ const PRIORITY: Readonly<Record<TimelineState, number>> = {
 	finished: 1,
 };
 
-const ERROR_OUTCOMES: ReadonlySet<string> = new Set(["error", "tool-error"]);
+// The collector logs a turn's end as `turn-ended`, `interrupted` or `error`
+// (StopFailure). A tool that failed mid-turn is not a failed turn: the agent
+// reads the failure and carries on, so only `error` crosses the end marker.
+const ERROR_OUTCOME = "error";
 
 type Interval = TimelineSegment & { readonly outcome: string };
 
@@ -73,15 +76,15 @@ function isTimelineState(state: string): state is TimelineState {
 
 /**
  * A session's spans. Without a log only the current state is known, from when
- * it was entered. A stale session's last state is unconfirmed after its last
- * event, so its span stops there.
+ * it was entered. Like the board, which counts only observed sessions, the
+ * timeline draws no unconfirmed present: a stale session's last state stops
+ * at its last event, and an uncertain session's current state is not drawn at
+ * all, so it can never outrank what an observed session of the task is doing.
  */
 export function sessionIntervals(
 	session: AgentSession,
 	now: number,
 ): readonly Interval[] {
-	const end =
-		session.observation === "stale" ? Math.min(session.updatedAt, now) : now;
 	const log: readonly WorkbranchRuntimeTransition[] =
 		session.transitions !== undefined && session.transitions.length > 0
 			? session.transitions
@@ -92,6 +95,13 @@ export function sessionIntervals(
 						outcome: session.state === "finished" ? session.outcome : "",
 					},
 				];
+	// Where the session's record stops being confirmed.
+	const end =
+		session.observation === "stale"
+			? Math.min(session.updatedAt, now)
+			: session.observation === "uncertain"
+				? Math.min(log.at(-1)?.at ?? now, now)
+				: now;
 	return log.flatMap((change, index): Interval[] => {
 		const until = Math.min(log[index + 1]?.at ?? end, end);
 		if (!isTimelineState(change.state) || until <= change.at) return [];
@@ -167,7 +177,7 @@ export function turnEnds(
 					(interval) =>
 						interval.state === "finished" &&
 						interval.start === segment.start &&
-						ERROR_OUTCOMES.has(interval.outcome),
+						interval.outcome === ERROR_OUTCOME,
 				),
 			},
 		];

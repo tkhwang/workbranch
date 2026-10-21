@@ -507,3 +507,40 @@ fn version_1_store_is_readable_and_upgrades_on_write() {
     // Time before the log began is unknown, so only logged time counts.
     assert_eq!(after[0].totals, Some(store::Totals { running: 0, waiting: 0, finished: 10 }));
 }
+
+#[test]
+fn a_state_held_past_retention_still_counts_from_the_cutoff() {
+    let mut db = store::open_memory().unwrap();
+    hook(&mut db, "UserPromptSubmit", "", 10);
+    // Same-state events keep the session alive for eight days.
+    let later = 10 + 8 * 86400;
+    hook(&mut db, "PreToolUse", "Bash", later);
+    let cutoff = later - 7 * 86400;
+    let s = &store::snapshot(&db, later).unwrap()[0];
+    assert_eq!(s.state, "running");
+    assert_eq!(s.transitions, log(&[("running", cutoff, "")]));
+    assert_eq!(s.totals, Some(store::Totals { running: 7 * 86400, waiting: 0, finished: 0 }));
+}
+
+#[test]
+fn recreated_workspace_does_not_inherit_the_prior_timeline() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("task");
+    std::fs::create_dir(&path).unwrap();
+    let marker = path.join(".workbranch.task");
+    std::fs::write(&marker, "old").unwrap();
+    let workspace = path.to_str().unwrap();
+    let mut db = store::open_memory().unwrap();
+    let send = |db: &mut rusqlite::Connection, event: &str, at| {
+        event::ingest(db, workspace, "claude", &json!({"session_id":"s","hook_event_name":event}), at).unwrap();
+    };
+    send(&mut db, "UserPromptSubmit", 100);
+    send(&mut db, "Stop", 200);
+    // Keep the old inode alive so the new marker cannot reuse it.
+    std::fs::rename(&marker, root.path().join("old-marker")).unwrap();
+    std::fs::write(&marker, "new").unwrap();
+    send(&mut db, "UserPromptSubmit", 300);
+    let s = &store::snapshot(&db, 400).unwrap()[0];
+    assert_eq!(s.transitions, log(&[("running", 300, "")]));
+    assert_eq!(s.totals, Some(store::Totals { running: 100, waiting: 0, finished: 0 }));
+}

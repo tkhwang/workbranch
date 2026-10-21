@@ -148,7 +148,35 @@ pub fn save(db: &Connection, s: &Session) -> Result<()> {
     // the transition log holds states and times only.
     let cutoff = i64::try_from(s.updated_at.saturating_sub(RETENTION_SECS))?;
     db.execute("DELETE FROM sessions WHERE updated < ?", [cutoff])?;
+    // A purged session's changes all predate the cutoff; they go with it.
+    db.execute(
+        "DELETE FROM transitions WHERE at < ?1 AND NOT EXISTS (SELECT 1 FROM sessions s WHERE s.workspace=transitions.workspace AND s.provider=transitions.provider AND s.session=transitions.session AND s.agent=transitions.agent)",
+        [cutoff],
+    )?;
+    // A live session keeps the state in force at the cutoff: its last change
+    // before the cutoff moves up to it, so a long-held state still counts
+    // from there instead of vanishing with its row.
+    db.execute(
+        "UPDATE transitions SET at = ?1 WHERE rowid IN (SELECT max(rowid) FROM transitions WHERE at < ?1 GROUP BY workspace, provider, session, agent)",
+        [cutoff],
+    )?;
     db.execute("DELETE FROM transitions WHERE at < ?", [cutoff])?;
+    Ok(())
+}
+
+/// Drops a session key's log, for a session that starts over under a key a
+/// previous one used (a recreated workspace).
+pub fn forget_transitions(
+    db: &Connection,
+    workspace: &str,
+    provider: &str,
+    session: &str,
+    agent: &str,
+) -> Result<()> {
+    db.execute(
+        "DELETE FROM transitions WHERE workspace=? AND provider=? AND session=? AND agent=?",
+        params![workspace, provider, session, agent],
+    )?;
     Ok(())
 }
 
