@@ -259,27 +259,27 @@ describe("App shell settings wiring", () => {
 		// When the button background token contract is inspected
 		const css = readCssContract("src/style.css");
 		expect(css).toMatch(
-			/main\[data-theme="claude"\]\s*\{[^}]*--button-bg:\s*rgba\(192,\s*202,\s*245,\s*0\.06\);[^}]*--button-bg-hover:\s*rgba\(192,\s*202,\s*245,\s*0\.12\);/s,
+			/main\[data-theme="claude"\]\s*\{[^}]*--button-bg:\s*rgba\(223,\s*230,\s*233,\s*0\.06\);[^}]*--button-bg-hover:\s*rgba\(223,\s*230,\s*233,\s*0\.12\);/s,
 		);
 		expect(css).toMatch(
-			/main\[data-theme="codex"\]\s*\{[^}]*--button-bg:\s*rgba\(237,\s*237,\s*237,\s*0\.06\);[^}]*--button-bg-hover:\s*rgba\(237,\s*237,\s*237,\s*0\.12\);/s,
+			/main\[data-theme="codex"\]\s*\{[^}]*--button-bg:\s*rgba\(223,\s*230,\s*233,\s*0\.06\);[^}]*--button-bg-hover:\s*rgba\(223,\s*230,\s*233,\s*0\.12\);/s,
 		);
 	});
 
-	it("reserves Claude orange for compact accents instead of structural backgrounds", () => {
+	it("reserves the Claude blue accent for compact signals instead of structural backgrounds", () => {
 		// Given the fixed-dark Claude theme contract
 		// When structural and selected-state tokens are inspected
 		const css = readCssContract("src/style.css");
 
-		// Then warm graphite owns broad surfaces while orange remains the emphasis signal
+		// Then neutral surfaces own broad areas while blue remains the emphasis signal
 		expect(css).toMatch(
-			/main\[data-theme="claude"\]\s*\{[^}]*--line:\s*#403b38;[^}]*--line-strong:\s*#625952;/s,
+			/main\[data-theme="claude"\]\s*\{[^}]*--line:\s*#3d4649;[^}]*--line-strong:\s*#636e72;/s,
 		);
 		expect(css).toMatch(
-			/main\[data-theme="claude"\]\s*\{[^}]*--emphasis-soft:\s*rgba\(205,\s*105,\s*74,\s*0\.14\);[^}]*--task-selected-summary-bg:\s*rgba\(192,\s*202,\s*245,\s*0\.06\);/s,
+			/main\[data-theme="claude"\]\s*\{[^}]*--emphasis-soft:\s*rgba\(9,\s*132,\s*227,\s*0\.16\);[^}]*--task-selected-summary-bg:\s*rgba\(223,\s*230,\s*233,\s*0\.06\);/s,
 		);
 		expect(css).toMatch(
-			/main\[data-theme="claude"\]\s*\{[^}]*--current-step-bg:\s*rgba\(192,\s*202,\s*245,\s*0\.08\);/s,
+			/main\[data-theme="claude"\]\s*\{[^}]*--current-step-bg:\s*rgba\(223,\s*230,\s*233,\s*0\.08\);/s,
 		);
 		expect(css).not.toMatch(
 			/main\[data-theme="claude"\]\s*\{[^}]*--line:\s*rgba\(205,\s*105,\s*74/s,
@@ -291,18 +291,18 @@ describe("App shell settings wiring", () => {
 		// When their structural surfaces and pre-hydration background are inspected
 		const css = readCssContract("src/style.css");
 
-		// Then Claude is warm graphite and Codex is brighter cool-neutral from first paint
+		// Then both share Flat UI Dracula Orchid surfaces from first paint
 		expect(css).toMatch(
-			/main\[data-theme="claude"\]\s*\{[^}]*--surface-0:\s*#131313;[^}]*--surface-1:\s*#1a1918;[^}]*--surface-2:\s*#22201f;[^}]*--surface-3:\s*#2c2927;/s,
+			/main\[data-theme="claude"\]\s*\{[^}]*--surface-0:\s*#131516;[^}]*--surface-1:\s*#1a1f20;[^}]*--surface-2:\s*#22292b;[^}]*--surface-3:\s*#2d3436;/s,
 		);
 		expect(css).toMatch(
-			/main\[data-theme="codex"\]\s*\{[^}]*--surface-0:\s*#121214;[^}]*--surface-1:\s*#18181b;[^}]*--surface-2:\s*#202024;[^}]*--surface-3:\s*#2b2b30;/s,
+			/main\[data-theme="codex"\]\s*\{[^}]*--surface-0:\s*#131516;[^}]*--surface-1:\s*#1a1f20;[^}]*--surface-2:\s*#22292b;[^}]*--surface-3:\s*#2d3436;/s,
 		);
 		expect(css).toMatch(
-			/main\[data-theme="codex"\]\s*\{[^}]*--line:\s*#414147;[^}]*--line-strong:\s*#60606a;/s,
+			/main\[data-theme="codex"\]\s*\{[^}]*--line:\s*#3d4649;[^}]*--line-strong:\s*#636e72;/s,
 		);
-		expect(css).toMatch(/:root\s*\{[^}]*background:\s*#131313/s);
-		expect(css).toMatch(/body\s*\{[^}]*background:\s*#131313/s);
+		expect(css).toMatch(/:root\s*\{[^}]*background:\s*#131516/s);
+		expect(css).toMatch(/body\s*\{[^}]*background:\s*#131516/s);
 	});
 
 	it("colors status token text by state instead of relying on the dot alone", () => {
@@ -455,11 +455,9 @@ describe("App shell settings wiring", () => {
 	it("uses a readable text token for small secondary copy", () => {
 		const css = readCssContract("src/style.css");
 
-		expect(css).toContain("--muted: #9aa5ce");
-		expect(css).toContain("--muted: #a8a8ad");
+		expect(css).toContain("--muted: #b2bec3");
 		expect(css).not.toContain("--muted: #949494");
-		expect(css).toContain("--faint: #8a91b3");
-		expect(css).toContain("--faint: #96969d");
+		expect(css).toContain("--faint: #9aa4a8");
 		expect(css).not.toContain("--faint: #767c99");
 		expect(css).not.toContain("--faint: #6b6b70");
 		expect(css).not.toContain("--faint: #626262");
@@ -677,16 +675,16 @@ describe("App shell settings wiring", () => {
 
 		expect(css).toContain('main[data-theme="claude"]');
 		expect(css).toContain('main[data-theme="codex"]');
-		expect(css).toContain("--accent: #cd694a");
-		expect(css).toContain("--emphasis: #cd694a");
-		expect(css).toContain("--text: #c0caf5");
-		expect(css).toContain("--surface-0: #131313");
-		expect(css).toContain("--surface-1: #1a1918");
-		expect(css).toContain("--line: #403b38");
+		expect(css).toContain("--accent: #0984e3");
+		expect(css).toContain("--emphasis: #0984e3");
+		expect(css).toContain("--text: #dfe6e9");
+		expect(css).toContain("--surface-0: #131516");
+		expect(css).toContain("--surface-1: #1a1f20");
+		expect(css).toContain("--line: #3d4649");
 		expect(css).not.toContain("--line: rgba(205, 105, 74");
-		expect(css).toContain("--accent: #5cc2e0");
-		expect(css).toContain("--emphasis: #ededed");
-		expect(css).toContain("--text: #ededed");
+		expect(css).toContain("--accent: #00cec9");
+		expect(css).toContain("--emphasis: #dfe6e9");
+		expect(css).toContain("--text: #dfe6e9");
 		expect(css).not.toContain('data-theme$="-light"');
 		expect(css).not.toMatch(/gradient\(/);
 	});

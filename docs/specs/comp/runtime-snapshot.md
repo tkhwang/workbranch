@@ -7,6 +7,8 @@ companion 이 agent runtime 상태를 읽는 곳은 Rust `RuntimeService`(`apps/
 - companion 은 `state.sqlite3` 를 직접 읽지 않는다. SQLite 는 수집기 버전과 함께 바뀌는 agent-runtime 내부 저장소이고, schema 가 있는 CLI 문서가 계약이다.
 - 감시 디렉터리는 `WORKBRANCH_RUNTIME_DIR` 이 있으면 그 경로, 없으면 `$HOME/.workbranch/runtime` 이다(agent-runtime 의 `runtime_dir()` 과 같은 규칙).
 
+- 세션은 선택 필드 `transitions`(최근 24시간 상태 전환, 그 시작 시점에 유효했던 전환부터, 최대 500개)와 `totals`(보관된 기록 전체의 상태별 초)를 가질 수 있다. 이전 수집기는 둘 다 보내지 않으므로 소비자는 없을 때를 다뤄야 한다(dashboard timeline 은 현재 상태만 그린다). 문서 schema 는 1 그대로다.
+
 ## 읽는 시점
 - 디렉터리에 변경 이벤트가 오면, 마지막 이벤트 뒤 200ms 동안 조용할 때 한 번 읽는다. 쓰기가 이어져도 첫 이벤트 뒤 1초 안에는 읽는다. hook 이벤트 하나가 저장소를 여러 번 건드려도 읽기는 한 번이다.
 - 변경이 없어도 마지막 읽기 뒤 60초마다 읽는다. 쓰기 없이 `stale` 로 바뀌는 세션과 감시가 놓친 변경을 잡는다.

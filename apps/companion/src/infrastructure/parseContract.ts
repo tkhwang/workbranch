@@ -145,6 +145,33 @@ export function parseListDocument(raw: string): WorkbranchListDocument {
 	return parsed;
 }
 
+// History fields are optional: older collectors send neither.
+function isOptionalTransitions(value: unknown): boolean {
+	return (
+		value === undefined ||
+		(Array.isArray(value) &&
+			value.every(
+				(t: unknown) =>
+					isRecord(t) &&
+					["running", "waiting", "finished", "idle"].includes(
+						String(t["state"]),
+					) &&
+					isNonNegativeInteger(t["at"]) &&
+					isOptionalString(t["outcome"]),
+			))
+	);
+}
+
+function isOptionalTotals(value: unknown): boolean {
+	return (
+		value === undefined ||
+		(isRecord(value) &&
+			isNonNegativeInteger(value["running"]) &&
+			isNonNegativeInteger(value["waiting"]) &&
+			isNonNegativeInteger(value["finished"]))
+	);
+}
+
 export function parseRuntimeDocument(
 	raw: string,
 ): readonly import("../domain/model").AgentSession[] {
@@ -175,7 +202,9 @@ export function parseRuntimeDocument(
 				"outcome",
 			].every((k) => typeof s[k] === "string") ||
 			!isNonNegativeInteger(s["updatedAt"]) ||
-			!isNonNegativeInteger(s["stateChangedAt"])
+			!isNonNegativeInteger(s["stateChangedAt"]) ||
+			!isOptionalTransitions(s["transitions"]) ||
+			!isOptionalTotals(s["totals"])
 		)
 			throw new Error("Invalid runtime session");
 		return s as unknown as import("../domain/model").AgentSession;

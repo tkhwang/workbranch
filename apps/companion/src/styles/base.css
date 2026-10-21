@@ -1,6 +1,6 @@
 :root {
-	background: #131313;
-	color: #c0caf5;
+	background: #131516;
+	color: #dfe6e9;
 	font-family:
 		ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
 		monospace;
@@ -12,7 +12,7 @@
 }
 
 body {
-	background: #131313;
+	background: #131516;
 	margin: 0;
 }
 

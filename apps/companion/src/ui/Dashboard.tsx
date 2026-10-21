@@ -1,25 +1,27 @@
-// The full-screen dashboard (COMP001, design D with the detailed cards of E):
-// a clock and the live counts on top, the board's three columns below.
+// The full-screen dashboard (COMP001): a clock and the active total with
+// per-state counts on top, a timeline of the live tasks below.
 // View-only: any input locks the Mac before this page could act on it, so it
 // renders no controls.
-import {
-	DASHBOARD_COLUMNS,
-	type DashboardCard,
-	type DashboardChanges,
-	type DashboardColumnKey,
-	type DashboardModel,
+import type {
+	DashboardColumnKey,
+	DashboardModel,
 } from "../application/dashboard";
 import type { CompanionFont, CompanionTheme } from "../application/preferences";
-import { COLUMN_COPY, OUTCOME_LABELS, WAIT_REASON_LABELS } from "./boardCopy";
+import { DashboardTimeline } from "./DashboardTimeline";
 import { SegmentClock } from "./SegmentClock";
-import { formatRelativeTime } from "./TaskRow";
 
 /**
- * Cards per column. Card lines are clamped and sized to the screen height
- * (dashboard.css), so three of the tallest cards fit under the header on any
- * display and the count needs no measuring.
+ * Timeline rows. Rows are sized to the screen height (dashboard.css), so this
+ * many fit under the header on any display and the count needs no measuring.
  */
-export const DASHBOARD_CARDS_PER_COLUMN = 3;
+export const DASHBOARD_TIMELINE_ROWS = 8;
+
+/** Header counts follow the work's flow: running, then waiting on me, then done. */
+const COUNT_ORDER: readonly DashboardColumnKey[] = [
+	"running",
+	"waiting",
+	"finished",
+];
 
 const COUNT_LABELS: Readonly<Record<DashboardColumnKey, string>> = {
 	waiting: "내 응답 대기",
@@ -51,122 +53,6 @@ function LockIcon() {
 	);
 }
 
-type ChangeFact = {
-	readonly tone: "dirty" | "ahead" | "behind";
-	readonly label: string;
-};
-
-// The menu bar's compact facts, summed over the task's repos. A clean task
-// shows none: on a screen read from afar, only what changed is worth a glyph.
-function changeFacts(changes: DashboardChanges): readonly ChangeFact[] {
-	const facts: ChangeFact[] = [];
-	if (changes.dirty)
-		facts.push({
-			tone: "dirty",
-			label: changes.files > 0 ? `●${changes.files}` : "●",
-		});
-	if (changes.ahead > 0)
-		facts.push({ tone: "ahead", label: `↑${changes.ahead}` });
-	if (changes.behind > 0)
-		facts.push({ tone: "behind", label: `↓${changes.behind}` });
-	return facts;
-}
-
-function detailLabel(
-	card: DashboardCard,
-	column: DashboardColumnKey,
-): string | undefined {
-	if (column === "waiting")
-		return card.reason === undefined
-			? undefined
-			: (WAIT_REASON_LABELS[card.reason] ?? COLUMN_COPY.waiting.label);
-	if (column === "finished") {
-		if (card.outcome !== undefined) return OUTCOME_LABELS[card.outcome];
-		if (card.detail?.kind === "response") return "마지막 응답";
-	}
-	return undefined;
-}
-
-// What the lead session waits on, runs, or answered last. The inner paragraph
-// is clamped in CSS so a long excerpt never makes the card taller than its
-// budget; the outer box carries the padding, which a clamp would not clip.
-function CardDetail({
-	card,
-	column,
-}: {
-	readonly card: DashboardCard;
-	readonly column: DashboardColumnKey;
-}) {
-	const label = detailLabel(card, column);
-	if (label === undefined && card.detail === undefined) return null;
-	return (
-		<div
-			className="dashboard-card-detail"
-			data-state={column}
-			data-kind={card.detail?.kind}
-			data-outcome={card.outcome}
-		>
-			<p className="dashboard-card-detail-text">
-				{label === undefined ? null : (
-					<span className="dashboard-card-label">{label}</span>
-				)}
-				{card.detail?.text}
-			</p>
-		</div>
-	);
-}
-
-function Card({
-	card,
-	column,
-	nowSeconds,
-}: {
-	readonly card: DashboardCard;
-	readonly column: DashboardColumnKey;
-	readonly nowSeconds: number;
-}) {
-	const where = [card.repo, card.branch]
-		.filter((part) => part !== undefined && part !== "")
-		.join(" · ");
-	const facts = changeFacts(card.changes);
-	return (
-		<article className="dashboard-card" data-state={column}>
-			<div className="dashboard-card-head">
-				<span className="dashboard-card-task">{card.task}</span>
-				<span className="dashboard-card-time">
-					{formatRelativeTime(card.since, nowSeconds)}
-				</span>
-			</div>
-			{card.prompt === undefined ? null : (
-				<p className="dashboard-card-prompt">{card.prompt}</p>
-			)}
-			<CardDetail card={card} column={column} />
-			<div className="dashboard-card-meta">
-				{card.agent === undefined ? null : (
-					<span className="dashboard-card-agent">{card.agent}</span>
-				)}
-				{where === "" ? null : (
-					<span className="dashboard-card-where">{where}</span>
-				)}
-				{facts.length === 0 ? null : (
-					<span className="dashboard-card-changes">
-						{facts.map((fact) => (
-							<span data-tone={fact.tone} key={fact.tone}>
-								{fact.label}
-							</span>
-						))}
-					</span>
-				)}
-				{card.notifications > 0 ? (
-					<span className="dashboard-card-notify">
-						알림 {card.notifications}
-					</span>
-				) : null}
-			</div>
-		</article>
-	);
-}
-
 type DashboardProps = {
 	readonly model: DashboardModel;
 	readonly now: Date;
@@ -186,7 +72,6 @@ export function Dashboard({
 	lockAvailable,
 	preview = false,
 }: DashboardProps) {
-	const nowSeconds = Math.floor(now.getTime() / 1000);
 	return (
 		<main className="dashboard" data-font={font} data-theme={theme}>
 			<header className="dashboard-top">
@@ -205,7 +90,11 @@ export function Dashboard({
 					</div>
 				</div>
 				<dl className="dashboard-counts">
-					{DASHBOARD_COLUMNS.map((key) => (
+					<div className="dashboard-count" data-state="active">
+						<dt className="dashboard-count-label">활성 세션</dt>
+						<dd className="dashboard-count-value">{model.active}</dd>
+					</div>
+					{COUNT_ORDER.map((key) => (
 						<div className="dashboard-count" data-state={key} key={key}>
 							<dt className="dashboard-count-label">{COUNT_LABELS[key]}</dt>
 							<dd className="dashboard-count-value">{model.counts[key]}</dd>
@@ -213,43 +102,10 @@ export function Dashboard({
 					))}
 				</dl>
 			</header>
-			<section aria-label="진행 중인 작업" className="dashboard-board">
-				{model.columns.map((column) => (
-					<section
-						aria-label={COLUMN_COPY[column.key].label}
-						className="dashboard-column"
-						data-state={column.key}
-						key={column.key}
-					>
-						<h2 className="dashboard-column-head">
-							<i
-								aria-hidden="true"
-								className="dashboard-dot"
-								data-state={column.key}
-							/>
-							{COLUMN_COPY[column.key].label}
-							<span className="dashboard-column-code">
-								{COLUMN_COPY[column.key].code}
-							</span>
-						</h2>
-						{column.cards.length === 0 ? (
-							<p className="dashboard-empty">없음</p>
-						) : (
-							column.cards.map((card) => (
-								<Card
-									card={card}
-									column={column.key}
-									key={card.key}
-									nowSeconds={nowSeconds}
-								/>
-							))
-						)}
-						{column.more > 0 ? (
-							<p className="dashboard-more">+{column.more} more</p>
-						) : null}
-					</section>
-				))}
-			</section>
+			<DashboardTimeline
+				model={model.timeline}
+				now={Math.floor(now.getTime() / 1000)}
+			/>
 		</main>
 	);
 }

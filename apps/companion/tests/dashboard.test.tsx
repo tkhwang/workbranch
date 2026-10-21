@@ -1,98 +1,93 @@
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import type {
-	DashboardCard,
-	DashboardModel,
-} from "../src/application/dashboard";
+import type { DashboardModel } from "../src/application/dashboard";
 import { Dashboard } from "../src/ui/Dashboard";
+import {
+	formatClock,
+	formatElapsed,
+	repoTone,
+} from "../src/ui/DashboardTimeline";
 import { SegmentClock, segmentsFor } from "../src/ui/SegmentClock";
 
 // 2026-10-16 (Fri) 09:05:30 local time.
 const NOW = new Date(2026, 9, 16, 9, 5, 30);
 const NOW_SECONDS = Math.floor(NOW.getTime() / 1000);
-
-const CLEAN = { dirty: false, files: 0, ahead: 0, behind: 0 };
-
-function card(
-	fields: Partial<DashboardCard> & { readonly task: string },
-): DashboardCard {
-	return {
-		key: `/work:${fields.task}`,
-		repo: "workbranch",
-		branch: `feat/${fields.task}`,
-		agent: "claude",
-		since: NOW_SECONDS - 60,
-		reason: undefined,
-		prompt: undefined,
-		detail: undefined,
-		outcome: undefined,
-		changes: CLEAN,
-		notifications: 0,
-		...fields,
-	};
-}
+const HOUR = 3600;
 
 const MODEL: DashboardModel = {
 	counts: { waiting: 1, running: 6, finished: 0 },
-	columns: [
-		{
-			key: "waiting",
-			count: 1,
-			more: 0,
-			cards: [
-				card({
-					task: "fix-sync",
-					branch: "fix/sync",
-					agent: "codex",
-					since: NOW_SECONDS - 6 * 60,
-					reason: "permission",
-					prompt: "retry sync with backoff",
-					detail: { kind: "activity", text: "Bash: git push origin fix/sync" },
-					changes: { dirty: true, files: 2, ahead: 3, behind: 0 },
-					notifications: 1,
-				}),
-			],
-		},
-		{
-			key: "running",
-			count: 6,
-			more: 2,
-			cards: ["a", "b", "c", "d"].map((name) =>
-				card({
-					task: `task-${name}`,
-					since: NOW_SECONDS - 12 * 60,
-					prompt: `work on ${name}`,
-					detail: { kind: "activity", text: `Edit: src/${name}.ts` },
-				}),
-			),
-		},
-		{ key: "finished", count: 0, more: 0, cards: [] },
-	],
+	active: 7,
+	timeline: {
+		start: NOW_SECONDS - 3 * HOUR,
+		end: NOW_SECONDS,
+		more: 2,
+		logged: true,
+		totals: { running: 3720, waiting: 960, finished: 0 },
+		rows: [
+			{
+				key: "/work:fix-sync",
+				title: "fix/sync",
+				repo: "workbranch",
+				moreRepos: 0,
+				agent: "codex",
+				state: "waiting",
+				since: NOW_SECONDS - 6 * 60,
+				segments: [
+					{
+						state: "running",
+						start: NOW_SECONDS - HOUR,
+						end: NOW_SECONDS - 1800,
+					},
+					{
+						state: "waiting",
+						start: NOW_SECONDS - 1800,
+						end: NOW_SECONDS - 1200,
+					},
+					{
+						state: "running",
+						start: NOW_SECONDS - 1200,
+						end: NOW_SECONDS - 360,
+					},
+					{ state: "waiting", start: NOW_SECONDS - 360, end: NOW_SECONDS },
+				],
+				turnEnds: [],
+				totals: { running: 3720, waiting: 960, finished: 0 },
+			},
+			{
+				key: "/work:release",
+				title: "release/0.9",
+				repo: "backend",
+				moreRepos: 1,
+				agent: "claude",
+				state: "finished",
+				since: NOW_SECONDS - 1500,
+				segments: [
+					{
+						state: "running",
+						start: NOW_SECONDS - 1.5 * HOUR,
+						end: NOW_SECONDS - 1500,
+					},
+					{ state: "finished", start: NOW_SECONDS - 1500, end: NOW_SECONDS },
+				],
+				turnEnds: [{ at: NOW_SECONDS - 1500, error: true }],
+				totals: undefined,
+			},
+		],
+	},
 };
 
-const FINISHED_MODEL: DashboardModel = {
+const QUIET_MODEL: DashboardModel = {
 	counts: { waiting: 0, running: 0, finished: 2 },
-	columns: [
-		{ key: "waiting", count: 0, more: 0, cards: [] },
-		{ key: "running", count: 0, more: 0, cards: [] },
-		{
-			key: "finished",
-			count: 2,
-			more: 0,
-			cards: [
-				card({
-					task: "release-notes",
-					detail: { kind: "response", text: "Release notes are ready." },
-				}),
-				card({
-					task: "hook-timeout",
-					detail: { kind: "response", text: "stop_after_timeout failed." },
-					outcome: "error",
-				}),
-			],
-		},
-	],
+	active: 2,
+	timeline: {
+		start: NOW_SECONDS - 3 * HOUR,
+		end: NOW_SECONDS,
+		more: 0,
+		logged: false,
+		totals: undefined,
+		rows: [],
+	},
 };
 
 function render(lockAvailable = true, model = MODEL): string {
@@ -113,6 +108,12 @@ function css(): string {
 	);
 }
 
+/** The markup of the row whose title is `title`. */
+function rowOf(html: string, title: string): string {
+	const at = html.indexOf(`>${title}<`);
+	return html.slice(html.lastIndexOf("<li", at), html.indexOf("</li>", at));
+}
+
 describe("SegmentClock", () => {
 	it("lights the classic segments for each digit", () => {
 		expect(segmentsFor("8")).toEqual(["a", "b", "c", "d", "e", "f", "g"]);
@@ -125,6 +126,23 @@ describe("SegmentClock", () => {
 		expect(html).toContain('role="img"');
 		expect(html).toContain('aria-label="09:05"');
 		expect(html.match(/class="segment-digit"/g)).toHaveLength(4);
+	});
+
+	it("draws pointed seven-segment hexagons, lit per digit", () => {
+		// 09:05 lights 6 + 6 + 6 + 5 segments of the 28 drawn.
+		const html = renderToStaticMarkup(<SegmentClock now={NOW} />);
+		expect(html.match(/<polygon /g)).toHaveLength(28);
+		expect(html).not.toContain("<rect");
+		expect(html.match(/<polygon [^>]*data-on="true"/g)).toHaveLength(23);
+		for (const polygon of html.match(/points="[^"]+"/g) ?? []) {
+			expect(polygon.split(" ")).toHaveLength(6);
+		}
+	});
+
+	it("sizes the clock smaller and slants it like a classic display", () => {
+		expect(css()).toMatch(
+			/\.segment-clock\s*\{[^}]*height:\s*8vh;[^}]*transform:\s*skewX\(-6deg\)/s,
+		);
 	});
 });
 
@@ -167,84 +185,116 @@ describe("Dashboard", () => {
 		);
 	});
 
-	it("lays out the three board columns with the board's names", () => {
+	it("leads with the active total, then running, waiting and finished", () => {
 		const html = render();
-		for (const label of ["내 응답 대기", "실행 중", "턴 종료 · 검토"]) {
-			expect(html).toContain(label);
-		}
-		expect(html.match(/class="dashboard-column"/g)).toHaveLength(3);
+		const counts = html.slice(
+			html.indexOf('class="dashboard-counts"'),
+			html.indexOf("</dl>"),
+		);
+		expect(counts.match(/data-state="(\w+)"/g)).toEqual([
+			'data-state="active"',
+			'data-state="running"',
+			'data-state="waiting"',
+			'data-state="finished"',
+		]);
+		expect(counts).toMatch(
+			/data-state="active"[^>]*>[\s\S]*?활성 세션[\s\S]*?class="dashboard-count-value">7</,
+		);
+		expect(render(true, QUIET_MODEL)).toMatch(
+			/data-state="active"[^>]*>[\s\S]*?class="dashboard-count-value">2</,
+		);
 	});
 
-	it("describes each card by task, agent, repo, branch and time in state", () => {
+	it("draws a row per live task: agent, worktree branch, state with its time, repo", () => {
+		const row = rowOf(render(), "fix/sync");
+		expect(row).toContain('data-provider="codex"');
+		expect(row).toContain('aria-label="Codex"');
+		expect(row).toContain("내 응답 대기 6m");
+		expect(row).toContain(
+			`class="timeline-repo-name" data-tone="${repoTone("workbranch")}">workbranch<`,
+		);
+		expect(row).not.toContain("timeline-repo-more");
+		const release = rowOf(render(), "release/0.9");
+		expect(release).toContain(`data-tone="${repoTone("backend")}">backend<`);
+		expect(release).toMatch(/class="timeline-repo-more">\s*\+1</);
+	});
+
+	it("places each span by time within the last three hours", () => {
+		const row = rowOf(render(), "fix/sync");
+		expect(row).toMatch(
+			/data-state="running" style="left:66\.667%;width:16\.667%"/,
+		);
+	});
+
+	it("labels a long waiting block with its duration, not a short one", () => {
+		const row = rowOf(render(), "fix/sync");
+		expect(row).toMatch(/data-state="waiting"[^>]*>10m</);
+		expect(row).toMatch(
+			/data-state="waiting" style="left:96\.667%[^"]*"><\/span>/,
+		);
+	});
+
+	it("marks turn ends, crossing out a failed one", () => {
+		const row = rowOf(render(), "release/0.9");
+		expect(row).toMatch(
+			/class="timeline-end" data-error="true"[^>]*><svg[^>]*class="timeline-error-mark"/,
+		);
+	});
+
+	it("fills the time columns in the header's flow order, as h:mm", () => {
+		const cells = rowOf(render(), "fix/sync").match(
+			/class="timeline-cell"[^>]*data-state="(\w+)"[^>]*>([^<]*)</g,
+		);
+		expect(
+			cells?.map((cell) =>
+				cell.replace(/.*data-state="(\w+)".*>([^<]*)<$/, "$1 $2"),
+			),
+		).toEqual(["running 1:02", "waiting 0:16", "finished –"]);
+		expect(rowOf(render(), "release/0.9").match(/>–</g)).toHaveLength(3);
+	});
+
+	it("heads the time columns with the session totals and shows the legend", () => {
 		const html = render();
-		expect(html).toContain("fix-sync");
-		expect(html).toContain("codex");
-		expect(html).toContain("workbranch · fix/sync");
-		expect(html).toContain("6m");
-		expect(html).toContain("권한 승인 대기");
-		expect(html).toContain("12m");
+		expect(html).toContain("세션 전체");
+		expect(html).toMatch(/data-state="running"><dt>실행<\/dt><dd>1:02<\/dd>/);
+		expect(html).toMatch(/data-state="waiting"><dt>대기<\/dt><dd>0:16<\/dd>/);
+		for (const key of [
+			"실행 중",
+			"내 응답 대기",
+			"턴 종료",
+			"검토 대기",
+			"오류로 끝남",
+		])
+			expect(html.slice(html.indexOf("timeline-legend"))).toContain(key);
 	});
 
-	it("puts the turn's prompt on each card", () => {
-		const html = render();
-		expect(html).toMatch(
-			/class="dashboard-card-prompt">retry sync with backoff</,
-		);
-		expect(html).toContain("work on a");
+	it("says history starts with an updated CLI, and when nothing is live", () => {
+		expect(render()).not.toContain("timeline-note");
+		const quiet = render(true, QUIET_MODEL);
+		expect(quiet).toContain("workbranch CLI");
+		expect(quiet).toContain("진행 중인 작업 없음");
 	});
 
-	it("shows what a waiting card waits on next to the wait reason", () => {
-		const html = render();
-		expect(html).toMatch(
-			/class="dashboard-card-detail" data-state="waiting"[^>]*><p class="dashboard-card-detail-text"><span class="dashboard-card-label">권한 승인 대기<\/span>Bash: git push origin fix\/sync</,
-		);
+	it("folds rows that do not fit into +n more", () => {
+		expect(render()).toContain("+2 more");
+		expect(render(true, QUIET_MODEL)).not.toMatch(/\+\d+ more/);
 	});
 
-	it("shows the tool a running card is using", () => {
-		const html = render();
-		expect(html).toMatch(
-			/class="dashboard-card-detail" data-state="running"[^>]*><p class="dashboard-card-detail-text">Edit: src\/a\.ts</,
-		);
+	it("marks half hours on the axis, leaving room for now", () => {
+		const axis = render().slice(render().indexOf("timeline-axis-track"));
+		for (const label of ["06:30", "07:00", "08:30", "지금"])
+			expect(axis).toContain(label);
+		expect(axis).not.toContain(">09:00<");
 	});
 
-	it("shows a finished turn's last answer, and how it ended when not normally", () => {
-		const html = render(true, FINISHED_MODEL);
-		expect(html).toMatch(
-			/<span class="dashboard-card-label">마지막 응답<\/span>Release notes are ready\./,
+	it("draws running as a line and waiting as a taller block", () => {
+		const styles = css();
+		expect(styles).toMatch(
+			/\.timeline-segment\[data-state="running"\]\s*\{[^}]*height:\s*1vh/,
 		);
-		expect(html).toMatch(
-			/data-outcome="error"[^>]*><p class="dashboard-card-detail-text"><span class="dashboard-card-label">오류로 종료<\/span>stop_after_timeout failed\./,
+		expect(styles).toMatch(
+			/\.timeline-segment\[data-state="waiting"\]\s*\{[^}]*height:\s*3vh/,
 		);
-	});
-
-	it("shows repo changes and notifications, and nothing for a clean repo", () => {
-		const html = render();
-		expect(html).toContain(">●2<");
-		expect(html).toContain(">↑3<");
-		expect(html).toContain("알림 1");
-		expect(html).not.toContain("CLEAN");
-		// The running cards are clean: no change facts at all.
-		expect(html.match(/class="dashboard-card-changes"/g)).toHaveLength(1);
-	});
-
-	it("caps a card's height: one prompt line and clamped detail lines", () => {
-		const style = css();
-		expect(style).toMatch(
-			/\.dashboard-card-prompt\s*\{[^}]*white-space:\s*nowrap/,
-		);
-		expect(style).toMatch(
-			/\.dashboard-card-detail-text\s*\{[^}]*-webkit-line-clamp:\s*2/,
-		);
-		expect(style).toMatch(
-			/\.dashboard-card-detail\[data-state="running"\] \.dashboard-card-detail-text\s*\{[^}]*-webkit-line-clamp:\s*1/,
-		);
-	});
-
-	it("folds what does not fit into +n more and marks empty columns", () => {
-		const html = render();
-		expect(html).toContain("+2 more");
-		expect(html).toContain("없음");
-		expect(html).not.toContain("overflow-y: auto");
 	});
 
 	it("is view-only: no buttons, links or inputs", () => {
@@ -254,5 +304,29 @@ describe("Dashboard", () => {
 
 	it("never scrolls the page", () => {
 		expect(css()).toMatch(/\.dashboard\s*\{[^}]*overflow:\s*hidden/);
+	});
+});
+
+describe("timeline formats", () => {
+	it("gives each repo one of four tints, the same one every time", () => {
+		const names = ["workbranch", "backend", "frontend", "homebrew-tap", "docs"];
+		for (const name of names) {
+			expect(repoTone(name)).toBe(repoTone(name));
+			expect([1, 2, 3, 4]).toContain(repoTone(name));
+		}
+		expect(new Set(names.map(repoTone)).size).toBeGreaterThan(1);
+	});
+
+	it("writes h:mm for the time columns, a dash for none", () => {
+		expect(formatClock(undefined)).toBe("–");
+		expect(formatClock(59)).toBe("–");
+		expect(formatClock(60)).toBe("0:01");
+		expect(formatClock(3 * HOUR + 125)).toBe("3:02");
+	});
+
+	it("writes minutes, then hours and minutes, for time in state", () => {
+		expect(formatElapsed(30)).toBe("0m");
+		expect(formatElapsed(12 * 60)).toBe("12m");
+		expect(formatElapsed(HOUR + 120)).toBe("1h 02m");
 	});
 });

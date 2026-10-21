@@ -89,6 +89,60 @@
           "stateChangedAt": {
             "type": "integer",
             "minimum": 0
+          },
+          "transitions": {
+            "description": "Optional. The last 24 hours of state changes, led by the change in force at their start; at most 500.",
+            "type": "array",
+            "maxItems": 500,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "state",
+                "at"
+              ],
+              "properties": {
+                "state": {
+                  "enum": [
+                    "running",
+                    "waiting",
+                    "finished",
+                    "idle"
+                  ]
+                },
+                "at": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "outcome": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "totals": {
+            "description": "Optional. Seconds spent per state across the retained transition log.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "running",
+              "waiting",
+              "finished"
+            ],
+            "properties": {
+              "running": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "waiting": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "finished": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
           }
         }
       }
