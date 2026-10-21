@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.38.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.37.0...workbranch-companion-v2.38.0) (2026-10-21)
+
+
+### Features
+
+* **runtime:** 재생성된 작업 공간이 이전 타임라인을 상속받지 않도록 수정하기 ([16f53e2](https://github.com/tkhwang/workbranch/commit/16f53e27cb82d7ac2fac8ac11c5ff4085b979ed0))
+* **ui:** update dashboard UI ([4e684d4](https://github.com/tkhwang/workbranch/commit/4e684d40e6ecefaa96867f1a2e32e2e888f611c7))
+
 ## [2.37.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.36.0...workbranch-companion-v2.37.0) (2026-10-20)
 
 
