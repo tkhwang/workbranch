@@ -42,6 +42,7 @@ const CUSTOM_MENU_BAR: MenuBarConfig = {
 
 const CUSTOM_SCREENSAVER: ScreensaverConfig = {
 	enabled: true,
+	showMessages: true,
 };
 
 const CUSTOM_IDE_WINDOW: IdeWindowConfig = {
@@ -370,7 +371,10 @@ describe("companion preferences", () => {
 
 describe("screensaver preference", () => {
 	it("defaults to off", () => {
-		expect(DEFAULT_SCREENSAVER).toEqual({ enabled: false });
+		expect(DEFAULT_SCREENSAVER).toEqual({
+			enabled: false,
+			showMessages: false,
+		});
 		expect(DEFAULT_COMPANION_PREFERENCES.screensaver).toEqual(
 			DEFAULT_SCREENSAVER,
 		);
@@ -392,18 +396,32 @@ describe("screensaver preference", () => {
 
 	it("keeps the switch and drops the idle minutes of older stores", () => {
 		expect(
-			sanitizeScreensaverConfig({ enabled: true, idleMinutes: 12 }),
-		).toEqual({ config: { enabled: true }, sanitized: true });
+			sanitizeScreensaverConfig({
+				enabled: true,
+				showMessages: false,
+				idleMinutes: 12,
+			}),
+		).toEqual({
+			config: { enabled: true, showMessages: false },
+			sanitized: true,
+		});
+	});
+
+	it("hides messages on stores written before the switch existed", () => {
+		expect(sanitizeScreensaverConfig({ enabled: true })).toEqual({
+			config: { enabled: true, showMessages: false },
+			sanitized: true,
+		});
 	});
 
 	it("falls back to off for an unusable switch", () => {
-		expect(sanitizeScreensaverConfig({ enabled: "yes" })).toEqual({
-			config: { enabled: false },
+		expect(
+			sanitizeScreensaverConfig({ enabled: "yes", showMessages: 1 }),
+		).toEqual({
+			config: { enabled: false, showMessages: false },
 			sanitized: true,
 		});
-		expect(sanitizeScreensaverConfig("on").config).toEqual({
-			enabled: false,
-		});
+		expect(sanitizeScreensaverConfig("on").config).toEqual(DEFAULT_SCREENSAVER);
 	});
 
 	it("compares configs by value", () => {
@@ -413,6 +431,12 @@ describe("screensaver preference", () => {
 		expect(sameScreensaverConfig(CUSTOM_SCREENSAVER, DEFAULT_SCREENSAVER)).toBe(
 			false,
 		);
+		expect(
+			sameScreensaverConfig(CUSTOM_SCREENSAVER, {
+				...CUSTOM_SCREENSAVER,
+				showMessages: false,
+			}),
+		).toBe(false);
 	});
 });
 

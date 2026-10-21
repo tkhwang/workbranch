@@ -16,12 +16,17 @@ export type DashboardModel = {
 	readonly timeline: TimelineModel;
 };
 
-/** `now` is epoch seconds; `maxRows` caps the timeline, the rest is "+n". */
+/**
+ * `now` is epoch seconds; `maxRows` caps the timeline, the rest is "+n".
+ * Rows carry their messages only with `showMessages`, so no request or reply
+ * text reaches the lock screen's page unless Settings asks for it.
+ */
 export function buildDashboardModel(
 	state: GlobalState,
 	sessions: readonly AgentSession[],
 	now: number,
 	maxRows: number,
+	showMessages = false,
 ): DashboardModel {
 	const { stageGroups } = buildMainViewModel(state, sessions);
 	const groups = DASHBOARD_COLUMNS.map((key) => ({
@@ -36,6 +41,14 @@ export function buildDashboardModel(
 			finished: finished ?? 0,
 		},
 		active: groups.reduce((sum, group) => sum + group.rows.length, 0),
-		timeline: buildTimeline(groups, now, maxRows),
+		timeline: withMessages(buildTimeline(groups, now, maxRows), showMessages),
+	};
+}
+
+function withMessages(timeline: TimelineModel, show: boolean): TimelineModel {
+	if (show) return timeline;
+	return {
+		...timeline,
+		rows: timeline.rows.map((row) => ({ ...row, messages: [] })),
 	};
 }

@@ -4,10 +4,11 @@ import {
 	buildTimeline,
 	buildTimelineRow,
 	mergeIntervals,
+	recentMessages,
 	sessionIntervals,
 	turnEnds,
 } from "../src/application/timeline";
-import type { AgentSession } from "../src/domain/model";
+import type { AgentSession, Repo } from "../src/domain/model";
 
 const NOW = 10_000;
 
@@ -309,5 +310,124 @@ describe("turn outcomes", () => {
 				{ state: "finished", start: 40, end: 100, outcome: "tool-error" },
 			]),
 		).toEqual([{ at: 40, error: false }]);
+	});
+});
+
+describe("recentMessages", () => {
+	function repo(name: string, recentCommits: Repo["recentCommits"]): Repo {
+		return {
+			name,
+			branch: "feat/x",
+			dirty: false,
+			activityAvailable: true,
+			ahead: recentCommits.length,
+			behind: 0,
+			changedFiles: 0,
+			lastCommitSubject: recentCommits[0]?.subject ?? "",
+			lastCommitAt: recentCommits[0]?.at ?? 0,
+			recentCommits,
+		};
+	}
+
+	function withRepos(base: MainTaskRow, repos: readonly Repo[]): MainTaskRow {
+		return { ...base, repos };
+	}
+
+	it("merges every session's requests and replies with the commits, newest first", () => {
+		const r = withRepos(
+			row([
+				session({
+					messages: [
+						{ kind: "prompt", text: "add the chart", at: 100 },
+						{ kind: "response", text: "Chart added.", at: 400 },
+					],
+				}),
+				session({
+					sessionId: "sub",
+					messages: [{ kind: "prompt", text: "check the axis", at: 300 }],
+				}),
+			]),
+			[repo("app", [{ subject: "feat: chart", at: 350 }])],
+		);
+		expect(recentMessages(r)).toEqual([
+			{ kind: "response", text: "Chart added.", at: 400 },
+			{ kind: "commit", text: "feat: chart", at: 350 },
+			{ kind: "prompt", text: "check the axis", at: 300 },
+		]);
+	});
+
+	it("lists a commit made in several repos once and skips empty text", () => {
+		const commit = { subject: "chore: bump", at: 50 };
+		const r = withRepos(
+			row([session({ messages: [{ kind: "prompt", text: "", at: 60 }] })]),
+			[repo("app", [commit]), repo("api", [commit])],
+		);
+		expect(recentMessages(r)).toEqual([
+			{ kind: "commit", text: "chore: bump", at: 50 },
+		]);
+	});
+
+	it("is empty when nothing was asked or committed", () => {
+		expect(recentMessages(row([session()]))).toEqual([]);
+	});
+
+	it("falls back to the latest request and reply of an older collector", () => {
+		const finished = session({
+			state: "finished",
+			prompt: "add the chart",
+			response: "Chart added.",
+			stateChangedAt: 5_000,
+			transitions: [
+				{ state: "finished", at: 1_000, outcome: "turn-ended" },
+				{ state: "running", at: 4_000 },
+				{ state: "waiting", at: 4_200 },
+				{ state: "running", at: 4_300 },
+				{ state: "finished", at: 5_000, outcome: "turn-ended" },
+			],
+		});
+		expect(recentMessages(row([finished]))).toEqual([
+			{ kind: "response", text: "Chart added.", at: 5_000 },
+			{ kind: "prompt", text: "add the chart", at: 4_000 },
+		]);
+		// Running: no reply yet, the request dated from the turn's start.
+		const running = session({
+			state: "running",
+			prompt: "go",
+			response: "stale reply",
+			stateChangedAt: 7_000,
+		});
+		expect(recentMessages(row([running]))).toEqual([
+			{ kind: "prompt", text: "go", at: 7_000 },
+		]);
+		// Without a log, the request still comes before its reply.
+		const unlogged = session({
+			state: "finished",
+			prompt: "go",
+			response: "done",
+			stateChangedAt: 8_000,
+			updatedAt: 9_000,
+		});
+		expect(recentMessages(row([unlogged])).map((m) => m.at)).toEqual([
+			8_000, 7_999,
+		]);
+	});
+
+	it("prefers the collector's messages when it keeps them", () => {
+		const s = session({
+			prompt: "latest",
+			messages: [{ kind: "prompt", text: "latest", at: 3_000 }],
+		});
+		expect(recentMessages(row([s]))).toEqual([
+			{ kind: "prompt", text: "latest", at: 3_000 },
+		]);
+	});
+
+	it("rides on each timeline row", () => {
+		const r = row([
+			session({ messages: [{ kind: "prompt", text: "go", at: 9_000 }] }),
+		]);
+		expect(buildTimelineRow(r, "running", NOW).messages).toEqual([
+			{ kind: "prompt", text: "go", at: 9_000 },
+		]);
 	});
 });

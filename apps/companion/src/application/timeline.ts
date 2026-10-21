@@ -9,6 +9,8 @@ import type { MainTaskRow } from "./state";
 
 /** How far back the timeline reaches. */
 export const TIMELINE_WINDOW_SECONDS = 3 * 60 * 60;
+/** Recent messages listed under a row. */
+export const TIMELINE_MESSAGES = 3;
 
 export type TimelineState = "running" | "waiting" | "finished";
 export type TimelineTotals = WorkbranchRuntimeTotals;
@@ -26,6 +28,14 @@ export type TimelineTurnEnd = {
 	readonly error: boolean;
 };
 
+/** A request or reply from one of the task's sessions, or a commit. */
+export type TimelineMessage = {
+	readonly kind: "prompt" | "response" | "commit";
+	readonly text: string;
+	/** Epoch seconds. */
+	readonly at: number;
+};
+
 export type TimelineRow = {
 	readonly key: string;
 	/** The worktree branch (the first repo's), else the task name. */
@@ -41,6 +51,8 @@ export type TimelineRow = {
 	readonly turnEnds: readonly TimelineTurnEnd[];
 	/** Session time per state across the retained log; unknown without one. */
 	readonly totals: TimelineTotals | undefined;
+	/** The task's newest messages across its sessions and repos, newest first. */
+	readonly messages: readonly TimelineMessage[];
 };
 
 export type TimelineModel = {
@@ -201,6 +213,84 @@ function rowTitle(row: MainTaskRow): string {
 	return row.repos[0]?.branch || row.task.name;
 }
 
+/** When the session's current turn began: its last start from rest. */
+function turnStart(session: AgentSession): number {
+	const log = session.transitions ?? [];
+	for (let i = log.length - 1; i >= 0; i -= 1) {
+		const change = log[i];
+		const before = log[i - 1]?.state;
+		if (
+			change?.state === "running" &&
+			(before === undefined || before === "finished" || before === "idle")
+		)
+			return change.at;
+	}
+	return session.state === "running"
+		? session.stateChangedAt
+		: session.updatedAt;
+}
+
+/**
+ * A session from before the collector kept messages, or one that has sent
+ * nothing since, still holds its latest request and reply: those stand in.
+ * The reply is dated when the turn ended; the request when the turn began,
+ * and never after its reply.
+ */
+export function sessionMessages(
+	session: AgentSession,
+): readonly TimelineMessage[] {
+	if (session.messages !== undefined && session.messages.length > 0)
+		return session.messages;
+	const replied = session.state === "finished" && session.response !== "";
+	const repliedAt = session.stateChangedAt;
+	const askedAt = Math.min(
+		turnStart(session),
+		replied ? repliedAt - 1 : Number.POSITIVE_INFINITY,
+	);
+	return [
+		...(session.prompt === ""
+			? []
+			: [{ kind: "prompt" as const, text: session.prompt, at: askedAt }]),
+		...(replied
+			? [{ kind: "response" as const, text: session.response, at: repliedAt }]
+			: []),
+	];
+}
+
+/**
+ * The task's last few requests, replies and commits, newest first. Every
+ * session and repo of the task contributes; a commit made in several repos
+ * under the same subject at the same time is listed once.
+ */
+export function recentMessages(
+	row: MainTaskRow,
+	limit = TIMELINE_MESSAGES,
+): readonly TimelineMessage[] {
+	const all: TimelineMessage[] = [
+		...row.sessions.flatMap(sessionMessages),
+		...row.repos.flatMap((repo) =>
+			repo.recentCommits.map(
+				(commit): TimelineMessage => ({
+					kind: "commit",
+					text: commit.subject,
+					at: commit.at,
+				}),
+			),
+		),
+	];
+	const seen = new Set<string>();
+	return all
+		.filter((message) => message.text !== "")
+		.sort((a, b) => b.at - a.at)
+		.filter((message) => {
+			const key = `${message.kind}\u0000${message.at}\u0000${message.text}`;
+			if (seen.has(key)) return false;
+			seen.add(key);
+			return true;
+		})
+		.slice(0, limit);
+}
+
 export function buildTimelineRow(
 	row: MainTaskRow,
 	state: TimelineState,
@@ -222,6 +312,7 @@ export function buildTimelineRow(
 		segments,
 		turnEnds: turnEnds(segments, intervals),
 		totals: sumTotals(row.sessions.map((s) => s.totals)),
+		messages: recentMessages(row),
 	};
 }
 

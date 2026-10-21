@@ -8,7 +8,11 @@ export type Repo = {
 	readonly changedFiles: number;
 	readonly lastCommitSubject: string;
 	readonly lastCommitAt: number;
+	/** The task's own commits, newest first; empty from older CLIs. */
+	readonly recentCommits: readonly Commit[];
 };
+
+export type Commit = import("@workbranch/contract").WorkbranchCommit;
 
 export type Task = {
 	readonly name: string;

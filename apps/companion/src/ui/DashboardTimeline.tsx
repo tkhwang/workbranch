@@ -3,6 +3,7 @@
 // end a dot (a crossed one when it failed), and review waiting a dotted line.
 // Positions are percentages of the window, so the strip scales with the screen.
 import type {
+	TimelineMessage,
 	TimelineModel,
 	TimelineRow,
 	TimelineState,
@@ -60,6 +61,54 @@ export function formatElapsed(seconds: number): string {
 	const minutes = Math.max(0, Math.floor(seconds / 60));
 	if (minutes < 60) return `${minutes}m`;
 	return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
+}
+
+const MESSAGE_LABELS: Readonly<Record<TimelineMessage["kind"], string>> = {
+	prompt: "요청",
+	response: "응답",
+	commit: "커밋",
+};
+
+/** How long ago, for a message: "방금", "12분 전", "3시간 전", "2일 전". */
+export function formatAgo(at: number, now: number): string {
+	const minutes = Math.floor(Math.max(0, now - at) / 60);
+	if (minutes < 1) return "방금";
+	if (minutes < 60) return `${minutes}분 전`;
+	const hours = Math.floor(minutes / 60);
+	if (hours < 24) return `${hours}시간 전`;
+	return `${Math.floor(hours / 24)}일 전`;
+}
+
+// Indented under the row's name behind a thin rule, so the details read as
+// belonging to that task. The newest message leads in larger, brighter type.
+function Messages({
+	messages,
+	now,
+}: {
+	readonly messages: readonly TimelineMessage[];
+	readonly now: number;
+}) {
+	if (messages.length === 0)
+		return <p className="timeline-messages-empty">최근 메시지 없음</p>;
+	return (
+		<ol aria-label="최근 메시지" className="timeline-messages">
+			{messages.map((message, index) => (
+				<li
+					className="timeline-message"
+					data-latest={index === 0 ? "true" : undefined}
+					key={`${message.kind}:${message.at}:${message.text}`}
+				>
+					<span className="timeline-message-kind" data-kind={message.kind}>
+						{MESSAGE_LABELS[message.kind]}
+					</span>
+					<span className="timeline-message-text">{message.text}</span>
+					<span className="timeline-message-ago">
+						{formatAgo(message.at, now)}
+					</span>
+				</li>
+			))}
+		</ol>
+	);
 }
 
 function ratio(model: TimelineModel, at: number): number {
@@ -134,10 +183,12 @@ function Row({
 	row,
 	model,
 	now,
+	showMessages,
 }: {
 	readonly row: TimelineRow;
 	readonly model: TimelineModel;
 	readonly now: number;
+	readonly showMessages: boolean;
 }) {
 	return (
 		<li className="timeline-grid timeline-row" data-state={row.state}>
@@ -164,6 +215,7 @@ function Row({
 						</span>
 					)}
 				</span>
+				{showMessages ? <Messages messages={row.messages} now={now} /> : null}
 			</div>
 			<div className="timeline-track">
 				{row.segments.map((segment) => (
@@ -213,14 +265,21 @@ function Row({
 export function DashboardTimeline({
 	model,
 	now,
+	showMessages = false,
 }: {
 	readonly model: TimelineModel;
 	/** Epoch seconds. */
 	readonly now: number;
+	/** Lists each row's recent messages under its name. */
+	readonly showMessages?: boolean;
 }) {
 	const marks = ticks(model);
 	return (
-		<section aria-label="타임라인" className="timeline">
+		<section
+			aria-label="타임라인"
+			className="timeline"
+			data-messages={showMessages ? "true" : undefined}
+		>
 			<div className="timeline-grid timeline-head">
 				<div className="timeline-heading">
 					<h2 className="timeline-title">
@@ -264,7 +323,13 @@ export function DashboardTimeline({
 				) : (
 					<ol className="timeline-rows">
 						{model.rows.map((row) => (
-							<Row key={row.key} model={model} now={now} row={row} />
+							<Row
+								key={row.key}
+								model={model}
+								now={now}
+								row={row}
+								showMessages={showMessages}
+							/>
 						))}
 					</ol>
 				)}

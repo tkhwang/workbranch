@@ -5,14 +5,23 @@
 
 export type ScreensaverConfig = {
 	readonly enabled: boolean;
+	/**
+	 * Whether the dashboard shows each task's last requests, replies and
+	 * commits. Off by default: the dashboard sits over the lock screen, where
+	 * anyone at the desk can read it.
+	 */
+	readonly showMessages: boolean;
 };
 
 export const DEFAULT_SCREENSAVER: ScreensaverConfig = {
 	enabled: false,
+	showMessages: false,
 };
 
+const SCREENSAVER_KEYS: readonly string[] = ["enabled", "showMessages"];
+
 /**
- * An unknown switch falls back to off. Stores from before COMP002 also carry
+ * An unknown switch falls back to its default (off). Stores from before COMP002 also carry
  * `idleMinutes`; it counts as needing a rewrite so the stale key goes away.
  */
 export function sanitizeScreensaverConfig(value: unknown): {
@@ -28,12 +37,17 @@ export function sanitizeScreensaverConfig(value: unknown): {
 			typeof input["enabled"] === "boolean"
 				? input["enabled"]
 				: DEFAULT_SCREENSAVER.enabled,
+		showMessages:
+			typeof input["showMessages"] === "boolean"
+				? input["showMessages"]
+				: DEFAULT_SCREENSAVER.showMessages,
 	};
 	return {
 		config,
 		sanitized:
 			config.enabled !== input["enabled"] ||
-			Object.keys(input).some((key) => key !== "enabled"),
+			config.showMessages !== input["showMessages"] ||
+			Object.keys(input).some((key) => !SCREENSAVER_KEYS.includes(key)),
 	};
 }
 
@@ -41,5 +55,7 @@ export function sameScreensaverConfig(
 	left: ScreensaverConfig,
 	right: ScreensaverConfig,
 ): boolean {
-	return left.enabled === right.enabled;
+	return (
+		left.enabled === right.enabled && left.showMessages === right.showMessages
+	);
 }

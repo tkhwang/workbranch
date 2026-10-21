@@ -98,6 +98,28 @@
         "lastCommitAt": {
           "type": "integer",
           "minimum": 0
+        },
+        "recentCommits": {
+          "description": "The task's own commits (base..HEAD), newest first; at most 3.",
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "subject",
+              "at"
+            ],
+            "properties": {
+              "subject": {
+                "type": "string"
+              },
+              "at": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
         }
       }
     },

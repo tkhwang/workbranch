@@ -82,6 +82,18 @@ last_commit_record() {
   git -C "$path" log -1 --format='%ct%x1f%s' 2>/dev/null
 }
 
+# The task's own commits (base..HEAD), newest first, one "time<US>subject" per line.
+recent_commit_records() {
+  path=$1
+  base_commit=$2
+  limit=$3
+  [ -d "$path" ] || return 1
+  case "$base_commit" in
+    missing|\?|'') return 1 ;;
+  esac
+  git -C "$path" log -n "$limit" --format='%ct%x1f%s' "$base_commit..HEAD" 2>/dev/null
+}
+
 remote_diff_label() {
   path=$1
   branch=$2

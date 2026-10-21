@@ -48,7 +48,15 @@ function isRepo(value: unknown): value is WorkbranchRepo {
 		isOptionalNonNegativeInteger(value["behind"]) &&
 		isOptionalNonNegativeInteger(value["changedFiles"]) &&
 		isOptionalString(value["lastCommitSubject"]) &&
-		isOptionalNonNegativeInteger(value["lastCommitAt"])
+		isOptionalNonNegativeInteger(value["lastCommitAt"]) &&
+		(value["recentCommits"] === undefined ||
+			(Array.isArray(value["recentCommits"]) &&
+				value["recentCommits"].every(
+					(c: unknown) =>
+						isRecord(c) &&
+						isString(c["subject"]) &&
+						isNonNegativeInteger(c["at"]),
+				)))
 	);
 }
 
@@ -162,6 +170,21 @@ function isOptionalTransitions(value: unknown): boolean {
 	);
 }
 
+// Older collectors send no messages.
+function isOptionalMessages(value: unknown): boolean {
+	return (
+		value === undefined ||
+		(Array.isArray(value) &&
+			value.every(
+				(m: unknown) =>
+					isRecord(m) &&
+					(m["kind"] === "prompt" || m["kind"] === "response") &&
+					isString(m["text"]) &&
+					isNonNegativeInteger(m["at"]),
+			))
+	);
+}
+
 function isOptionalTotals(value: unknown): boolean {
 	return (
 		value === undefined ||
@@ -204,7 +227,8 @@ export function parseRuntimeDocument(
 			!isNonNegativeInteger(s["updatedAt"]) ||
 			!isNonNegativeInteger(s["stateChangedAt"]) ||
 			!isOptionalTransitions(s["transitions"]) ||
-			!isOptionalTotals(s["totals"])
+			!isOptionalTotals(s["totals"]) ||
+			!isOptionalMessages(s["messages"])
 		)
 			throw new Error("Invalid runtime session");
 		return s as unknown as import("../domain/model").AgentSession;

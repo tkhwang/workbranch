@@ -176,6 +176,7 @@ main() {
   run_test test_list_shows_conventional_task_folder_and_branch
   run_test test_list_json_shape
   run_test test_list_json_repo_activity_facts
+  run_test test_list_json_recent_commits_are_the_tasks_newest_three
   run_test test_list_json_repo_activity_missing_base_commit_falls_back
   run_test test_list_json_no_color_no_log_noise
   run_test test_list_json_escapes_control_characters

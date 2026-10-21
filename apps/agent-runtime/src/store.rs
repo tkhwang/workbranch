@@ -32,6 +32,10 @@ pub struct Session {
     pub waits: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub completed_tools: Vec<String>,
+    /// The last few requests and replies, newest last, for the dashboard.
+    /// Kept in the session row, so they age out with it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub messages: Vec<Message>,
     /// Snapshot only: the last day of state changes. Never stored in `data`;
     /// the transition log is the record.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -50,6 +54,37 @@ pub struct Transition {
     pub at: u64,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub outcome: String,
+}
+
+/// A request (`prompt`) or the reply that ended a turn (`response`), clipped
+/// and scrubbed like the latest ones.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Message {
+    pub kind: String,
+    pub text: String,
+    pub at: u64,
+}
+
+/// Messages kept per session, newest kept.
+pub const MESSAGE_LIMIT: usize = 3;
+
+/// Adds a message, skipping an empty one or a repeat of the newest.
+pub fn remember(messages: &mut Vec<Message>, kind: &str, text: &str, at: u64) {
+    if text.is_empty()
+        || messages
+            .last()
+            .is_some_and(|m| m.kind == kind && m.text == text)
+    {
+        return;
+    }
+    messages.push(Message {
+        kind: kind.into(),
+        text: text.into(),
+        at,
+    });
+    if messages.len() > MESSAGE_LIMIT {
+        messages.drain(..messages.len() - MESSAGE_LIMIT);
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -145,7 +180,8 @@ pub fn load(
 pub fn save(db: &Connection, s: &Session) -> Result<()> {
     db.execute("INSERT INTO sessions VALUES (?,?,?,?,?,?) ON CONFLICT(workspace,provider,session,agent) DO UPDATE SET data=excluded.data,updated=excluded.updated", params![s.workspace,s.provider,s.session_id,s.agent_id,serde_json::to_string(s)?,i64::try_from(s.updated_at)?])?;
     // Purging is bounded by age and never creates a second history of content:
-    // the transition log holds states and times only.
+    // the transition log holds states and times only, and the few recent
+    // messages live in the session row itself.
     let cutoff = i64::try_from(s.updated_at.saturating_sub(RETENTION_SECS))?;
     db.execute("DELETE FROM sessions WHERE updated < ?", [cutoff])?;
     // A purged session's changes all predate the cutoff; they go with it.

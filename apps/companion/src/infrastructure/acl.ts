@@ -19,6 +19,7 @@ function mapTask(dto: WorkbranchListDocument["tasks"][number]): Task {
 			changedFiles: repo.changedFiles ?? 0,
 			lastCommitSubject: repo.lastCommitSubject ?? "",
 			lastCommitAt: repo.lastCommitAt ?? 0,
+			recentCommits: repo.recentCommits ?? [],
 		})),
 		updatedAt: Math.max(0, ...dto.repos.map((repo) => repo.lastCommitAt ?? 0)),
 	};

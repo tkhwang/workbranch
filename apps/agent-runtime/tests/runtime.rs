@@ -16,13 +16,15 @@ fn correlated_waits_do_not_resume_on_another_tools_completion() {
 }
 
 #[test]
-fn latest_only_and_stale_is_not_idle() {
+fn only_recent_messages_are_kept_and_stale_is_not_idle() {
     let mut db = store::open_memory().unwrap();
-    for prompt in ["old private request", "new request"] {
+    for prompt in ["old private request", "second", "third", "new request"] {
         event::ingest(&mut db,"/p/t","codex",&json!({"session_id":"s","turn_id":"t","hook_event_name":"UserPromptSubmit","prompt":prompt}), 10).unwrap();
     }
     let state = store::snapshot(&db, 911).unwrap();
     assert_eq!(state[0].prompt, "new request");
+    let texts: Vec<_> = state[0].messages.iter().map(|m| m.text.as_str()).collect();
+    assert_eq!(texts, ["second", "third", "new request"]);
     assert_eq!(state[0].state, "running");
     assert_eq!(state[0].observation, "stale");
     assert!(
@@ -543,4 +545,37 @@ fn recreated_workspace_does_not_inherit_the_prior_timeline() {
     let s = &store::snapshot(&db, 400).unwrap()[0];
     assert_eq!(s.transitions, log(&[("running", 300, "")]));
     assert_eq!(s.totals, Some(store::Totals { running: 100, waiting: 0, finished: 0 }));
+}
+
+#[test]
+fn requests_and_replies_are_remembered_newest_last() {
+    let mut db = store::open_memory().unwrap();
+    let send = |db: &mut rusqlite::Connection, payload: serde_json::Value, at| {
+        event::ingest(db, "/p/t", "claude", &payload, at).unwrap();
+    };
+    send(&mut db, json!({"session_id":"s","hook_event_name":"UserPromptSubmit","prompt":"add  the\nchart"}), 10);
+    send(&mut db, json!({"session_id":"s","hook_event_name":"Stop","last_assistant_message":"Chart added."}), 20);
+    // A repeated Stop does not add the same reply twice.
+    send(&mut db, json!({"session_id":"s","hook_event_name":"Stop","last_assistant_message":"Chart added."}), 21);
+    // Credentials are scrubbed exactly as in the latest prompt.
+    send(&mut db, json!({"session_id":"s","hook_event_name":"UserPromptSubmit","prompt":"use token=abc"}), 30);
+    let s = &store::snapshot(&db, 40).unwrap()[0];
+    let got: Vec<_> = s.messages.iter().map(|m| (m.kind.as_str(), m.text.as_str(), m.at)).collect();
+    assert_eq!(
+        got,
+        [("prompt", "add the chart", 10), ("response", "Chart added.", 20), ("prompt", "[sensitive content omitted]", 30)]
+    );
+    let json = serde_json::to_value(s).unwrap();
+    assert_eq!(json["messages"][1], json!({"kind": "response", "text": "Chart added.", "at": 20}));
+}
+
+#[test]
+fn a_long_message_is_clipped_for_the_dashboard() {
+    let mut db = store::open_memory().unwrap();
+    let long = "x".repeat(400);
+    event::ingest(&mut db, "/p/t", "claude", &json!({"session_id":"s","hook_event_name":"UserPromptSubmit","prompt":long}), 10).unwrap();
+    let s = &store::snapshot(&db, 10).unwrap()[0];
+    assert_eq!(s.prompt.chars().count(), 400);
+    assert_eq!(s.messages[0].text.chars().count(), 301);
+    assert!(s.messages[0].text.ends_with('…'));
 }

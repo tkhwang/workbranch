@@ -96,7 +96,7 @@ describe("ScreensaverSettings", () => {
 	it("has no idle-minutes choice: the macOS screen saver decides when", () => {
 		const html = renderToStaticMarkup(
 			<ScreensaverSettings
-				value={{ enabled: true }}
+				value={{ enabled: true, showMessages: false }}
 				onChange={() => undefined}
 				onPreview={() => undefined}
 			/>,
@@ -117,7 +117,32 @@ describe("ScreensaverSettings", () => {
 		findField(element, "screensaver-enabled")?.onChange?.({
 			currentTarget: { checked: true, value: "on" },
 		});
-		expect(changes).toEqual([{ enabled: true }]);
+		expect(changes).toEqual([{ enabled: true, showMessages: false }]);
+	});
+
+	it("keeps messages off the dashboard until asked", () => {
+		const html = renderToStaticMarkup(
+			<ScreensaverSettings
+				value={DEFAULT_SCREENSAVER}
+				onChange={() => undefined}
+				onPreview={() => undefined}
+			/>,
+		);
+		expect(html).toMatch(/id="screensaver-show-messages"(?![^>]*checked)/);
+		expect(html).toContain("anyone at the desk");
+	});
+
+	it("shows recent messages on the dashboard", () => {
+		const changes: ScreensaverConfig[] = [];
+		const element = ScreensaverSettings({
+			value: DEFAULT_SCREENSAVER,
+			onChange: (config) => changes.push(config),
+			onPreview: () => undefined,
+		});
+		findField(element, "screensaver-show-messages")?.onChange?.({
+			currentTarget: { checked: true, value: "on" },
+		});
+		expect(changes).toEqual([{ enabled: false, showMessages: true }]);
 	});
 });
 

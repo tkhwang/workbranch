@@ -500,6 +500,99 @@ body {
 	width: 1px;
 }
 
+/* With messages on, each row lists its task's last three requests, replies
+   and commits under the name, so the label column widens and rows stand
+   taller; four of them fill the space eight plain rows take
+   (DASHBOARD_TIMELINE_ROWS_WITH_MESSAGES). */
+.timeline[data-messages="true"] {
+	--timeline-columns: 4.6vh minmax(0, 36vw) minmax(0, 1fr) repeat(3, 7.6vh);
+}
+
+.timeline[data-messages="true"] .timeline-row {
+	align-items: center;
+	height: 11.4vh;
+}
+
+.timeline[data-messages="true"] .timeline-agent {
+	align-self: start;
+	margin-top: 0.4vh;
+}
+
+.timeline[data-messages="true"] .timeline-label {
+	align-self: stretch;
+	justify-content: center;
+	overflow: hidden;
+}
+
+/* Indented behind a thin rule: the details belong to the name above. */
+.timeline-messages {
+	border-left: 1px solid var(--line);
+	display: flex;
+	flex-direction: column;
+	gap: 0.45vh;
+	list-style: none;
+	margin: 0.5vh 0 0 0.6vh;
+	min-width: 0;
+	padding: 0 0 0 1.6vh;
+}
+
+.timeline-messages-empty {
+	border-left: 1px solid var(--line);
+	color: var(--faint);
+	font-size: clamp(11px, 1.3vh, 18px);
+	margin: 0.5vh 0 0 0.6vh;
+	padding-left: 1.6vh;
+}
+
+.timeline-message {
+	align-items: center;
+	color: var(--faint);
+	display: flex;
+	font-size: clamp(11px, 1.4vh, 19px);
+	gap: 0.9vh;
+	min-width: 0;
+}
+
+.timeline-message[data-latest="true"] {
+	color: var(--dashboard-ink);
+	font-size: clamp(12px, 1.7vh, 23px);
+}
+
+.timeline-message-kind {
+	border: 1px solid currentColor;
+	border-radius: 0.4vh;
+	flex: none;
+	font-size: clamp(9px, 1.05vh, 15px);
+	font-weight: 700;
+	padding: 0.05vh 0.5vh;
+}
+
+.timeline-message-kind[data-kind="prompt"] {
+	color: var(--plan);
+}
+
+.timeline-message-kind[data-kind="response"] {
+	color: var(--runtime-finished);
+}
+
+.timeline-message-kind[data-kind="commit"] {
+	color: var(--review);
+}
+
+.timeline-message-text {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.timeline-message-ago {
+	color: var(--faint);
+	flex: none;
+	font-size: clamp(10px, 1.2vh, 16px);
+	margin-left: auto;
+}
+
 .timeline-track {
 	height: 3vh;
 	position: relative;

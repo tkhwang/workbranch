@@ -38,6 +38,27 @@ export function ScreensaverSettings({
 				/>
 			</SettingsRow>
 			<SettingsRow
+				description={
+					value.showMessages
+						? "On: each task on the dashboard lists its last three requests, replies and commits. Anyone at the desk can read them while the dashboard covers the lock screen."
+						: "Off: the dashboard shows branch and repo names, states and times only, since anyone at the desk can read it."
+				}
+				htmlFor="screensaver-show-messages"
+				title="Show recent messages"
+			>
+				<input
+					aria-checked={value.showMessages}
+					checked={value.showMessages}
+					className="settings-switch"
+					id="screensaver-show-messages"
+					onChange={(event) =>
+						onChange({ ...value, showMessages: event.currentTarget.checked })
+					}
+					role="switch"
+					type="checkbox"
+				/>
+			</SettingsRow>
+			<SettingsRow
 				description="Works while the switch is off, too. The preview ignores input for two seconds, then any input closes it without locking."
 				title="Preview"
 			>

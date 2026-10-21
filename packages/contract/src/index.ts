@@ -7,6 +7,14 @@ export type WorkbranchRepo = {
 	readonly changedFiles?: number;
 	readonly lastCommitSubject?: string;
 	readonly lastCommitAt?: number;
+	/** The task's own commits (base..HEAD), newest first, at most 3. */
+	readonly recentCommits?: readonly WorkbranchCommit[];
+};
+
+export type WorkbranchCommit = {
+	readonly subject: string;
+	/** Epoch seconds. */
+	readonly at: number;
 };
 
 export type WorkbranchTask = {
@@ -67,6 +75,15 @@ export type WorkbranchAgentSession = {
  readonly transitions?: readonly WorkbranchRuntimeTransition[];
  /** Seconds per state over the retained log; absent when nothing is logged. */
  readonly totals?: WorkbranchRuntimeTotals;
+ /** The last few requests and replies, newest last; absent from older collectors. */
+ readonly messages?: readonly WorkbranchRuntimeMessage[];
+};
+export type WorkbranchRuntimeMessage = {
+ readonly kind: "prompt" | "response";
+ /** Clipped and scrubbed like `prompt` and `response`. */
+ readonly text: string;
+ /** Epoch seconds. */
+ readonly at: number;
 };
 export type WorkbranchRuntimeTransition = {
  readonly state: "running" | "waiting" | "finished" | "idle";

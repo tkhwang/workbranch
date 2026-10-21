@@ -2,8 +2,14 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { DashboardModel } from "../src/application/dashboard";
-import { Dashboard } from "../src/ui/Dashboard";
 import {
+	DASHBOARD_TIMELINE_ROWS,
+	DASHBOARD_TIMELINE_ROWS_WITH_MESSAGES,
+	Dashboard,
+	dashboardTimelineRows,
+} from "../src/ui/Dashboard";
+import {
+	formatAgo,
 	formatClock,
 	formatElapsed,
 	repoTone,
@@ -53,6 +59,23 @@ const MODEL: DashboardModel = {
 				],
 				turnEnds: [],
 				totals: { running: 3720, waiting: 960, finished: 0 },
+				messages: [
+					{
+						kind: "response",
+						text: "Tests added; permission needed",
+						at: NOW_SECONDS - 6 * 60,
+					},
+					{
+						kind: "commit",
+						text: "fix(sync): retry on conflict",
+						at: NOW_SECONDS - 50 * 60,
+					},
+					{
+						kind: "prompt",
+						text: "Fix the sync retry",
+						at: NOW_SECONDS - 2 * HOUR,
+					},
+				],
 			},
 			{
 				key: "/work:release",
@@ -72,6 +95,7 @@ const MODEL: DashboardModel = {
 				],
 				turnEnds: [{ at: NOW_SECONDS - 1500, error: true }],
 				totals: undefined,
+				messages: [],
 			},
 		],
 	},
@@ -90,12 +114,17 @@ const QUIET_MODEL: DashboardModel = {
 	},
 };
 
-function render(lockAvailable = true, model = MODEL): string {
+function render(
+	lockAvailable = true,
+	model = MODEL,
+	showMessages = false,
+): string {
 	return renderToStaticMarkup(
 		<Dashboard
 			lockAvailable={lockAvailable}
 			model={model}
 			now={NOW}
+			showMessages={showMessages}
 			theme="claude"
 		/>,
 	);
@@ -328,5 +357,77 @@ describe("timeline formats", () => {
 		expect(formatElapsed(30)).toBe("0m");
 		expect(formatElapsed(12 * 60)).toBe("12m");
 		expect(formatElapsed(HOUR + 120)).toBe("1h 02m");
+	});
+});
+
+describe("recent messages", () => {
+	/** A whole timeline row, its nested message items included. */
+	function rowBlock(html: string, title: string): string {
+		const at = html.indexOf(`>${title}<`);
+		const start = html.lastIndexOf('<li class="timeline-grid timeline-row', at);
+		const next = html.indexOf('<li class="timeline-grid timeline-row', at);
+		return html.slice(start, next === -1 ? undefined : next);
+	}
+
+	it("stay off the dashboard unless Settings turns them on", () => {
+		const html = render();
+		expect(html).not.toContain("timeline-messages");
+		expect(html).not.toContain("Fix the sync retry");
+		expect(html).not.toContain('data-messages="true"');
+	});
+
+	it("list a row's messages newest first, indented under its name", () => {
+		const html = render(true, MODEL, true);
+		expect(html).toContain('data-messages="true"');
+		const row = rowBlock(html, "fix/sync");
+		const texts = [
+			"Tests added; permission needed",
+			"fix(sync): retry on conflict",
+			"Fix the sync retry",
+		].map((text) => row.indexOf(text));
+		expect(texts.every((at) => at > 0)).toBe(true);
+		expect([...texts].sort((a, b) => a - b)).toEqual(texts);
+		expect(row).toContain('data-kind="response"');
+		expect(row).toContain(">응답<");
+		expect(row).toContain(">커밋<");
+		expect(row).toContain(">요청<");
+		expect(row).toContain(">6분 전<");
+		expect(row).toContain(">2시간 전<");
+		expect(row.match(/data-latest="true"/g)).toHaveLength(1);
+		// The messages sit in the label, under the name and status line.
+		expect(row.indexOf("timeline-messages")).toBeGreaterThan(
+			row.indexOf("timeline-meta"),
+		);
+		expect(row.indexOf("timeline-messages")).toBeLessThan(
+			row.indexOf("timeline-track"),
+		);
+	});
+
+	it("say so when a task has none yet", () => {
+		expect(rowBlock(render(true, MODEL, true), "release/0.9")).toContain(
+			"최근 메시지 없음",
+		);
+	});
+
+	it("halve the rows, since each one stands taller", () => {
+		expect(dashboardTimelineRows(false)).toBe(DASHBOARD_TIMELINE_ROWS);
+		expect(dashboardTimelineRows(true)).toBe(
+			DASHBOARD_TIMELINE_ROWS_WITH_MESSAGES,
+		);
+		expect(DASHBOARD_TIMELINE_ROWS_WITH_MESSAGES).toBe(4);
+		const styles = css();
+		expect(styles).toMatch(
+			/\.timeline\[data-messages="true"\] \.timeline-row \{[^}]*height: 11\.4vh/,
+		);
+		expect(styles).toMatch(/\.timeline-messages \{[^}]*border-left/);
+	});
+
+	it("say how long ago in minutes, hours or days", () => {
+		const now = 100_000;
+		expect(formatAgo(now - 20, now)).toBe("방금");
+		expect(formatAgo(now - 12 * 60, now)).toBe("12분 전");
+		expect(formatAgo(now - 3 * HOUR, now)).toBe("3시간 전");
+		expect(formatAgo(now - 50 * HOUR, now)).toBe("2일 전");
+		expect(formatAgo(now + 60, now)).toBe("방금");
 	});
 });
