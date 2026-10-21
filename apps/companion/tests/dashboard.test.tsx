@@ -388,9 +388,9 @@ describe("recent messages", () => {
 		expect(texts.every((at) => at > 0)).toBe(true);
 		expect([...texts].sort((a, b) => a - b)).toEqual(texts);
 		expect(row).toContain('data-kind="response"');
-		expect(row).toContain(">응답<");
-		expect(row).toContain(">커밋<");
-		expect(row).toContain(">요청<");
+		expect(row).toContain(">AI<");
+		expect(row).toContain(">Commit<");
+		expect(row).toContain(">Human<");
 		expect(row).toContain(">6분 전<");
 		expect(row).toContain(">2시간 전<");
 		expect(row.match(/data-latest="true"/g)).toHaveLength(1);

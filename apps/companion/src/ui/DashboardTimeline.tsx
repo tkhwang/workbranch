@@ -64,9 +64,9 @@ export function formatElapsed(seconds: number): string {
 }
 
 const MESSAGE_LABELS: Readonly<Record<TimelineMessage["kind"], string>> = {
-	prompt: "요청",
-	response: "응답",
-	commit: "커밋",
+	prompt: "Human",
+	response: "AI",
+	commit: "Commit",
 };
 
 /** How long ago, for a message: "방금", "12분 전", "3시간 전", "2일 전". */
@@ -80,7 +80,7 @@ export function formatAgo(at: number, now: number): string {
 }
 
 // Indented under the row's name behind a thin rule, so the details read as
-// belonging to that task. The newest message leads in larger, brighter type.
+// belonging to that task. The newest message reads a little brighter.
 function Messages({
 	messages,
 	now,

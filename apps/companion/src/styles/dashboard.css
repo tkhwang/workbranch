@@ -545,38 +545,28 @@ body {
 }
 
 .timeline-message {
-	align-items: center;
+	align-items: baseline;
 	color: var(--faint);
 	display: flex;
-	font-size: clamp(11px, 1.4vh, 19px);
-	gap: 0.9vh;
+	font-size: clamp(11px, 1.35vh, 18px);
+	gap: 1vh;
 	min-width: 0;
+	opacity: 0.72;
 }
 
 .timeline-message[data-latest="true"] {
-	color: var(--dashboard-ink);
-	font-size: clamp(12px, 1.7vh, 23px);
+	color: var(--muted);
+	opacity: 1;
 }
 
+/* A quiet speaker tag: same tone as the text, fixed width so lines align. */
 .timeline-message-kind {
-	border: 1px solid currentColor;
-	border-radius: 0.4vh;
+	color: var(--faint);
 	flex: none;
-	font-size: clamp(9px, 1.05vh, 15px);
-	font-weight: 700;
-	padding: 0.05vh 0.5vh;
-}
-
-.timeline-message-kind[data-kind="prompt"] {
-	color: var(--plan);
-}
-
-.timeline-message-kind[data-kind="response"] {
-	color: var(--runtime-finished);
-}
-
-.timeline-message-kind[data-kind="commit"] {
-	color: var(--review);
+	font-size: clamp(9px, 1.05vh, 14px);
+	letter-spacing: 0.04em;
+	min-width: 5.5ch;
+	opacity: 0.8;
 }
 
 .timeline-message-text {
