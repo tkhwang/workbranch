@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.41.0](https://github.com/tkhwang/workbranch/compare/v2.40.0...v2.41.0) (2026-11-02)
+
+
+### Features
+
+* **config:** PREFERRED_LANGUAGE 설정 및 config language 서브커맨드 제거하기 ([2917a77](https://github.com/tkhwang/workbranch/commit/2917a7785bf3371d9d46ba296921f25c5f94d2bf))
+* **config:** PREFERRED_LANGUAGE 설정 및 config language 서브커맨드 제거하기 ([02227b6](https://github.com/tkhwang/workbranch/commit/02227b6e5ab77d80cc621800699ef9f5aef6d82d))
+
 ## [2.40.0](https://github.com/tkhwang/workbranch/compare/v2.39.0...v2.40.0) (2026-10-21)
 
 
