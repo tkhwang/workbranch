@@ -21,7 +21,6 @@ macOS 전용: `finder`, `ide`, `terminal`, `config ide`, `config terminal`. Linu
 | `workbranch config base`                 | base branch 설정만 수정하고 base worktree checkout                 |
 | `workbranch config ide`                  | IDE 명령만 수정                                                    |
 | `workbranch config terminal`             | terminal 명령만 수정                                               |
-| `workbranch config language`             | generated task guidance 선호 언어 수정                             |
 | `workbranch add [<task>] [--from <ref>]` | task workspace 생성                                                |
 | `workbranch list [--json]`               | repo와 task workspace 목록 확인; `--json`은 companion용 contract 출력 |
 | `workbranch remove <task>`               | task worktree와 local task branch 제거                             |
@@ -120,12 +119,11 @@ workbranch completion fish > ~/.config/fish/completions/workbranch.fish
 
 ## 작업 workspace 열기
 
-프로젝트에서 공통으로 사용할 IDE/terminal 명령과 generated task guidance 언어를 설정합니다.
+프로젝트에서 공통으로 사용할 IDE/terminal 명령을 설정합니다.
 
 ```bash
 workbranch config ide
 workbranch config terminal
-workbranch config language
 ```
 
 Task surface를 엽니다.

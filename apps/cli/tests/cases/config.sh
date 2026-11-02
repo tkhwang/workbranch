@@ -148,37 +148,35 @@ test_config_tool_targets_are_macos_only() {
 
 
 
-test_config_language_updates_preferred_language_only() {
+test_config_language_subcommand_is_removed() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+
+  out=$(printf '%s\n' "2" | run_expect_fail "$WORKBRANCH" config language)
+  assert_contains "$out" "usage: workbranch config [base|ide|terminal|--rewrite]"
+}
+
+test_config_ignores_legacy_preferred_language() {
   new_fixture
   project="$FIXTURE_PROJECT"
   cd "$project" || return 1
   cat >> "$project/.workbranch.config" <<'CONFIG'
 IDE open -a Cursor
-TERMINAL open -a Warp
-PREFERRED_LANGUAGE en
+PREFERRED_LANGUAGE ko
 CONFIG
 
-  out=$(printf '%s\n' "2" | run_expect_success "$WORKBRANCH" config language)
-  assert_contains "$out" "[*] Preferred language"
-  assert_contains "$out" "1) English"
-  assert_contains "$out" "2) 한글"
-  assert_contains "$out" "[+] Config updated:"
+  run_expect_success "$WORKBRANCH" list >/dev/null
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  run_expect_success "$WORKBRANCH" add login >/dev/null
+  guidance=$(cat "$project/login/AGENTS.md")
+  assert_contains "$guidance" "# Workbranch Task Guidance"
+  assert_not_contains "$guidance" "Workbranch 작업 안내"
+
+  run_expect_success "$WORKBRANCH" config --rewrite >/dev/null
   config=$(cat "$project/.workbranch.config")
-  assert_contains "$config" "PREFERRED_LANGUAGE ko"
+  assert_not_contains "$config" "PREFERRED_LANGUAGE"
   assert_contains "$config" "IDE open -a Cursor"
-  assert_contains "$config" "TERMINAL open -a Warp"
-}
-
-test_config_rejects_invalid_preferred_language() {
-  new_fixture
-  project="$FIXTURE_PROJECT"
-  cd "$project" || return 1
-  cat >> "$project/.workbranch.config" <<'CONFIG'
-PREFERRED_LANGUAGE jp
-CONFIG
-
-  out=$(run_expect_fail "$WORKBRANCH" list)
-  assert_contains "$out" "invalid PREFERRED_LANGUAGE 'jp'"
 }
 
 test_config_base_checks_out_changed_base_branches_before_add() {
