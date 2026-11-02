@@ -32,7 +32,6 @@ The config file is `.workbranch.config` in the project root.
 PROJECT_NAME fullstack
 MAIN_WORKTREES_DIR _base
 BRANCH_PREFIX feature
-PREFERRED_LANGUAGE en
 IDE open -na Cursor --args --new-window
 TERMINAL open -a Warp
 TASK_SETUP sh scripts/workbranch-setup.sh
@@ -47,7 +46,6 @@ REPO_SETUP backend ./gradlew dependencies
 Format:
 
 ```text
-PREFERRED_LANGUAGE en|ko
 IDE <command>
 TERMINAL <command>
 TASK_SETUP <command>
@@ -60,7 +58,7 @@ Rules:
 - `PROJECT_NAME` must be a safe directory name.
 - `MAIN_WORKTREES_DIR` must be a safe directory name.
 - `BRANCH_PREFIX` is retained for compatibility with explicit task keys that do not use the conventional `type-detail` form. New interactive setup does not ask for it; config writing keeps `BRANCH_PREFIX feature` as an internal compatibility default.
-- `PREFERRED_LANGUAGE` is optional in older configs and defaults to `en`. Current config writing emits `PREFERRED_LANGUAGE en|ko`; it controls generated agent guidance, not full CLI localization.
+- `PREFERRED_LANGUAGE` is obsolete. Older configs that still contain it load without error, the value is ignored, and the next config write drops the line. Generated task guidance is always English.
 - `IDE` is optional. It stores one project-level IDE launch command text after the directive.
 - `TERMINAL` is optional. It stores one project-level terminal launch command text after the directive.
 - `TASK_SETUP` is optional. It stores one project-level command text after the directive.
@@ -107,11 +105,11 @@ Git operation internals are defined in [`docs/git-operations.md`](../git-operati
 
 Create or update config without cloning repos.
 
-If `.workbranch.config` or legacy `.tasktree.config` / `.monotree.config` already exists in the current project, load it, then prompt for the project name, main worktrees directory, preferred language for generated task guidance, IDE command, terminal command, each repo's base branch, and each repo-level setup command. Press Enter to keep the current value. Type `--clear` at a tool or repo setup prompt to remove that command.
+If `.workbranch.config` or legacy `.tasktree.config` / `.monotree.config` already exists in the current project, load it, then prompt for the project name, main worktrees directory, IDE command, terminal command, each repo's base branch, and each repo-level setup command. Press Enter to keep the current value. Type `--clear` at a tool or repo setup prompt to remove that command.
 
 Changing a repo base branch in the full `workbranch config` flow updates config and, for existing `_base/<repo>` worktrees, fetches `origin`, checks out the selected base branch, and pulls it with `--ff-only`. `workbranch config` does not clone, move, or rename existing worktrees. Existing `BRANCH_PREFIX` values are preserved silently; it is no longer an interactive setting. Changing `MAIN_WORKTREES_DIR` is allowed only before base worktrees exist. Once matching base worktrees exist, `workbranch config` rejects that change.
 
-Existing project-level `TASK_SETUP` values remain supported for `workbranch add` and are preserved by `workbranch config` unless another explicit flow clears or migrates them. `workbranch config ide` and `workbranch config terminal` update only the matching tool command. `workbranch config language` updates only `PREFERRED_LANGUAGE`.
+Existing project-level `TASK_SETUP` values remain supported for `workbranch add` and are preserved by `workbranch config` unless another explicit flow clears or migrates them. `workbranch config ide` and `workbranch config terminal` update only the matching tool command.
 
 When a base branch changes after repos are cloned, `workbranch config` preflights each existing base worktree for a clean state and no rebase in progress before changing checkout state. Missing base worktrees are still handled by later `workbranch init`.
 
@@ -131,14 +129,14 @@ If no config exists, run interactive config setup:
 4. Explain that new tasks are created with `workbranch add`, which asks for task type and detail name, derives folder `type-detail`, then suggests each repo's task branch from that repo's configured base branch.
 5. Ask for one or more repos: name, Git URL, base branch for this repo, and optional repo-level setup command.
 6. For config-only setup, ask for optional IDE and terminal commands from presets or custom input.
-7. Write `.workbranch.config` with `BRANCH_PREFIX feature` retained as a compatibility default and `PREFERRED_LANGUAGE en` by default.
+7. Write `.workbranch.config` with `BRANCH_PREFIX feature` retained as a compatibility default.
 
 ### `workbranch init`
 
 Initialize main worktrees from config.
 
 - If `.workbranch.config` exists in the current directory, read it and clone each repo into `_base/<repo>` on its base repo branch. Legacy `.tasktree.config` / `.monotree.config` are also accepted by `workbranch init` and can be rewritten with `workbranch config`.
-- If `.workbranch.config` does not exist, run interactive setup, then clone repos. After successful cloning from this interactive setup, ask whether to add the first task. Accepting enters the same task creation flow as `workbranch add`; EOF or a declined answer leaves the initialized project without creating a task. After the first-task prompt or task creation finishes, ask for preferred language for generated task guidance, then ask for optional IDE and terminal commands from presets or custom input and rewrite `.workbranch.config` with those settings.
+- If `.workbranch.config` does not exist, run interactive setup, then clone repos. After successful cloning from this interactive setup, ask whether to add the first task. Accepting enters the same task creation flow as `workbranch add`; EOF or a declined answer leaves the initialized project without creating a task. After the first-task prompt or task creation finishes, ask for optional IDE and terminal commands from presets or custom input and rewrite `.workbranch.config` with those settings.
 - If cloning fails, remove paths created by the failed command.
 
 ### `workbranch path <task>`

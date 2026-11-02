@@ -58,7 +58,6 @@ Config:
   config base       Update base branch settings and checkout base worktrees
   config ide        Update only the configured IDE command
   config terminal   Update only the configured terminal command
-  config language   Update preferred language for generated task guidance
   config --rewrite  Rewrite config to current format without prompts
 Other:
   doctor            Diagnose project health; --fix applies safe repairs
@@ -113,8 +112,7 @@ usage_enhanced() {
   printf '  config            Create or update .workbranch.config without cloning repos\n'
   printf '  config base       Update base branch settings and checkout base worktrees\n'
   printf '  config ide        Update only the configured IDE command\n'
-  printf '  config terminal   Update only the configured terminal command
-  config language   Update preferred language for generated task guidance\n'
+  printf '  config terminal   Update only the configured terminal command\n'
   printf '  config --rewrite  Rewrite config to current format without prompts\n'
   section "Other"
   printf '  doctor            Diagnose project health; --fix applies safe repairs\n'

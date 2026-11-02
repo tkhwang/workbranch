@@ -141,7 +141,6 @@ AFTER
       fi
     fi
     prompt_add_first_task_after_init || return 1
-    prompt_language_config_after_init || return 1
     prompt_tool_config_after_init
   else
     success "Config written: $CONFIG_FILE"
@@ -167,16 +166,6 @@ prompt_add_first_task_after_init() {
     cd "$PROJECT_ROOT" || exit 1
     cmd_add
   )
-}
-
-prompt_language_config_after_init() {
-  printf '
-' >&2
-  section "Generated task guidance"
-  configure_preferred_language_prompt yes
-  status=$?
-  [ "$status" -ne 0 ] && [ "$status" -ne 2 ] && return "$status"
-  write_config "$CONFIG_FILE"
 }
 
 prompt_tool_config_after_init() {

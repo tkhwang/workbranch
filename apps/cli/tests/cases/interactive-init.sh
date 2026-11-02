@@ -22,7 +22,6 @@ $backend_remote
 n
 Y
 n
-
 2
 2
 INPUT
@@ -76,16 +75,11 @@ INPUT
   assert_contains "$out" "[*] Project"
   assert_contains "$out" "[*] Repo #1"
   assert_contains "$out" "[*] Repo #2"
-  assert_contains "$out" "[*] Preferred language for generated task guidance (choose 1 or 2) [1: English]:"
-  assert_contains "$out" "1) English"
-  assert_contains "$out" "2) 한글"
+  assert_not_contains "$out" "Preferred language"
+  assert_not_contains "$out" "Generated task guidance"
   case "$out" in
-    *"[*] Repo #1"*"[*] Preferred language for generated task guidance (choose 1 or 2) [1: English]:"*"[*] IDE command:"*) ;;
-    *) fail "expected language prompt before IDE prompt after repo setup; got: $out" ;;
-  esac
-  case "$out" in
-    *"[+] Initialized"*"[*] Add your first task now? [Y/n]:"*"[*] Preferred language for generated task guidance (choose 1 or 2) [1: English]:"*"[*] IDE command:"*"[*] Terminal command:"*) ;;
-    *) fail "expected init order: base clone, add first task prompt, language preference, then tool config; got: $out" ;;
+    *"[+] Initialized"*"[*] Add your first task now? [Y/n]:"*"[*] IDE command:"*"[*] Terminal command:"*) ;;
+    *) fail "expected init order: base clone, add first task prompt, then tool config; got: $out" ;;
   esac
   assert_not_contains "$out" "[*] Task setup command"
   assert_not_contains "$out" "[*] Task setup:"
@@ -97,7 +91,7 @@ INPUT
   assert_contains "$(cat "$project/.workbranch.config")" "BRANCH_PREFIX feature"
   assert_contains "$(cat "$project/.workbranch.config")" 'IDE open -na "Antigravity IDE" --args --new-window'
   assert_contains "$(cat "$project/.workbranch.config")" "TERMINAL open -a Warp"
-  assert_contains "$(cat "$project/.workbranch.config")" "PREFERRED_LANGUAGE en"
+  assert_not_contains "$(cat "$project/.workbranch.config")" "PREFERRED_LANGUAGE"
   assert_contains "$(cat "$project/.workbranch.config")" "REPO frontend $frontend_remote master"
   assert_contains "$(cat "$project/.workbranch.config")" "REPO backend $backend_remote master"
   assert_dir "$project/_base/frontend/.git"
@@ -128,7 +122,6 @@ Y
 
 feat
 login
-
 
 
 2
@@ -172,7 +165,6 @@ master
 n
 Y
 n
-
 2
 INPUT
 )
@@ -401,38 +393,4 @@ INPUT
   config=$(cat "$TMP_ROOT/work/fullstack/.workbranch.config")
   assert_not_contains "$config" "IDE "
   assert_not_contains "$config" "TERMINAL "
-}
-
-
-test_interactive_init_can_choose_korean_preferred_language_before_tool_config() {
-  TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
-  mkdir -p "$TMP_ROOT/remotes" "$TMP_ROOT/seeds" "$TMP_ROOT/work"
-  frontend_remote=$(make_repo frontend)
-  input=$(cat <<INPUT
-
-.
-fullstack
-_base
-frontend
-$frontend_remote
-master
-
-n
-Y
-n
-2
-
-
-INPUT
-)
-  out=$(cd "$TMP_ROOT/work" && printf '%s' "$input" | WORKBRANCH_TEST_PLATFORM=macos run_expect_success "$WORKBRANCH" init)
-  project="$TMP_ROOT/work/fullstack"
-  assert_contains "$out" "[*] Preferred language for generated task guidance (choose 1 or 2) [1: English]:"
-  assert_contains "$out" "1) English"
-  assert_contains "$out" "2) 한글"
-  case "$out" in
-    *"[*] Preferred language for generated task guidance (choose 1 or 2) [1: English]:"*"[*] IDE command:"*) ;;
-    *) fail "expected language prompt before tool config; got: $out" ;;
-  esac
-  assert_contains "$(cat "$project/.workbranch.config")" "PREFERRED_LANGUAGE ko"
 }

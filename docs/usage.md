@@ -21,7 +21,6 @@ macOS-only: `finder`, `ide`, `terminal`, `config ide`, and `config terminal`. On
 | `workbranch config base`                 | Update only base branch settings and checkout base worktrees                 |
 | `workbranch config ide`                  | Update only the configured IDE command                                       |
 | `workbranch config terminal`             | Update only the configured terminal command                                  |
-| `workbranch config language`             | Update preferred language for generated task guidance                        |
 | `workbranch add [<task>] [--from <ref>]` | Create a task workspace                                                      |
 | `workbranch list [--json]`               | Show repos and task workspaces; `--json` emits the companion-facing contract |
 | `workbranch remove <task>`               | Remove task worktrees and local task branches                                |
@@ -120,12 +119,11 @@ workbranch completion fish > ~/.config/fish/completions/workbranch.fish
 
 ## Opening task workspaces
 
-Configure one IDE and one terminal command for the project, and optionally the language used by generated task guidance:
+Configure one IDE and one terminal command for the project:
 
 ```bash
 workbranch config ide
 workbranch config terminal
-workbranch config language
 ```
 
 Then open task surfaces:
