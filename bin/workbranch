@@ -1575,13 +1575,21 @@ registry_lock_wait() {
   sleep 0.1 2>/dev/null || sleep 1
 }
 
+# Takes the lock by creating its file through the shell's own noclobber
+# redirection, which opens with O_EXCL. An external `mkdir` is not a safe lock:
+# uutils coreutils before 2026-08-28, the default on Ubuntu 26.04, reports
+# success when another process created the directory first.
+registry_lock_try() {
+  (set -o noclobber; : > "$1") 2>/dev/null
+}
+
 registry_lock_acquire() {
   local lock dir attempts
   lock=$(registry_lock_path)
   dir=$(dirname "$lock")
   mkdir -p "$dir" || die "failed to create companion registry directory: $dir"
   attempts=${WORKBRANCH_REGISTRY_LOCK_RETRIES:-100}
-  while ! mkdir "$lock" 2>/dev/null; do
+  while ! registry_lock_try "$lock"; do
     attempts=$((attempts - 1))
     [ "$attempts" -gt 0 ] || die "failed to acquire companion registry lock: $lock"
     registry_lock_wait
@@ -1592,7 +1600,7 @@ registry_lock_acquire() {
 registry_lock_release() {
   local lock
   lock=$1
-  [ -z "$lock" ] || rmdir "$lock" 2>/dev/null || true
+  [ -z "$lock" ] || rm -f "$lock" 2>/dev/null || true
 }
 
 registry_abort_locked() {
