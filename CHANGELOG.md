@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.42.0](https://github.com/tkhwang/workbranch/compare/v2.41.0...v2.42.0) (2026-11-26)
+
+
+### Features
+
+* **checkout:** 원격 브랜치 기반 작업 공간 생성 명령 추가하기 ([bf599fa](https://github.com/tkhwang/workbranch/commit/bf599fa07f672b3f7977b82f6d00e7e47cce84bd))
+* **checkout:** 원격 브랜치 기반 작업 공간 생성 명령 추가하기 ([b9d49b5](https://github.com/tkhwang/workbranch/commit/b9d49b5b5e8357907c7168fc6a8158302b5dcc94))
+
+
+### Bug Fixes
+
+* **checkout:** add와 task 이름 규칙 맞추고 안내 명령 보완하기 ([3735158](https://github.com/tkhwang/workbranch/commit/37351586ba7221fdac79c1ea97541a792ca5821d))
+* **checkout:** stale ref 안내 누락과 안내 명령 quoting 보완하기 ([80f0564](https://github.com/tkhwang/workbranch/commit/80f05641be6d5f1cd9ca86ba164a6f9a26ceae60))
+* **checkout:** 생성·롤백 경쟁 조건과 원격 브랜치 판별 보완하기 ([9505930](https://github.com/tkhwang/workbranch/commit/95059305045a7ac0a3a71d0c2a0c9cdf793828a6))
+* **registry:** Ubuntu 26.04에서 배타성이 깨지는 mkdir 잠금 교체하기 ([9fde2a5](https://github.com/tkhwang/workbranch/commit/9fde2a556cf8c23915c8568a631a4042162b9249))
+
 ## [2.41.0](https://github.com/tkhwang/workbranch/compare/v2.40.0...v2.41.0) (2026-11-02)
 
 
