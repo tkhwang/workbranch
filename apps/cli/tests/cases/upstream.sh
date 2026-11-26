@@ -450,6 +450,31 @@ test_upstream_stops_when_a_base_changes_after_preflight() {
   assert_not_exists "$backend/upstream-race-backend.txt"
 }
 
+test_upstream_preflight_reports_newline_only_ignored_path() {
+  upstream_fixture || return 1
+  base="$project/_base/frontend"
+  nl=$'\n'
+  # '?' is the only exclude pattern that can match a one-newline name.
+  printf '?\n' >> "$base/.git/info/exclude"
+  printf 'MY SECRET\n' > "$base/$nl"
+  assert_clean "$base"
+  clone="$TMP_ROOT/upstream-newline"
+  git clone "$TMP_ROOT/remotes/frontend.git" "$clone" >/dev/null 2>&1
+  git -C "$clone" config user.name "Workbranch Test"
+  git -C "$clone" config user.email "workbranch-test@example.com"
+  printf 'TRACKED\n' > "$clone/$nl"
+  git -C "$clone" add -f -- "$nl"
+  git -C "$clone" commit -m "add newline-named file" >/dev/null
+  git -C "$clone" push origin master >/dev/null 2>&1
+  before=$(git -C "$base" rev-parse HEAD)
+
+  out=$(run_expect_fail "$WORKBRANCH" upstream --repo frontend)
+  assert_contains "$out" "_base/frontend has local files that origin/master would overwrite"
+  assert_contains "$out" "  \$'\\n'"
+  [ "$(cat "$base/$nl")" = "MY SECRET" ] || fail "newline-named ignored file was overwritten"
+  [ "$(git -C "$base" rev-parse HEAD)" = "$before" ] || fail "base changed after overwrite preflight"
+}
+
 test_upstream_detects_default_branch_without_origin_head() {
   upstream_fixture || return 1
   # Newer Git recreates a missing origin/HEAD on fetch; keep it absent so only

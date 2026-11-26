@@ -141,6 +141,13 @@ preflight_autostash_conflict_message() {
     "  # resolve the conflicts, then: (cd $task_path && workbranch stash drop)"
 }
 
+# One path per line, escaped (%q), so every line is non-empty and a path that
+# holds or is only newlines can neither vanish in a command substitution nor
+# split across lines.
+preflight_print_path() {
+  printf '%q\n' "$1"
+}
+
 # Print the local path that adding $2 to worktree $1 would destroy, if any: a
 # file Git does not track at that path or at a parent the new tree needs as a
 # directory, or a directory in the way of a new file that still holds such
@@ -163,7 +170,7 @@ preflight_overwritten_local_path() {
       if [ -n "$saved_untracked" ] && git -C "$root" cat-file -e "$saved_untracked:$prefix" 2>/dev/null; then
         return 0
       fi
-      printf '%s\n' "$prefix"
+      preflight_print_path "$prefix"
       return 0
     fi
     # Nothing exists below a missing directory.
@@ -179,7 +186,7 @@ preflight_overwritten_local_path() {
       if [ -n "$saved_untracked" ] && git -C "$root" cat-file -e "$saved_untracked:$entry" 2>/dev/null; then
         continue
       fi
-      printf '%s\n' "$prefix"
+      preflight_print_path "$prefix"
       break
     done
 }
