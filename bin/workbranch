@@ -376,6 +376,7 @@ Workspace:
   hooks install|status|uninstall|describe --provider claude|codex|grok
   list [--global] [--json]  List configured repos and task workspaces
   add [<task>] [--from <ref>]  Create a task workspace
+  checkout <branch> [<task>]  Create a task workspace on a remote branch
   remove <task> [--force]  Remove task worktrees, branches, and task-root state
   destroy [--force]  Destroy the current workbranch project
 Git:
@@ -431,6 +432,7 @@ usage_enhanced() {
   printf '  migrate agent-runtime --dry-run|--apply [--global]\n'
   printf '  list [--global] [--json]  List configured repos and task workspaces\n'
   printf '  add [<task>] [--from <ref>]  Create a task workspace\n'
+  printf '  checkout <branch> [<task>]  Create a task workspace on a remote branch\n'
   printf '  remove <task> [--force]  Remove task worktrees, branches, and task-root state\n'
   printf '  destroy [--force]  Destroy the current workbranch project\n'
   section "Git"
@@ -1015,6 +1017,14 @@ task_folder_from_parent_base() {
   validate_parent_base_task_name "$name" "$parent"
   slug=$(parent_branch_to_folder_slug "$parent")
   printf '%s-%s' "$slug" "$name"
+}
+
+# Mirrors a branch name as a path-safe task folder: feat/login -> feat-login.
+task_folder_from_branch() {
+  local slug
+  slug=${1//\//-}
+  is_safe_name "$slug" || return 1
+  printf '%s' "$slug"
 }
 
 task_branch_from_identity() {
@@ -3644,6 +3654,23 @@ resolve_add_source_ref() {
   printf '%s' "$requested"
 }
 
+# Runs the configured setup commands for a task workspace that was just created.
+# The retry verb names the command that would create it again.
+run_new_task_setups() {
+  local task retry_verb
+  task=$1
+  retry_verb=$2
+  has_task_setups || return 0
+  printf '\n'
+  if ! run_task_setups "$task"; then
+    printf '%s[-] Error:%s task setup failed\n' "$WB_ERR_RED" "$WB_ERR_RESET" >&2
+    printf '%s[*]%s Worktrees were created. Fix setup with:\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" >&2
+    printf '    %sworkbranch config%s\n' "$WB_ERR_GRAY" "$WB_ERR_RESET" >&2
+    printf '%s[*]%s Then rerun the setup command shown above, or remove and %s the task again.\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" "$retry_verb" >&2
+    return 1
+  fi
+}
+
 cmd_add() {
   parse_add_options "$@"
   require_project
@@ -3715,6 +3742,9 @@ cmd_add() {
       fi
       if [ "$remote_branch_exists" -eq 1 ]; then
         printf '[*] Remote origin/%s exists; delete it outside workbranch before adding again.\n' "$branch" >&2
+        if [ "$local_branch_exists" -eq 0 ]; then
+          printf '[*] To work on that remote branch instead: workbranch checkout %s\n' "$branch" >&2
+        fi
       fi
       exit 1
     fi
@@ -3746,16 +3776,231 @@ cmd_add() {
     fi
     i=$((i + 1))
   done
-  if has_task_setups; then
-    printf '\n'
-    if ! run_task_setups "$task"; then
-      printf '%s[-] Error:%s task setup failed\n' "$WB_ERR_RED" "$WB_ERR_RESET" >&2
-      printf '%s[*]%s Worktrees were created. Fix setup with:\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" >&2
-      printf '    %sworkbranch config%s\n' "$WB_ERR_GRAY" "$WB_ERR_RESET" >&2
-      printf '%s[*]%s Then rerun the setup command shown above, or remove and add the task again.\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" >&2
-      return 1
-    fi
+  run_new_task_setups "$task" "add"
+}
+
+# ----- src/workbranch/commands/checkout.sh -----
+parse_checkout_options() {
+  CHECKOUT_BRANCH=""
+  CHECKOUT_TASK=""
+  ARGS=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -*)
+        die "usage: workbranch checkout <branch> [<task>]"
+        ;;
+      *)
+        ARGS[${#ARGS[@]}]=$1
+        shift
+        ;;
+    esac
+  done
+
+  if [ ${#ARGS[@]} -lt 1 ] || [ ${#ARGS[@]} -gt 2 ]; then
+    die "usage: workbranch checkout <branch> [<task>]"
   fi
+  CHECKOUT_BRANCH=${ARGS[0]#origin/}
+  validate_branch_name "branch" "$CHECKOUT_BRANCH"
+  if [ ${#ARGS[@]} -eq 2 ]; then
+    CHECKOUT_TASK=$(normalize_task_argument "${ARGS[1]}")
+  fi
+}
+
+# Prints the worktree that has the branch checked out, if any.
+checkout_worktree_path_for_branch() {
+  local base branch line path
+  base=$1
+  branch=$2
+  path=""
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      worktree\ *) path=${line#worktree } ;;
+      "branch refs/heads/$branch")
+        [ -n "$path" ] || return 1
+        printf '%s' "$path"
+        return 0
+        ;;
+      "") path="" ;;
+    esac
+  done <<EOF_WORKTREE_LIST
+$(git -C "$base" worktree list --porcelain 2>/dev/null || true)
+EOF_WORKTREE_LIST
+  return 1
+}
+
+checkout_local_branch_exists_message() {
+  local base_label base branch worktree
+  base_label=$1
+  base=$2
+  branch=$3
+  if worktree=$(checkout_worktree_path_for_branch "$base" "$branch"); then
+    printf '%s\n' "$base_label branch $branch is already checked out at ${worktree#"$PROJECT_ROOT"/}"
+    return 0
+  fi
+  printf '%s\n' \
+    "$base_label local branch $branch already exists" \
+    "Delete it, then retry:" \
+    "  git -C $base branch -d $branch"
+}
+
+checkout_stale_remote_ref_message() {
+  local base_label base branch
+  base_label=$1
+  base=$2
+  branch=$3
+  printf '%s\n' \
+    "$base_label has a stale origin/$branch; origin no longer has that branch" \
+    "Drop the stale ref, then retry:" \
+    "  git -C $base branch -dr origin/$branch"
+}
+
+# Decide how one repo joins the task: "track" when origin has the branch,
+# "create" when it does not and the branch starts from the local base worktree.
+# An empty mode means the repo failed preflight.
+preflight_checkout_repo() {
+  local index branch name base base_branch base_label state errors_before
+  index=$1
+  branch=$2
+  name=$(repo_name_at "$index")
+  base=$(base_repo_path "$name")
+  base_branch=$(repo_base_branch_at "$index")
+  base_label="$BASE_DIR/$name"
+  CHECKOUT_REPO_MODES[$index]=""
+
+  if [ ! -d "$base/.git" ] && [ ! -f "$base/.git" ]; then
+    preflight_error "$base_label missing git repo"
+    CHECKOUT_REMOTE_UNKNOWN=1
+    return 0
+  fi
+  if [ "$branch" = "$base_branch" ]; then
+    preflight_error "$base_label $branch is the configured base branch"
+    CHECKOUT_REMOTE_UNKNOWN=1
+    return 0
+  fi
+  if branch_exists "$base" "$branch"; then
+    preflight_error "$(checkout_local_branch_exists_message "$base_label" "$base" "$branch")"
+    CHECKOUT_REMOTE_UNKNOWN=1
+    return 0
+  fi
+  if ! workbranch_git_add_fetch_base "$base"; then
+    preflight_error "$base_label failed to fetch origin"
+    CHECKOUT_REMOTE_UNKNOWN=1
+    return 0
+  fi
+
+  workbranch_git_remote_branch_state "$base" "$branch"
+  state=$?
+  case "$state" in
+    0)
+      if git_ref_exists "$base" "origin/$branch"; then
+        CHECKOUT_REPO_MODES[$index]=track
+        CHECKOUT_REMOTE_FOUND=1
+      else
+        preflight_error "$base_label origin has $branch, but fetch did not create origin/$branch; check the remote fetch refspec"
+        CHECKOUT_REMOTE_UNKNOWN=1
+      fi
+      ;;
+    1)
+      if git_ref_exists "$base" "origin/$branch"; then
+        preflight_error "$(checkout_stale_remote_ref_message "$base_label" "$base" "$branch")"
+        return 0
+      fi
+      CHECKOUT_REPO_MODES[$index]=create
+      errors_before=${#PREFLIGHT_ERRORS[@]}
+      preflight_require_current_branch "$base_label" "$base" "$base_branch"
+      preflight_require_clean "$base_label" "$base"
+      preflight_require_no_rebase "$base_label" "$base"
+      if [ ${#PREFLIGHT_ERRORS[@]} -gt "$errors_before" ]; then
+        preflight_error "$base_label has no origin/$branch, so its task branch starts from the local base worktree"
+      fi
+      ;;
+    *)
+      preflight_error "$base_label failed to ask origin for branch $branch"
+      CHECKOUT_REMOTE_UNKNOWN=1
+      ;;
+  esac
+}
+
+preflight_checkout() {
+  local branch i
+  branch=$1
+  CHECKOUT_REPO_MODES=()
+  CHECKOUT_REMOTE_FOUND=0
+  CHECKOUT_REMOTE_UNKNOWN=0
+  reset_preflight
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    preflight_checkout_repo "$i" "$branch"
+    i=$((i + 1))
+  done
+
+  # Nothing to check out is the real problem; base worktree errors in repos that
+  # would only have received a new branch are noise next to it.
+  if [ "$CHECKOUT_REMOTE_FOUND" -eq 0 ] && [ "$CHECKOUT_REMOTE_UNKNOWN" -eq 0 ]; then
+    printf '%s[-] Error:%s no repo has remote branch origin/%s\n' "$WB_ERR_RED" "$WB_ERR_RESET" "$branch" >&2
+    printf '%s[*]%s To start a new task branch instead: workbranch add\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" >&2
+    exit 1
+  fi
+  preflight_die_if_errors "checkout"
+}
+
+cmd_checkout() {
+  parse_checkout_options "$@"
+  require_project
+  branch=$CHECKOUT_BRANCH
+  if [ -n "$CHECKOUT_TASK" ]; then
+    task=$CHECKOUT_TASK
+  else
+    task=$(task_folder_from_branch "$branch") || die "cannot derive a task folder from branch '$branch'; name one: workbranch checkout $branch <task>"
+  fi
+  validate_task_folder_name "$task"
+  CREATED_PATHS=()
+  CREATED_WORKTREES=()
+  CREATED_WORKTREE_BASES=()
+  CREATED_BRANCH_REPOS=()
+  CREATED_BRANCH_NAMES=()
+  task_dir="$PROJECT_ROOT/$task"
+  [ ! -e "$task_dir" ] || die "task directory already exists: $task_dir"
+
+  preflight_checkout "$branch"
+
+  reset_task_metadata_cache
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    set_task_metadata_branch "$(repo_name_at "$i")" "$branch"
+    i=$((i + 1))
+  done
+
+  mkdir -p "$task_dir" || die "failed to create task directory: $task_dir"
+  track_path "$task_dir"
+  write_task_metadata "$task"
+  write_default_task_state "$task"
+
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    base=$(base_repo_path "$name")
+    base_branch=$(repo_base_branch_at "$i")
+    target=$(task_repo_path "$task" "$name")
+    track_branch "$base" "$branch"
+    if [ "${CHECKOUT_REPO_MODES[$i]}" = "track" ]; then
+      workbranch_git_create_task_branch_from_remote "$base" "$branch" || fail_with_rollback "failed to create task branch for repo '$name'"
+      track_worktree "$target" "$base"
+      workbranch_git_add_existing_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
+    else
+      track_worktree "$target" "$base"
+      workbranch_git_add_new_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
+    fi
+    printf '\n'
+    success_repo_target "Created" "$task" "$name"
+    if [ "${CHECKOUT_REPO_MODES[$i]}" = "track" ]; then
+      success "  [remote] $(color_branch_name "origin/$branch") -> [task repo] $(color_branch_name "$branch")"
+    else
+      success "  [base repo] $(color_branch_name "$base_branch") -> [task repo] $(color_branch_name "$branch") (new; not on origin)"
+    fi
+    i=$((i + 1))
+  done
+  run_new_task_setups "$task" "check out"
 }
 
 # ----- src/workbranch/commands/runtime.sh -----
@@ -6066,6 +6311,20 @@ workbranch_git_create_task_branch_from_remote() {
     git -C "$base_path" branch "$task_branch" "origin/$task_branch" >/dev/null 2>&1
 }
 
+# Asks origin itself, because a remote-tracking ref outlives a branch deleted on
+# origin until someone prunes it. Returns 0 when origin has the branch, 1 when it
+# does not, and 2 when origin could not be asked.
+workbranch_git_remote_branch_state() {
+  base_path=$1
+  task_branch=$2
+  git -C "$base_path" ls-remote --exit-code --heads origin "refs/heads/$task_branch" >/dev/null 2>&1
+  case $? in
+    0) return 0 ;;
+    2) return 1 ;;
+    *) return 2 ;;
+  esac
+}
+
 workbranch_git_pull_base() {
   repo_name=$1
   base_path=$2
@@ -6152,7 +6411,7 @@ cmd_complete_repos() {
 }
 
 cmd_complete_commands() {
-  printf '%s\n' add completion config destroy doctor finalize finder help ide init land list runtime migrate hooks noti path prune pull push refresh remove stash status terminal update version
+  printf '%s\n' add checkout completion config destroy doctor finalize finder help ide init land list runtime migrate hooks noti path prune pull push refresh remove stash status terminal update version
 }
 
 print_completion_bash() {
@@ -6423,6 +6682,7 @@ main() {
     config) cmd_config "$@" ;;
     init) cmd_init "$@" ;;
     add) cmd_add "$@" ;;
+    checkout) cmd_checkout "$@" ;;
     capabilities) cmd_capabilities "$@" ;;
     runtime) cmd_runtime "$@" ;;
     migrate) cmd_migrate "$@" ;;

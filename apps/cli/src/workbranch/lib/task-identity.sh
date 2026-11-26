@@ -104,6 +104,14 @@ task_folder_from_parent_base() {
   printf '%s-%s' "$slug" "$name"
 }
 
+# Mirrors a branch name as a path-safe task folder: feat/login -> feat-login.
+task_folder_from_branch() {
+  local slug
+  slug=${1//\//-}
+  is_safe_name "$slug" || return 1
+  printf '%s' "$slug"
+}
+
 task_branch_from_identity() {
   local type detail
   type=$1

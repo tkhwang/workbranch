@@ -54,6 +54,20 @@ workbranch_git_create_task_branch_from_remote() {
     git -C "$base_path" branch "$task_branch" "origin/$task_branch" >/dev/null 2>&1
 }
 
+# Asks origin itself, because a remote-tracking ref outlives a branch deleted on
+# origin until someone prunes it. Returns 0 when origin has the branch, 1 when it
+# does not, and 2 when origin could not be asked.
+workbranch_git_remote_branch_state() {
+  base_path=$1
+  task_branch=$2
+  git -C "$base_path" ls-remote --exit-code --heads origin "refs/heads/$task_branch" >/dev/null 2>&1
+  case $? in
+    0) return 0 ;;
+    2) return 1 ;;
+    *) return 2 ;;
+  esac
+}
+
 workbranch_git_pull_base() {
   repo_name=$1
   base_path=$2

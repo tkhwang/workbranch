@@ -22,6 +22,7 @@ macOS 전용: `finder`, `ide`, `terminal`, `config ide`, `config terminal`. Linu
 | `workbranch config ide`                  | IDE 명령만 수정                                                    |
 | `workbranch config terminal`             | terminal 명령만 수정                                               |
 | `workbranch add [<task>] [--from <ref>]` | task workspace 생성                                                |
+| `workbranch checkout <branch> [<task>]`  | origin에 이미 있는 branch로 task workspace 생성                    |
 | `workbranch list [--json]`               | repo와 task workspace 목록 확인; `--json`은 companion용 contract 출력 |
 | `workbranch remove <task>`               | task worktree와 local task branch 제거                             |
 | `workbranch doctor [--fix]`              | project health 진단; `--fix`는 stale worktree registration만 prune |

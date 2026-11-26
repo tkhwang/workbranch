@@ -511,6 +511,7 @@ test_add_rejects_existing_task_branch() {
   out=$(run_expect_fail "$WORKBRANCH" add login)
   assert_contains "$out" "task branch already exists for repo 'frontend': feature/login"
   assert_contains "$out" "To delete the local branch first: workbranch remove login"
+  assert_not_contains "$out" "workbranch checkout"
   assert_not_contains "$out" "workbranch resume"
   assert_not_exists "$project/login"
 }
@@ -525,6 +526,7 @@ test_add_rejects_remote_only_task_branch_without_remove_advice() {
   out=$(run_expect_fail "$WORKBRANCH" add login)
   assert_contains "$out" "task branch already exists for repo 'frontend': feature/login"
   assert_contains "$out" "Remote origin/feature/login exists; delete it outside workbranch before adding again."
+  assert_contains "$out" "To work on that remote branch instead: workbranch checkout feature/login"
   assert_not_contains "$out" "workbranch resume"
   assert_not_contains "$out" "workbranch remove login"
   assert_not_exists "$project/login"

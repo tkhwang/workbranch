@@ -23,6 +23,7 @@ Workspace:
   hooks install|status|uninstall|describe --provider claude|codex|grok
   list [--global] [--json]  List configured repos and task workspaces
   add [<task>] [--from <ref>]  Create a task workspace
+  checkout <branch> [<task>]  Create a task workspace on a remote branch
   remove <task> [--force]  Remove task worktrees, branches, and task-root state
   destroy [--force]  Destroy the current workbranch project
 Git:
@@ -78,6 +79,7 @@ usage_enhanced() {
   printf '  migrate agent-runtime --dry-run|--apply [--global]\n'
   printf '  list [--global] [--json]  List configured repos and task workspaces\n'
   printf '  add [<task>] [--from <ref>]  Create a task workspace\n'
+  printf '  checkout <branch> [<task>]  Create a task workspace on a remote branch\n'
   printf '  remove <task> [--force]  Remove task worktrees, branches, and task-root state\n'
   printf '  destroy [--force]  Destroy the current workbranch project\n'
   section "Git"

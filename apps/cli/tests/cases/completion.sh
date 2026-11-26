@@ -16,6 +16,7 @@ test_complete_helpers_list_tasks_repos_and_commands() {
   assert_contains "$repos" "frontend"
   assert_contains "$repos" "backend"
   assert_contains "$commands" "completion"
+  assert_contains "$commands" "checkout"
   assert_contains "$commands" "update"
   assert_contains "$commands" "refresh"
   assert_not_contains "$commands" "sync"

@@ -19,7 +19,7 @@ cmd_complete_repos() {
 }
 
 cmd_complete_commands() {
-  printf '%s\n' add completion config destroy doctor finalize finder help ide init land list runtime migrate hooks noti path prune pull push refresh remove stash status terminal update version
+  printf '%s\n' add checkout completion config destroy doctor finalize finder help ide init land list runtime migrate hooks noti path prune pull push refresh remove stash status terminal update version
 }
 
 print_completion_bash() {

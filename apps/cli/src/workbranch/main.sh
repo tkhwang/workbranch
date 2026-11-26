@@ -9,6 +9,7 @@ main() {
     config) cmd_config "$@" ;;
     init) cmd_init "$@" ;;
     add) cmd_add "$@" ;;
+    checkout) cmd_checkout "$@" ;;
     capabilities) cmd_capabilities "$@" ;;
     runtime) cmd_runtime "$@" ;;
     migrate) cmd_migrate "$@" ;;

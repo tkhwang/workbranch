@@ -18,6 +18,7 @@ src/workbranch/lib/status-format.sh
 src/workbranch/commands/config.sh
 src/workbranch/commands/init.sh
 src/workbranch/commands/add.sh
+src/workbranch/commands/checkout.sh
 src/workbranch/commands/runtime.sh
 src/workbranch/commands/noti.sh
 src/workbranch/commands/list.sh

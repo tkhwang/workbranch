@@ -133,6 +133,23 @@ resolve_add_source_ref() {
   printf '%s' "$requested"
 }
 
+# Runs the configured setup commands for a task workspace that was just created.
+# The retry verb names the command that would create it again.
+run_new_task_setups() {
+  local task retry_verb
+  task=$1
+  retry_verb=$2
+  has_task_setups || return 0
+  printf '\n'
+  if ! run_task_setups "$task"; then
+    printf '%s[-] Error:%s task setup failed\n' "$WB_ERR_RED" "$WB_ERR_RESET" >&2
+    printf '%s[*]%s Worktrees were created. Fix setup with:\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" >&2
+    printf '    %sworkbranch config%s\n' "$WB_ERR_GRAY" "$WB_ERR_RESET" >&2
+    printf '%s[*]%s Then rerun the setup command shown above, or remove and %s the task again.\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" "$retry_verb" >&2
+    return 1
+  fi
+}
+
 cmd_add() {
   parse_add_options "$@"
   require_project
@@ -204,6 +221,9 @@ cmd_add() {
       fi
       if [ "$remote_branch_exists" -eq 1 ]; then
         printf '[*] Remote origin/%s exists; delete it outside workbranch before adding again.\n' "$branch" >&2
+        if [ "$local_branch_exists" -eq 0 ]; then
+          printf '[*] To work on that remote branch instead: workbranch checkout %s\n' "$branch" >&2
+        fi
       fi
       exit 1
     fi
@@ -235,14 +255,5 @@ cmd_add() {
     fi
     i=$((i + 1))
   done
-  if has_task_setups; then
-    printf '\n'
-    if ! run_task_setups "$task"; then
-      printf '%s[-] Error:%s task setup failed\n' "$WB_ERR_RED" "$WB_ERR_RESET" >&2
-      printf '%s[*]%s Worktrees were created. Fix setup with:\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" >&2
-      printf '    %sworkbranch config%s\n' "$WB_ERR_GRAY" "$WB_ERR_RESET" >&2
-      printf '%s[*]%s Then rerun the setup command shown above, or remove and add the task again.\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" >&2
-      return 1
-    fi
-  fi
+  run_new_task_setups "$task" "add"
 }
