@@ -279,6 +279,28 @@ git pull --ff-only origin <base-branch>
 
 Fails if any base worktree is dirty.
 
+### `workbranch upstream [--from <ref>]`
+
+Merge origin's main branch into local base worktrees. `pull` updates a base from its own remote branch; `upstream` updates it from the main branch the base was cut from, for example `master` into `feature/cpq`.
+
+The main branch is origin's default branch, as origin reports it, unless `--from <ref>` names another source.
+
+For each repo:
+
+```bash
+cd _base/<repo>
+git fetch origin
+git merge --ff --commit --no-squash --no-overwrite-ignore --no-edit -m "<message>" <commit of origin/<main-branch>>
+```
+
+The merge names the commit that the checks below ran against, so a later fetch cannot change what is merged.
+
+Changes the local base only: it does not pull the base branch, update task worktrees, or push.
+
+Fails if any base worktree is dirty, on the wrong branch, or has a rebase, merge, cherry-pick, or revert in progress.
+Fails if any local base lacks commits from `origin/<base-branch>`, unless `origin/<base-branch>` is the source being merged. A base that is behind is fixed with `workbranch pull`; a diverged base must be reconciled by hand.
+Fails if the merge would conflict, or would overwrite an ignored file, in any repo, before any base is changed.
+
 ### `workbranch update`
 
 Update every task worktree from its local base worktree.

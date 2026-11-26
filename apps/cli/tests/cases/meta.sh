@@ -196,6 +196,7 @@ test_help_groups_commands() {
   assert_contains "$out" "status            Show remote diff, task diff, and dirty state"
   assert_contains "$out" "  vertical"
   assert_contains "$out" "pull              Pull remote base branches into main worktrees"
+  assert_contains "$out" "upstream [--from <ref>]  Merge the remote default branch into local base branches"
   assert_contains "$out" "push              Push base branches to origin"
   assert_contains "$out" "push <task>       Push task branches to origin"
   assert_contains "$out" "  horizontal"

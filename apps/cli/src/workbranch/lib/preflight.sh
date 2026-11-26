@@ -76,6 +76,33 @@ preflight_require_no_rebase() {
   fi
 }
 
+# Print the unfinished merge, cherry-pick, or revert in a worktree, if any. Each
+# can leave the worktree clean, and Git will not start a merge over the first
+# two.
+git_pending_operation() {
+  local path git_dir
+  path=$1
+  git_dir=$(git_dir_for_path "$path") || return 1
+  if [ -f "$git_dir/MERGE_HEAD" ]; then
+    printf 'merge'
+  elif [ -f "$git_dir/CHERRY_PICK_HEAD" ]; then
+    printf 'cherry-pick'
+  elif [ -f "$git_dir/REVERT_HEAD" ]; then
+    printf 'revert'
+  else
+    return 1
+  fi
+}
+
+preflight_require_no_pending_operation() {
+  local label path operation
+  label=$1
+  path=$2
+  if operation=$(git_pending_operation "$path"); then
+    preflight_error "$label $operation in progress"
+  fi
+}
+
 
 preflight_rebase_conflict_message() {
   local label base_label autostash task repo task_path base_path
@@ -114,10 +141,61 @@ preflight_autostash_conflict_message() {
     "  # resolve the conflicts, then: (cd $task_path && workbranch stash drop)"
 }
 
-# Print paths the rebased tree adds that already exist in the task worktree.
-# A rebase silently overwrites ignored files and is blocked by untracked files
-# autostash cannot save, such as embedded repositories. Untracked files saved
-# in the autostash commit are removed before the rebase, so they are skipped.
+# One path per line, escaped (%q), so every line is non-empty and a path that
+# holds or is only newlines can neither vanish in a command substitution nor
+# split across lines.
+preflight_print_path() {
+  printf '%q\n' "$1"
+}
+
+# Print the local path that adding $2 to worktree $1 would destroy, if any: a
+# file Git does not track at that path or at a parent the new tree needs as a
+# directory, or a directory in the way of a new file that still holds such
+# files. $3 is the autostash's untracked tree, when there is one.
+preflight_overwritten_local_path() {
+  local root path saved_untracked prefix rest entry
+  root=$1
+  path=$2
+  saved_untracked=$3
+  prefix=
+  rest=$path
+  while :; do
+    case "$rest" in
+      */*) prefix=$prefix${rest%%/*}; rest=${rest#*/} ;;
+      *) prefix=$prefix$rest; rest= ;;
+    esac
+    if [ -L "$root/$prefix" ] || { [ -e "$root/$prefix" ] && [ ! -d "$root/$prefix" ]; }; then
+      # A tracked file the new tree turns into a directory is Git's to replace.
+      ! git -C "$root" cat-file -e "HEAD:$prefix" 2>/dev/null || return 0
+      if [ -n "$saved_untracked" ] && git -C "$root" cat-file -e "$saved_untracked:$prefix" 2>/dev/null; then
+        return 0
+      fi
+      preflight_print_path "$prefix"
+      return 0
+    fi
+    # Nothing exists below a missing directory.
+    [ -d "$root/$prefix" ] || return 0
+    [ -n "$rest" ] || break
+    prefix=$prefix/
+  done
+
+  # A directory stands where the new tree puts a file. Tracked files in it go
+  # with the old tree; anything else in it would be lost.
+  git --literal-pathspecs -C "$root" ls-files --others -z -- "$prefix/" |
+    while IFS= read -r -d '' entry; do
+      if [ -n "$saved_untracked" ] && git -C "$root" cat-file -e "$saved_untracked:$entry" 2>/dev/null; then
+        continue
+      fi
+      preflight_print_path "$prefix"
+      break
+    done
+}
+
+# Print the worktree paths that would lose local data when the tree at $2
+# replaces HEAD. A rebase or merge silently overwrites ignored files and is
+# blocked by untracked files autostash cannot save, such as embedded
+# repositories. Untracked files saved in the autostash commit are removed
+# before the rebase, so they are skipped. Fails if the trees cannot be compared.
 preflight_update_overwritten_paths() {
   local task_path rebased saved saved_untracked path
   task_path=$1
@@ -125,14 +203,12 @@ preflight_update_overwritten_paths() {
   saved=${3:-}
   saved_untracked=
   [ -z "$saved" ] || saved_untracked=$(git -C "$task_path" rev-parse -q --verify "$saved^3") || saved_untracked=
+  # The loop below hides a failing diff, and no output must mean no collision.
+  git -C "$task_path" diff --name-only --no-renames --diff-filter=A HEAD "$rebased" >/dev/null 2>&1 || return 1
   git -C "$task_path" diff --name-only -z --no-renames --diff-filter=A HEAD "$rebased" |
     while IFS= read -r -d '' path; do
-      [ -e "$task_path/$path" ] || [ -L "$task_path/$path" ] || continue
-      if [ -n "$saved_untracked" ] && git -C "$task_path" cat-file -e "$saved_untracked:$path" 2>/dev/null; then
-        continue
-      fi
-      printf '%s\n' "$path"
-    done
+      preflight_overwritten_local_path "$task_path" "$path" "$saved_untracked"
+    done | awk '!seen[$0]++'
 }
 
 preflight_overwrite_message() {

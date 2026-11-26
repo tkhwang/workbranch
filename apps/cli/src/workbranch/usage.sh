@@ -30,6 +30,7 @@ Git:
   status            Show remote diff, task diff, and dirty state
   vertical
   pull              Pull remote base branches into main worktrees
+  upstream [--from <ref>]  Merge the remote default branch into local base branches
   push              Push base branches to origin
   push <task>       Push task branches to origin
   horizontal
@@ -86,6 +87,7 @@ usage_enhanced() {
   printf '  status            Show remote diff, task diff, and dirty state\n'
   printf '%s  vertical%s\n' "$WB_GRAY" "$WB_RESET"
   printf '  pull              Pull remote base branches into main worktrees\n'
+  printf '  upstream [--from <ref>]  Merge the remote default branch into local base branches\n'
   printf '  push              Push base branches to origin\n'
   printf '  push <task>       Push task branches to origin\n'
   printf '%s  horizontal%s\n' "$WB_GRAY" "$WB_RESET"

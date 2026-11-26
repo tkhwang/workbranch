@@ -399,6 +399,7 @@ Git:
   status            Show remote diff, task diff, and dirty state
   vertical
   pull              Pull remote base branches into main worktrees
+  upstream [--from <ref>]  Merge the remote default branch into local base branches
   push              Push base branches to origin
   push <task>       Push task branches to origin
   horizontal
@@ -455,6 +456,7 @@ usage_enhanced() {
   printf '  status            Show remote diff, task diff, and dirty state\n'
   printf '%s  vertical%s\n' "$WB_GRAY" "$WB_RESET"
   printf '  pull              Pull remote base branches into main worktrees\n'
+  printf '  upstream [--from <ref>]  Merge the remote default branch into local base branches\n'
   printf '  push              Push base branches to origin\n'
   printf '  push <task>       Push task branches to origin\n'
   printf '%s  horizontal%s\n' "$WB_GRAY" "$WB_RESET"
@@ -1825,6 +1827,33 @@ preflight_require_no_rebase() {
   fi
 }
 
+# Print the unfinished merge, cherry-pick, or revert in a worktree, if any. Each
+# can leave the worktree clean, and Git will not start a merge over the first
+# two.
+git_pending_operation() {
+  local path git_dir
+  path=$1
+  git_dir=$(git_dir_for_path "$path") || return 1
+  if [ -f "$git_dir/MERGE_HEAD" ]; then
+    printf 'merge'
+  elif [ -f "$git_dir/CHERRY_PICK_HEAD" ]; then
+    printf 'cherry-pick'
+  elif [ -f "$git_dir/REVERT_HEAD" ]; then
+    printf 'revert'
+  else
+    return 1
+  fi
+}
+
+preflight_require_no_pending_operation() {
+  local label path operation
+  label=$1
+  path=$2
+  if operation=$(git_pending_operation "$path"); then
+    preflight_error "$label $operation in progress"
+  fi
+}
+
 
 preflight_rebase_conflict_message() {
   local label base_label autostash task repo task_path base_path
@@ -1863,10 +1892,61 @@ preflight_autostash_conflict_message() {
     "  # resolve the conflicts, then: (cd $task_path && workbranch stash drop)"
 }
 
-# Print paths the rebased tree adds that already exist in the task worktree.
-# A rebase silently overwrites ignored files and is blocked by untracked files
-# autostash cannot save, such as embedded repositories. Untracked files saved
-# in the autostash commit are removed before the rebase, so they are skipped.
+# One path per line, escaped (%q), so every line is non-empty and a path that
+# holds or is only newlines can neither vanish in a command substitution nor
+# split across lines.
+preflight_print_path() {
+  printf '%q\n' "$1"
+}
+
+# Print the local path that adding $2 to worktree $1 would destroy, if any: a
+# file Git does not track at that path or at a parent the new tree needs as a
+# directory, or a directory in the way of a new file that still holds such
+# files. $3 is the autostash's untracked tree, when there is one.
+preflight_overwritten_local_path() {
+  local root path saved_untracked prefix rest entry
+  root=$1
+  path=$2
+  saved_untracked=$3
+  prefix=
+  rest=$path
+  while :; do
+    case "$rest" in
+      */*) prefix=$prefix${rest%%/*}; rest=${rest#*/} ;;
+      *) prefix=$prefix$rest; rest= ;;
+    esac
+    if [ -L "$root/$prefix" ] || { [ -e "$root/$prefix" ] && [ ! -d "$root/$prefix" ]; }; then
+      # A tracked file the new tree turns into a directory is Git's to replace.
+      ! git -C "$root" cat-file -e "HEAD:$prefix" 2>/dev/null || return 0
+      if [ -n "$saved_untracked" ] && git -C "$root" cat-file -e "$saved_untracked:$prefix" 2>/dev/null; then
+        return 0
+      fi
+      preflight_print_path "$prefix"
+      return 0
+    fi
+    # Nothing exists below a missing directory.
+    [ -d "$root/$prefix" ] || return 0
+    [ -n "$rest" ] || break
+    prefix=$prefix/
+  done
+
+  # A directory stands where the new tree puts a file. Tracked files in it go
+  # with the old tree; anything else in it would be lost.
+  git --literal-pathspecs -C "$root" ls-files --others -z -- "$prefix/" |
+    while IFS= read -r -d '' entry; do
+      if [ -n "$saved_untracked" ] && git -C "$root" cat-file -e "$saved_untracked:$entry" 2>/dev/null; then
+        continue
+      fi
+      preflight_print_path "$prefix"
+      break
+    done
+}
+
+# Print the worktree paths that would lose local data when the tree at $2
+# replaces HEAD. A rebase or merge silently overwrites ignored files and is
+# blocked by untracked files autostash cannot save, such as embedded
+# repositories. Untracked files saved in the autostash commit are removed
+# before the rebase, so they are skipped. Fails if the trees cannot be compared.
 preflight_update_overwritten_paths() {
   local task_path rebased saved saved_untracked path
   task_path=$1
@@ -1874,14 +1954,12 @@ preflight_update_overwritten_paths() {
   saved=${3:-}
   saved_untracked=
   [ -z "$saved" ] || saved_untracked=$(git -C "$task_path" rev-parse -q --verify "$saved^3") || saved_untracked=
+  # The loop below hides a failing diff, and no output must mean no collision.
+  git -C "$task_path" diff --name-only --no-renames --diff-filter=A HEAD "$rebased" >/dev/null 2>&1 || return 1
   git -C "$task_path" diff --name-only -z --no-renames --diff-filter=A HEAD "$rebased" |
     while IFS= read -r -d '' path; do
-      [ -e "$task_path/$path" ] || [ -L "$task_path/$path" ] || continue
-      if [ -n "$saved_untracked" ] && git -C "$task_path" cat-file -e "$saved_untracked:$path" 2>/dev/null; then
-        continue
-      fi
-      printf '%s\n' "$path"
-    done
+      preflight_overwritten_local_path "$task_path" "$path" "$saved_untracked"
+    done | awk '!seen[$0]++'
 }
 
 preflight_overwrite_message() {
@@ -5119,6 +5197,314 @@ cmd_pull() {
   run_pull
 }
 
+# ----- src/workbranch/commands/upstream.sh -----
+# Remove --from <ref> from ARGS (left by parse_repo_option) and record it.
+parse_upstream_from_option() {
+  local remaining arg want_value
+  UPSTREAM_FROM_REF=""
+  remaining=()
+  want_value=0
+  for arg in ${ARGS[@]+"${ARGS[@]}"}; do
+    if [ "$want_value" -eq 1 ]; then
+      [ -n "$arg" ] || die "missing value for --from"
+      UPSTREAM_FROM_REF=$arg
+      want_value=0
+      continue
+    fi
+    case "$arg" in
+      --from)
+        want_value=1
+        ;;
+      --from=*)
+        UPSTREAM_FROM_REF=${arg#--from=}
+        [ -n "$UPSTREAM_FROM_REF" ] || die "missing value for --from"
+        ;;
+      *)
+        remaining[${#remaining[@]}]=$arg
+        ;;
+    esac
+  done
+  [ "$want_value" -eq 0 ] || die "missing value for --from"
+  ARGS=(${remaining[@]+"${remaining[@]}"})
+  if [ -n "$UPSTREAM_FROM_REF" ]; then
+    validate_nonempty_no_space "source ref" "$UPSTREAM_FROM_REF"
+  fi
+}
+
+# Print the remote-tracking ref of origin's default branch in full, such as
+# refs/remotes/origin/master. The remote is asked first: a fetch keeps an
+# existing origin/HEAD, so the cached ref goes stale when origin's default
+# branch changes. origin/HEAD is the fallback for a remote that does not
+# report where its HEAD points; a failed query never falls back to it.
+upstream_default_ref() {
+  local base ref branch remote_head
+  base=$1
+  remote_head=$(git -C "$base" ls-remote --symref origin HEAD 2>/dev/null) || return 1
+  branch=$(printf '%s\n' "$remote_head" |
+    sed -n 's|^ref: refs/heads/\(.*\)[[:space:]]HEAD$|\1|p' | head -n 1)
+  if [ -n "$branch" ]; then
+    ref="refs/remotes/origin/$branch"
+  else
+    ref=$(git -C "$base" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null) || return 1
+  fi
+  git_ref_exists "$base" "$ref" || return 1
+  printf '%s' "$ref"
+}
+
+# Print the ref to merge for --from <ref>. A branch name prefers its
+# remote-tracking ref, named in full because a tag or local branch called
+# origin/<branch> would otherwise win the lookup. Anything else goes to Git as
+# given.
+upstream_from_ref() {
+  local base requested
+  base=$1
+  requested=$2
+  case "$requested" in
+    refs/*|HEAD) ;;
+    origin/*)
+      if git_ref_exists "$base" "refs/remotes/$requested"; then
+        printf 'refs/remotes/%s' "$requested"
+        return 0
+      fi
+      ;;
+    *)
+      if git_ref_exists "$base" "refs/remotes/origin/$requested"; then
+        printf 'refs/remotes/origin/%s' "$requested"
+        return 0
+      fi
+      ;;
+  esac
+  git_ref_exists "$base" "$requested" || return 1
+  printf '%s' "$requested"
+}
+
+upstream_source_ref() {
+  local base
+  base=$1
+  if [ -n "$UPSTREAM_FROM_REF" ]; then
+    upstream_from_ref "$base" "$UPSTREAM_FROM_REF"
+    return $?
+  fi
+  upstream_default_ref "$base"
+}
+
+# The name shown to the user: origin/master for refs/remotes/origin/master.
+upstream_source_name() {
+  printf '%s' "${1#refs/remotes/}"
+}
+
+# Git's own wording for a remote-tracking branch. The merge names a commit id,
+# which Git would otherwise put in the message.
+upstream_merge_message() {
+  local source_ref base_branch
+  source_ref=$1
+  base_branch=$2
+  case "$source_ref" in
+    refs/remotes/*) printf "Merge remote-tracking branch '%s' into %s" "${source_ref#refs/remotes/}" "$base_branch" ;;
+    *) printf "Merge '%s' into %s" "$source_ref" "$base_branch" ;;
+  esac
+}
+
+# upstream never pulls the base branch. Merging into a base that lacks remote
+# base commits would leave it diverged from origin, which pull and push
+# (ff-only) reject. A source that is the remote base branch's own commit has no
+# such gap, whichever name selected it.
+preflight_upstream_base_current() {
+  local label name base base_branch source_commit remote remote_commit
+  label=$1
+  name=$2
+  base=$3
+  base_branch=$4
+  source_commit=$5
+  remote="origin/$base_branch"
+  remote_commit=$(git -C "$base" rev-parse --verify --quiet "refs/remotes/$remote^{commit}") || return 0
+  [ "$source_commit" != "$remote_commit" ] || return 0
+  git_is_ancestor "$base" "$remote_commit" HEAD && return 0
+  if git_is_ancestor "$base" HEAD "$remote_commit"; then
+    preflight_error "$label is behind $remote; run workbranch pull --repo $name first"
+  else
+    preflight_error "$(preflight_pull_diverged_message "$label" HEAD "$remote")"
+  fi
+  return 1
+}
+
+preflight_upstream_conflict_message() {
+  local label source_name base_path
+  label=$1
+  source_name=$2
+  base_path=$(shell_quote "$PROJECT_ROOT/$label")
+  printf '%s\n' \
+    "$label cannot merge $source_name without conflicts" \
+    "Resolve manually:" \
+    "  git -C $base_path merge $(shell_quote "$source_name")" \
+    "  git -C $base_path add <resolved-files>" \
+    "  git -C $base_path commit --no-edit"
+}
+
+# Replay the merge in a scratch worktree so conflicts, and local files the
+# merge would silently overwrite, surface before the base worktree changes.
+preflight_upstream_merge_clean() {
+  local label base source_commit source_name tmp_parent tmp_path merged overwritten
+  label=$1
+  base=$2
+  source_commit=$3
+  source_name=$4
+  # $5 is the repo index the checked merge result is recorded under.
+
+  git_ref_exists "$base" HEAD || return 0
+  # Nothing to merge.
+  git_is_ancestor "$base" "$source_commit" HEAD && return 0
+  # Only a merge commit needs an identity; a fast-forward does not.
+  if ! git_is_ancestor "$base" HEAD "$source_commit" &&
+    ! git -C "$base" var GIT_COMMITTER_IDENT >/dev/null 2>&1; then
+    preflight_error "$label needs Git user.name and user.email to create the merge commit"
+    return 0
+  fi
+
+  tmp_parent=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-merge-check) || {
+    preflight_error "$label cannot prepare merge preflight"
+    return 0
+  }
+  tmp_path="$tmp_parent/worktree"
+
+  if ! git -C "$base" worktree add --quiet --detach "$tmp_path" HEAD >/dev/null 2>&1; then
+    # A failing post-checkout hook fails the command but keeps the registration.
+    git -C "$base" worktree remove --force "$tmp_path" >/dev/null 2>&1 || true
+    rm -rf "$tmp_parent"
+    preflight_error "$label cannot prepare merge preflight"
+    return 0
+  fi
+
+  # --no-ff makes a fast-forwardable source take the same path. Git checks the
+  # committer identity even with --no-commit, so the replay gets a placeholder.
+  if ! git -C "$tmp_path" -c user.name=workbranch -c user.email=workbranch@localhost \
+    merge --no-commit --no-ff "$source_commit" >/dev/null 2>&1; then
+    preflight_error "$(preflight_upstream_conflict_message "$label" "$source_name")"
+  elif ! merged=$(git -C "$tmp_path" write-tree 2>/dev/null) || [ -z "$merged" ] ||
+    ! overwritten=$(preflight_update_overwritten_paths "$base" "$merged"); then
+    # An unreadable result is not an empty one: the merge stays unchecked.
+    preflight_error "$label cannot inspect the merge result for overwritten files"
+  elif [ -n "$overwritten" ]; then
+    preflight_error "$(preflight_overwrite_message "$label" "$source_name" "$overwritten")"
+  else
+    UPSTREAM_MERGED_TREES[$5]=$merged
+  fi
+
+  git -C "$tmp_path" merge --abort >/dev/null 2>&1 || true
+  git -C "$base" worktree remove --force "$tmp_path" >/dev/null 2>&1 || rm -rf "$tmp_path"
+  rm -rf "$tmp_parent"
+}
+
+preflight_upstream_repos() {
+  local i name base base_branch label source_ref source_commit
+  UPSTREAM_SOURCE_REFS=()
+  UPSTREAM_SOURCE_COMMITS=()
+  UPSTREAM_BASE_HEADS=()
+  UPSTREAM_MERGED_TREES=()
+  i=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    repo_matches_filter "$name" || { i=$((i + 1)); continue; }
+    base=$(base_repo_path "$name")
+    base_branch=$(repo_base_branch_at "$i")
+    label="$BASE_DIR/$name"
+    if [ ! -d "$base/.git" ] && [ ! -f "$base/.git" ]; then
+      preflight_error "$label missing git repo"
+      i=$((i + 1))
+      continue
+    fi
+    preflight_require_current_branch "$label" "$base" "$base_branch"
+    preflight_require_clean "$label" "$base"
+    preflight_require_no_rebase "$label" "$base"
+    preflight_require_no_pending_operation "$label" "$base"
+    preflight_fetch_origin "$label" "$base"
+
+    # Pin the commit now: execution merges what preflight checked, even if a
+    # fetch moves the ref in between.
+    if ! source_ref=$(upstream_source_ref "$base") ||
+      ! source_commit=$(git -C "$base" rev-parse --verify --quiet "$source_ref^{commit}"); then
+      if [ -n "$UPSTREAM_FROM_REF" ]; then
+        preflight_error "$label missing source ref: $UPSTREAM_FROM_REF"
+      else
+        preflight_error "$label cannot detect origin's default branch; pass --from <ref>"
+      fi
+      i=$((i + 1))
+      continue
+    fi
+    UPSTREAM_SOURCE_REFS[$i]=$source_ref
+    UPSTREAM_SOURCE_COMMITS[$i]=$source_commit
+    UPSTREAM_BASE_HEADS[$i]=$(git -C "$base" rev-parse --verify --quiet HEAD) || UPSTREAM_BASE_HEADS[$i]=""
+
+    if [ "$(branch_or_unknown "$base")" = "$base_branch" ] &&
+      ! is_git_dirty "$base" &&
+      ! is_rebase_in_progress "$base" &&
+      ! git_pending_operation "$base" >/dev/null &&
+      preflight_upstream_base_current "$label" "$name" "$base" "$base_branch" "$source_commit"; then
+      preflight_upstream_merge_clean "$label" "$base" "$source_commit" "$(upstream_source_name "$source_ref")" "$i"
+    fi
+    i=$((i + 1))
+  done
+}
+
+execute_upstream_repos() {
+  local i name base base_branch source_ref source_commit source_name seen
+  i=0
+  seen=0
+  while [ $i -lt ${#REPO_NAMES[@]} ]; do
+    name=$(repo_name_at "$i")
+    repo_matches_filter "$name" || { i=$((i + 1)); continue; }
+    base=$(base_repo_path "$name")
+    base_branch=$(repo_base_branch_at "$i")
+    source_ref=${UPSTREAM_SOURCE_REFS[$i]:-}
+    source_commit=${UPSTREAM_SOURCE_COMMITS[$i]:-}
+    source_name=$(upstream_source_name "$source_ref")
+    repo_log_separator "$seen"
+    seen=1
+    i=$((i + 1))
+    info "Merging $(color_repo_name "$name"): $(color_branch_name "$source_name") -> $(color_branch_name "$base_branch")"
+    ensure_current_branch "$base" "$base_branch"
+    if git_is_ancestor "$base" "$source_commit" HEAD; then
+      success_repo_target "Already up to date" "" "$name"
+      continue
+    fi
+    upstream_require_base_unchanged "$name" "$base" "${UPSTREAM_BASE_HEADS[$((i - 1))]:-}" "${UPSTREAM_MERGED_TREES[$((i - 1))]:-}"
+    workbranch_git_merge_upstream "$name" "$base" "$source_commit" "$source_name" "$(upstream_merge_message "$source_ref" "$base_branch")"
+    success_repo_target "Merged" "" "$name"
+  done
+}
+
+# Preflight checks every repo before the first merge, so a base can change
+# in between. Merge only the base preflight checked: same HEAD, still clean,
+# and no new local file in the merge's way.
+upstream_require_base_unchanged() {
+  local name base checked_head merged_tree overwritten
+  name=$1
+  base=$2
+  checked_head=$3
+  merged_tree=$4
+  [ "$(git -C "$base" rev-parse --verify --quiet HEAD)" = "$checked_head" ] ||
+    die "base repo '$name' changed after preflight; rerun workbranch upstream"
+  ! is_git_dirty "$base" ||
+    die "base repo '$name' has local changes since preflight; rerun workbranch upstream"
+  [ -n "$merged_tree" ] || die "base repo '$name' has no checked merge result; rerun workbranch upstream"
+  overwritten=$(preflight_update_overwritten_paths "$base" "$merged_tree") ||
+    die "base repo '$name': cannot inspect the merge result for overwritten files"
+  [ -z "$overwritten" ] ||
+    die "base repo '$name' has local files the merge would overwrite since preflight: $(printf '%s' "$overwritten" | tr '\n' ' ')"
+}
+
+cmd_upstream() {
+  require_project
+  parse_repo_option "$@"
+  parse_upstream_from_option
+  [ ${#ARGS[@]} -eq 0 ] || die "usage: workbranch upstream [--from <ref>] [--repo <repo>]"
+
+  reset_preflight
+  preflight_upstream_repos
+  preflight_die_if_errors "merge upstream"
+  execute_upstream_repos
+}
+
 # ----- src/workbranch/commands/stash.sh -----
 # -----------------------------------------------------------------------------
 # Branch-scoped stash
@@ -6388,6 +6774,21 @@ workbranch_git_pull_base() {
   git -C "$base_path" pull --ff-only origin "$base_branch" || die "failed to pull repo '$repo_name'"
 }
 
+# Merges the commit preflight replayed rather than the ref name, which a fetch
+# could have moved since. Options that merge.ff or branch.<name>.mergeOptions
+# can preset are spelled out, so success always means the base advanced.
+# --no-overwrite-ignore backs up the preflight scan; Git honors it only when
+# fast-forwarding.
+workbranch_git_merge_upstream() {
+  repo_name=$1
+  base_path=$2
+  source_commit=$3
+  source_name=$4
+  merge_message=$5
+  git -C "$base_path" merge --ff --commit --no-squash --no-overwrite-ignore --no-edit -m "$merge_message" "$source_commit" ||
+    die "failed to merge $source_name in repo '$repo_name'; if the merge stopped midway, resolve it in $base_path and commit, or run: git -C $(shell_quote "$base_path") merge --abort"
+}
+
 workbranch_git_checkout_base_branch() {
   repo_name=$1
   base_path=$2
@@ -6467,7 +6868,7 @@ cmd_complete_repos() {
 }
 
 cmd_complete_commands() {
-  printf '%s\n' add checkout completion config destroy doctor finalize finder help ide init land list runtime migrate hooks noti path prune pull push refresh remove stash status terminal update version
+  printf '%s\n' add checkout completion config destroy doctor finalize finder help ide init land list runtime migrate hooks noti path prune pull push refresh remove stash status terminal update upstream version
 }
 
 print_completion_bash() {
@@ -6529,6 +6930,7 @@ _workbranch() {
         doctor) words='--fix --repo' ;;
         update) words='--all --repo --autostash' ;;
         refresh) words='--repo --autostash' ;;
+        upstream) words='--from --repo' ;;
         status|pull|push|land|finalize|path|finder|ide|terminal) words='--repo' ;;
         *) words='' ;;
       esac
@@ -6603,6 +7005,7 @@ _workbranch() {
       doctor) flags=(--fix --repo) ;;
       update) flags=(--all --repo --autostash) ;;
       refresh) flags=(--repo --autostash) ;;
+      upstream) flags=(--from --repo) ;;
       status|pull|push|land|finalize|path|finder|ide|terminal) flags=(--repo) ;;
       *) flags=() ;;
     esac
@@ -6703,6 +7106,8 @@ complete -c workbranch -n '__workbranch_seen_command update' -l repo -d 'Limit o
 complete -c workbranch -n '__workbranch_seen_command update' -l autostash -d 'Stash dirty task repos, then restore them'
 complete -c workbranch -n '__workbranch_seen_command status' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command pull' -l repo -d 'Limit operation to one repo'
+complete -c workbranch -n '__workbranch_seen_command upstream' -l repo -d 'Limit operation to one repo'
+complete -c workbranch -n '__workbranch_seen_command upstream' -l from -d 'Merge this ref instead of the default branch'
 complete -c workbranch -n '__workbranch_seen_command push' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command land' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command finalize' -l repo -d 'Limit operation to one repo'
@@ -6752,6 +7157,7 @@ main() {
     status) cmd_status "$@" ;;
     doctor) cmd_doctor "$@" ;;
     pull) cmd_pull "$@" ;;
+    upstream) cmd_upstream "$@" ;;
     stash) cmd_stash "$@" ;;
     update) cmd_update "$@" ;;
     refresh) cmd_refresh "$@" ;;

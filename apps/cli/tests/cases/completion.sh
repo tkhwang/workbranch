@@ -19,6 +19,7 @@ test_complete_helpers_list_tasks_repos_and_commands() {
   assert_contains "$commands" "checkout"
   assert_contains "$commands" "update"
   assert_contains "$commands" "refresh"
+  assert_contains "$commands" "upstream"
   assert_not_contains "$commands" "sync"
   assert_contains "$commands" "doctor"
   assert_contains "$commands" "prune"
@@ -157,6 +158,18 @@ test_completion_bash_uses_command_specific_flags() {
   assert_contains "${COMPREPLY[*]}" "--from"
   assert_not_contains "${COMPREPLY[*]}" "--force"
 
+  COMP_WORDS=(workbranch upstream --)
+  COMP_CWORD=2
+  _workbranch
+  assert_contains "${COMPREPLY[*]}" "--from"
+  assert_contains "${COMPREPLY[*]}" "--repo"
+  assert_not_contains "${COMPREPLY[*]}" "--autostash"
+
+  COMP_WORDS=(workbranch upstream "")
+  COMP_CWORD=2
+  _workbranch
+  assert_not_contains "${COMPREPLY[*]-}" "feat-login"
+
   COMP_WORDS=(workbranch list --)
   COMP_CWORD=2
   _workbranch
@@ -174,6 +187,8 @@ test_completion_fish_emits_complete_command() {
   assert_contains "$out" "complete -c workbranch"
   assert_contains "$out" "__complete-tasks"
   assert_contains "$out" "__workbranch_seen_command refresh' -l repo"
+  assert_contains "$out" "__workbranch_seen_command upstream' -l repo"
+  assert_contains "$out" "__workbranch_seen_command upstream' -l from"
   assert_not_contains "$out" "__workbranch_seen_command sync' -l repo"
   assert_contains "$out" "__workbranch_seen_command doctor' -l repo"
   assert_contains "$out" "__workbranch_seen_command doctor' -l fix"
