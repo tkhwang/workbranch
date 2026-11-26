@@ -19,7 +19,7 @@ cmd_complete_repos() {
 }
 
 cmd_complete_commands() {
-  printf '%s\n' add checkout completion config destroy doctor finalize finder help ide init land list runtime migrate hooks noti path prune pull push refresh remove stash status terminal update version
+  printf '%s\n' add checkout completion config destroy doctor finalize finder help ide init land list runtime migrate hooks noti path prune pull push refresh remove stash status terminal update upstream version
 }
 
 print_completion_bash() {
@@ -81,6 +81,7 @@ _workbranch() {
         doctor) words='--fix --repo' ;;
         update) words='--all --repo --autostash' ;;
         refresh) words='--repo --autostash' ;;
+        upstream) words='--from --repo' ;;
         status|pull|push|land|finalize|path|finder|ide|terminal) words='--repo' ;;
         *) words='' ;;
       esac
@@ -155,6 +156,7 @@ _workbranch() {
       doctor) flags=(--fix --repo) ;;
       update) flags=(--all --repo --autostash) ;;
       refresh) flags=(--repo --autostash) ;;
+      upstream) flags=(--from --repo) ;;
       status|pull|push|land|finalize|path|finder|ide|terminal) flags=(--repo) ;;
       *) flags=() ;;
     esac
@@ -255,6 +257,8 @@ complete -c workbranch -n '__workbranch_seen_command update' -l repo -d 'Limit o
 complete -c workbranch -n '__workbranch_seen_command update' -l autostash -d 'Stash dirty task repos, then restore them'
 complete -c workbranch -n '__workbranch_seen_command status' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command pull' -l repo -d 'Limit operation to one repo'
+complete -c workbranch -n '__workbranch_seen_command upstream' -l repo -d 'Limit operation to one repo'
+complete -c workbranch -n '__workbranch_seen_command upstream' -l from -d 'Merge this ref instead of the default branch'
 complete -c workbranch -n '__workbranch_seen_command push' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command land' -l repo -d 'Limit operation to one repo'
 complete -c workbranch -n '__workbranch_seen_command finalize' -l repo -d 'Limit operation to one repo'

@@ -205,6 +205,7 @@ workbranch push                  # local feat/login -> origin/feat/login
 | `workbranch list [--json]`  | Show repos and task workspaces; `--json` is machine-readable output     |
 | `workbranch noti ...`       | Add, list, or clear task notifications                                  |
 | `workbranch status`         | Show base remote diff, task diff, and dirty state                       |
+| `workbranch upstream`       | Merge origin's main branch (e.g. `master`) into local base branches     |
 | `workbranch update [task]`  | Update every repo in the task from local base (no pull)                 |
 | `workbranch land <task>`    | Fast-forward task work into local base branches                         |
 | `workbranch push [task]`    | Push base or task branches                                              |

@@ -12,6 +12,7 @@ The source-level definitions live in `apps/cli/src/workbranch/git-ops.sh`.
 ```text
 Vertical:
   pull        remote base -> local base
+  upstream    remote main -> local base
   push        local base  -> remote base
 
 Horizontal:
@@ -126,6 +127,33 @@ Safety:
 
 - Fails before running if the local base worktree is dirty.
 - Uses `--ff-only`; no merge commit is created.
+
+### `workbranch upstream [--from <ref>]`
+
+Direction: remote main branch -> local base.
+
+`pull` always brings in the base branch itself; `upstream` always brings in origin's main branch. Use it when the base is a long-lived branch such as `feature/cpq` that has to pick up `master` from time to time. The main branch is origin's default branch (`origin/HEAD`, asking the remote when that ref is missing). `--from <ref>` names another source and resolves like `add --from`: a bare `develop` prefers `origin/develop`.
+
+For each repo:
+
+```bash
+cd _base/<repo>
+git fetch origin
+git merge --ff --no-edit origin/<main-branch>
+```
+
+The base fast-forwards when it has no commits of its own; otherwise the merge creates a merge commit. On a base that is the main branch, `upstream` therefore fast-forwards exactly like `pull`, and differs only when the local and remote branch have diverged: `pull` stops, `upstream` merges.
+
+`upstream` changes the local base only. It does not pull the base branch, update tasks, or push. Run `workbranch update` to carry the merge into tasks and `workbranch push` to publish it.
+
+Safety:
+
+- Fails before running if the local base worktree is dirty, on the wrong branch, or has a rebase or merge in progress.
+- Fails before running if the local base lacks commits from `origin/<base-branch>`; run `workbranch pull` first. Merging into a stale base would leave it diverged from its remote.
+- Replays the merge in a scratch worktree first. Fails before running on a merge conflict, or when a path the merge adds already exists in the base worktree as an ignored file, which a merge would silently overwrite.
+- Fails before running if a merge commit is needed and Git has no `user.name` / `user.email`.
+- Preflight covers every selected repo before any base changes, so one failing repo stops the whole command.
+- Conflict resolution is left to Git and the user: run the printed `git merge`, resolve, and commit in `_base/<repo>`.
 
 ### `workbranch update`
 

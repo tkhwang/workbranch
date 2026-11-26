@@ -88,6 +88,15 @@ workbranch_git_pull_base() {
   git -C "$base_path" pull --ff-only origin "$base_branch" || die "failed to pull repo '$repo_name'"
 }
 
+workbranch_git_merge_upstream() {
+  repo_name=$1
+  base_path=$2
+  source_ref=$3
+  # --ff is explicit so a user-level merge.ff setting cannot change the result.
+  git -C "$base_path" merge --ff --no-edit "$source_ref" ||
+    die "failed to merge $source_ref in repo '$repo_name'; if the merge stopped midway, resolve it in $base_path and commit, or run: git -C $base_path merge --abort"
+}
+
 workbranch_git_checkout_base_branch() {
   repo_name=$1
   base_path=$2

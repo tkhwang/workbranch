@@ -205,6 +205,7 @@ workbranch push                  # local feat/login -> origin/feat/login
 | `workbranch list [--json]`  | repo와 task workspace 목록 확인; `--json`은 machine-readable 출력           |
 | `workbranch noti ...`       | task notification 추가/목록/삭제                                            |
 | `workbranch status`         | base remote diff, task diff, dirty state 확인                               |
+| `workbranch upstream`       | origin의 main branch(예: `master`)를 local base branch에 merge              |
 | `workbranch update [task]`  | local base 기준으로 task의 모든 repo update (pull 없음)                     |
 | `workbranch land <task>`    | task 작업을 local base branch로 fast-forward 반영                           |
 | `workbranch push [task]`    | base 또는 task branch push                                                  |

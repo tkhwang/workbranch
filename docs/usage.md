@@ -33,6 +33,7 @@ macOS-only: `finder`, `ide`, `terminal`, `config ide`, and `config terminal`. On
 | -------------------------- | ---------------------------------------------------- |
 | `workbranch status`        | Show base remote diff, task diff, and dirty state    |
 | `workbranch pull`          | Pull remote base branches into `_base/<repo>`        |
+| `workbranch upstream`      | Merge origin's main branch into local base branches  |
 | `workbranch update [task]` | Rebase task worktrees onto local base (`git rebase <_base/repo HEAD>`) |
 | `workbranch push`          | Push base branches                                   |
 | `workbranch push <task>`   | Push task branches                                   |
@@ -43,6 +44,8 @@ macOS-only: `finder`, `ide`, `terminal`, `config ide`, and `config terminal`. On
 `git stash` keeps one stash list for every worktree of a repo, so a bare `git stash pop` can restore another worktree's entry. `workbranch stash` runs in the current worktree and stores tracked, staged, and untracked changes under `refs/workbranch/stash-v2/<encoded-branch>` without touching the shared list. `pop` and `apply` only restore the current branch's slot unless `--branch <branch>` is given; `list`, `show [-p]`, and `drop` inspect or discard slots. Each branch holds one slot at a time.
 
 `update --autostash` and `refresh --autostash` do that for every dirty task repo: save to the branch slot, rebase, then restore with `--index` so staged and unstaged changes keep their split. Preflight replays the rebase and the restore in a scratch worktree, so a conflict in any repo stops the command before anything changes. A dirty repo whose task already contains the base keeps its changes in place. A branch that already holds a slot must `pop` or `drop` it first.
+
+`pull` brings in the base branch itself; `upstream` brings in origin's main branch. When the base is a long-lived branch such as `feature/cpq`, `workbranch upstream` merges `origin/master` into `_base/<repo>` and stops there, so you can check the result before sharing it. Follow it with `workbranch update` to rebase tasks onto the merged base and `workbranch push` to publish the base. `--from <ref>` merges another branch instead of the default one. If the local base is behind its own remote branch, `upstream` asks for `workbranch pull` first, and a merge conflict stops the command before any base changes.
 
 ### Combined flow
 

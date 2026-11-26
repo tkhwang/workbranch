@@ -76,6 +76,22 @@ preflight_require_no_rebase() {
   fi
 }
 
+is_merge_in_progress() {
+  local path git_dir
+  path=$1
+  git_dir=$(git_dir_for_path "$path") || return 1
+  [ -f "$git_dir/MERGE_HEAD" ]
+}
+
+preflight_require_no_merge() {
+  local label path
+  label=$1
+  path=$2
+  if is_merge_in_progress "$path"; then
+    preflight_error "$label merge in progress"
+  fi
+}
+
 
 preflight_rebase_conflict_message() {
   local label base_label autostash task repo task_path base_path
