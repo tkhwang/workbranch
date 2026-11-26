@@ -79,14 +79,17 @@ git ls-remote --exit-code --heads origin refs/heads/<branch>
 Where origin has the branch, the task branch tracks it:
 
 ```bash
-git branch --track <branch> origin/<branch>
+git branch --track <branch> refs/remotes/origin/<branch>
 git worktree add <task>/<repo> <branch>
 ```
 
-Where origin does not have it, the repo gets a new branch of the same name from the local base worktree, as `workbranch add` would create it:
+The remote-tracking ref is named in full, so a tag or local branch called `origin/<branch>` is never mistaken for it. If Git cannot set up the upstream, the command fails instead of creating an untracked branch.
+
+Where origin does not have it, the repo gets a new branch of the same name from the local base worktree, as `workbranch add` would start it:
 
 ```bash
-git worktree add <task>/<repo> -b <branch> HEAD
+git branch --no-track <branch> HEAD
+git worktree add <task>/<repo> <branch>
 ```
 
 Fails before creating anything when:
@@ -96,12 +99,14 @@ Fails before creating anything when:
 - `<branch>` is a repo's configured base branch.
 - a repo where origin no longer has the branch still holds a stale `origin/<branch>` ref. Drop it with `git branch -dr origin/<branch>`.
 - the task directory already exists.
+- `<task>` is given but empty, or starts with `.`; commands that find task workspaces skip dot-prefixed folders.
 
 Safety:
 
-- Rolls back worktrees and branches created by the command if worktree creation fails.
+- Rolls back the task directory, worktrees and branches created by the command if initialization, branch creation or worktree creation fails.
+- Rolls back only what it created. A task directory or branch that another process creates after preflight makes the command fail and is left in place.
 - Requires a clean base worktree on its configured branch only in repos where the branch is created from the base. Repos that track `origin/<branch>` do not read the base worktree.
-- Never deletes or prunes remote-tracking refs.
+- Does not prune remote-tracking refs itself. Its `git fetch origin` still follows your Git configuration, so with `fetch.prune` or `remote.origin.prune` enabled the fetch drops stale refs; such a repo then has no stale ref to report and gets a new branch from the base.
 - Runs configured setup commands as `workbranch add` does, and keeps the created worktrees if one fails.
 - Commands suggested in error output quote branch names and paths that a shell would otherwise split or expand.
 - `workbranch update` and `workbranch refresh` rebase this task branch onto the local base like any other task. Once that rebase rewrites commits already on origin, the branch no longer fast-forwards to `origin/<branch>` and `workbranch push <task>` refuses it.

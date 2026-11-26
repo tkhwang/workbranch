@@ -20,7 +20,12 @@ parse_checkout_options() {
   CHECKOUT_BRANCH=${ARGS[0]#origin/}
   validate_branch_name "branch" "$CHECKOUT_BRANCH"
   if [ ${#ARGS[@]} -eq 2 ]; then
+    validate_task_folder_name "${ARGS[1]}"
     CHECKOUT_TASK=$(normalize_task_argument "${ARGS[1]}")
+    # Commands that find task workspaces skip dot-prefixed folders.
+    case "$CHECKOUT_TASK" in
+      .*) die "invalid task '$CHECKOUT_TASK': a task folder cannot start with '.'" ;;
+    esac
   fi
 }
 
@@ -110,7 +115,7 @@ preflight_checkout_repo() {
   state=$?
   case "$state" in
     0)
-      if git_ref_exists "$base" "origin/$branch"; then
+      if git_ref_exists "$base" "refs/remotes/origin/$branch"; then
         CHECKOUT_REPO_MODES[$index]=track
         CHECKOUT_REMOTE_FOUND=1
       else
@@ -119,7 +124,7 @@ preflight_checkout_repo() {
       fi
       ;;
     1)
-      if git_ref_exists "$base" "origin/$branch"; then
+      if git_ref_exists "$base" "refs/remotes/origin/$branch"; then
         preflight_error "$(checkout_stale_remote_ref_message "$base_label" "$base" "$branch")"
         CHECKOUT_REPO_BLOCKED=1
         return 0
@@ -174,7 +179,6 @@ cmd_checkout() {
   else
     task=$(task_folder_from_branch "$branch") || die "cannot derive a task folder from branch '$branch'; name one: workbranch checkout $(shell_quote "$branch") <task>"
   fi
-  validate_task_folder_name "$task"
   CREATED_PATHS=()
   CREATED_WORKTREES=()
   CREATED_WORKTREE_BASES=()
@@ -192,10 +196,13 @@ cmd_checkout() {
     i=$((i + 1))
   done
 
-  mkdir -p "$task_dir" || die "failed to create task directory: $task_dir"
+  # Plain mkdir fails if another process claimed the directory after the check
+  # above, so rollback only ever removes a directory this command created.
+  mkdir "$task_dir" 2>/dev/null || die "failed to create task directory: $task_dir"
   track_path "$task_dir"
-  write_task_metadata "$task"
-  write_default_task_state "$task"
+  # The writers exit on failure; the subshell turns that into a status so the
+  # task directory is rolled back instead of blocking the retry.
+  (write_task_metadata "$task" && write_default_task_state "$task") || fail_with_rollback "failed to initialize task workspace: $task"
 
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
@@ -203,15 +210,16 @@ cmd_checkout() {
     base=$(base_repo_path "$name")
     base_branch=$(repo_base_branch_at "$i")
     target=$(task_repo_path "$task" "$name")
-    track_branch "$base" "$branch"
     if [ "${CHECKOUT_REPO_MODES[$i]}" = "track" ]; then
       workbranch_git_create_task_branch_from_remote "$base" "$branch" || fail_with_rollback "failed to create task branch for repo '$name'"
-      track_worktree "$target" "$base"
-      workbranch_git_add_existing_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
     else
-      track_worktree "$target" "$base"
-      workbranch_git_add_new_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
+      workbranch_git_create_task_branch_from_base "$base" "$branch" || fail_with_rollback "failed to create task branch for repo '$name'"
     fi
+    # Registered only now: a branch someone else created in the meantime made
+    # the step above fail, and rollback must not delete it.
+    track_branch "$base" "$branch"
+    track_worktree "$target" "$base"
+    workbranch_git_add_existing_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
     printf '\n'
     success_repo_target "Created" "$task" "$name"
     if [ "${CHECKOUT_REPO_MODES[$i]}" = "track" ]; then

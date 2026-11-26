@@ -2105,7 +2105,7 @@ rollback_created() {
   while [ $i -ge 0 ]; do
     repo=${CREATED_BRANCH_REPOS[$i]}
     branch=${CREATED_BRANCH_NAMES[$i]}
-    if [ -d "$repo/.git" ] && branch_exists "$repo" "$branch"; then
+    if { [ -d "$repo/.git" ] || [ -f "$repo/.git" ]; } && branch_exists "$repo" "$branch"; then
       git -C "$repo" branch -D "$branch" >/dev/null 2>&1 || true
     fi
     i=$((i - 1))
@@ -3761,7 +3761,7 @@ cmd_add() {
       if [ "$remote_branch_exists" -eq 1 ]; then
         printf '[*] Remote origin/%s exists; delete it outside workbranch before adding again.\n' "$branch" >&2
         if [ "$local_branch_exists" -eq 0 ]; then
-          printf '[*] To work on that remote branch instead: workbranch checkout %s\n' "$(shell_quote "$branch")" >&2
+          printf '[*] To work on that remote branch instead: workbranch checkout %s %s\n' "$(shell_quote "$branch")" "$task" >&2
         fi
       fi
       exit 1
@@ -3820,7 +3820,12 @@ parse_checkout_options() {
   CHECKOUT_BRANCH=${ARGS[0]#origin/}
   validate_branch_name "branch" "$CHECKOUT_BRANCH"
   if [ ${#ARGS[@]} -eq 2 ]; then
+    validate_task_folder_name "${ARGS[1]}"
     CHECKOUT_TASK=$(normalize_task_argument "${ARGS[1]}")
+    # Commands that find task workspaces skip dot-prefixed folders.
+    case "$CHECKOUT_TASK" in
+      .*) die "invalid task '$CHECKOUT_TASK': a task folder cannot start with '.'" ;;
+    esac
   fi
 }
 
@@ -3910,7 +3915,7 @@ preflight_checkout_repo() {
   state=$?
   case "$state" in
     0)
-      if git_ref_exists "$base" "origin/$branch"; then
+      if git_ref_exists "$base" "refs/remotes/origin/$branch"; then
         CHECKOUT_REPO_MODES[$index]=track
         CHECKOUT_REMOTE_FOUND=1
       else
@@ -3919,7 +3924,7 @@ preflight_checkout_repo() {
       fi
       ;;
     1)
-      if git_ref_exists "$base" "origin/$branch"; then
+      if git_ref_exists "$base" "refs/remotes/origin/$branch"; then
         preflight_error "$(checkout_stale_remote_ref_message "$base_label" "$base" "$branch")"
         CHECKOUT_REPO_BLOCKED=1
         return 0
@@ -3974,7 +3979,6 @@ cmd_checkout() {
   else
     task=$(task_folder_from_branch "$branch") || die "cannot derive a task folder from branch '$branch'; name one: workbranch checkout $(shell_quote "$branch") <task>"
   fi
-  validate_task_folder_name "$task"
   CREATED_PATHS=()
   CREATED_WORKTREES=()
   CREATED_WORKTREE_BASES=()
@@ -3992,10 +3996,13 @@ cmd_checkout() {
     i=$((i + 1))
   done
 
-  mkdir -p "$task_dir" || die "failed to create task directory: $task_dir"
+  # Plain mkdir fails if another process claimed the directory after the check
+  # above, so rollback only ever removes a directory this command created.
+  mkdir "$task_dir" 2>/dev/null || die "failed to create task directory: $task_dir"
   track_path "$task_dir"
-  write_task_metadata "$task"
-  write_default_task_state "$task"
+  # The writers exit on failure; the subshell turns that into a status so the
+  # task directory is rolled back instead of blocking the retry.
+  (write_task_metadata "$task" && write_default_task_state "$task") || fail_with_rollback "failed to initialize task workspace: $task"
 
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
@@ -4003,15 +4010,16 @@ cmd_checkout() {
     base=$(base_repo_path "$name")
     base_branch=$(repo_base_branch_at "$i")
     target=$(task_repo_path "$task" "$name")
-    track_branch "$base" "$branch"
     if [ "${CHECKOUT_REPO_MODES[$i]}" = "track" ]; then
       workbranch_git_create_task_branch_from_remote "$base" "$branch" || fail_with_rollback "failed to create task branch for repo '$name'"
-      track_worktree "$target" "$base"
-      workbranch_git_add_existing_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
     else
-      track_worktree "$target" "$base"
-      workbranch_git_add_new_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
+      workbranch_git_create_task_branch_from_base "$base" "$branch" || fail_with_rollback "failed to create task branch for repo '$name'"
     fi
+    # Registered only now: a branch someone else created in the meantime made
+    # the step above fail, and rollback must not delete it.
+    track_branch "$base" "$branch"
+    track_worktree "$target" "$base"
+    workbranch_git_add_existing_task_worktree "$base" "$target" "$branch" || fail_with_rollback "failed to create worktree for repo '$name'"
     printf '\n'
     success_repo_target "Created" "$task" "$name"
     if [ "${CHECKOUT_REPO_MODES[$i]}" = "track" ]; then
@@ -6324,26 +6332,39 @@ workbranch_git_delete_task_branch() {
   fi
 }
 
+# Names the remote-tracking ref in full: a tag or branch called origin/<branch>
+# would otherwise win the lookup. Fails if Git cannot set up the upstream.
 workbranch_git_create_task_branch_from_remote() {
   base_path=$1
   task_branch=$2
   workbranch_git_prune_stale_worktrees "$base_path" || return 1
-  git -C "$base_path" branch --track "$task_branch" "origin/$task_branch" >/dev/null 2>&1 ||
-    git -C "$base_path" branch "$task_branch" "origin/$task_branch" >/dev/null 2>&1
+  git -C "$base_path" branch --track "$task_branch" "refs/remotes/origin/$task_branch" >/dev/null 2>&1
+}
+
+workbranch_git_create_task_branch_from_base() {
+  base_path=$1
+  task_branch=$2
+  workbranch_git_prune_stale_worktrees "$base_path" || return 1
+  git -C "$base_path" branch --no-track "$task_branch" HEAD >/dev/null 2>&1
 }
 
 # Asks origin itself, because a remote-tracking ref outlives a branch deleted on
 # origin until someone prunes it. Returns 0 when origin has the branch, 1 when it
 # does not, and 2 when origin could not be asked.
 workbranch_git_remote_branch_state() {
+  local remote_refs remote_ref tab
   base_path=$1
   task_branch=$2
-  git -C "$base_path" ls-remote --exit-code --heads origin "refs/heads/$task_branch" >/dev/null 2>&1
-  case $? in
-    0) return 0 ;;
-    2) return 1 ;;
-    *) return 2 ;;
-  esac
+  tab=$(printf '\t')
+  remote_refs=$(git -C "$base_path" ls-remote --heads origin "refs/heads/$task_branch" 2>/dev/null) || return 2
+  # ls-remote matches the pattern against the tail of a ref, so
+  # refs/heads/x/refs/heads/<branch> would match too; compare the full name.
+  while IFS= read -r remote_ref || [ -n "$remote_ref" ]; do
+    [ "${remote_ref#*"$tab"}" = "refs/heads/$task_branch" ] && return 0
+  done <<EOF_REMOTE_REFS
+$remote_refs
+EOF_REMOTE_REFS
+  return 1
 }
 
 workbranch_git_pull_base() {

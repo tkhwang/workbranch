@@ -253,17 +253,17 @@ Safety: `.workbranch.config` is trusted project configuration. Setup commands ar
 
 Create one task workspace on a branch that already exists on origin. `<branch>` accepts an optional `origin/` prefix. Without `<task>`, the task folder is `<branch>` with `/` replaced by `-`; the command fails and asks for `<task>` when that is not a valid task folder name. The command does not prompt.
 
-1. Fail if the task directory exists.
+1. Fail if `<task>` is given but empty or starts with `.`, or if the task directory exists.
 2. For each repo, fail preflight if `_base/<repo>` is missing, if `<branch>` is the repo's configured base branch, or if a local branch named `<branch>` already exists.
-3. For each repo, fetch origin and ask origin whether `<branch>` exists. A remote-tracking ref without the branch on origin is stale and fails preflight with the command that drops it.
+3. For each repo, fetch origin and ask origin whether exactly `refs/heads/<branch>` exists. A `refs/remotes/origin/<branch>` ref without the branch on origin is stale and fails preflight with the command that drops it.
 4. Fail if no repo has the branch on origin.
 5. In repos without the branch on origin, require `_base/<repo>` to be clean and on its configured base branch.
-6. Create the task directory and write `<task>/.workbranch.task` with `<branch>` for every repo.
-7. In repos with the branch on origin, create a local `<branch>` that tracks `origin/<branch>`. In the others, create `<branch>` from the base worktree HEAD.
+6. Create the task directory, failing if it appeared since step 1, and write `<task>/.workbranch.task` with `<branch>` for every repo.
+7. In repos with the branch on origin, create a local `<branch>` that tracks `refs/remotes/origin/<branch>`, failing if the upstream cannot be set. In the others, create `<branch>` from the base worktree HEAD.
 8. Create a linked worktree at `<task>/<repo>`.
 9. Run configured setup commands as `workbranch add` does.
 
-If any repo fails, roll back paths and branches created by the command. Setup failures keep the created worktrees, as in `workbranch add`.
+If initialization or any repo fails, roll back the paths and branches this command created; a branch or directory created by another process in the meantime is left in place. Setup failures keep the created worktrees, as in `workbranch add`.
 
 ### `workbranch pull`
 

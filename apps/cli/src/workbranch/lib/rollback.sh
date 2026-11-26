@@ -14,7 +14,7 @@ rollback_created() {
   while [ $i -ge 0 ]; do
     repo=${CREATED_BRANCH_REPOS[$i]}
     branch=${CREATED_BRANCH_NAMES[$i]}
-    if [ -d "$repo/.git" ] && branch_exists "$repo" "$branch"; then
+    if { [ -d "$repo/.git" ] || [ -f "$repo/.git" ]; } && branch_exists "$repo" "$branch"; then
       git -C "$repo" branch -D "$branch" >/dev/null 2>&1 || true
     fi
     i=$((i - 1))

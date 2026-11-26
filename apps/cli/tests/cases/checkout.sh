@@ -13,6 +13,7 @@ assert_no_upstream() {
 }
 
 assert_no_local_branch() {
+  git -C "$1" rev-parse --git-dir >/dev/null 2>&1 || fail "could not read repository: $1"
   if git -C "$1" show-ref --verify --quiet "refs/heads/$2"; then
     fail "expected no local branch $2 in $1"
   fi
@@ -348,6 +349,193 @@ GIT
   if git -C "$project/_base/frontend" worktree list --porcelain | grep -F "$project/feat-login/frontend" >/dev/null; then
     fail "expected rollback to remove frontend worktree registration"
   fi
+}
+
+test_checkout_rejects_empty_or_hidden_explicit_task() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  commit_to_remote_branch frontend feat/login remote-frontend
+
+  # "/" normalizes to nothing; it was given, so it must not fall back to feat-login.
+  out=$(run_expect_fail "$WORKBRANCH" checkout feat/login /)
+  assert_contains "$out" "invalid task '/'"
+  assert_not_exists "$project/feat-login"
+
+  out=$(run_expect_fail "$WORKBRANCH" checkout feat/login .review)
+  assert_contains "$out" "invalid task '.review': a task folder cannot start with '.'"
+  assert_not_exists "$project/.review"
+  assert_no_local_branch "$project/_base/frontend" feat/login
+}
+
+test_checkout_ignores_tag_named_like_the_remote_tracking_ref() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  commit_to_remote_branch frontend feat/login remote-frontend
+  git -C "$project/_base/frontend" tag origin/feat/login HEAD
+  git -C "$project/_base/backend" tag origin/feat/login HEAD
+
+  out=$(run_expect_success "$WORKBRANCH" checkout feat/login)
+
+  assert_file "$project/feat-login/frontend/remote-frontend.txt"
+  upstream=$(git -C "$project/feat-login/frontend" rev-parse --symbolic-full-name '@{upstream}' 2>/dev/null) || fail "expected frontend to track the remote branch"
+  [ "$upstream" = "refs/remotes/origin/feat/login" ] || fail "expected upstream refs/remotes/origin/feat/login, got $upstream"
+  assert_branch "$project/feat-login/backend" "feat/login"
+  assert_not_contains "$out" "stale"
+}
+
+test_checkout_requires_exact_remote_branch_name() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  commit_to_remote_branch frontend feat/login remote-frontend
+  # ls-remote matches a pattern against the tail of a ref, so this branch matches refs/heads/feat/login.
+  commit_to_remote_branch backend archive/refs/heads/feat/login remote-backend
+
+  out=$(run_expect_success "$WORKBRANCH" checkout feat/login)
+
+  assert_upstream "$project/feat-login/frontend" "origin/feat/login"
+  assert_no_upstream "$project/feat-login/backend"
+  assert_not_exists "$project/feat-login/backend/remote-backend.txt"
+  assert_contains "$out" "[base repo] master -> [task repo] feat/login (new; not on origin)"
+}
+
+test_checkout_does_not_take_over_task_directory_created_meanwhile() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  commit_to_remote_branch frontend feat/login remote-frontend
+
+  real_git=$(command -v git)
+  fakebin="$TMP_ROOT/fakebin"
+  mkdir -p "$fakebin"
+  cat > "$fakebin/git" <<'GIT'
+#!/usr/bin/env bash
+if [ "${1:-}" = "-C" ] && [ "${2:-}" = "$RACE_BASE" ] && [ "${3:-}" = "fetch" ]; then
+  mkdir -p "$RACE_TASK_DIR"
+  printf '%s\n' "someone else" > "$RACE_TASK_DIR/other.txt"
+fi
+exec "$REAL_GIT" "$@"
+GIT
+  chmod +x "$fakebin/git"
+
+  old_path=$PATH
+  export REAL_GIT=$real_git
+  export RACE_BASE=$(cd "$project/_base/frontend" && pwd -P)
+  export RACE_TASK_DIR="$project/feat-login"
+  PATH="$fakebin:$PATH"
+  out=$(run_expect_fail "$WORKBRANCH" checkout feat/login)
+  PATH=$old_path
+  unset REAL_GIT RACE_BASE RACE_TASK_DIR
+
+  assert_contains "$out" "failed to create task directory"
+  assert_file "$project/feat-login/other.txt"
+  assert_not_exists "$project/feat-login/frontend"
+  assert_no_local_branch "$project/_base/frontend" feat/login
+  assert_no_local_branch "$project/_base/backend" feat/login
+}
+
+test_checkout_rolls_back_task_directory_when_state_initialization_fails() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  commit_to_remote_branch frontend feat/login remote-frontend
+
+  fakebin="$TMP_ROOT/fakebin"
+  mkdir -p "$fakebin"
+  printf '%s\n' '#!/usr/bin/env bash' 'exit 1' > "$fakebin/touch"
+  chmod +x "$fakebin/touch"
+
+  old_path=$PATH
+  PATH="$fakebin:$PATH"
+  out=$(run_expect_fail "$WORKBRANCH" checkout feat/login)
+  PATH=$old_path
+
+  assert_contains "$out" "failed to initialize task workspace: feat-login"
+  assert_not_exists "$project/feat-login"
+  assert_no_local_branch "$project/_base/frontend" feat/login
+
+  run_expect_success "$WORKBRANCH" checkout feat/login >/dev/null
+  assert_branch "$project/feat-login/frontend" "feat/login"
+}
+
+test_checkout_rollback_keeps_branch_created_by_someone_else() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  commit_to_remote_branch frontend feat/login remote-frontend
+  commit_to_remote_branch backend feat/login remote-backend
+
+  real_git=$(command -v git)
+  fakebin="$TMP_ROOT/fakebin"
+  mkdir -p "$fakebin"
+  cat > "$fakebin/git" <<'GIT'
+#!/usr/bin/env bash
+if [ "${1:-}" = "-C" ] && [ "${2:-}" = "$RACE_BASE" ] && [ "${3:-}" = "branch" ] && [ "${4:-}" = "--track" ]; then
+  "$REAL_GIT" -C "$RACE_BASE" branch "$5" HEAD >/dev/null 2>&1
+fi
+exec "$REAL_GIT" "$@"
+GIT
+  chmod +x "$fakebin/git"
+
+  old_path=$PATH
+  export REAL_GIT=$real_git
+  export RACE_BASE=$(cd "$project/_base/backend" && pwd -P)
+  PATH="$fakebin:$PATH"
+  out=$(run_expect_fail "$WORKBRANCH" checkout feat/login)
+  PATH=$old_path
+  unset REAL_GIT RACE_BASE
+
+  assert_contains "$out" "failed to create task branch for repo 'backend'"
+  assert_not_exists "$project/feat-login"
+  assert_no_local_branch "$project/_base/frontend" feat/login
+  git -C "$project/_base/backend" show-ref --verify --quiet refs/heads/feat/login ||
+    fail "expected rollback to keep the backend branch another process created"
+}
+
+test_checkout_rolls_back_branch_in_gitfile_base() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  commit_to_remote_branch frontend feat/login remote-frontend
+  commit_to_remote_branch backend feat/login remote-backend
+
+  moved_git_dir="$TMP_ROOT/backend-base.git"
+  mv "$project/_base/backend/.git" "$moved_git_dir"
+  printf '%s\n' "gitdir: $moved_git_dir" > "$project/_base/backend/.git"
+
+  real_git=$(command -v git)
+  fakebin="$TMP_ROOT/fakebin"
+  mkdir -p "$fakebin"
+  cat > "$fakebin/git" <<'GIT'
+#!/usr/bin/env bash
+if [ "${1:-}" = "-C" ] && [ "${2:-}" = "$FAIL_WORKTREE_BASE" ] && [ "${3:-}" = "worktree" ] && [ "${4:-}" = "add" ]; then
+  exit 1
+fi
+exec "$REAL_GIT" "$@"
+GIT
+  chmod +x "$fakebin/git"
+
+  old_path=$PATH
+  export REAL_GIT=$real_git
+  export FAIL_WORKTREE_BASE=$(cd "$project/_base/backend" && pwd -P)
+  PATH="$fakebin:$PATH"
+  out=$(run_expect_fail "$WORKBRANCH" checkout feat/login)
+  PATH=$old_path
+  unset REAL_GIT FAIL_WORKTREE_BASE
+
+  assert_contains "$out" "failed to create worktree for repo 'backend'"
+  assert_not_exists "$project/feat-login"
+  assert_no_local_branch "$project/_base/frontend" feat/login
+  assert_no_local_branch "$project/_base/backend" feat/login
 }
 
 test_checkout_runs_configured_task_setup() {
