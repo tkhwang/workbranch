@@ -5228,11 +5228,12 @@ parse_upstream_from_option() {
 # refs/remotes/origin/master. The remote is asked first: a fetch keeps an
 # existing origin/HEAD, so the cached ref goes stale when origin's default
 # branch changes. origin/HEAD is the fallback for a remote that does not
-# report where its HEAD points.
+# report where its HEAD points; a failed query never falls back to it.
 upstream_default_ref() {
-  local base ref branch
+  local base ref branch remote_head
   base=$1
-  branch=$(git -C "$base" ls-remote --symref origin HEAD 2>/dev/null |
+  remote_head=$(git -C "$base" ls-remote --symref origin HEAD 2>/dev/null) || return 1
+  branch=$(printf '%s\n' "$remote_head" |
     sed -n 's|^ref: refs/heads/\(.*\)[[:space:]]HEAD$|\1|p' | head -n 1)
   if [ -n "$branch" ]; then
     ref="refs/remotes/origin/$branch"
@@ -5341,6 +5342,7 @@ preflight_upstream_merge_clean() {
   base=$2
   source_commit=$3
   source_name=$4
+  # $5 is the repo index the checked merge result is recorded under.
 
   git_ref_exists "$base" HEAD || return 0
   # Nothing to merge.
@@ -5377,6 +5379,8 @@ preflight_upstream_merge_clean() {
     preflight_error "$label cannot inspect the merge result for overwritten files"
   elif [ -n "$overwritten" ]; then
     preflight_error "$(preflight_overwrite_message "$label" "$source_name" "$overwritten")"
+  else
+    UPSTREAM_MERGED_TREES[$5]=$merged
   fi
 
   git -C "$tmp_path" merge --abort >/dev/null 2>&1 || true
@@ -5388,6 +5392,8 @@ preflight_upstream_repos() {
   local i name base base_branch label source_ref source_commit
   UPSTREAM_SOURCE_REFS=()
   UPSTREAM_SOURCE_COMMITS=()
+  UPSTREAM_BASE_HEADS=()
+  UPSTREAM_MERGED_TREES=()
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
     name=$(repo_name_at "$i")
@@ -5420,13 +5426,14 @@ preflight_upstream_repos() {
     fi
     UPSTREAM_SOURCE_REFS[$i]=$source_ref
     UPSTREAM_SOURCE_COMMITS[$i]=$source_commit
+    UPSTREAM_BASE_HEADS[$i]=$(git -C "$base" rev-parse --verify --quiet HEAD) || UPSTREAM_BASE_HEADS[$i]=""
 
     if [ "$(branch_or_unknown "$base")" = "$base_branch" ] &&
       ! is_git_dirty "$base" &&
       ! is_rebase_in_progress "$base" &&
       ! git_pending_operation "$base" >/dev/null &&
       preflight_upstream_base_current "$label" "$name" "$base" "$base_branch" "$source_commit"; then
-      preflight_upstream_merge_clean "$label" "$base" "$source_commit" "$(upstream_source_name "$source_ref")"
+      preflight_upstream_merge_clean "$label" "$base" "$source_commit" "$(upstream_source_name "$source_ref")" "$i"
     fi
     i=$((i + 1))
   done
@@ -5453,9 +5460,30 @@ execute_upstream_repos() {
       success_repo_target "Already up to date" "" "$name"
       continue
     fi
+    upstream_require_base_unchanged "$name" "$base" "${UPSTREAM_BASE_HEADS[$((i - 1))]:-}" "${UPSTREAM_MERGED_TREES[$((i - 1))]:-}"
     workbranch_git_merge_upstream "$name" "$base" "$source_commit" "$source_name" "$(upstream_merge_message "$source_ref" "$base_branch")"
     success_repo_target "Merged" "" "$name"
   done
+}
+
+# Preflight checks every repo before the first merge, so a base can change
+# in between. Merge only the base preflight checked: same HEAD, still clean,
+# and no new local file in the merge's way.
+upstream_require_base_unchanged() {
+  local name base checked_head merged_tree overwritten
+  name=$1
+  base=$2
+  checked_head=$3
+  merged_tree=$4
+  [ "$(git -C "$base" rev-parse --verify --quiet HEAD)" = "$checked_head" ] ||
+    die "base repo '$name' changed after preflight; rerun workbranch upstream"
+  ! is_git_dirty "$base" ||
+    die "base repo '$name' has local changes since preflight; rerun workbranch upstream"
+  [ -n "$merged_tree" ] || die "base repo '$name' has no checked merge result; rerun workbranch upstream"
+  overwritten=$(preflight_update_overwritten_paths "$base" "$merged_tree") ||
+    die "base repo '$name': cannot inspect the merge result for overwritten files"
+  [ -z "$overwritten" ] ||
+    die "base repo '$name' has local files the merge would overwrite since preflight: $(printf '%s' "$overwritten" | tr '\n' ' ')"
 }
 
 cmd_upstream() {

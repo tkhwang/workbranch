@@ -132,7 +132,7 @@ Safety:
 
 Direction: remote main branch -> local base.
 
-`pull` always brings in the base branch itself; `upstream` always brings in origin's main branch. Use it when the base is a long-lived branch such as `feature/cpq` that has to pick up `master` from time to time. The main branch is origin's default branch: `upstream` asks origin where its `HEAD` points, because a fetch does not update an existing `origin/HEAD`, and falls back to the cached `origin/HEAD` only when origin names no branch. `--from <ref>` names another source: a branch name such as `develop` or `origin/develop` means the remote-tracking branch `refs/remotes/origin/develop` when it exists, and anything else, such as a tag, a commit, or `@{upstream}`, is resolved by Git in the base worktree.
+`pull` always brings in the base branch itself; `upstream` always brings in origin's main branch. Use it when the base is a long-lived branch such as `feature/cpq` that has to pick up `master` from time to time. The main branch is origin's default branch: `upstream` asks origin where its `HEAD` points, because a fetch does not update an existing `origin/HEAD`, and falls back to the cached `origin/HEAD` only when origin answers but names no branch; a failed query stops the command. `--from <ref>` names another source: a branch name such as `develop` or `origin/develop` means the remote-tracking branch `refs/remotes/origin/develop` when it exists, and anything else, such as a tag, a commit, or `@{upstream}`, is resolved by Git in the base worktree.
 
 For each repo:
 
@@ -152,10 +152,10 @@ The base fast-forwards when it has no commits of its own; otherwise the merge cr
 Safety:
 
 - Fails before running if the local base worktree is dirty, on the wrong branch, or has a rebase, merge, cherry-pick, or revert in progress.
-- Fails before running if the local base lacks commits from `origin/<base-branch>`; run `workbranch pull` first. Merging into a stale base would leave it diverged from its remote. This check does not apply when the source is `origin/<base-branch>` itself, as on a base that is the main branch or with `--from <base-branch>`: the merge then brings in those commits.
+- Fails before running if the local base lacks commits from `origin/<base-branch>`. When the base is only behind, run `workbranch pull` first; when it has also diverged, `pull` (fast-forward only) cannot help, so inspect the printed `git log --left-right` and reconcile the base yourself. Merging into a stale base would leave it diverged from its remote. This check does not apply when the source is `origin/<base-branch>` itself, as on a base that is the main branch or with `--from <base-branch>`: the merge then brings in those commits.
 - Replays the merge in a scratch worktree first. Fails before running on a merge conflict, or when the merge would silently overwrite an ignored file in the base worktree: one at a path the merge adds, at a parent path the merge needs as a directory, or inside a directory the merge replaces with a file.
 - Fails before running if a merge commit is needed and Git has no `user.name` / `user.email`.
-- Preflight covers every selected repo before any base changes, so one failing repo stops the whole command.
+- Preflight covers every selected repo before any base changes, so one failing repo stops the whole command. Right before each merge, `upstream` confirms the base still has the HEAD preflight checked, is still clean, and has gained no local file the merge would overwrite; otherwise it stops and asks for a rerun.
 - Conflict resolution is left to Git and the user: run the printed `git merge`, resolve, and commit in `_base/<repo>`.
 
 ### `workbranch update`

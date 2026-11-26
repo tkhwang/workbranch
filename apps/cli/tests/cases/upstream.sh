@@ -411,6 +411,45 @@ test_upstream_preflight_separates_tracked_directory_from_local_files_in_it() {
   [ -f "$base/docs" ] || fail "docs was not replaced by the file from master"
 }
 
+test_upstream_does_not_fall_back_when_origin_cannot_be_asked() {
+  upstream_fixture || return 1
+  base="$project/_base/frontend"
+  commit_to_remote_master frontend upstream-unreachable
+  git -C "$base" fetch origin >/dev/null 2>&1
+  # fetch still works; only the HEAD query fails.
+  before=$(git -C "$base" rev-parse HEAD)
+  wrapper="$TMP_ROOT/git-wrapper"
+  mkdir -p "$wrapper"
+  real_git=$(command -v git)
+  cat > "$wrapper/git" <<SCRIPT
+#!/usr/bin/env bash
+for arg in "\$@"; do [ "\$arg" != ls-remote ] || exit 128; done
+exec "$real_git" "\$@"
+SCRIPT
+  chmod +x "$wrapper/git"
+
+  out=$(PATH="$wrapper:$PATH" run_expect_fail "$WORKBRANCH" upstream --repo frontend)
+  assert_contains "$out" "_base/frontend cannot detect origin's default branch; pass --from <ref>"
+  [ "$(git -C "$base" rev-parse HEAD)" = "$before" ] || fail "merged the cached default branch after a failed query"
+}
+
+test_upstream_stops_when_a_base_changes_after_preflight() {
+  upstream_fixture || return 1
+  commit_to_remote_master frontend upstream-race-frontend
+  commit_to_remote_master backend upstream-race-backend
+  backend="$project/_base/backend"
+  # Merging frontend runs its post-merge hook, which stands in for another
+  # process committing to the backend base after preflight checked it.
+  upstream_install_hook "$project/_base/frontend" post-merge "git -C '$backend' commit --allow-empty -qm moved"
+  moved_from=$(git -C "$backend" rev-parse HEAD)
+
+  out=$(run_expect_fail "$WORKBRANCH" upstream)
+  assert_contains "$out" "Merged: frontend"
+  assert_contains "$out" "base repo 'backend' changed after preflight; rerun workbranch upstream"
+  [ "$(git -C "$backend" rev-parse HEAD^)" = "$moved_from" ] || fail "fixture: hook did not move backend"
+  assert_not_exists "$backend/upstream-race-backend.txt"
+}
+
 test_upstream_detects_default_branch_without_origin_head() {
   upstream_fixture || return 1
   # Newer Git recreates a missing origin/HEAD on fetch; keep it absent so only

@@ -298,7 +298,7 @@ The merge names the commit that the checks below ran against, so a later fetch c
 Changes the local base only: it does not pull the base branch, update task worktrees, or push.
 
 Fails if any base worktree is dirty, on the wrong branch, or has a rebase, merge, cherry-pick, or revert in progress.
-Fails if any local base lacks commits from `origin/<base-branch>`, unless `origin/<base-branch>` is the source being merged.
+Fails if any local base lacks commits from `origin/<base-branch>`, unless `origin/<base-branch>` is the source being merged. A base that is behind is fixed with `workbranch pull`; a diverged base must be reconciled by hand.
 Fails if the merge would conflict, or would overwrite an ignored file, in any repo, before any base is changed.
 
 ### `workbranch update`
