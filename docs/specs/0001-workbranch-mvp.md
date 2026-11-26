@@ -93,6 +93,7 @@ Rule:
 - For conventional task keys, repos on `main`/`master`-style bases default to `<type>/<detail>`. Repos on parent feature bases such as `feature/cpq` or `feat/cpq` default to `<base-branch>-<detail>`.
 - Non-interactive `workbranch add <task>` values without the conventional `type-` prefix keep the legacy default rule for script compatibility: parent feature base branches become `<base-branch>-<task>`, otherwise the default is `<BRANCH_PREFIX>/<task>` with `feature` as the compatibility fallback.
 - Task command arguments may include a completion-added trailing `/`; commands normalize that trailing slash before validation. Embedded slashes and path-like task arguments are still invalid.
+- A task folder that is being created cannot start with `.`: commands that find task workspaces skip dot-prefixed folders. `workbranch add` and `workbranch checkout` reject such a name.
 - Chosen branches are validated with `git check-ref-format --branch`; whitespace is not supported.
 - Chosen branches are persisted in `<task>/.workbranch.task` as `REPO_BRANCH <repo> <branch>` lines so later commands use the real branch.
 - Existing task workspaces without metadata keep working by falling back to the current task worktree branch, then the default rule.

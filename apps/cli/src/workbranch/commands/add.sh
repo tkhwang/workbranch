@@ -154,7 +154,7 @@ cmd_add() {
   parse_add_options "$@"
   require_project
   task=$(resolve_task_for_add) || return 1
-  validate_task_folder_name "$task"
+  validate_new_task_folder_name "$task"
   CREATED_PATHS=()
   CREATED_WORKTREES=()
   CREATED_WORKTREE_BASES=()
@@ -222,7 +222,7 @@ cmd_add() {
       if [ "$remote_branch_exists" -eq 1 ]; then
         printf '[*] Remote origin/%s exists; delete it outside workbranch before adding again.\n' "$branch" >&2
         if [ "$local_branch_exists" -eq 0 ]; then
-          printf '[*] To work on that remote branch instead: workbranch checkout %s %s\n' "$(shell_quote "$branch")" "$task" >&2
+          printf '[*] To work on that remote branch instead: workbranch checkout %s %s\n' "$(shell_quote "origin/$branch")" "$task" >&2
         fi
       fi
       exit 1

@@ -4,7 +4,7 @@ parse_checkout_options() {
   ARGS=()
   while [ $# -gt 0 ]; do
     case "$1" in
-      -*)
+      --*)
         die "usage: workbranch checkout <branch> [<task>]"
         ;;
       *)
@@ -20,12 +20,8 @@ parse_checkout_options() {
   CHECKOUT_BRANCH=${ARGS[0]#origin/}
   validate_branch_name "branch" "$CHECKOUT_BRANCH"
   if [ ${#ARGS[@]} -eq 2 ]; then
-    validate_task_folder_name "${ARGS[1]}"
+    validate_new_task_folder_name "${ARGS[1]}"
     CHECKOUT_TASK=$(normalize_task_argument "${ARGS[1]}")
-    # Commands that find task workspaces skip dot-prefixed folders.
-    case "$CHECKOUT_TASK" in
-      .*) die "invalid task '$CHECKOUT_TASK': a task folder cannot start with '.'" ;;
-    esac
   fi
 }
 

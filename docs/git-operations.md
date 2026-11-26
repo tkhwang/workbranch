@@ -66,7 +66,7 @@ Safety:
 
 Direction: remote task branch -> task worktree.
 
-Create a task workspace on a branch that already exists on origin, instead of starting a new branch. `<branch>` may be written as `feat/login` or `origin/feat/login`. Without `<task>`, the task folder mirrors the branch name with `/` replaced by `-`, so `feat/login` becomes `feat-login`; pass `<task>` to choose another folder, or when the mirrored name is not a valid task folder name. Every repo uses `<branch>` as its task branch, so there are no branch prompts. The branch is saved in `<task>/.workbranch.task`.
+Create a task workspace on a branch that already exists on origin, instead of starting a new branch. `<branch>` may be written as `feat/login` or `origin/feat/login`; one leading `origin/` is read as the remote, so a branch whose own name starts with `origin/` takes the prefix twice. Without `<task>`, the task folder mirrors the branch name with `/` replaced by `-`, so `feat/login` becomes `feat-login`; pass `<task>` to choose another folder, or when the mirrored name is not a valid task folder name. Every repo uses `<branch>` as its task branch, so there are no branch prompts. The branch is saved in `<task>/.workbranch.task`.
 
 For each repo, workbranch fetches origin and then asks origin whether the branch exists. A remote-tracking ref alone is not trusted, because it outlives a branch deleted on origin until it is pruned.
 
@@ -99,7 +99,7 @@ Fails before creating anything when:
 - `<branch>` is a repo's configured base branch.
 - a repo where origin no longer has the branch still holds a stale `origin/<branch>` ref. Drop it with `git branch -dr origin/<branch>`.
 - the task directory already exists.
-- `<task>` is given but empty, or starts with `.`; commands that find task workspaces skip dot-prefixed folders.
+- `<task>` is given but empty, or starts with `.`; commands that find task workspaces skip dot-prefixed folders, and `workbranch add` rejects such a name for the same reason.
 
 Safety:
 

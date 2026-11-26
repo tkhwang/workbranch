@@ -526,7 +526,7 @@ test_add_rejects_remote_only_task_branch_without_remove_advice() {
   out=$(run_expect_fail "$WORKBRANCH" add login)
   assert_contains "$out" "task branch already exists for repo 'frontend': feature/login"
   assert_contains "$out" "Remote origin/feature/login exists; delete it outside workbranch before adding again."
-  assert_contains "$out" "To work on that remote branch instead: workbranch checkout feature/login login"
+  assert_contains "$out" "To work on that remote branch instead: workbranch checkout origin/feature/login login"
   assert_not_contains "$out" "workbranch resume"
   assert_not_contains "$out" "workbranch remove login"
   assert_not_exists "$project/login"
@@ -543,8 +543,25 @@ test_add_remote_branch_hint_quotes_branch_for_shell() {
   status=$?
   [ "$status" -ne 0 ] || fail "expected add to reject the existing remote branch"
   assert_contains "$out" "Remote origin/tk/a;b exists; delete it outside workbranch before adding again."
-  assert_contains "$out" "To work on that remote branch instead: workbranch checkout 'tk/a;b' login"
+  assert_contains "$out" "To work on that remote branch instead: workbranch checkout 'origin/tk/a;b' login"
   assert_not_exists "$project/login"
+}
+
+test_add_rejects_dot_prefixed_task_folder() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+
+  # With valid branch names the workspace used to be created, yet no command could find it again.
+  out=$(printf 'tk/hidden\ntk/hidden\n' | "$WORKBRANCH" add .hidden 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "expected add to reject a dot-prefixed task folder"
+  assert_contains "$out" "invalid task '.hidden': a task folder cannot start with '.'"
+  assert_not_exists "$project/.hidden"
+  if git -C "$project/_base/frontend" show-ref --verify --quiet refs/heads/tk/hidden; then
+    fail "expected no branch to be created for the rejected task"
+  fi
 }
 
 test_add_rejects_invalid_task_branch_override() {

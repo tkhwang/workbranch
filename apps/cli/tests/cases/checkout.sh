@@ -12,11 +12,15 @@ assert_no_upstream() {
   fi
 }
 
+# show-ref --verify exits 1 only when the ref is absent; a missing repository
+# or unreadable refs exit with another status and must not pass as "absent".
 assert_no_local_branch() {
-  git -C "$1" rev-parse --git-dir >/dev/null 2>&1 || fail "could not read repository: $1"
-  if git -C "$1" show-ref --verify --quiet "refs/heads/$2"; then
-    fail "expected no local branch $2 in $1"
-  fi
+  git -C "$1" show-ref --verify --quiet "refs/heads/$2" 2>/dev/null
+  case $? in
+    1) return 0 ;;
+    0) fail "expected no local branch $2 in $1" ;;
+    *) fail "could not read refs in $1" ;;
+  esac
 }
 
 test_checkout_tracks_remote_branch_in_every_repo() {
@@ -367,6 +371,57 @@ test_checkout_rejects_empty_or_hidden_explicit_task() {
   assert_contains "$out" "invalid task '.review': a task folder cannot start with '.'"
   assert_not_exists "$project/.review"
   assert_no_local_branch "$project/_base/frontend" feat/login
+}
+
+test_assert_no_local_branch_fails_when_refs_cannot_be_read() {
+  TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
+  repo="$TMP_ROOT/repo"
+  git init -q "$repo" >/dev/null
+  git -C "$repo" -c user.name="Workbranch Test" -c user.email="workbranch-test@example.com" commit -q --allow-empty -m initial
+
+  (assert_no_local_branch "$repo" feat/absent) >/dev/null || fail "expected an absent branch in a readable repository to pass"
+
+  out=$( (assert_no_local_branch "$TMP_ROOT/missing" feat/absent) 2>&1 ) && fail "expected a missing repository to fail the assertion"
+  assert_contains "$out" "could not read refs"
+
+  printf '%s\n' "not a packed ref" > "$repo/.git/packed-refs"
+  out=$( (assert_no_local_branch "$repo" feat/absent) 2>&1 ) && fail "expected unreadable refs to fail the assertion"
+  assert_contains "$out" "could not read refs"
+}
+
+test_checkout_accepts_dash_prefixed_task_from_add_hint() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  commit_to_remote_branch frontend feat/login remote-frontend
+
+  out=$(printf 'feat/login\n\n' | "$WORKBRANCH" add -foo 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "expected add to reject the existing remote branch"
+  assert_contains "$out" "To work on that remote branch instead: workbranch checkout origin/feat/login -foo"
+
+  run_expect_success "$WORKBRANCH" checkout origin/feat/login -foo >/dev/null
+  assert_branch "$project/-foo/frontend" "feat/login"
+  assert_upstream "$project/-foo/frontend" "origin/feat/login"
+}
+
+test_checkout_keeps_origin_prefix_that_belongs_to_the_branch_name() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  commit_to_remote_branch frontend origin/feat/login remote-frontend
+
+  # add names the remote branch in full, so the one prefix checkout strips is not the branch's own.
+  out=$(printf 'origin/feat/login\n\n' | "$WORKBRANCH" add review 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "expected add to reject the existing remote branch"
+  assert_contains "$out" "To work on that remote branch instead: workbranch checkout origin/origin/feat/login review"
+
+  run_expect_success "$WORKBRANCH" checkout origin/origin/feat/login review >/dev/null
+  assert_branch "$project/review/frontend" "origin/feat/login"
+  assert_file "$project/review/frontend/remote-frontend.txt"
 }
 
 test_checkout_ignores_tag_named_like_the_remote_tracking_ref() {

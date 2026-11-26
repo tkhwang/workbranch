@@ -168,6 +168,7 @@ main() {
   run_test test_add_rejects_existing_task_branch
   run_test test_add_rejects_remote_only_task_branch_without_remove_advice
   run_test test_add_remote_branch_hint_quotes_branch_for_shell
+  run_test test_add_rejects_dot_prefixed_task_folder
   run_test test_add_rejects_invalid_task_branch_override
   run_test test_checkout_tracks_remote_branch_in_every_repo
   run_test test_checkout_starts_new_branch_in_repos_without_the_remote_branch
@@ -186,6 +187,9 @@ main() {
   run_test test_checkout_rejects_missing_or_extra_arguments
   run_test test_checkout_rolls_back_when_worktree_creation_fails
   run_test test_checkout_rejects_empty_or_hidden_explicit_task
+  run_test test_assert_no_local_branch_fails_when_refs_cannot_be_read
+  run_test test_checkout_accepts_dash_prefixed_task_from_add_hint
+  run_test test_checkout_keeps_origin_prefix_that_belongs_to_the_branch_name
   run_test test_checkout_ignores_tag_named_like_the_remote_tracking_ref
   run_test test_checkout_requires_exact_remote_branch_name
   run_test test_checkout_does_not_take_over_task_directory_created_meanwhile

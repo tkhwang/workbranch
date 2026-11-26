@@ -86,6 +86,16 @@ validate_task_folder_name() {
   validate_safe_name "task" "$value"
 }
 
+# The extra rule for a folder that is about to be created: commands that find
+# task workspaces skip dot-prefixed folders, so such a task could never be
+# addressed again.
+validate_new_task_folder_name() {
+  validate_task_folder_name "$1"
+  case "$(normalize_task_argument "$1")" in
+    .*) die "invalid task '$1': a task folder cannot start with '.'" ;;
+  esac
+}
+
 task_folder_from_identity() {
   local type detail
   type=$1
