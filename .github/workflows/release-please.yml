@@ -10,6 +10,13 @@ permissions:
   issues: write
   pull-requests: write
 
+# Run release-please one at a time. A run that overlaps a release PR merge
+# reads a stale latest release, reopens the same version and later fails with
+# "already_exists" on the tag.
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
 jobs:
   release-please:
     name: Open release PR or publish release
