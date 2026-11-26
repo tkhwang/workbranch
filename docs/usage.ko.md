@@ -45,7 +45,7 @@ macOS 전용: `finder`, `ide`, `terminal`, `config ide`, `config terminal`. Linu
 
 `update --autostash`와 `refresh --autostash`는 dirty한 모든 task repo에 대해 이 과정을 대신합니다. branch slot에 저장하고, rebase한 뒤, staged/unstaged 구분이 유지되도록 `--index`로 복원합니다. preflight가 임시 worktree에서 rebase와 복원을 재현하므로, 어느 repo라도 충돌하면 아무것도 바꾸기 전에 멈춥니다. task가 이미 base를 포함하는 dirty repo는 변경을 그대로 둡니다. 이미 slot을 가진 branch는 먼저 `pop`이나 `drop`해야 합니다.
 
-`pull`은 base branch 자체를 가져오고, `upstream`은 origin의 main branch를 가져옵니다. base가 `feature/cpq`처럼 오래 유지되는 branch라면 `workbranch upstream`이 `origin/master`를 `_base/<repo>`에 merge하고 거기서 멈추므로, 공유하기 전에 결과를 확인할 수 있습니다. 이어서 `workbranch update`로 task를 merge된 base 위로 rebase하고, `workbranch push`로 base를 올립니다. `--from <ref>`를 주면 기본 branch 대신 다른 branch를 merge합니다. local base가 자기 remote branch보다 뒤처져 있으면 `upstream`은 먼저 `workbranch pull`을 하라고 안내하고, merge conflict가 있으면 어떤 base도 바꾸기 전에 멈춥니다.
+`pull`은 base branch 자체를 가져오고, `upstream`은 origin의 main branch를 가져옵니다. base가 `feature/cpq`처럼 오래 유지되는 branch라면 `workbranch upstream`이 `origin/master`를 `_base/<repo>`에 merge하고 거기서 멈추므로, 공유하기 전에 결과를 확인할 수 있습니다. 이어서 `workbranch update`로 task를 merge된 base 위로 rebase하고, `workbranch push`로 base를 올립니다. `--from <ref>`를 주면 기본 branch 대신 다른 branch를 merge합니다. local base가 자기 remote branch보다 뒤처져 있으면 `upstream`은 먼저 `workbranch pull`을 하라고 안내합니다. 다만 base가 main branch인 경우처럼 그 remote branch가 바로 merge 대상이면 그대로 merge합니다. merge conflict가 있으면 어떤 base도 바꾸기 전에 멈춥니다.
 
 ### Combined flow
 

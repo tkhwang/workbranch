@@ -88,13 +88,19 @@ workbranch_git_pull_base() {
   git -C "$base_path" pull --ff-only origin "$base_branch" || die "failed to pull repo '$repo_name'"
 }
 
+# Merges the commit preflight replayed rather than the ref name, which a fetch
+# could have moved since. Options that merge.ff or branch.<name>.mergeOptions
+# can preset are spelled out, so success always means the base advanced.
+# --no-overwrite-ignore backs up the preflight scan; Git honors it only when
+# fast-forwarding.
 workbranch_git_merge_upstream() {
   repo_name=$1
   base_path=$2
-  source_ref=$3
-  # --ff is explicit so a user-level merge.ff setting cannot change the result.
-  git -C "$base_path" merge --ff --no-edit "$source_ref" ||
-    die "failed to merge $source_ref in repo '$repo_name'; if the merge stopped midway, resolve it in $base_path and commit, or run: git -C $base_path merge --abort"
+  source_commit=$3
+  source_name=$4
+  merge_message=$5
+  git -C "$base_path" merge --ff --commit --no-squash --no-overwrite-ignore --no-edit -m "$merge_message" "$source_commit" ||
+    die "failed to merge $source_name in repo '$repo_name'; if the merge stopped midway, resolve it in $base_path and commit, or run: git -C $(shell_quote "$base_path") merge --abort"
 }
 
 workbranch_git_checkout_base_branch() {
