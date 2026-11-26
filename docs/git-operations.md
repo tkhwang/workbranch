@@ -66,7 +66,7 @@ Safety:
 
 Direction: remote task branch -> task worktree.
 
-Create a task workspace on a branch that already exists on origin, instead of starting a new branch. `<branch>` may be written as `feat/login` or `origin/feat/login`. Without `<task>`, the task folder mirrors the branch name with `/` replaced by `-`, so `feat/login` becomes `feat-login`; pass `<task>` to choose another folder, or when the mirrored name is not path-safe. Every repo uses `<branch>` as its task branch, so there are no branch prompts. The branch is saved in `<task>/.workbranch.task`.
+Create a task workspace on a branch that already exists on origin, instead of starting a new branch. `<branch>` may be written as `feat/login` or `origin/feat/login`. Without `<task>`, the task folder mirrors the branch name with `/` replaced by `-`, so `feat/login` becomes `feat-login`; pass `<task>` to choose another folder, or when the mirrored name is not a valid task folder name. Every repo uses `<branch>` as its task branch, so there are no branch prompts. The branch is saved in `<task>/.workbranch.task`.
 
 For each repo, workbranch fetches origin and then asks origin whether the branch exists. A remote-tracking ref alone is not trusted, because it outlives a branch deleted on origin until it is pruned.
 
@@ -91,7 +91,7 @@ git worktree add <task>/<repo> -b <branch> HEAD
 
 Fails before creating anything when:
 
-- no repo has the branch on origin; use `workbranch add` to start a new task branch.
+- no repo has the branch on origin; use `workbranch add` to start a new task branch. A stale `origin/<branch>` ref is reported first, because `workbranch add` would stop on it too.
 - a local branch named `<branch>` already exists in any repo. The error names the worktree that has it checked out; otherwise delete the leftover branch.
 - `<branch>` is a repo's configured base branch.
 - a repo where origin no longer has the branch still holds a stale `origin/<branch>` ref. Drop it with `git branch -dr origin/<branch>`.
@@ -103,6 +103,7 @@ Safety:
 - Requires a clean base worktree on its configured branch only in repos where the branch is created from the base. Repos that track `origin/<branch>` do not read the base worktree.
 - Never deletes or prunes remote-tracking refs.
 - Runs configured setup commands as `workbranch add` does, and keeps the created worktrees if one fails.
+- Commands suggested in error output quote branch names and paths that a shell would otherwise split or expand.
 - `workbranch update` and `workbranch refresh` rebase this task branch onto the local base like any other task. Once that rebase rewrites commits already on origin, the branch no longer fast-forwards to `origin/<branch>` and `workbranch push <task>` refuses it.
 
 ### `workbranch pull`

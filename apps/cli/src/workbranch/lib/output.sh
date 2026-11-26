@@ -261,3 +261,19 @@ info_tool_opening() {
 success() { printf '%s[+]%s %s\n' "$WB_GREEN" "$WB_RESET" "$*"; }
 
 die() { printf '%s[-] Error:%s %s\n' "$WB_ERR_RED" "$WB_ERR_RESET" "$*" >&2; exit 1; }
+
+# Quotes a value for a command the user is told to paste into a shell. Plain
+# values print as they are; anything else is wrapped in single quotes, which
+# keeps non-ASCII paths readable where printf %q would escape every byte.
+shell_quote() {
+  local value quote escaped
+  value=$1
+  case "$value" in
+    ''|*[!ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._/:@%+-]*)
+      quote="'"
+      escaped="'\\''"
+      printf "'%s'" "${value//$quote/$escaped}"
+      ;;
+    *) printf '%s' "$value" ;;
+  esac
+}

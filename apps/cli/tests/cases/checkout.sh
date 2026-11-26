@@ -119,6 +119,12 @@ test_checkout_derives_task_folder_from_branch_name() {
   out=$(run_expect_fail "$WORKBRANCH" checkout feat/login+v2)
   assert_contains "$out" "cannot derive a task folder from branch 'feat/login+v2'"
   assert_contains "$out" "workbranch checkout feat/login+v2 <task>"
+
+  # feat-.x is path-safe, but as a task folder it would stand for the invalid branch feat/.x.
+  out=$(run_expect_fail "$WORKBRANCH" checkout feat-.x)
+  assert_contains "$out" "cannot derive a task folder from branch 'feat-.x'"
+  assert_contains "$out" "workbranch checkout feat-.x <task>"
+  assert_not_contains "$out" "invalid task detail name"
 }
 
 test_checkout_fails_when_no_repo_has_the_remote_branch() {
@@ -206,6 +212,55 @@ test_checkout_rejects_stale_remote_tracking_ref() {
   assert_upstream "$project/feat-login/frontend" "origin/feat/login"
   assert_no_upstream "$project/feat-login/backend"
   assert_not_exists "$project/feat-login/backend/remote-backend.txt"
+}
+
+test_checkout_reports_stale_ref_when_no_repo_has_the_branch() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  commit_to_remote_branch backend feat/login remote-backend
+  # A user-level fetch.prune would drop the stale ref before checkout sees it.
+  git -C "$project/_base/backend" config fetch.prune false
+  git -C "$project/_base/backend" fetch origin >/dev/null 2>&1
+  git --git-dir="$TMP_ROOT/remotes/backend.git" branch -D feat/login >/dev/null
+
+  out=$(run_expect_fail "$WORKBRANCH" checkout feat/login)
+  assert_contains "$out" "Cannot checkout: preflight failed"
+  assert_contains "$out" "_base/backend has a stale origin/feat/login; origin no longer has that branch"
+  assert_contains "$out" "branch -dr origin/feat/login"
+  assert_not_contains "$out" "no repo has remote branch"
+  assert_not_contains "$out" "workbranch add"
+  assert_not_exists "$project/feat-login"
+
+  git -C "$project/_base/backend" branch -dr origin/feat/login >/dev/null
+  out=$(run_expect_fail "$WORKBRANCH" checkout feat/login)
+  assert_contains "$out" "no repo has remote branch origin/feat/login"
+  assert_contains "$out" "To start a new task branch instead: workbranch add"
+}
+
+test_checkout_quotes_branch_in_suggested_commands() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+
+  out=$(run_expect_fail "$WORKBRANCH" checkout 'tk/a;b')
+  assert_contains "$out" "workbranch checkout 'tk/a;b' <task>"
+
+  git -C "$project/_base/frontend" branch 'tk/a;b'
+  out=$(run_expect_fail "$WORKBRANCH" checkout 'tk/a;b' review)
+  assert_contains "$out" "_base/frontend local branch tk/a;b already exists"
+  assert_contains "$out" "branch -d 'tk/a;b'"
+
+  commit_to_remote_branch backend 'tk/c;d' remote-backend
+  git -C "$project/_base/backend" config fetch.prune false
+  git -C "$project/_base/backend" fetch origin >/dev/null 2>&1
+  git --git-dir="$TMP_ROOT/remotes/backend.git" branch -D 'tk/c;d' >/dev/null
+  out=$(run_expect_fail "$WORKBRANCH" checkout 'tk/c;d' review)
+  assert_contains "$out" "_base/backend has a stale origin/tk/c;d; origin no longer has that branch"
+  assert_contains "$out" "branch -dr 'origin/tk/c;d'"
+  assert_not_exists "$project/review"
 }
 
 test_checkout_requires_clean_base_only_where_it_creates_the_branch() {

@@ -104,11 +104,13 @@ task_folder_from_parent_base() {
   printf '%s-%s' "$slug" "$name"
 }
 
-# Mirrors a branch name as a path-safe task folder: feat/login -> feat-login.
+# Mirrors a branch name as a task folder: feat/login -> feat-login. Fails when
+# the mirrored name is not a valid task folder, so the caller can ask for one.
+# The validators exit on failure, hence the subshell.
 task_folder_from_branch() {
   local slug
   slug=${1//\//-}
-  is_safe_name "$slug" || return 1
+  (validate_task_folder_name "$slug") >/dev/null 2>&1 || return 1
   printf '%s' "$slug"
 }
 

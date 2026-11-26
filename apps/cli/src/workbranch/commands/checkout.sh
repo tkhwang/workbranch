@@ -58,7 +58,7 @@ checkout_local_branch_exists_message() {
   printf '%s\n' \
     "$base_label local branch $branch already exists" \
     "Delete it, then retry:" \
-    "  git -C $base branch -d $branch"
+    "  git -C $(shell_quote "$base") branch -d $(shell_quote "$branch")"
 }
 
 checkout_stale_remote_ref_message() {
@@ -69,12 +69,12 @@ checkout_stale_remote_ref_message() {
   printf '%s\n' \
     "$base_label has a stale origin/$branch; origin no longer has that branch" \
     "Drop the stale ref, then retry:" \
-    "  git -C $base branch -dr origin/$branch"
+    "  git -C $(shell_quote "$base") branch -dr $(shell_quote "origin/$branch")"
 }
 
 # Decide how one repo joins the task: "track" when origin has the branch,
 # "create" when it does not and the branch starts from the local base worktree.
-# An empty mode means the repo failed preflight.
+# An empty mode means the repo is blocked by an error of its own.
 preflight_checkout_repo() {
   local index branch name base base_branch base_label state errors_before
   index=$1
@@ -87,22 +87,22 @@ preflight_checkout_repo() {
 
   if [ ! -d "$base/.git" ] && [ ! -f "$base/.git" ]; then
     preflight_error "$base_label missing git repo"
-    CHECKOUT_REMOTE_UNKNOWN=1
+    CHECKOUT_REPO_BLOCKED=1
     return 0
   fi
   if [ "$branch" = "$base_branch" ]; then
     preflight_error "$base_label $branch is the configured base branch"
-    CHECKOUT_REMOTE_UNKNOWN=1
+    CHECKOUT_REPO_BLOCKED=1
     return 0
   fi
   if branch_exists "$base" "$branch"; then
     preflight_error "$(checkout_local_branch_exists_message "$base_label" "$base" "$branch")"
-    CHECKOUT_REMOTE_UNKNOWN=1
+    CHECKOUT_REPO_BLOCKED=1
     return 0
   fi
   if ! workbranch_git_add_fetch_base "$base"; then
     preflight_error "$base_label failed to fetch origin"
-    CHECKOUT_REMOTE_UNKNOWN=1
+    CHECKOUT_REPO_BLOCKED=1
     return 0
   fi
 
@@ -115,12 +115,13 @@ preflight_checkout_repo() {
         CHECKOUT_REMOTE_FOUND=1
       else
         preflight_error "$base_label origin has $branch, but fetch did not create origin/$branch; check the remote fetch refspec"
-        CHECKOUT_REMOTE_UNKNOWN=1
+        CHECKOUT_REPO_BLOCKED=1
       fi
       ;;
     1)
       if git_ref_exists "$base" "origin/$branch"; then
         preflight_error "$(checkout_stale_remote_ref_message "$base_label" "$base" "$branch")"
+        CHECKOUT_REPO_BLOCKED=1
         return 0
       fi
       CHECKOUT_REPO_MODES[$index]=create
@@ -134,7 +135,7 @@ preflight_checkout_repo() {
       ;;
     *)
       preflight_error "$base_label failed to ask origin for branch $branch"
-      CHECKOUT_REMOTE_UNKNOWN=1
+      CHECKOUT_REPO_BLOCKED=1
       ;;
   esac
 }
@@ -144,7 +145,7 @@ preflight_checkout() {
   branch=$1
   CHECKOUT_REPO_MODES=()
   CHECKOUT_REMOTE_FOUND=0
-  CHECKOUT_REMOTE_UNKNOWN=0
+  CHECKOUT_REPO_BLOCKED=0
   reset_preflight
   i=0
   while [ $i -lt ${#REPO_NAMES[@]} ]; do
@@ -152,9 +153,11 @@ preflight_checkout() {
     i=$((i + 1))
   done
 
-  # Nothing to check out is the real problem; base worktree errors in repos that
-  # would only have received a new branch are noise next to it.
-  if [ "$CHECKOUT_REMOTE_FOUND" -eq 0 ] && [ "$CHECKOUT_REMOTE_UNKNOWN" -eq 0 ]; then
+  # When every repo simply lacks the branch, nothing to check out is the real
+  # problem, and base worktree errors in repos that would only have received a
+  # new branch are noise next to it. A blocked repo keeps its own error: the
+  # advice below would run into the same block.
+  if [ "$CHECKOUT_REMOTE_FOUND" -eq 0 ] && [ "$CHECKOUT_REPO_BLOCKED" -eq 0 ]; then
     printf '%s[-] Error:%s no repo has remote branch origin/%s\n' "$WB_ERR_RED" "$WB_ERR_RESET" "$branch" >&2
     printf '%s[*]%s To start a new task branch instead: workbranch add\n' "$WB_ERR_BLUE" "$WB_ERR_RESET" >&2
     exit 1
@@ -169,7 +172,7 @@ cmd_checkout() {
   if [ -n "$CHECKOUT_TASK" ]; then
     task=$CHECKOUT_TASK
   else
-    task=$(task_folder_from_branch "$branch") || die "cannot derive a task folder from branch '$branch'; name one: workbranch checkout $branch <task>"
+    task=$(task_folder_from_branch "$branch") || die "cannot derive a task folder from branch '$branch'; name one: workbranch checkout $(shell_quote "$branch") <task>"
   fi
   validate_task_folder_name "$task"
   CREATED_PATHS=()

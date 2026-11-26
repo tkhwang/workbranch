@@ -532,6 +532,21 @@ test_add_rejects_remote_only_task_branch_without_remove_advice() {
   assert_not_exists "$project/login"
 }
 
+test_add_remote_branch_hint_quotes_branch_for_shell() {
+  new_fixture
+  project="$FIXTURE_PROJECT"
+  cd "$project" || return 1
+  run_expect_success "$WORKBRANCH" init >/dev/null
+  commit_to_remote_branch frontend 'tk/a;b' remote-frontend
+
+  out=$(printf 'tk/a;b\n\n' | "$WORKBRANCH" add login 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "expected add to reject the existing remote branch"
+  assert_contains "$out" "Remote origin/tk/a;b exists; delete it outside workbranch before adding again."
+  assert_contains "$out" "To work on that remote branch instead: workbranch checkout 'tk/a;b'"
+  assert_not_exists "$project/login"
+}
+
 test_add_rejects_invalid_task_branch_override() {
   new_fixture
   project="$FIXTURE_PROJECT"

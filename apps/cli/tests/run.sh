@@ -167,6 +167,7 @@ main() {
   run_test test_add_task_branch_override_is_used_by_later_commands
   run_test test_add_rejects_existing_task_branch
   run_test test_add_rejects_remote_only_task_branch_without_remove_advice
+  run_test test_add_remote_branch_hint_quotes_branch_for_shell
   run_test test_add_rejects_invalid_task_branch_override
   run_test test_checkout_tracks_remote_branch_in_every_repo
   run_test test_checkout_starts_new_branch_in_repos_without_the_remote_branch
@@ -178,6 +179,8 @@ main() {
   run_test test_checkout_names_the_worktree_that_already_uses_the_branch
   run_test test_checkout_rejects_existing_task_directory
   run_test test_checkout_rejects_stale_remote_tracking_ref
+  run_test test_checkout_reports_stale_ref_when_no_repo_has_the_branch
+  run_test test_checkout_quotes_branch_in_suggested_commands
   run_test test_checkout_requires_clean_base_only_where_it_creates_the_branch
   run_test test_checkout_rejects_configured_base_branch
   run_test test_checkout_rejects_missing_or_extra_arguments

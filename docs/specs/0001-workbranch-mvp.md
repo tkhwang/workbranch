@@ -251,7 +251,7 @@ Safety: `.workbranch.config` is trusted project configuration. Setup commands ar
 
 ### `workbranch checkout <branch> [<task>]`
 
-Create one task workspace on a branch that already exists on origin. `<branch>` accepts an optional `origin/` prefix. Without `<task>`, the task folder is `<branch>` with `/` replaced by `-`; the command fails and asks for `<task>` when that is not a path-safe folder name. The command does not prompt.
+Create one task workspace on a branch that already exists on origin. `<branch>` accepts an optional `origin/` prefix. Without `<task>`, the task folder is `<branch>` with `/` replaced by `-`; the command fails and asks for `<task>` when that is not a valid task folder name. The command does not prompt.
 
 1. Fail if the task directory exists.
 2. For each repo, fail preflight if `_base/<repo>` is missing, if `<branch>` is the repo's configured base branch, or if a local branch named `<branch>` already exists.
