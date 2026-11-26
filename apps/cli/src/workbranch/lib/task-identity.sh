@@ -86,6 +86,16 @@ validate_task_folder_name() {
   validate_safe_name "task" "$value"
 }
 
+# The extra rule for a folder that is about to be created: commands that find
+# task workspaces skip dot-prefixed folders, so such a task could never be
+# addressed again.
+validate_new_task_folder_name() {
+  validate_task_folder_name "$1"
+  case "$(normalize_task_argument "$1")" in
+    .*) die "invalid task '$1': a task folder cannot start with '.'" ;;
+  esac
+}
+
 task_folder_from_identity() {
   local type detail
   type=$1
@@ -102,6 +112,16 @@ task_folder_from_parent_base() {
   validate_parent_base_task_name "$name" "$parent"
   slug=$(parent_branch_to_folder_slug "$parent")
   printf '%s-%s' "$slug" "$name"
+}
+
+# Mirrors a branch name as a task folder: feat/login -> feat-login. Fails when
+# the mirrored name is not a valid task folder, so the caller can ask for one.
+# The validators exit on failure, hence the subshell.
+task_folder_from_branch() {
+  local slug
+  slug=${1//\//-}
+  (validate_task_folder_name "$slug") >/dev/null 2>&1 || return 1
+  printf '%s' "$slug"
 }
 
 task_branch_from_identity() {

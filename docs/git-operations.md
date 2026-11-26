@@ -27,6 +27,7 @@ Maintenance:
 
 Optional:
   push <task> task        -> remote task branch
+  checkout    remote task branch -> task
 ```
 
 ## Commands
@@ -52,7 +53,7 @@ git fetch origin
 git worktree add <task>/<repo> -b <task-branch> <resolved-source-ref>
 ```
 
-If the task branch already exists locally or remotely, `workbranch add [<task>]` fails. For local task branches, run `workbranch remove <task>` to delete the local branch before adding again. For remote-only task branches, delete or rename the remote branch outside workbranch before adding again.
+If the task branch already exists locally or remotely, `workbranch add [<task>]` fails. For local task branches, run `workbranch remove <task>` to delete the local branch before adding again. For remote-only task branches, delete or rename the remote branch outside workbranch before adding again, or work on that branch with `workbranch checkout <branch>`.
 
 Safety:
 
@@ -60,6 +61,55 @@ Safety:
 - Keeps created worktrees if a configured setup command fails, prints the failed setup directory and command, and tells the user to fix setup with `workbranch config`, then rerun the shown command or remove and add the task again.
 - Uses the local base worktree HEAD, not `origin/<base-branch>`.
 - `workbranch remove <task>` deletes local task branches, so adding the same task after remove starts from the current local base again.
+
+### `workbranch checkout <branch> [<task>]`
+
+Direction: remote task branch -> task worktree.
+
+Create a task workspace on a branch that already exists on origin, instead of starting a new branch. `<branch>` may be written as `feat/login` or `origin/feat/login`; one leading `origin/` is read as the remote, so a branch whose own name starts with `origin/` takes the prefix twice. Without `<task>`, the task folder mirrors the branch name with `/` replaced by `-`, so `feat/login` becomes `feat-login`; pass `<task>` to choose another folder, or when the mirrored name is not a valid task folder name. Every repo uses `<branch>` as its task branch, so there are no branch prompts. The branch is saved in `<task>/.workbranch.task`.
+
+For each repo, workbranch fetches origin and then asks origin whether the branch exists. A remote-tracking ref alone is not trusted, because it outlives a branch deleted on origin until it is pruned.
+
+```bash
+cd _base/<repo>
+git fetch origin
+git ls-remote --exit-code --heads origin refs/heads/<branch>
+```
+
+Where origin has the branch, the task branch tracks it:
+
+```bash
+git branch --track <branch> refs/remotes/origin/<branch>
+git worktree add <task>/<repo> <branch>
+```
+
+The remote-tracking ref is named in full, so a tag or local branch called `origin/<branch>` is never mistaken for it. If Git cannot set up the upstream, the command fails instead of creating an untracked branch.
+
+Where origin does not have it, the repo gets a new branch of the same name from the local base worktree, as `workbranch add` would start it:
+
+```bash
+git branch --no-track <branch> HEAD
+git worktree add <task>/<repo> <branch>
+```
+
+Fails before creating anything when:
+
+- no repo has the branch on origin; use `workbranch add` to start a new task branch. A stale `origin/<branch>` ref is reported first, because `workbranch add` would stop on it too.
+- a local branch named `<branch>` already exists in any repo. The error names the worktree that has it checked out; otherwise delete the leftover branch.
+- `<branch>` is a repo's configured base branch.
+- a repo where origin no longer has the branch still holds a stale `origin/<branch>` ref. Drop it with `git branch -dr origin/<branch>`.
+- the task directory already exists.
+- `<task>` is given but empty, or starts with `.`; commands that find task workspaces skip dot-prefixed folders, and `workbranch add` rejects such a name for the same reason.
+
+Safety:
+
+- Rolls back the task directory, worktrees and branches created by the command if initialization, branch creation or worktree creation fails.
+- Rolls back only what it created. A task directory or branch that another process creates after preflight makes the command fail and is left in place.
+- Requires a clean base worktree on its configured branch only in repos where the branch is created from the base. Repos that track `origin/<branch>` do not read the base worktree.
+- Does not prune remote-tracking refs itself. Its `git fetch origin` still follows your Git configuration, so with `fetch.prune` or `remote.origin.prune` enabled the fetch drops stale refs; such a repo then has no stale ref to report and gets a new branch from the base.
+- Runs configured setup commands as `workbranch add` does, and keeps the created worktrees if one fails.
+- Commands suggested in error output quote branch names and paths that a shell would otherwise split or expand.
+- `workbranch update` and `workbranch refresh` rebase this task branch onto the local base like any other task. Once that rebase rewrites commits already on origin, the branch no longer fast-forwards to `origin/<branch>` and `workbranch push <task>` refuses it.
 
 ### `workbranch pull`
 
@@ -274,6 +324,14 @@ base feature/cpq  + explicit feat-task1    -> folder feat-task1         -> branc
 base master       + non-interactive login  -> folder login              -> branch feature/login
 base feature/cpq  + non-interactive task1  -> folder task1              -> branch feature/cpq-task1
 task key feat-login      + override tk/login -> tk/login
+```
+
+`workbranch checkout <branch> [<task>]` does not apply these defaults. It uses `<branch>` for every repo and mirrors it as the folder unless `<task>` is given:
+
+```text
+checkout feat/login           -> folder feat-login    -> branch feat/login
+checkout tk/login-fix         -> folder tk-login-fix  -> branch tk/login-fix
+checkout tk/login-fix review  -> folder review        -> branch tk/login-fix
 ```
 
 Chosen branches are persisted in `<task>/.workbranch.task`. Later commands resolve task branches in this order:

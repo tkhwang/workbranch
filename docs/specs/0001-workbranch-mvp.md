@@ -93,6 +93,7 @@ Rule:
 - For conventional task keys, repos on `main`/`master`-style bases default to `<type>/<detail>`. Repos on parent feature bases such as `feature/cpq` or `feat/cpq` default to `<base-branch>-<detail>`.
 - Non-interactive `workbranch add <task>` values without the conventional `type-` prefix keep the legacy default rule for script compatibility: parent feature base branches become `<base-branch>-<task>`, otherwise the default is `<BRANCH_PREFIX>/<task>` with `feature` as the compatibility fallback.
 - Task command arguments may include a completion-added trailing `/`; commands normalize that trailing slash before validation. Embedded slashes and path-like task arguments are still invalid.
+- A task folder that is being created cannot start with `.`: commands that find task workspaces skip dot-prefixed folders. `workbranch add` and `workbranch checkout` reject such a name.
 - Chosen branches are validated with `git check-ref-format --branch`; whitespace is not supported.
 - Chosen branches are persisted in `<task>/.workbranch.task` as `REPO_BRANCH <repo> <branch>` lines so later commands use the real branch.
 - Existing task workspaces without metadata keep working by falling back to the current task worktree branch, then the default rule.
@@ -220,7 +221,7 @@ For each repo:
 
 1. Ensure `_base/<repo>` exists and is clean.
 2. Show the repo's configured base branch, then prompt for the task branch name, defaulting from the branch naming rule above.
-3. Fail if the chosen local or remote task branch already exists. Local task branches can be deleted with `workbranch remove <task>` before adding again; remote-only task branches must be deleted or renamed outside workbranch.
+3. Fail if the chosen local or remote task branch already exists. Local task branches can be deleted with `workbranch remove <task>` before adding again; remote-only task branches must be deleted or renamed outside workbranch, or worked on with `workbranch checkout <branch>`.
 4. Create the task directory and write `<task>/.workbranch.task`.
 5. Create a new local task branch from the base branch, or from the resolved `--from` source ref when provided. Bare `--from feat/x` prefers `origin/feat/x`; explicit `origin/feat/x`, `refs/...`, `HEAD`, and existing local refs are also accepted.
 6. Create a linked worktree at `<task>/<repo>`.
@@ -248,6 +249,22 @@ WORKBRANCH_BASE_REPO_DIR
 ```
 
 Safety: `.workbranch.config` is trusted project configuration. Setup commands are executed with `sh -c`.
+
+### `workbranch checkout <branch> [<task>]`
+
+Create one task workspace on a branch that already exists on origin. `<branch>` accepts an optional `origin/` prefix. Without `<task>`, the task folder is `<branch>` with `/` replaced by `-`; the command fails and asks for `<task>` when that is not a valid task folder name. The command does not prompt.
+
+1. Fail if `<task>` is given but empty or starts with `.`, or if the task directory exists.
+2. For each repo, fail preflight if `_base/<repo>` is missing, if `<branch>` is the repo's configured base branch, or if a local branch named `<branch>` already exists.
+3. For each repo, fetch origin and ask origin whether exactly `refs/heads/<branch>` exists. A `refs/remotes/origin/<branch>` ref without the branch on origin is stale and fails preflight with the command that drops it.
+4. Fail if no repo has the branch on origin.
+5. In repos without the branch on origin, require `_base/<repo>` to be clean and on its configured base branch.
+6. Create the task directory, failing if it appeared since step 1, and write `<task>/.workbranch.task` with `<branch>` for every repo.
+7. In repos with the branch on origin, create a local `<branch>` that tracks `refs/remotes/origin/<branch>`, failing if the upstream cannot be set. In the others, create `<branch>` from the base worktree HEAD.
+8. Create a linked worktree at `<task>/<repo>`.
+9. Run configured setup commands as `workbranch add` does.
+
+If initialization or any repo fails, roll back the paths and branches this command created; a branch or directory created by another process in the meantime is left in place. Setup failures keep the created worktrees, as in `workbranch add`.
 
 ### `workbranch pull`
 

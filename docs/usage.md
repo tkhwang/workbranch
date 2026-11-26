@@ -22,6 +22,7 @@ macOS-only: `finder`, `ide`, `terminal`, `config ide`, and `config terminal`. On
 | `workbranch config ide`                  | Update only the configured IDE command                                       |
 | `workbranch config terminal`             | Update only the configured terminal command                                  |
 | `workbranch add [<task>] [--from <ref>]` | Create a task workspace                                                      |
+| `workbranch checkout <branch> [<task>]`  | Create a task workspace on a branch that already exists on origin            |
 | `workbranch list [--json]`               | Show repos and task workspaces; `--json` emits the companion-facing contract |
 | `workbranch remove <task>`               | Remove task worktrees and local task branches                                |
 | `workbranch doctor [--fix]`              | Diagnose project health; `--fix` prunes stale worktree registrations only    |

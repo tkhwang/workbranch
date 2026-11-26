@@ -46,12 +46,39 @@ workbranch_git_delete_task_branch() {
   fi
 }
 
+# Names the remote-tracking ref in full: a tag or branch called origin/<branch>
+# would otherwise win the lookup. Fails if Git cannot set up the upstream.
 workbranch_git_create_task_branch_from_remote() {
   base_path=$1
   task_branch=$2
   workbranch_git_prune_stale_worktrees "$base_path" || return 1
-  git -C "$base_path" branch --track "$task_branch" "origin/$task_branch" >/dev/null 2>&1 ||
-    git -C "$base_path" branch "$task_branch" "origin/$task_branch" >/dev/null 2>&1
+  git -C "$base_path" branch --track "$task_branch" "refs/remotes/origin/$task_branch" >/dev/null 2>&1
+}
+
+workbranch_git_create_task_branch_from_base() {
+  base_path=$1
+  task_branch=$2
+  workbranch_git_prune_stale_worktrees "$base_path" || return 1
+  git -C "$base_path" branch --no-track "$task_branch" HEAD >/dev/null 2>&1
+}
+
+# Asks origin itself, because a remote-tracking ref outlives a branch deleted on
+# origin until someone prunes it. Returns 0 when origin has the branch, 1 when it
+# does not, and 2 when origin could not be asked.
+workbranch_git_remote_branch_state() {
+  local remote_refs remote_ref tab
+  base_path=$1
+  task_branch=$2
+  tab=$(printf '\t')
+  remote_refs=$(git -C "$base_path" ls-remote --heads origin "refs/heads/$task_branch" 2>/dev/null) || return 2
+  # ls-remote matches the pattern against the tail of a ref, so
+  # refs/heads/x/refs/heads/<branch> would match too; compare the full name.
+  while IFS= read -r remote_ref || [ -n "$remote_ref" ]; do
+    [ "${remote_ref#*"$tab"}" = "refs/heads/$task_branch" ] && return 0
+  done <<EOF_REMOTE_REFS
+$remote_refs
+EOF_REMOTE_REFS
+  return 1
 }
 
 workbranch_git_pull_base() {

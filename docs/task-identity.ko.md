@@ -37,6 +37,8 @@ workbranch add
 
 다른 source ref에서 새 task branch를 시작하려면 `workbranch add [<task>] --from <ref>`를 사용하세요. 예를 들어 `workbranch add task1 --from feat/XXX`는 origin을 fetch한 뒤 `origin/feat/XXX`가 있으면 그것을 우선 사용하고, prompt로 정한 task branch 이름은 그대로 유지한 채 linked task worktree를 만듭니다. 이후 `workbranch status`는 여전히 task branch를 현재 local base와 비교하며, source ref는 생성 시점 정보일 뿐 지속적인 status 기준이 아닙니다.
 
+origin에 이미 있는 branch에서 작업하려면 새 branch를 만드는 대신 `workbranch checkout <branch> [<task>]`를 사용하세요. 예를 들어 `workbranch checkout feat/login`은 origin을 fetch한 뒤 `feat-login/<repo>` worktree를 만들고, 각 repo의 `feat/login` branch가 `origin/feat/login`을 추적하게 합니다. origin에 그 branch가 없는 repo에는 local base에서 같은 이름의 새 branch를 만들며, 어느 repo에도 없으면 실패합니다. Folder 이름은 branch 이름의 `/`를 `-`로 바꾼 값이고, 다른 folder를 쓰려면 `<task>`를 지정하세요.
+
 작업 중에는 `workbranch refresh`로 remote base branch를 `_base/<repo>`에 pull한 다음, 갱신된 local base 기준으로 모든 task workspace를 update할 수 있습니다. 하나의 task만 갱신하려면 `workbranch refresh <task>`를 사용합니다. `refresh`는 먼저 대상 task worktree들이 update 가능한지 확인하므로, dirty 상태이거나 막힌 task가 있으면 base branch를 pull하기 전에 중단합니다.
 
 repo를 다시 clone하지 않고 project 설정, base branch, IDE/terminal 실행 명령, repo별 setup command를 수정하려면 `workbranch config`를 사용합니다. base branch가 바뀌면 기존 `_base/<repo>` worktree를 fetch, checkout, fast-forward pull까지 해서 해당 branch로 맞춥니다. base branch만 수정하려면 `workbranch config base`를 사용합니다.
