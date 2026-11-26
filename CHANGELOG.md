@@ -7,6 +7,8 @@
 
 * **checkout:** 원격 브랜치 기반 작업 공간 생성 명령 추가하기 ([bf599fa](https://github.com/tkhwang/workbranch/commit/bf599fa07f672b3f7977b82f6d00e7e47cce84bd))
 * **checkout:** 원격 브랜치 기반 작업 공간 생성 명령 추가하기 ([b9d49b5](https://github.com/tkhwang/workbranch/commit/b9d49b5b5e8357907c7168fc6a8158302b5dcc94))
+* **upstream:** origin 기본 브랜치를 로컬 base 브랜치로 merge하는 upstream 명령 추가하기 ([c240673](https://github.com/tkhwang/workbranch/commit/c2406737636db41f147af4af65739c7a2f7947dc))
+* **upstream:** origin 기본 브랜치를 로컬 base 브랜치로 merge하는 upstream 명령 추가하기 ([0935c12](https://github.com/tkhwang/workbranch/commit/0935c120657ac4e60c17b6f00b32f4fe673e4543))
 
 
 ### Bug Fixes
@@ -15,6 +17,9 @@
 * **checkout:** stale ref 안내 누락과 안내 명령 quoting 보완하기 ([80f0564](https://github.com/tkhwang/workbranch/commit/80f05641be6d5f1cd9ca86ba164a6f9a26ceae60))
 * **checkout:** 생성·롤백 경쟁 조건과 원격 브랜치 판별 보완하기 ([9505930](https://github.com/tkhwang/workbranch/commit/95059305045a7ac0a3a71d0c2a0c9cdf793828a6))
 * **registry:** Ubuntu 26.04에서 배타성이 깨지는 mkdir 잠금 교체하기 ([9fde2a5](https://github.com/tkhwang/workbranch/commit/9fde2a556cf8c23915c8568a631a4042162b9249))
+* **upstream:** 2차 리뷰 지적 사항 반영하기 ([c3c8331](https://github.com/tkhwang/workbranch/commit/c3c833192f15ddc989c32c198ea70ee35183f17c))
+* **upstream:** PR 리뷰 지적 사항 반영하기 ([e93cafe](https://github.com/tkhwang/workbranch/commit/e93cafef1b386857e969182615742dde0af77aad))
+* **upstream:** 줄바꿈만으로 된 경로도 덮어쓰기 검사에서 보고하기 ([cc5f12b](https://github.com/tkhwang/workbranch/commit/cc5f12b1587a77283bda00ba2d351c3c1dc3d895))
 
 ## [2.41.0](https://github.com/tkhwang/workbranch/compare/v2.40.0...v2.41.0) (2026-11-02)
 
