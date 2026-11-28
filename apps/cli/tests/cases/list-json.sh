@@ -481,7 +481,7 @@ assert d["schemaVersion"] == 2, d
 assert [p["root"] for p in d["projects"]] == [expected], d
 assert d["projects"][0]["tasks"][0]["name"] == "login", d
 assert d["errors"] and d["errors"][0]["root"] == "/tmp/workbranch-missing-root", d
-assert "message" in d["errors"][0], d' "$project"
+assert d["errors"][0]["message"].startswith("project root not found"), d' "$project"
 }
 
 
@@ -525,4 +525,37 @@ d=json.load(sys.stdin)
 assert d["schemaVersion"] == 2, d
 assert d["projects"] == [], d
 assert len(d["errors"]) == 2, d'
+}
+
+
+test_list_global_names_why_a_registered_root_is_unavailable() {
+  TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
+  xdg="$TMP_ROOT/xdg"
+  registry="$xdg/workbranch-companion/projects.md"
+  missing="$TMP_ROOT/moved-away"
+  locked="$TMP_ROOT/locked"
+  mkdir -p "$xdg/workbranch-companion" "$locked"
+  cat > "$registry" <<EOF_REGISTRY
+# workbranch companion projects
+
+## projects
+- $missing
+- $locked
+EOF_REGISTRY
+
+  chmod 000 "$locked"
+  json=$(cd "$TMP_ROOT" && run_expect_fail env XDG_CONFIG_HOME="$xdg" "$WORKBRANCH" list --global --json)
+  human=$(cd "$TMP_ROOT" && run_expect_fail env XDG_CONFIG_HOME="$xdg" "$WORKBRANCH" list --global)
+  chmod 755 "$locked"
+
+  printf '%s' "$json" | python3 -c 'import json, sys
+missing, locked, registry = sys.argv[1:4]
+d = json.load(sys.stdin)
+messages = {e["root"]: e["message"] for e in d["errors"]}
+assert messages == {
+    missing: "project root not found; update or remove it in " + registry,
+    locked: "project root is not accessible",
+}, d' "$missing" "$locked" "$registry" || return 1
+  assert_contains "$human" "[-] Error: $missing: project root not found; update or remove it in $registry"
+  assert_contains "$human" "[-] Error: $locked: project root is not accessible"
 }

@@ -253,6 +253,7 @@ main() {
   run_test test_list_global_json_projects_and_errors
   run_test test_list_global_uses_stable_launcher_after_changing_directory
   run_test test_list_global_json_all_roots_failure_is_nonzero
+  run_test test_list_global_names_why_a_registered_root_is_unavailable
   run_test test_destroy_force_removes_project_and_registry
   run_test test_destroy_force_continues_when_base_repo_is_missing
   run_test test_destroy_blocks_dirty_without_force
