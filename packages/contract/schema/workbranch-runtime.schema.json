@@ -172,6 +172,128 @@
                 }
               }
             }
+          },
+          "turns": {
+            "description": "Optional. When the session's turns began in the last 3 hours, oldest first: `prompt` for a request the user sent, `agent` for a report from a subagent; at most 50.",
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "at"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "prompt",
+                    "agent"
+                  ]
+                },
+                "at": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "calls": {
+            "description": "Optional. The session's tool calls in the last 3 hours, oldest first; at most 300. `tool` is the provider's own tool name, `files` the names (never paths) of the files the call touched, `failed` true when the provider reported the call failed.",
+            "type": "array",
+            "maxItems": 300,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "tool",
+                "at"
+              ],
+              "properties": {
+                "tool": {
+                  "type": "string"
+                },
+                "files": {
+                  "type": "array",
+                  "maxItems": 8,
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "failed": {
+                  "type": "boolean"
+                },
+                "at": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "todos": {
+            "description": "Optional. How far the agent's todo list has come, as its todo tools (Claude Code TodoWrite, TaskCreate, TaskUpdate; Codex update_plan) last left it: its size, how many are done, and the text of the one in progress (absent when none is). Absent when the session has no todos.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "total",
+              "done"
+            ],
+            "properties": {
+              "total": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "done": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "active": {
+                "type": "string"
+              }
+            }
+          },
+          "lastTurn": {
+            "description": "Optional. What the session's last request turn left once it ended: the files its edits changed, the lines they added and removed (from the edit input: exact for Codex patches, approximate for Claude Code edits), how its last test command went (passed, failed, unknown when the provider did not say, none without one) and the commits it made. Absent while the turn runs and from older collectors.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "startedAt",
+              "filesChanged",
+              "linesAdded",
+              "linesRemoved",
+              "tests",
+              "commits"
+            ],
+            "properties": {
+              "startedAt": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "filesChanged": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "linesAdded": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "linesRemoved": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "tests": {
+                "enum": [
+                  "passed",
+                  "failed",
+                  "unknown",
+                  "none"
+                ]
+              },
+              "commits": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
           }
         }
       }

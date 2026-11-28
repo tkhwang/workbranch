@@ -204,6 +204,9 @@ test("runtime collector snapshot satisfies its independent schema", () => {
   const collector=join(repoRoot,"apps/agent-runtime/target/debug/workbranch-agent-runtime");
   const env={...process.env,WORKBRANCH_RUNTIME_DIR:join(dir,"runtime")};
   execFileSync(collector,["ingest","claude"],{env,input:JSON.stringify({session_id:"contract",hook_event_name:"UserPromptSubmit",cwd:workspace,prompt:"Contract fixture"})});
+  execFileSync(collector,["ingest","claude"],{env,input:JSON.stringify({session_id:"contract",hook_event_name:"PreToolUse",cwd:workspace,tool_use_id:"edit-1",tool_name:"Edit",tool_input:{file_path:join(workspace,"src","store.rs"),old_string:"a",new_string:"b"}})});
+  execFileSync(collector,["ingest","claude"],{env,input:JSON.stringify({session_id:"contract",hook_event_name:"PostToolUse",cwd:workspace,tool_use_id:"todo-1",tool_name:"TodoWrite",tool_input:{todos:[{content:"Write the ring",status:"in_progress"},{content:"Test it",status:"pending"}]}})});
+  execFileSync(collector,["ingest","claude"],{env,input:JSON.stringify({session_id:"contract",hook_event_name:"Stop",cwd:workspace})});
   const snapshot=JSON.parse(execFileSync(collector,["snapshot"],{env,encoding:"utf8"}));
   const ajv=new Ajv2020({allErrors:true});
   validateOrThrow(ajv.compile(readJson("schema/workbranch-runtime.schema.json")),snapshot);
@@ -211,5 +214,9 @@ test("runtime collector snapshot satisfies its independent schema", () => {
   assert.equal(snapshot.sessions[0].prompt,"Contract fixture");
   assert.equal(snapshot.sessions[0].transitions[0].state,"running");
   assert.equal(typeof snapshot.sessions[0].totals.running,"number");
+  assert.deepEqual(snapshot.sessions[0].turns.map((t)=>t.kind),["prompt"]);
+  assert.deepEqual(snapshot.sessions[0].calls.map((c)=>[c.tool,c.files]),[["Edit",["store.rs"]]]);
+  assert.deepEqual(snapshot.sessions[0].todos,{total:2,done:0,active:"Write the ring"});
+  assert.deepEqual(snapshot.sessions[0].lastTurn,{startedAt:snapshot.sessions[0].lastTurn.startedAt,filesChanged:1,linesAdded:1,linesRemoved:1,tests:"none",commits:0});
  } finally {rmSync(dir,{recursive:true,force:true});}
 });
