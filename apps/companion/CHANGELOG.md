@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.41.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.40.0...workbranch-companion-v2.41.0) (2026-11-28)
+
+
+### Features
+
+* **companion:** update dashboard ui - agent observability ([380f39e](https://github.com/tkhwang/workbranch/commit/380f39e13f3dcd49a0c51d194a1b5207e80b6a08))
+* **companion:** 잠금 화면 dashboard 를 task 링으로 바꾸기 ([a5dc3e5](https://github.com/tkhwang/workbranch/commit/a5dc3e5dde3168321d029259fdfe873fca3a5978))
+
+
+### Bug Fixes
+
+* **companion:** PR [#273](https://github.com/tkhwang/workbranch/issues/273) 2차 리뷰의 도구 묶음·오류 판정·격자·접근성 지적 반영하기 ([5bdf7de](https://github.com/tkhwang/workbranch/commit/5bdf7de5cc56af5f72aadcec14fc98cb8e17aa75))
+* **companion:** PR [#273](https://github.com/tkhwang/workbranch/issues/273) 리뷰의 오류 판정·요약 선택 지적 반영하기 ([02c4993](https://github.com/tkhwang/workbranch/commit/02c49938b6d62eae5c47f2e1c18c1f31799875f4))
+
 ## [2.40.0](https://github.com/tkhwang/workbranch/compare/workbranch-companion-v2.39.0...workbranch-companion-v2.40.0) (2026-10-21)
 
 
