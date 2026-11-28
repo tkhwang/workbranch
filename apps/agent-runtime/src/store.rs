@@ -51,9 +51,16 @@ pub struct Session {
     /// Snapshot only: how far the todo list has come.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub todos: Option<TodoSummary>,
-    /// Snapshot only: what the last turn left, once it has ended.
+    /// What the last request turn left, summed when it ended and kept in the
+    /// session row, so it outlives the call log it was read from. The
+    /// snapshot carries it only while the session is still finished.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_turn: Option<TurnSummary>,
+    /// The highest call-log rowid when the current request turn began: the
+    /// turn's calls are the ones logged after it, however fast turns follow
+    /// each other. Never in the snapshot.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub turn_calls_after: i64,
     /// Snapshot only: the last day of state changes. Never stored in `data`;
     /// the transition log is the record.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -411,7 +418,7 @@ fn transitions_of(db: &Connection, s: &Session) -> Result<Vec<Transition>> {
 }
 
 /// What the session's last request turn left, once that turn has ended.
-fn turn_summary(db: &Connection, s: &Session) -> Result<Option<TurnSummary>> {
+pub fn turn_summary(db: &Connection, s: &Session) -> Result<Option<TurnSummary>> {
     let Some(start) = s.turns.iter().rev().find(|turn| turn.kind == "prompt").map(|turn| turn.at) else {
         return Ok(None);
     };
@@ -419,10 +426,10 @@ fn turn_summary(db: &Connection, s: &Session) -> Result<Option<TurnSummary>> {
         return Ok(None);
     }
     let mut stmt = db.prepare(
-        "SELECT files, edit, added, removed, kind, failed FROM tool_calls WHERE workspace=? AND provider=? AND session=? AND agent=? AND at >= ? ORDER BY at, rowid",
+        "SELECT files, edit, added, removed, kind, failed FROM tool_calls WHERE workspace=? AND provider=? AND session=? AND agent=? AND rowid > ? ORDER BY rowid",
     )?;
     let rows = stmt.query_map(
-        params![s.workspace, s.provider, s.session_id, s.agent_id, i64::try_from(start)?],
+        params![s.workspace, s.provider, s.session_id, s.agent_id, s.turn_calls_after],
         |r| {
             Ok((
                 r.get::<_, String>(0)?,
@@ -443,7 +450,8 @@ fn turn_summary(db: &Connection, s: &Session) -> Result<Option<TurnSummary>> {
     for row in rows {
         let (names, edit, added, removed, kind, failed) = row?;
         let kinds: Vec<&str> = kind.split(' ').collect();
-        if edit {
+        // An edit the provider rejected changed nothing.
+        if edit && !failed {
             for name in serde_json::from_str::<Vec<String>>(&names).unwrap_or_default() {
                 if !files.contains(&name) {
                     files.push(name);
@@ -462,8 +470,8 @@ fn turn_summary(db: &Connection, s: &Session) -> Result<Option<TurnSummary>> {
             }
             .into();
         }
-        if kinds.contains(&"commit") && !failed {
-            summary.commits += 1;
+        if !failed {
+            summary.commits += kinds.iter().filter(|kind| **kind == "commit").count();
         }
     }
     summary.files_changed = files.len();
@@ -570,9 +578,12 @@ pub fn snapshot(db: &Connection, now: u64) -> Result<Vec<Session>> {
         }
         if calls_logged {
             s.calls = calls_of(db, &s, ring_start)?;
-            s.last_turn = turn_summary(db, &s)?;
         }
         s.turns.retain(|turn| turn.at >= ring_start);
+        if s.state != "finished" {
+            s.last_turn = None;
+        }
+        s.turn_calls_after = 0;
         s.todos = todo_summary(&s.todo_items);
         s.todo_items.clear();
         s.closed = false;
@@ -637,4 +648,13 @@ pub fn open_read(path: &Path) -> Result<Connection> {
 
 fn is_false(value: &bool) -> bool {
     !value
+}
+
+fn is_zero(value: &i64) -> bool {
+    *value == 0
+}
+
+/// The highest rowid in the call log, 0 when it is empty.
+pub fn last_call_rowid(db: &Connection) -> Result<i64> {
+    Ok(db.query_row("SELECT coalesce(max(rowid), 0) FROM tool_calls", [], |r| r.get(0))?)
 }

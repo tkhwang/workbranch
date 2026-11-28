@@ -1069,3 +1069,77 @@ fn claude_hooks_register_subagent_stop() {
     let hooks: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
     assert_eq!(hooks["hooks"]["SubagentStop"], hooks["hooks"]["Stop"]);
 }
+
+#[test]
+fn a_rejected_edit_is_left_out_of_the_turn_summary() {
+    let mut db = store::open_memory().unwrap();
+    claude(&mut db, json!({"hook_event_name":"UserPromptSubmit","prompt":"go"}), 10);
+    let mut edit = fixture("claude-edit.json");
+    edit["tool_use_id"] = json!("bad");
+    claude(&mut db, edit.clone(), 11);
+    edit["hook_event_name"] = json!("PostToolUseFailure");
+    edit["error"] = json!("old_string not found");
+    claude(&mut db, edit, 12);
+    claude(&mut db, fixture("claude-write.json"), 13);
+    claude(&mut db, json!({"hook_event_name":"Stop"}), 14);
+    let summary = last_turn(&db, 20).unwrap();
+    assert_eq!((summary.files_changed, summary.lines_added, summary.lines_removed), (1, 3, 0));
+}
+
+#[test]
+fn every_providers_shell_tool_is_classified() {
+    for tool_name in ["Bash", "shell", "exec_command", "local_shell", "run_terminal_command"] {
+        assert_eq!(tool::command_kinds(tool_name, &json!({"command": "pnpm test"})), ["test"], "{tool_name}");
+    }
+    assert_eq!(
+        tool::command_kinds("exec_command", &json!({"command": ["git", "commit", "-m", "x"]})),
+        ["commit"]
+    );
+}
+
+#[test]
+fn each_commit_in_a_compound_command_counts() {
+    assert_eq!(kinds("git commit -m a && git commit -m b"), ["commit", "commit"]);
+    let mut db = store::open_memory().unwrap();
+    claude(&mut db, json!({"hook_event_name":"UserPromptSubmit","prompt":"go"}), 10);
+    bash(&mut db, "c", "git add -A && git commit -m a && git commit --allow-empty -m b", true, 11);
+    claude(&mut db, json!({"hook_event_name":"Stop"}), 13);
+    assert_eq!(last_turn(&db, 20).unwrap().commits, 2);
+}
+
+#[test]
+fn reordered_lines_count_as_changes() {
+    assert_eq!(tool::line_changes("Edit", &json!({"old_string": "a\nb", "new_string": "b\na"})), (1, 1));
+    assert_eq!(tool::line_changes("Edit", &json!({"old_string": "a\nb\nc", "new_string": "a\nb\nc"})), (0, 0));
+    let big_old = (0..600).map(|i| i.to_string()).collect::<Vec<_>>().join("\n");
+    let big_new = format!("{big_old}\nextra");
+    assert_eq!(tool::line_changes("Edit", &json!({"old_string": big_old, "new_string": big_new})), (1, 0));
+}
+
+#[test]
+fn a_turn_keeps_its_own_calls_when_the_next_prompt_comes_in_the_same_second() {
+    let mut db = store::open_memory().unwrap();
+    claude(&mut db, json!({"hook_event_name":"UserPromptSubmit","prompt":"one"}), 10);
+    claude(&mut db, fixture("claude-write.json"), 20);
+    claude(&mut db, json!({"hook_event_name":"Stop"}), 20);
+    claude(&mut db, json!({"hook_event_name":"UserPromptSubmit","prompt":"two"}), 20);
+    claude(&mut db, json!({"hook_event_name":"Stop"}), 21);
+    let summary = last_turn(&db, 30).unwrap();
+    assert_eq!(summary.started_at, 20);
+    assert_eq!(summary.files_changed, 0, "the write belongs to the first turn");
+}
+
+#[test]
+fn an_ended_turns_summary_outlives_the_call_log() {
+    let mut db = store::open_memory().unwrap();
+    claude(&mut db, json!({"hook_event_name":"UserPromptSubmit","prompt":"go"}), 10);
+    claude(&mut db, fixture("claude-write.json"), 11);
+    claude(&mut db, json!({"hook_event_name":"Stop"}), 12);
+    // Another session writes a day later; the purge empties the call log.
+    hook(&mut db, "UserPromptSubmit", "", 12 + 86400 + 10);
+    assert_eq!(call_rows(&db), 0);
+    let summary = last_turn(&db, 12 + 86400 + 20).unwrap();
+    assert_eq!((summary.files_changed, summary.lines_added), (1, 3));
+    claude(&mut db, json!({"hook_event_name":"UserPromptSubmit","prompt":"next"}), 12 + 86400 + 30);
+    assert_eq!(last_turn(&db, 12 + 86400 + 40), None, "a running turn shows no summary");
+}

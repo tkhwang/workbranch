@@ -267,6 +267,8 @@ pub fn ingest(
             // A request repeated under the same turn id starts no new turn.
             if turn.is_empty() || s.turn_id != turn {
                 store::remember_turn(&mut s.turns, "prompt", now);
+                s.turn_calls_after = store::last_call_rowid(&tx)?;
+                s.last_turn = None;
             }
             if !s.turn_id.is_empty() && s.turn_id != turn {
                 s.retired_turns.push(s.turn_id.clone());
@@ -460,6 +462,8 @@ pub fn ingest(
         }
         "Stop" | "Interrupt" | "StopFailure" => {
             s.state = "finished".into();
+            // Summed now, while the turn's calls are all in the log.
+            s.last_turn = store::turn_summary(&tx, &s)?;
             s.waits.clear();
             s.active_tools.clear();
             let response = string(v, "last_assistant_message");

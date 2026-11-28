@@ -220,7 +220,8 @@ pub fn apply_todo(items: &mut Vec<TodoItem>, change: TodoChange) {
 
 /// Lines an edit adds and removes, from its input alone (COMP004 R4): a Codex
 /// patch counts its `+` and `-` lines exactly; a Claude Code edit compares
-/// the old and new text line by line, so a moved line counts once each way;
+/// the old and new text line by line in order, so a moved line counts once
+/// each way;
 /// a write counts the new file's lines as added.
 pub fn line_changes(tool: &str, input: &Value) -> (u32, u32) {
     let text = |key: &str| input.get(key).and_then(Value::as_str).unwrap_or("");
@@ -261,27 +262,68 @@ fn patch_lines(patch: &str) -> (u32, u32) {
     (added, removed)
 }
 
-// Lines of `new` not matched in `old` were added; lines of `old` not matched
-// in `new` were removed. Each line matches at most once.
+/// Line pairs an edit compares in order before it falls back to an unordered
+/// match, which keeps a huge edit from costing the hook its time budget.
+const ORDERED_DIFF_LIMIT: usize = 250_000;
+
+// Lines kept in order are the longest common subsequence of the two texts;
+// everything else was added or removed, so a moved line counts once each way.
 fn edit_lines(old: &str, new: &str) -> (u32, u32) {
-    let mut unmatched: Vec<&str> = old.lines().collect();
-    let mut added = 0;
-    for line in new.lines() {
-        match unmatched.iter().position(|old_line| *old_line == line) {
-            Some(index) => {
-                unmatched.swap_remove(index);
-            }
-            None => added += 1,
-        }
-    }
-    (added, count(unmatched.len()))
+    let old: Vec<&str> = old.lines().collect();
+    let new: Vec<&str> = new.lines().collect();
+    let kept = if old.len().saturating_mul(new.len()) <= ORDERED_DIFF_LIMIT {
+        common_lines(&old, &new)
+    } else {
+        unordered_common_lines(&old, &new)
+    };
+    (count(new.len() - kept), count(old.len() - kept))
 }
 
-/// What a shell command is, for the turn summary (COMP004 R4): `test` when any
-/// of its parts runs a test suite, `commit` when one makes a git commit. The
-/// command itself is never kept.
+fn common_lines(old: &[&str], new: &[&str]) -> usize {
+    let mut row = vec![0usize; new.len() + 1];
+    for old_line in old {
+        let mut diagonal = 0;
+        for (j, new_line) in new.iter().enumerate() {
+            let above = row[j + 1];
+            row[j + 1] = if old_line == new_line {
+                diagonal + 1
+            } else {
+                above.max(row[j])
+            };
+            diagonal = above;
+        }
+    }
+    row[new.len()]
+}
+
+fn unordered_common_lines(old: &[&str], new: &[&str]) -> usize {
+    let mut unmatched = old.to_vec();
+    new.iter()
+        .filter(|line| {
+            unmatched
+                .iter()
+                .position(|old_line| old_line == *line)
+                .map(|index| unmatched.swap_remove(index))
+                .is_some()
+        })
+        .count()
+}
+
+/// The providers' shell tools: Claude Code's and Codex's canonical `Bash`,
+/// Codex's older names, and Grok's terminal tool.
+const SHELL_TOOLS: [&str; 5] = [
+    "Bash",
+    "shell",
+    "exec_command",
+    "local_shell",
+    "run_terminal_command",
+];
+
+/// What a shell command is, for the turn summary (COMP004 R4): `test` once
+/// when any of its parts runs a test suite, and `commit` once for every part
+/// that makes a git commit. The command itself is never kept.
 pub fn command_kinds(tool: &str, input: &Value) -> Vec<&'static str> {
-    if tool != "Bash" {
+    if !SHELL_TOOLS.contains(&tool) {
         return Vec::new();
     }
     let command = match input.get("command") {
@@ -305,9 +347,12 @@ pub fn command_kinds(tool: &str, input: &Value) -> Vec<&'static str> {
     if parts.iter().any(|words| is_test(words)) {
         kinds.push("test");
     }
-    if parts.iter().any(|words| is_commit(words)) {
-        kinds.push("commit");
-    }
+    kinds.extend(
+        parts
+            .iter()
+            .filter(|words| is_commit(words))
+            .map(|_| "commit"),
+    );
     kinds
 }
 
