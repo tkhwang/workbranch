@@ -528,34 +528,71 @@ assert len(d["errors"]) == 2, d'
 }
 
 
-test_list_global_names_why_a_registered_root_is_unavailable() {
+test_list_global_names_a_missing_registered_root() {
   TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
   xdg="$TMP_ROOT/xdg"
   registry="$xdg/workbranch-companion/projects.md"
   missing="$TMP_ROOT/moved-away"
-  locked="$TMP_ROOT/locked"
-  mkdir -p "$xdg/workbranch-companion" "$locked"
+  file="$TMP_ROOT/plain-file"
+  dangling="$TMP_ROOT/dangling-link"
+  mkdir -p "$xdg/workbranch-companion"
+  : > "$file"
+  ln -s "$TMP_ROOT/never-created" "$dangling"
   cat > "$registry" <<EOF_REGISTRY
 # workbranch companion projects
 
 ## projects
 - $missing
-- $locked
+- $file
+- $dangling
 EOF_REGISTRY
 
-  chmod 000 "$locked"
   json=$(cd "$TMP_ROOT" && run_expect_fail env XDG_CONFIG_HOME="$xdg" "$WORKBRANCH" list --global --json)
   human=$(cd "$TMP_ROOT" && run_expect_fail env XDG_CONFIG_HOME="$xdg" "$WORKBRANCH" list --global)
-  chmod 755 "$locked"
 
   printf '%s' "$json" | python3 -c 'import json, sys
-missing, locked, registry = sys.argv[1:4]
+registry, roots = sys.argv[1], sys.argv[2:]
 d = json.load(sys.stdin)
-messages = {e["root"]: e["message"] for e in d["errors"]}
-assert messages == {
-    missing: "project root not found; update or remove it in " + registry,
-    locked: "project root is not accessible",
-}, d' "$missing" "$locked" "$registry" || return 1
+expected = "project root not found; update or remove it in " + registry
+assert {e["root"]: e["message"] for e in d["errors"]} == {root: expected for root in roots}, d' "$registry" "$missing" "$file" "$dangling" || return 1
   assert_contains "$human" "[-] Error: $missing: project root not found; update or remove it in $registry"
-  assert_contains "$human" "[-] Error: $locked: project root is not accessible"
+}
+
+
+test_list_global_names_an_inaccessible_registered_root() {
+  TMP_ROOT=$(mktemp -d 2>/dev/null || mktemp -d -t workbranch-test)
+  xdg="$TMP_ROOT/xdg"
+  registry="$xdg/workbranch-companion/projects.md"
+  locked="$TMP_ROOT/locked"
+  sealed="$TMP_ROOT/sealed"
+  behind="$sealed/project"
+  link="$TMP_ROOT/link-to-sealed-project"
+  mkdir -p "$xdg/workbranch-companion" "$locked" "$behind"
+  ln -s "$behind" "$link"
+  cat > "$registry" <<EOF_REGISTRY
+# workbranch companion projects
+
+## projects
+- $locked
+- $behind
+- $link
+EOF_REGISTRY
+
+  chmod 000 "$locked" "$sealed"
+  if (cd "$locked") 2>/dev/null; then
+    # Directory permissions do not stop this user (root), so none of these
+    # roots is inaccessible here.
+    chmod 755 "$locked" "$sealed"
+    log "[*] skipped: directory permissions do not restrict this user"
+    return 0
+  fi
+  json=$(cd "$TMP_ROOT" && run_expect_fail env XDG_CONFIG_HOME="$xdg" "$WORKBRANCH" list --global --json)
+  human=$(cd "$TMP_ROOT" && run_expect_fail env XDG_CONFIG_HOME="$xdg" "$WORKBRANCH" list --global)
+  chmod 755 "$locked" "$sealed"
+
+  printf '%s' "$json" | python3 -c 'import json, sys
+roots = sys.argv[1:]
+d = json.load(sys.stdin)
+assert {e["root"]: e["message"] for e in d["errors"]} == {root: "project root is not accessible" for root in roots}, d' "$locked" "$behind" "$link" || return 1
+  assert_contains "$human" "[-] Error: $behind: project root is not accessible"
 }

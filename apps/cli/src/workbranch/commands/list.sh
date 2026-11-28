@@ -315,19 +315,24 @@ workbranch_self_path() {
 }
 
 # Runs `workbranch list` inside one registered root. A root it cannot enter
-# (moved, deleted or unreadable) prints the reason and fails; the silenced cd
-# used to leave that error with an empty message.
+# prints why and fails. Only a path the system reports as absent asks for a
+# registry edit: `[ -d ]` would also call a root behind an unsearchable parent
+# or symlink target missing, so the reason is read from cd in the C locale.
 list_registered_root() {
-  local root self
+  local root self reason
   root=$1
   self=$2
   shift 2
   if ! cd "$root" 2>/dev/null; then
-    if [ -d "$root" ]; then
-      printf 'project root is not accessible'
-    else
-      printf 'project root not found; update or remove it in %s' "$(registry_path)"
-    fi
+    reason=$(LC_ALL=C; cd "$root" 2>&1 || exit)
+    case "${reason##*: }" in
+      "No such file or directory"|"Not a directory")
+        printf 'project root not found; update or remove it in %s' "$(registry_path)"
+        ;;
+      *)
+        printf 'project root is not accessible'
+        ;;
+    esac
     return 1
   fi
   "$self" list "$@" 2>&1
