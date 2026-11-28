@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.43.1](https://github.com/tkhwang/workbranch/compare/v2.43.0...v2.43.1) (2026-11-28)
+
+
+### Bug Fixes
+
+* **cli:** list --global 에서 접근할 수 없는 root 의 오류 이유 밝히기 ([ed16502](https://github.com/tkhwang/workbranch/commit/ed16502cafa4e5f88b92fd5476422e735c88d0dd))
+* **cli:** list --global 에서 접근할 수 없는 root 의 오류 이유 밝히기 ([9df5f70](https://github.com/tkhwang/workbranch/commit/9df5f706bceeb2150f0a90eb89d3206d92a9d997))
+* **cli:** PR [#276](https://github.com/tkhwang/workbranch/issues/276) 리뷰의 권한 오류 판정·root 실행 테스트 지적 반영하기 ([1a32af7](https://github.com/tkhwang/workbranch/commit/1a32af75a33fcc1df6f1c365d3565a534c61c99a))
+
 ## [2.43.0](https://github.com/tkhwang/workbranch/compare/v2.42.0...v2.43.0) (2026-11-28)
 
 
