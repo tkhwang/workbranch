@@ -77,6 +77,47 @@ export type WorkbranchAgentSession = {
  readonly totals?: WorkbranchRuntimeTotals;
  /** The last few requests and replies, newest last; absent from older collectors. */
  readonly messages?: readonly WorkbranchRuntimeMessage[];
+ /** When turns began in the last 3 hours, oldest first; absent from older collectors. */
+ readonly turns?: readonly WorkbranchRuntimeTurn[];
+ /** Tool calls in the last 3 hours, oldest first; absent from older collectors. */
+ readonly calls?: readonly WorkbranchRuntimeCall[];
+ /** How far the agent's todo list has come; absent without todos or from older collectors. */
+ readonly todos?: WorkbranchRuntimeTodos;
+ /** What the last request turn left once it ended; absent while it runs and from older collectors. */
+ readonly lastTurn?: WorkbranchRuntimeTurnSummary;
+};
+export type WorkbranchRuntimeTurnSummary = {
+ /** Epoch seconds the turn's request came in. */
+ readonly startedAt: number;
+ readonly filesChanged: number;
+ /** From the edit input: exact for Codex patches, approximate for Claude Code edits. */
+ readonly linesAdded: number;
+ readonly linesRemoved: number;
+ /** The turn's last test command: `unknown` when the provider did not say how it went. */
+ readonly tests: "passed" | "failed" | "unknown" | "none";
+ readonly commits: number;
+};
+export type WorkbranchRuntimeTodos = {
+ readonly total: number;
+ readonly done: number;
+ /** The todo in progress, clipped and scrubbed; absent when none is. */
+ readonly active?: string;
+};
+export type WorkbranchRuntimeTurn = {
+ /** `prompt`: a request the user sent; `agent`: a subagent's report. */
+ readonly kind: "prompt" | "agent";
+ /** Epoch seconds. */
+ readonly at: number;
+};
+export type WorkbranchRuntimeCall = {
+ /** The provider's own tool name (`Bash`, `Edit`, `apply_patch`, `mcp__…`). */
+ readonly tool: string;
+ /** Names, never paths, of the files the call touched; absent when none. */
+ readonly files?: readonly string[];
+ /** Present and true when the provider reported the call failed. */
+ readonly failed?: boolean;
+ /** Epoch seconds the call started. */
+ readonly at: number;
 };
 export type WorkbranchRuntimeMessage = {
  readonly kind: "prompt" | "response";

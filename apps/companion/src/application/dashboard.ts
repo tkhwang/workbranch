@@ -1,10 +1,12 @@
-// What the full-screen dashboard shows (COMP001 R8, R9, R11): the board's
-// three live columns as counts, and those same tasks on a timeline built from
-// the runtime's transition log. The board's view model decides which tasks are
-// live and in which column, so the dashboard and the menu bar always agree.
+// What the full-screen dashboard shows (COMP001 R8, R9, R11; COMP004 R6,
+// R12): the board's three live columns as counts, and those same tasks as
+// rings placed by how many are live. The board's view model decides which
+// tasks are live and in which column, so the dashboard and the menu bar
+// always agree.
 import type { AgentSession, GlobalState } from "../domain/model";
+import { type DashboardLayout, dashboardLayout } from "./dashboardLayout";
+import { buildRing, type RingModel } from "./ring";
 import { buildMainViewModel } from "./state";
-import { buildTimeline, type TimelineModel } from "./timeline";
 
 export const DASHBOARD_COLUMNS = ["waiting", "running", "finished"] as const;
 export type DashboardColumnKey = (typeof DASHBOARD_COLUMNS)[number];
@@ -13,20 +15,18 @@ export type DashboardModel = {
 	readonly counts: Readonly<Record<DashboardColumnKey, number>>;
 	/** Tasks in any live column: the header's "활성 세션" total. */
 	readonly active: number;
-	readonly timeline: TimelineModel;
+	readonly layout: DashboardLayout<RingModel>;
 };
 
 /**
- * `now` is epoch seconds; `maxRows` caps the timeline, the rest is "+n".
- * Rows carry their messages only with `showMessages`, so no request or reply
- * text reaches the lock screen's page unless Settings asks for it.
+ * `now` is epoch seconds. Rings carry file names, the current activity and
+ * the newest message only with `showDetails` (Settings › Show work details).
  */
 export function buildDashboardModel(
 	state: GlobalState,
 	sessions: readonly AgentSession[],
 	now: number,
-	maxRows: number,
-	showMessages = false,
+	showDetails = false,
 ): DashboardModel {
 	const { stageGroups } = buildMainViewModel(state, sessions);
 	const groups = DASHBOARD_COLUMNS.map((key) => ({
@@ -41,14 +41,10 @@ export function buildDashboardModel(
 			finished: finished ?? 0,
 		},
 		active: groups.reduce((sum, group) => sum + group.rows.length, 0),
-		timeline: withMessages(buildTimeline(groups, now, maxRows), showMessages),
-	};
-}
-
-function withMessages(timeline: TimelineModel, show: boolean): TimelineModel {
-	if (show) return timeline;
-	return {
-		...timeline,
-		rows: timeline.rows.map((row) => ({ ...row, messages: [] })),
+		layout: dashboardLayout(
+			groups.flatMap((group) =>
+				group.rows.map((row) => buildRing(row, group.state, now, showDetails)),
+			),
+		),
 	};
 }

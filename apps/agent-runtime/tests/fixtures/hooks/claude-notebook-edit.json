@@ -1,0 +1,1 @@
+{"session_id":"s-claude","prompt_id":"p1","transcript_path":"/tmp/t.jsonl","cwd":"/work/task","hook_event_name":"PreToolUse","tool_name":"NotebookEdit","tool_use_id":"toolu_nb","tool_input":{"notebook_path":"/work/task/notes/analysis.ipynb","cell_id":"c1","cell_type":"code","new_source":"print(1)"}}

@@ -40,11 +40,11 @@ export function ScreensaverSettings({
 			<SettingsRow
 				description={
 					value.showMessages
-						? "On: each task on the dashboard lists its last three requests, replies and commits. Anyone at the desk can read them while the dashboard covers the lock screen."
-						: "Off: the dashboard shows branch and repo names, states and times only, since anyone at the desk can read it."
+						? "On: each large ring names the files its task touched, what it is doing now and its newest request, reply or commit. Anyone at the desk can read them while the dashboard covers the lock screen."
+						: "Off: the dashboard shows branch and repo names, states, times and tool activity only, since anyone at the desk can read it."
 				}
 				htmlFor="screensaver-show-messages"
-				title="Show recent messages"
+				title="Show work details"
 			>
 				<input
 					aria-checked={value.showMessages}

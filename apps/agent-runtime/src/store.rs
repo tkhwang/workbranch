@@ -1,4 +1,4 @@
-use crate::Result;
+use crate::{Result, tool::TodoItem};
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, path::Path, time::Duration};
@@ -36,6 +36,31 @@ pub struct Session {
     /// Kept in the session row, so they age out with it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub messages: Vec<Message>,
+    /// When recent turns began, newest last. Kept in the session row (at most
+    /// `TURN_LIMIT`); the snapshot carries the last few hours.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub turns: Vec<Turn>,
+    /// Snapshot only: the last few hours of tool calls, oldest first. Never
+    /// stored in `data`; the call log is the record.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub calls: Vec<Call>,
+    /// The agent's todo list as its todo tools last left it. Kept in the
+    /// session row; the snapshot carries only `todos`, a summary.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub todo_items: Vec<TodoItem>,
+    /// Snapshot only: how far the todo list has come.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub todos: Option<TodoSummary>,
+    /// What the last request turn left, summed when it ended and kept in the
+    /// session row, so it outlives the call log it was read from. The
+    /// snapshot carries it only while the session is still finished.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_turn: Option<TurnSummary>,
+    /// The highest call-log rowid when the current request turn began: the
+    /// turn's calls are the ones logged after it, however fast turns follow
+    /// each other. Never in the snapshot.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub turn_calls_after: i64,
     /// Snapshot only: the last day of state changes. Never stored in `data`;
     /// the transition log is the record.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -63,6 +88,66 @@ pub struct Message {
     pub kind: String,
     pub text: String,
     pub at: u64,
+}
+
+/// Where a turn began: `prompt` for a request the user sent.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Turn {
+    pub kind: String,
+    pub at: u64,
+}
+
+/// A tool call as the dashboard draws it: the tool's own name, the names of
+/// the files it touched, whether it failed, and when it started.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Call {
+    pub tool: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub files: Vec<String>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub failed: bool,
+    pub at: u64,
+}
+
+/// How far a todo list has come: its size, how many are done, and the text of
+/// the one in progress (empty when none is).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TodoSummary {
+    pub total: usize,
+    pub done: usize,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub active: String,
+}
+
+/// What an ended turn left: the files its edits changed, the lines they
+/// added and removed, how its last test command went (`passed`, `failed`,
+/// `unknown` when the provider did not say, `none` without one), and the
+/// commits it made.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TurnSummary {
+    pub started_at: u64,
+    pub files_changed: usize,
+    pub lines_added: u64,
+    pub lines_removed: u64,
+    pub tests: String,
+    pub commits: usize,
+}
+
+/// The summary of `items`; none for an empty list.
+pub fn todo_summary(items: &[TodoItem]) -> Option<TodoSummary> {
+    if items.is_empty() {
+        return None;
+    }
+    Some(TodoSummary {
+        total: items.len(),
+        done: items.iter().filter(|todo| todo.status == "done").count(),
+        active: items
+            .iter()
+            .find(|todo| todo.status == "active")
+            .map(|todo| todo.text.clone())
+            .unwrap_or_default(),
+    })
 }
 
 /// Messages kept per session, newest kept.
@@ -103,9 +188,22 @@ const RECENT_SECS: u64 = 86400;
 const RECENT_LIMIT: usize = 500;
 /// Matches the snapshot's stale rule: no event for this long.
 const STALE_SECS: u64 = 900;
-const SCHEMA_VERSION: u32 = 2;
+/// Tool calls are kept for this long: a few hours drawn on the dashboard, and
+/// a whole turn, however long, for its summary.
+const CALL_RETENTION_SECS: u64 = 86400;
+/// The snapshot carries the last few hours of calls and turns per session.
+const RING_SECS: u64 = 3 * 3600;
+/// Upper bound on calls per session in a snapshot, newest kept.
+const CALL_LIMIT: usize = 300;
+/// Upper bound on turn starts kept per session, newest kept.
+pub const TURN_LIMIT: usize = 50;
+const SCHEMA_VERSION: u32 = 3;
 const SESSIONS_TABLE: &str = "CREATE TABLE IF NOT EXISTS sessions (workspace TEXT NOT NULL, provider TEXT NOT NULL, session TEXT NOT NULL, agent TEXT NOT NULL, data TEXT NOT NULL, updated INTEGER NOT NULL, PRIMARY KEY(workspace,provider,session,agent));";
 const TRANSITIONS_TABLE: &str = "CREATE TABLE IF NOT EXISTS transitions (workspace TEXT NOT NULL, provider TEXT NOT NULL, session TEXT NOT NULL, agent TEXT NOT NULL, state TEXT NOT NULL, outcome TEXT NOT NULL, at INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS transitions_by_session ON transitions(workspace,provider,session,agent,at); CREATE INDEX IF NOT EXISTS transitions_by_time ON transitions(at);";
+/// One row per tool call: names and numbers only, never paths, contents or
+/// command text. `files` is a JSON array of file names; `added`, `removed`
+/// and `kind` (`test`, `commit`) describe what an edit or command did.
+const TOOL_CALLS_TABLE: &str = "CREATE TABLE IF NOT EXISTS tool_calls (workspace TEXT NOT NULL, provider TEXT NOT NULL, session TEXT NOT NULL, agent TEXT NOT NULL, tool_use_id TEXT NOT NULL, tool TEXT NOT NULL, files TEXT NOT NULL, edit INTEGER NOT NULL, failed INTEGER NOT NULL DEFAULT 0, added INTEGER NOT NULL DEFAULT 0, removed INTEGER NOT NULL DEFAULT 0, kind TEXT NOT NULL DEFAULT '', at INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS tool_calls_by_session ON tool_calls(workspace,provider,session,agent,at); CREATE INDEX IF NOT EXISTS tool_calls_by_time ON tool_calls(at); CREATE UNIQUE INDEX IF NOT EXISTS tool_calls_by_id ON tool_calls(workspace,provider,session,agent,tool_use_id) WHERE tool_use_id <> '';";
 /// How long a hook writer waits for another writer's commit. Hooks from
 /// several sessions serialize on one database, and each commit fsyncs, so on
 /// a busy disk the queue outlasts a short timeout and the event is lost.
@@ -123,11 +221,12 @@ fn initialize(db: &Connection) -> Result<()> {
     if version == SCHEMA_VERSION {
         return Ok(());
     }
-    // A new store gets both tables; a version 1 store (sessions only) gains the
-    // transition log. IMMEDIATE serializes hooks that upgrade at once, and
-    // IF NOT EXISTS makes the later one a no-op.
+    // A new store gets every table; an older one gains what it lacks: version
+    // 1 (sessions only) the transition log, versions 1 and 2 the call log.
+    // IMMEDIATE serializes hooks that upgrade at once, and IF NOT EXISTS makes
+    // the later one a no-op.
     db.execute_batch(&format!(
-        "BEGIN IMMEDIATE; {SESSIONS_TABLE} {TRANSITIONS_TABLE} PRAGMA user_version={SCHEMA_VERSION}; COMMIT;"
+        "BEGIN IMMEDIATE; {SESSIONS_TABLE} {TRANSITIONS_TABLE} {TOOL_CALLS_TABLE} PRAGMA user_version={SCHEMA_VERSION}; COMMIT;"
     ))?;
     Ok(())
 }
@@ -197,23 +296,101 @@ pub fn save(db: &Connection, s: &Session) -> Result<()> {
         [cutoff],
     )?;
     db.execute("DELETE FROM transitions WHERE at < ?", [cutoff])?;
+    let call_cutoff = i64::try_from(s.updated_at.saturating_sub(CALL_RETENTION_SECS))?;
+    db.execute("DELETE FROM tool_calls WHERE at < ?", [call_cutoff])?;
     Ok(())
 }
 
-/// Drops a session key's log, for a session that starts over under a key a
+/// Drops a session key's logs, for a session that starts over under a key a
 /// previous one used (a recreated workspace).
-pub fn forget_transitions(
+pub fn forget_history(
     db: &Connection,
     workspace: &str,
     provider: &str,
     session: &str,
     agent: &str,
 ) -> Result<()> {
+    for table in ["transitions", "tool_calls"] {
+        db.execute(
+            &format!("DELETE FROM {table} WHERE workspace=? AND provider=? AND session=? AND agent=?"),
+            params![workspace, provider, session, agent],
+        )?;
+    }
+    Ok(())
+}
+
+/// What the log keeps of one call: names and numbers, no content.
+pub struct CallRecord<'a> {
+    pub tool_use_id: &'a str,
+    pub tool: &'a str,
+    pub files: &'a [String],
+    pub edit: bool,
+    pub added: u32,
+    pub removed: u32,
+    /// `test` and/or `commit`, space separated; empty for anything else.
+    pub kind: String,
+}
+
+/// Logs a tool call `s` started at `at`. A repeated call id is logged once.
+pub fn record_call(db: &Connection, s: &Session, call: &CallRecord, at: u64) -> Result<()> {
     db.execute(
-        "DELETE FROM transitions WHERE workspace=? AND provider=? AND session=? AND agent=?",
-        params![workspace, provider, session, agent],
+        "INSERT OR IGNORE INTO tool_calls (workspace, provider, session, agent, tool_use_id, tool, files, edit, added, removed, kind, at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        params![
+            s.workspace,
+            s.provider,
+            s.session_id,
+            s.agent_id,
+            call.tool_use_id,
+            call.tool,
+            serde_json::to_string(call.files)?,
+            call.edit,
+            call.added,
+            call.removed,
+            call.kind,
+            i64::try_from(at)?
+        ],
     )?;
     Ok(())
+}
+
+/// Marks the call `tool_use_id` of `s` as ended, failed or not: a commit it
+/// ran then counts, while one still waiting (an interrupted turn) does not.
+pub fn complete_call(db: &Connection, s: &Session, tool_use_id: &str) -> Result<()> {
+    db.execute(
+        "UPDATE tool_calls SET kind = kind || ' done' WHERE workspace=? AND provider=? AND session=? AND agent=? AND tool_use_id=? AND kind <> '' AND ' ' || kind || ' ' NOT LIKE '% done %'",
+        params![s.workspace, s.provider, s.session_id, s.agent_id, tool_use_id],
+    )?;
+    Ok(())
+}
+
+/// Marks the call `tool_use_id` of `s` as known to have succeeded: a test or
+/// commit it ran then counts as passed or made.
+pub fn confirm_call(db: &Connection, s: &Session, tool_use_id: &str) -> Result<()> {
+    db.execute(
+        "UPDATE tool_calls SET kind = kind || ' ok' WHERE workspace=? AND provider=? AND session=? AND agent=? AND tool_use_id=? AND kind <> '' AND failed = 0 AND kind NOT LIKE '% ok'",
+        params![s.workspace, s.provider, s.session_id, s.agent_id, tool_use_id],
+    )?;
+    Ok(())
+}
+
+/// Marks the call `tool_use_id` of `s` as failed.
+pub fn fail_call(db: &Connection, s: &Session, tool_use_id: &str) -> Result<()> {
+    db.execute(
+        "UPDATE tool_calls SET failed=1 WHERE workspace=? AND provider=? AND session=? AND agent=? AND tool_use_id=?",
+        params![s.workspace, s.provider, s.session_id, s.agent_id, tool_use_id],
+    )?;
+    Ok(())
+}
+
+/// Adds a turn start, keeping the newest `TURN_LIMIT`.
+pub fn remember_turn(turns: &mut Vec<Turn>, kind: &str, at: u64) {
+    turns.push(Turn {
+        kind: kind.into(),
+        at,
+    });
+    if turns.len() > TURN_LIMIT {
+        turns.drain(..turns.len() - TURN_LIMIT);
+    }
 }
 
 /// Logs that `s` entered its current state at `at`.
@@ -250,6 +427,117 @@ fn transitions_of(db: &Connection, s: &Session) -> Result<Vec<Transition>> {
     Ok(rows.collect::<std::result::Result<_, _>>()?)
 }
 
+/// What the session's last request turn left, once that turn has ended.
+pub fn turn_summary(db: &Connection, s: &Session) -> Result<Option<TurnSummary>> {
+    let Some(start) = s.turns.iter().rev().find(|turn| turn.kind == "prompt").map(|turn| turn.at) else {
+        return Ok(None);
+    };
+    if s.state != "finished" {
+        return Ok(None);
+    }
+    let mut stmt = db.prepare(
+        "SELECT files, edit, added, removed, kind, failed FROM tool_calls WHERE workspace=? AND provider=? AND session=? AND agent=? AND (rowid > ? OR at > ?) ORDER BY at, rowid",
+    )?;
+    // After the boundary rowid, or in a later second than the request: a call
+    // in the request's own second belongs to it only past the boundary, and a
+    // rowid SQLite reuses once the log was emptied still counts by its time.
+    let rows = stmt.query_map(
+        params![
+            s.workspace,
+            s.provider,
+            s.session_id,
+            s.agent_id,
+            s.turn_calls_after,
+            i64::try_from(start)?
+        ],
+        |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, bool>(1)?,
+                r.get::<_, i64>(2)?,
+                r.get::<_, i64>(3)?,
+                r.get::<_, String>(4)?,
+                r.get::<_, bool>(5)?,
+            ))
+        },
+    )?;
+    let mut summary = TurnSummary {
+        started_at: start,
+        tests: "none".into(),
+        ..TurnSummary::default()
+    };
+    let mut files: Vec<String> = Vec::new();
+    for row in rows {
+        let (names, edit, added, removed, kind, failed) = row?;
+        let kinds: Vec<&str> = kind.split(' ').collect();
+        // An edit the provider rejected changed nothing.
+        if edit && !failed {
+            for name in serde_json::from_str::<Vec<String>>(&names).unwrap_or_default() {
+                if !files.contains(&name) {
+                    files.push(name);
+                }
+            }
+            summary.lines_added += u64::try_from(added).unwrap_or(0);
+            summary.lines_removed += u64::try_from(removed).unwrap_or(0);
+        }
+        if kinds.contains(&"test") {
+            summary.tests = if failed {
+                "failed"
+            } else if kinds.contains(&"ok") {
+                "passed"
+            } else {
+                "unknown"
+            }
+            .into();
+        }
+        // Only a commit whose call ended, and did not fail, was made.
+        if !failed && kinds.contains(&"done") {
+            summary.commits += kinds.iter().filter(|kind| **kind == "commit").count();
+        }
+    }
+    summary.files_changed = files.len();
+    Ok(Some(summary))
+}
+
+/// The session's calls since `since`, oldest first; at most `CALL_LIMIT`,
+/// newest kept.
+fn calls_of(db: &Connection, s: &Session, since: u64) -> Result<Vec<Call>> {
+    let mut stmt = db.prepare(
+        "SELECT tool, files, failed, at FROM tool_calls WHERE workspace=? AND provider=? AND session=? AND agent=? AND at >= ? ORDER BY at DESC, rowid DESC LIMIT ?",
+    )?;
+    let rows = stmt.query_map(
+        params![
+            s.workspace,
+            s.provider,
+            s.session_id,
+            s.agent_id,
+            i64::try_from(since)?,
+            i64::try_from(CALL_LIMIT)?
+        ],
+        |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, bool>(2)?,
+                r.get::<_, i64>(3)?,
+            ))
+        },
+    )?;
+    let mut calls = Vec::new();
+    for row in rows {
+        let (tool, files, failed, at) = row?;
+        calls.push(Call {
+            tool,
+            // A row the collector wrote always parses; anything else has no names.
+            files: serde_json::from_str(&files).unwrap_or_default(),
+            failed,
+            at: u64::try_from(at).unwrap_or(0),
+        });
+    }
+    calls.reverse();
+    Ok(calls)
+}
+
 /// Seconds per state across the whole log. Each change lasts until the next
 /// one; the last lasts until `end`.
 pub fn totals(log: &[Transition], end: u64) -> Totals {
@@ -284,6 +572,9 @@ pub fn snapshot(db: &Connection, now: u64) -> Result<Vec<Session>> {
     // A version 1 store has no transition log yet; its sessions carry no history.
     let version: u32 = db.query_row("PRAGMA user_version", [], |r| r.get(0))?;
     let logged = version >= 2;
+    // Calls are logged from version 3 on.
+    let calls_logged = version >= 3;
+    let ring_start = now.saturating_sub(RING_SECS);
     let mut result = Vec::new();
     for item in data {
         let mut s: Session = serde_json::from_str(&item?)?;
@@ -306,6 +597,16 @@ pub fn snapshot(db: &Connection, now: u64) -> Result<Vec<Session>> {
                 s.transitions = recent(&log, now.saturating_sub(RECENT_SECS));
             }
         }
+        if calls_logged {
+            s.calls = calls_of(db, &s, ring_start)?;
+        }
+        s.turns.retain(|turn| turn.at >= ring_start);
+        if s.state != "finished" {
+            s.last_turn = None;
+        }
+        s.turn_calls_after = 0;
+        s.todos = todo_summary(&s.todo_items);
+        s.todo_items.clear();
         s.closed = false;
         s.workspace_stamp.clear();
         s.retired_turns.clear();
@@ -368,4 +669,13 @@ pub fn open_read(path: &Path) -> Result<Connection> {
 
 fn is_false(value: &bool) -> bool {
     !value
+}
+
+fn is_zero(value: &i64) -> bool {
+    *value == 0
+}
+
+/// The highest rowid in the call log, 0 when it is empty.
+pub fn last_call_rowid(db: &Connection) -> Result<i64> {
+    Ok(db.query_row("SELECT coalesce(max(rowid), 0) FROM tool_calls", [], |r| r.get(0))?)
 }

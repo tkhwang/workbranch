@@ -1,14 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { MainTaskRow } from "../src/application/state";
 import {
-	buildTimeline,
-	buildTimelineRow,
 	mergeIntervals,
 	recentMessages,
 	scrubMessage,
 	sessionIntervals,
 	turnEnds,
-} from "../src/application/timeline";
+} from "../src/application/taskHistory";
 import type { AgentSession, Repo } from "../src/domain/model";
 
 const NOW = 10_000;
@@ -175,93 +173,6 @@ describe("turnEnds", () => {
 	});
 });
 
-describe("buildTimelineRow", () => {
-	it("sums known totals across a task's sessions", () => {
-		const timelineRow = buildTimelineRow(
-			row([
-				session({ totals: { running: 60, waiting: 30, finished: 0 } }),
-				session({
-					sessionId: "sub",
-					agentId: "a",
-					totals: { running: 120, waiting: 0, finished: 5 },
-				}),
-				session({ sessionId: "old" }),
-			]),
-			"running",
-			NOW,
-		);
-		expect(timelineRow.totals).toEqual({
-			running: 180,
-			waiting: 30,
-			finished: 5,
-		});
-	});
-
-	it("leaves totals unknown when no session has a log", () => {
-		expect(buildTimelineRow(row([session()]), "running", NOW).totals).toBe(
-			undefined,
-		);
-	});
-
-	it("keeps only the window and reports the lead's time in state", () => {
-		const timelineRow = buildTimelineRow(
-			row([
-				session({
-					stateChangedAt: 9_000,
-					transitions: [
-						{ state: "running", at: 100 },
-						{ state: "waiting", at: 9_000 },
-					],
-				}),
-			]),
-			"waiting",
-			NOW,
-			3_600,
-		);
-		expect(timelineRow.segments).toEqual([
-			{ state: "running", start: 6_400, end: 9_000 },
-			{ state: "waiting", start: 9_000, end: NOW },
-		]);
-		expect(timelineRow.since).toBe(9_000);
-	});
-});
-
-describe("buildTimeline", () => {
-	it("totals every live task, shown or not, and says whether anything is logged", () => {
-		const logged = session({
-			transitions: [{ state: "running", at: 9_000 }],
-			totals: { running: 1_000, waiting: 0, finished: 0 },
-		});
-		const model = buildTimeline(
-			[
-				{ state: "waiting", rows: [] },
-				{
-					state: "running",
-					rows: [row([logged], "a"), row([logged], "b")],
-				},
-				{ state: "finished", rows: [] },
-			],
-			NOW,
-			1,
-		);
-		expect(model.rows).toHaveLength(1);
-		expect(model.more).toBe(1);
-		expect(model.totals).toEqual({ running: 2_000, waiting: 0, finished: 0 });
-		expect(model.logged).toBe(true);
-		expect(model.end - model.start).toBe(3 * 60 * 60);
-	});
-
-	it("is not logged while sessions come from an older collector", () => {
-		const model = buildTimeline(
-			[{ state: "running", rows: [row([session()])] }],
-			NOW,
-			8,
-		);
-		expect(model.logged).toBe(false);
-		expect(model.totals).toBe(undefined);
-	});
-});
-
 describe("unconfirmed sessions", () => {
 	it("does not draw an uncertain session's current state", () => {
 		const uncertain = session({
@@ -278,25 +189,6 @@ describe("unconfirmed sessions", () => {
 		expect(
 			sessionIntervals(session({ observation: "uncertain" }), NOW),
 		).toEqual([]);
-	});
-
-	it("lets an observed running session decide the task, as the board does", () => {
-		const timelineRow = buildTimelineRow(
-			row([
-				session({ transitions: [{ state: "running", at: 9_000 }] }),
-				session({
-					sessionId: "other",
-					observation: "uncertain",
-					state: "waiting",
-					transitions: [{ state: "waiting", at: 9_500 }],
-				}),
-			]),
-			"running",
-			NOW,
-		);
-		expect(timelineRow.segments).toEqual([
-			{ state: "running", start: 9_000, end: NOW },
-		]);
 	});
 });
 
@@ -420,15 +312,6 @@ describe("recentMessages", () => {
 		});
 		expect(recentMessages(row([s]))).toEqual([
 			{ kind: "prompt", text: "latest", at: 3_000 },
-		]);
-	});
-
-	it("rides on each timeline row", () => {
-		const r = row([
-			session({ messages: [{ kind: "prompt", text: "go", at: 9_000 }] }),
-		]);
-		expect(buildTimelineRow(r, "running", NOW).messages).toEqual([
-			{ kind: "prompt", text: "go", at: 9_000 },
 		]);
 	});
 });

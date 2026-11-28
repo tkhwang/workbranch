@@ -1,0 +1,1 @@
+{"session_id":"s-claude","prompt_id":"p1","cwd":"/work/task","hook_event_name":"PostToolUse","tool_name":"TaskCreate","tool_use_id":"toolu_task_1","tool_input":{"subject":"Record tool calls","description":"Record tool calls"},"tool_response":{"task":{"id":"1","subject":"Record tool calls","description":"Record tool calls"}},"duration_ms":2}

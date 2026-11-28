@@ -67,7 +67,10 @@ function state(tasks: readonly Task[]): GlobalState {
 const NOW = 200;
 
 function titles(model: ReturnType<typeof buildDashboardModel>) {
-	return model.timeline.rows.map((row) => [row.state, row.title]);
+	return [...model.layout.rings, ...model.layout.overflow].map((ring) => [
+		ring.state,
+		ring.title,
+	]);
 }
 
 describe("buildDashboardModel", () => {
@@ -89,54 +92,106 @@ describe("buildDashboardModel", () => {
 				session("unseen", "running", { observation: "stale" }),
 			],
 			NOW,
-			8,
 		);
 		expect(titles(model)).toEqual([
 			["waiting", "asking"],
 			["running", "busy"],
 			["finished", "done"],
 		]);
+		expect(model.layout.mode).toBe("large");
+		expect(model.layout.rings[0]?.waitReason).toBe("permission");
 	});
 
-	it("caps the rows, most recent first, and counts the rest", () => {
-		const tasks = ["a", "b", "c", "d", "e", "f"].map((name) => task(name));
+	it("places live tasks most recent first and turns four or more into a grid", () => {
+		const tasks = ["a", "b", "c", "d", "e"].map((name) => task(name));
 		const model = buildDashboardModel(
-			state(tasks),
-			tasks.map((t, index) =>
-				session(t.name, "running", { stateChangedAt: 100 + index }),
-			),
+			state([...tasks, task("done")]),
+			[
+				...tasks.map((t, index) =>
+					session(t.name, "running", { stateChangedAt: 100 + index }),
+				),
+				session("done", "finished"),
+			],
 			NOW,
-			4,
 		);
-		expect(model.timeline.rows.map((row) => row.title)).toEqual([
-			"f",
+		expect(model.layout.mode).toBe("grid");
+		expect(model.layout.columns).toBe(3);
+		expect(model.layout.rings.map((ring) => ring.title)).toEqual([
 			"e",
 			"d",
 			"c",
+			"b",
+			"a",
 		]);
-		expect(model.timeline.more).toBe(2);
+		expect(model.layout.overflow.map((ring) => ring.title)).toEqual(["done"]);
 	});
 
-	it("never carries session ids, nor turn text while messages are off", () => {
+	it("never carries session ids or turn text", () => {
 		const sessions = [
 			session("busy", "running", {
 				sessionId: "sess-secret-id",
+				activity: "Bash: deploy --prod",
 				messages: [{ kind: "prompt", text: "secret prompt text", at: NOW }],
 			}),
 		];
 		const json = JSON.stringify(
-			buildDashboardModel(state([task("busy")]), sessions, NOW, 8),
+			buildDashboardModel(state([task("busy")]), sessions, NOW),
 		);
 		expect(json).not.toContain("sess-secret-id");
 		expect(json).not.toContain("secret prompt text");
-		const shown = JSON.stringify(
-			buildDashboardModel(state([task("busy")]), sessions, NOW, 4, true),
-		);
-		expect(shown).not.toContain("sess-secret-id");
-		expect(shown).toContain("secret prompt text");
+		expect(json).not.toContain("deploy --prod");
 	});
 
-	it("titles a row by its worktree branch and names extra repos by count", () => {
+	it("carries file names, activity and the newest message only with work details", () => {
+		const sessions = [
+			session("busy", "running", {
+				activity: "Edit: /work/busy/src/store.rs",
+				messages: [{ kind: "prompt", text: "fix the store", at: NOW - 5 }],
+				calls: [{ tool: "Edit", files: ["store.rs"], at: NOW - 10 }],
+			}),
+		];
+		const hidden = buildDashboardModel(state([task("busy")]), sessions, NOW);
+		const json = JSON.stringify(hidden);
+		expect(json).not.toContain("store.rs");
+		expect(json).not.toContain("fix the store");
+		const ring = hidden.layout.rings[0];
+		expect(ring?.calls).toHaveLength(1);
+		expect(ring?.files).toEqual([]);
+		expect(ring?.activity).toBeUndefined();
+		expect(ring?.message).toBeUndefined();
+
+		const shown = buildDashboardModel(
+			state([task("busy")]),
+			sessions,
+			NOW,
+			true,
+		).layout.rings[0];
+		expect(shown?.files.map((file) => file.name)).toEqual(["store.rs"]);
+		expect(shown?.calls[0]?.files).toEqual(["store.rs"]);
+		expect(shown?.activity).toBe("Edit: /work/busy/src/store.rs");
+		expect(shown?.message).toEqual({
+			kind: "prompt",
+			text: "fix the store",
+			at: NOW - 5,
+		});
+		expect(JSON.stringify(shown)).not.toContain("busy-s");
+	});
+
+	it("scrubs a credential-looking activity even with work details on", () => {
+		const shown = buildDashboardModel(
+			state([task("busy")]),
+			[
+				session("busy", "running", {
+					activity: "Bash: curl -H 'Authorization: x'",
+				}),
+			],
+			NOW,
+			true,
+		).layout.rings[0];
+		expect(shown?.activity).toBe("[sensitive content omitted]");
+	});
+
+	it("titles a ring by its worktree branch and names extra repos by count", () => {
 		const model = buildDashboardModel(
 			state([
 				task("multi", [
@@ -147,16 +202,15 @@ describe("buildDashboardModel", () => {
 			]),
 			[session("multi", "running"), session("bare", "running")],
 			NOW,
-			8,
 		);
-		const rows = model.timeline.rows;
-		expect(rows.find((row) => row.key === "/work:multi")).toMatchObject({
+		const rings = model.layout.rings;
+		expect(rings.find((ring) => ring.key === "/work:multi")).toMatchObject({
 			title: "feat/x",
 			repo: "workbranch",
 			moreRepos: 1,
-			agent: "claude",
+			agents: ["claude"],
 		});
-		expect(rows.find((row) => row.key === "/work:bare")).toMatchObject({
+		expect(rings.find((ring) => ring.key === "/work:bare")).toMatchObject({
 			title: "bare",
 			repo: undefined,
 			moreRepos: 0,
@@ -168,14 +222,13 @@ describe("buildDashboardModel", () => {
 			state([task("busy"), task("asking")]),
 			[session("busy", "running"), session("asking", "waiting")],
 			NOW,
-			8,
 		);
 		expect(model.counts).toEqual({ waiting: 1, running: 1, finished: 0 });
 		expect(model.active).toBe(2);
 	});
 
-	it("counts every live task in the active total, beyond the rows shown", () => {
-		const names = ["a", "b", "c", "d", "e", "f"];
+	it("counts every live task in the active total, beyond the rings shown", () => {
+		const names = ["a", "b", "c", "d", "e", "f", "g"];
 		const model = buildDashboardModel(
 			state([...names.map((name) => task(name)), task("done")]),
 			[
@@ -183,15 +236,16 @@ describe("buildDashboardModel", () => {
 				session("done", "finished"),
 			],
 			NOW,
-			4,
 		);
-		expect(model.timeline.rows).toHaveLength(4);
-		expect(model.active).toBe(7);
+		expect(model.layout.rings).toHaveLength(6);
+		expect(model.layout.overflow).toHaveLength(2);
+		expect(model.active).toBe(8);
 	});
 
 	it("has no active tasks when nothing is in play", () => {
-		const model = buildDashboardModel(state([]), [], NOW, 8);
+		const model = buildDashboardModel(state([]), [], NOW);
 		expect(model.active).toBe(0);
-		expect(model.timeline.rows).toEqual([]);
+		expect(model.layout.rings).toEqual([]);
+		expect(model.layout.overflow).toEqual([]);
 	});
 });
