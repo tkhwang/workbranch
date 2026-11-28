@@ -185,6 +185,64 @@ function isOptionalMessages(value: unknown): boolean {
 	);
 }
 
+// Older collectors send no turns.
+function isOptionalTurns(value: unknown): boolean {
+	return (
+		value === undefined ||
+		(Array.isArray(value) &&
+			value.every(
+				(t: unknown) =>
+					isRecord(t) &&
+					(t["kind"] === "prompt" || t["kind"] === "agent") &&
+					isNonNegativeInteger(t["at"]),
+			))
+	);
+}
+
+// Older collectors send no calls.
+function isOptionalCalls(value: unknown): boolean {
+	return (
+		value === undefined ||
+		(Array.isArray(value) &&
+			value.every(
+				(c: unknown) =>
+					isRecord(c) &&
+					isString(c["tool"]) &&
+					(c["files"] === undefined ||
+						(Array.isArray(c["files"]) && c["files"].every(isString))) &&
+					(c["failed"] === undefined || typeof c["failed"] === "boolean") &&
+					isNonNegativeInteger(c["at"]),
+			))
+	);
+}
+
+// Older collectors, and sessions without todos, send none.
+function isOptionalTodos(value: unknown): boolean {
+	return (
+		value === undefined ||
+		(isRecord(value) &&
+			isNonNegativeInteger(value["total"]) &&
+			isNonNegativeInteger(value["done"]) &&
+			(value["active"] === undefined || isString(value["active"])))
+	);
+}
+
+// Older collectors send none, and nor does a turn still running.
+function isOptionalTurnSummary(value: unknown): boolean {
+	return (
+		value === undefined ||
+		(isRecord(value) &&
+			isNonNegativeInteger(value["startedAt"]) &&
+			isNonNegativeInteger(value["filesChanged"]) &&
+			isNonNegativeInteger(value["linesAdded"]) &&
+			isNonNegativeInteger(value["linesRemoved"]) &&
+			["passed", "failed", "unknown", "none"].includes(
+				String(value["tests"]),
+			) &&
+			isNonNegativeInteger(value["commits"]))
+	);
+}
+
 function isOptionalTotals(value: unknown): boolean {
 	return (
 		value === undefined ||
@@ -228,7 +286,11 @@ export function parseRuntimeDocument(
 			!isNonNegativeInteger(s["stateChangedAt"]) ||
 			!isOptionalTransitions(s["transitions"]) ||
 			!isOptionalTotals(s["totals"]) ||
-			!isOptionalMessages(s["messages"])
+			!isOptionalMessages(s["messages"]) ||
+			!isOptionalTurns(s["turns"]) ||
+			!isOptionalCalls(s["calls"]) ||
+			!isOptionalTodos(s["todos"]) ||
+			!isOptionalTurnSummary(s["lastTurn"])
 		)
 			throw new Error("Invalid runtime session");
 		return s as unknown as import("../domain/model").AgentSession;

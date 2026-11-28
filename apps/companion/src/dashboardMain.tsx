@@ -4,6 +4,7 @@ import { DashboardApp } from "./DashboardApp";
 import "./styles/base.css";
 import "./styles/themes.css";
 import "./styles/dashboard.css";
+import "./styles/dashboard-ring.css";
 
 const root = document.getElementById("root");
 

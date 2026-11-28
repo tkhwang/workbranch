@@ -130,6 +130,8 @@ describe("ScreensaverSettings", () => {
 		);
 		expect(html).toMatch(/id="screensaver-show-messages"(?![^>]*checked)/);
 		expect(html).toContain("anyone at the desk");
+		expect(html).toContain("Show work details");
+		expect(html).not.toContain("Show recent messages");
 	});
 
 	it("shows recent messages on the dashboard", () => {

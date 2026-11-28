@@ -1,29 +1,16 @@
 // The full-screen dashboard (COMP001): a clock and the active total with
-// per-state counts on top, a timeline of the live tasks below.
+// per-state counts on top, the tasks as rings below (COMP004 R5, R6).
 // View-only: any input locks the Mac before this page could act on it, so it
 // renders no controls.
 import type {
 	DashboardColumnKey,
 	DashboardModel,
 } from "../application/dashboard";
+import type { DashboardLayout } from "../application/dashboardLayout";
 import type { CompanionFont, CompanionTheme } from "../application/preferences";
-import { DashboardTimeline } from "./DashboardTimeline";
+import type { RingModel } from "../application/ring";
+import { DashboardRing, formatElapsed, summaryLine } from "./DashboardRing";
 import { SegmentClock } from "./SegmentClock";
-
-/**
- * Timeline rows. Rows are sized to the screen height (dashboard.css), so this
- * many fit under the header on any display and the count needs no measuring.
- */
-export const DASHBOARD_TIMELINE_ROWS = 8;
-/** Rows when each one also lists its recent messages, so it stands taller. */
-export const DASHBOARD_TIMELINE_ROWS_WITH_MESSAGES = 4;
-
-/** How many rows fit, with or without the messages under each. */
-export function dashboardTimelineRows(showMessages: boolean): number {
-	return showMessages
-		? DASHBOARD_TIMELINE_ROWS_WITH_MESSAGES
-		: DASHBOARD_TIMELINE_ROWS;
-}
 
 /** Header counts follow the work's flow: running, then waiting on me, then done. */
 const COUNT_ORDER: readonly DashboardColumnKey[] = [
@@ -71,9 +58,67 @@ type DashboardProps = {
 	readonly lockAvailable: boolean;
 	/** Opened from Settings: input closes it, nothing locks (R12). */
 	readonly preview?: boolean;
-	/** Lists each task's recent messages; off unless Settings turns it on. */
-	readonly showMessages?: boolean;
 };
+
+// Tasks without a ring, in one line under the rings: each by its branch and
+// how long it has been in its state.
+function More({
+	tasks,
+	now,
+}: {
+	readonly tasks: readonly RingModel[];
+	readonly now: number;
+}) {
+	if (tasks.length === 0) return null;
+	return (
+		<p className="rings-more">
+			+{tasks.length} more
+			{tasks.map((task) => (
+				<span key={task.key}>
+					{" · "}
+					<span className="rings-more-name">{task.title}</span>{" "}
+					<span className="rings-more-status" data-state={task.state}>
+						{COUNT_LABELS[task.state]} {formatElapsed(now - task.since)}
+						{task.state === "finished" && task.summary !== undefined
+							? ` · ${summaryLine(task.summary)}`
+							: ""}
+					</span>
+				</span>
+			))}
+		</p>
+	);
+}
+
+function Rings({
+	layout,
+	now,
+}: {
+	readonly layout: DashboardLayout<RingModel>;
+	readonly now: number;
+}) {
+	if (layout.rings.length === 0)
+		return <p className="rings-empty">진행 중인 작업 없음</p>;
+	return (
+		<>
+			<section
+				aria-label="작업"
+				className="rings"
+				data-columns={layout.columns}
+				data-mode={layout.mode}
+			>
+				{layout.rings.map((ring) => (
+					<DashboardRing
+						key={ring.key}
+						now={now}
+						ring={ring}
+						size={layout.mode === "large" ? "large" : "compact"}
+					/>
+				))}
+			</section>
+			<More now={now} tasks={layout.overflow} />
+		</>
+	);
+}
 
 export function Dashboard({
 	model,
@@ -82,7 +127,6 @@ export function Dashboard({
 	font,
 	lockAvailable,
 	preview = false,
-	showMessages = false,
 }: DashboardProps) {
 	return (
 		<main className="dashboard" data-font={font} data-theme={theme}>
@@ -114,11 +158,7 @@ export function Dashboard({
 					))}
 				</dl>
 			</header>
-			<DashboardTimeline
-				model={model.timeline}
-				now={Math.floor(now.getTime() / 1000)}
-				showMessages={showMessages}
-			/>
+			<Rings layout={model.layout} now={Math.floor(now.getTime() / 1000)} />
 		</main>
 	);
 }

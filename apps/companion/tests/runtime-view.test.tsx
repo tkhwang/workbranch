@@ -406,6 +406,110 @@ describe("runtime UI", () => {
 		);
 		expect(plain?.messages).toBeUndefined();
 	});
+	it("keeps turns and tool calls when the collector sends them", () => {
+		const activity = {
+			turns: [
+				{ kind: "prompt", at: 10 },
+				{ kind: "agent", at: 30 },
+			],
+			calls: [
+				{ tool: "Edit", files: ["store.rs"], at: 12 },
+				{ tool: "Bash", failed: true, at: 14 },
+				{ tool: "mcp__fs__read", at: 15 },
+			],
+		};
+		const [parsed] = parseRuntimeDocument(
+			JSON.stringify({
+				schemaVersion: 1,
+				sessions: [{ ...session, ...activity }],
+			}),
+		);
+		expect(parsed?.turns).toEqual(activity.turns);
+		expect(parsed?.calls).toEqual(activity.calls);
+		const [plain] = parseRuntimeDocument(
+			JSON.stringify({ schemaVersion: 1, sessions: [session] }),
+		);
+		expect(plain?.turns).toBeUndefined();
+		expect(plain?.calls).toBeUndefined();
+	});
+	it("rejects malformed turns or tool calls", () => {
+		for (const bad of [
+			{ turns: [{ kind: "reply", at: 1 }] },
+			{ turns: [{ kind: "prompt", at: -1 }] },
+			{ turns: { kind: "prompt", at: 1 } },
+			{ calls: [{ tool: 1, at: 1 }] },
+			{ calls: [{ tool: "Edit", files: "store.rs", at: 1 }] },
+			{ calls: [{ tool: "Edit", files: [1], at: 1 }] },
+			{ calls: [{ tool: "Bash", failed: "yes", at: 1 }] },
+			{ calls: [{ tool: "Bash", at: 1.5 }] },
+		])
+			expect(() =>
+				parseRuntimeDocument(
+					JSON.stringify({
+						schemaVersion: 1,
+						sessions: [{ ...session, ...bad }],
+					}),
+				),
+			).toThrow();
+	});
+	it("keeps the todo summary when the collector sends one", () => {
+		const todos = { total: 7, done: 3, active: "Ring layout" };
+		const [parsed] = parseRuntimeDocument(
+			JSON.stringify({ schemaVersion: 1, sessions: [{ ...session, todos }] }),
+		);
+		expect(parsed?.todos).toEqual(todos);
+		const [idle] = parseRuntimeDocument(
+			JSON.stringify({
+				schemaVersion: 1,
+				sessions: [{ ...session, todos: { total: 2, done: 2 } }],
+			}),
+		);
+		expect(idle?.todos).toEqual({ total: 2, done: 2 });
+		for (const bad of [
+			{ total: 2 },
+			{ total: -1, done: 0 },
+			{ total: 2, done: 1, active: 3 },
+			[7, 3],
+		])
+			expect(() =>
+				parseRuntimeDocument(
+					JSON.stringify({
+						schemaVersion: 1,
+						sessions: [{ ...session, todos: bad }],
+					}),
+				),
+			).toThrow();
+	});
+	it("keeps an ended turn's summary when the collector sends one", () => {
+		const lastTurn = {
+			startedAt: 10,
+			filesChanged: 4,
+			linesAdded: 530,
+			linesRemoved: 133,
+			tests: "passed",
+			commits: 1,
+		};
+		const [parsed] = parseRuntimeDocument(
+			JSON.stringify({
+				schemaVersion: 1,
+				sessions: [{ ...session, lastTurn }],
+			}),
+		);
+		expect(parsed?.lastTurn).toEqual(lastTurn);
+		for (const bad of [
+			{ ...lastTurn, tests: "green" },
+			{ ...lastTurn, commits: -1 },
+			{ ...lastTurn, filesChanged: undefined },
+		])
+			expect(() =>
+				parseRuntimeDocument(
+					JSON.stringify({
+						schemaVersion: 1,
+						sessions: [{ ...session, lastTurn: bad }],
+					}),
+				),
+			).toThrow();
+	});
 	it("rejects malformed messages", () => {
 		for (const messages of [
 			[{ kind: "commit", text: "x", at: 1 }],
