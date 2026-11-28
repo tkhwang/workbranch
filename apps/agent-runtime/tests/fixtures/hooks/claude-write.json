@@ -1,0 +1,1 @@
+{"session_id":"s-claude","prompt_id":"p1","transcript_path":"/tmp/t.jsonl","cwd":"/work/task","hook_event_name":"PreToolUse","tool_name":"Write","tool_use_id":"toolu_write","tool_input":{"file_path":"/work/task/app/src/tool.rs","content":"pub fn a() {}\n\npub fn b() {}\n"}}

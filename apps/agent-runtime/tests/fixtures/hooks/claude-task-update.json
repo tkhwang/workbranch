@@ -1,0 +1,1 @@
+{"session_id":"s-claude","prompt_id":"p1","cwd":"/work/task","hook_event_name":"PostToolUse","tool_name":"TaskUpdate","tool_use_id":"toolu_task_u","tool_input":{"taskId":"1","status":"in_progress"},"tool_response":{"success":true,"taskId":"1","updatedFields":["status"],"statusChange":{"from":"pending","to":"in_progress"}},"duration_ms":1}

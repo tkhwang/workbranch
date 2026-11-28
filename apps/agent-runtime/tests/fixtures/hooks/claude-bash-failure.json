@@ -1,0 +1,1 @@
+{"session_id":"s-claude","prompt_id":"p1","transcript_path":"/tmp/t.jsonl","cwd":"/work/task","hook_event_name":"PostToolUseFailure","tool_name":"Bash","tool_use_id":"toolu_bash","tool_input":{"command":"cargo test -p agent-runtime && git status","description":"Run the collector tests"},"error":"Exit code 101","is_interrupt":false,"duration_ms":5120}

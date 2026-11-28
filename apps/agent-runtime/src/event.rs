@@ -1,6 +1,7 @@
 use crate::{
     Result,
     store::{self, Session},
+    tool as tool_input,
 };
 use rusqlite::{Connection, TransactionBehavior};
 use serde_json::Value;
@@ -8,6 +9,8 @@ use sha2::{Digest, Sha256};
 
 /// A dashboard line needs only the start of a message.
 const MESSAGE_CHARS: usize = 300;
+/// A todo's text is shown as one short line.
+const TODO_CHARS: usize = 120;
 
 fn string<'a>(v: &'a Value, key: &str) -> &'a str {
     v.get(key).and_then(Value::as_str).unwrap_or("")
@@ -47,6 +50,14 @@ fn clipped(text: &str, limit: usize) -> String {
         out.push('…');
     }
     out
+}
+
+// The exit code a provider reported for a shell call, when it reported one.
+fn exit_code(v: &Value) -> Option<i64> {
+    let response = v.get("tool_response")?;
+    ["exit_code", "exitCode"]
+        .iter()
+        .find_map(|key| response.get(key).and_then(Value::as_i64))
 }
 
 fn signature(v: &Value) -> String {
@@ -186,6 +197,7 @@ pub fn ingest(
             | "Elicitation"
             | "ElicitationResult"
             | "Stop"
+            | "SubagentStop"
             | "Interrupt"
             | "StopFailure"
     ) {
@@ -197,7 +209,7 @@ pub fn ingest(
     let stored = store::load(&tx, workspace, provider, sid, agent)?;
     if stored.as_ref().is_some_and(|s| s.workspace_stamp != stamp) {
         // A recreated workspace starts over, its predecessor's timeline too.
-        store::forget_transitions(&tx, workspace, provider, sid, agent)?;
+        store::forget_history(&tx, workspace, provider, sid, agent)?;
     }
     let mut s = stored
         .filter(|s| s.workspace_stamp == stamp)
@@ -230,7 +242,7 @@ pub fn ingest(
         && event != "UserPromptSubmit"
         && event != "SessionStart"
         && event != "SessionEnd"
-        && !matches!(event, "Stop" | "StopFailure" | "Interrupt")
+        && !matches!(event, "Stop" | "SubagentStop" | "StopFailure" | "Interrupt")
     {
         return Ok(());
     }
@@ -252,6 +264,10 @@ pub fn ingest(
         }
         "UserPromptSubmit" => {
             s.closed = false;
+            // A request repeated under the same turn id starts no new turn.
+            if turn.is_empty() || s.turn_id != turn {
+                store::remember_turn(&mut s.turns, "prompt", now);
+            }
             if !s.turn_id.is_empty() && s.turn_id != turn {
                 s.retired_turns.push(s.turn_id.clone());
                 bound(&mut s.retired_turns);
@@ -289,6 +305,22 @@ pub fn ingest(
             if !id.is_empty() {
                 s.active_tools.insert(id.into(), signature(v));
             }
+            let input = v.get("tool_input").unwrap_or(&Value::Null);
+            let (added, removed) = tool_input::line_changes(tool, input);
+            store::record_call(
+                &tx,
+                &s,
+                &store::CallRecord {
+                    tool_use_id: id,
+                    tool,
+                    files: &tool_input::files(tool, input),
+                    edit: tool_input::is_edit(tool),
+                    added,
+                    removed,
+                    kind: tool_input::command_kinds(tool, input).join(" "),
+                },
+                now,
+            )?;
             s.activity = activity(v);
             let reason = match tool {
                 "AskUserQuestion" | "request_user_input" => "question",
@@ -374,6 +406,29 @@ pub fn ingest(
             if id.is_empty() {
                 return Ok(());
             }
+            if event == "PostToolUse" {
+                // Claude Code reports a failed call with its own event, so a
+                // plain PostToolUse succeeded. Other providers report every
+                // outcome here: only an exit code says how it went.
+                match exit_code(v) {
+                    Some(0) => store::confirm_call(&tx, &s, id)?,
+                    Some(_) => store::fail_call(&tx, &s, id)?,
+                    None if provider == "claude" => store::confirm_call(&tx, &s, id)?,
+                    None => {}
+                }
+            }
+            if event == "PostToolUse"
+                && let Some(change) = tool_input::todo_change(
+                    tool,
+                    v.get("tool_input").unwrap_or(&Value::Null),
+                    v.get("tool_response").unwrap_or(&Value::Null),
+                )
+            {
+                tool_input::apply_todo(&mut s.todo_items, change);
+                for todo in &mut s.todo_items {
+                    todo.text = clipped(&todo.text, TODO_CHARS);
+                }
+            }
             s.active_tools.remove(id);
             s.waits.remove(id);
             s.completed_tools.push(id.into());
@@ -388,7 +443,20 @@ pub fn ingest(
             }
             if event == "PostToolUseFailure" {
                 s.outcome = "tool-error".into();
+                store::fail_call(&tx, &s, id)?;
             }
+        }
+        // A subagent's report ends its own session (keyed by `agent_id`) and
+        // marks where its parent's work turned on it.
+        "SubagentStop" => {
+            if agent.is_empty() {
+                return Ok(());
+            }
+            s.state = "finished".into();
+            s.waits.clear();
+            s.active_tools.clear();
+            s.outcome = "turn-ended".into();
+            store::remember_turn(&mut s.turns, "agent", now);
         }
         "Stop" | "Interrupt" | "StopFailure" => {
             s.state = "finished".into();

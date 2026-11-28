@@ -121,6 +121,17 @@
         ]
       }
     ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/collect.sh\"",
+            "timeout": 1
+          }
+        ]
+      }
+    ],
     "StopFailure": [
       {
         "hooks": [

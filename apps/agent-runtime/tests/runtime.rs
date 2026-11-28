@@ -1,5 +1,5 @@
 use serde_json::json;
-use workbranch_agent_runtime::{event, migration, store};
+use workbranch_agent_runtime::{event, migration, store, tool};
 
 #[test]
 fn correlated_waits_do_not_resume_on_another_tools_completion() {
@@ -502,7 +502,7 @@ fn version_1_store_is_readable_and_upgrades_on_write() {
 
     let mut db = store::open(&path).unwrap();
     let version: u32 = db.query_row("PRAGMA user_version", [], |r| r.get(0)).unwrap();
-    assert_eq!(version, 2);
+    assert_eq!(version, 3);
     hook(&mut db, "Stop", "", 30);
     let after = store::snapshot(&store::open_read(&path).unwrap(), 40).unwrap();
     assert_eq!(after[0].transitions, log(&[("finished", 30, "turn-ended")]));
@@ -578,4 +578,494 @@ fn a_long_message_is_clipped_for_the_dashboard() {
     assert_eq!(s.prompt.chars().count(), 400);
     assert_eq!(s.messages[0].text.chars().count(), 301);
     assert!(s.messages[0].text.ends_with('…'));
+}
+
+fn fixture(name: &str) -> serde_json::Value {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/hooks")
+        .join(name);
+    serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
+}
+
+fn files_of(name: &str) -> Vec<String> {
+    let v = fixture(name);
+    tool::files(v["tool_name"].as_str().unwrap(), &v["tool_input"])
+}
+
+#[test]
+fn tool_files_are_names_never_paths() {
+    assert_eq!(files_of("claude-read.json"), ["event.rs"]);
+    assert_eq!(files_of("claude-edit.json"), ["store.rs"]);
+    assert_eq!(files_of("claude-write.json"), ["tool.rs"]);
+    assert_eq!(files_of("claude-notebook-edit.json"), ["analysis.ipynb"]);
+    assert_eq!(
+        files_of("codex-apply-patch.json"),
+        ["watcher.rs", "watcher_test.rs", "legacy.rs"]
+    );
+    assert!(files_of("claude-bash.json").is_empty());
+}
+
+#[test]
+fn tool_files_skip_unknown_input_repeat_names_and_stop_at_the_cap() {
+    assert!(tool::files("Grep", &json!({"pattern":"x","path":"/work/src"})).is_empty());
+    assert!(tool::files("Edit", &json!({"file_path":42})).is_empty());
+    assert!(tool::files("apply_patch", &json!({"command":["not","text"]})).is_empty());
+    assert!(tool::files("Write", &json!({"file_path":"/"})).is_empty());
+    let patch: String = (0..12)
+        .map(|i| {
+            format!(
+                "*** Update File: src/f{}.rs\n*** Update File: src/f{}.rs\n",
+                i % 10,
+                i % 10
+            )
+        })
+        .collect();
+    let names = tool::files("apply_patch", &json!({ "command": patch }));
+    assert_eq!(names.len(), tool::MAX_FILES);
+    assert_eq!(names[0], "f0.rs");
+    assert_eq!(names[1], "f1.rs");
+}
+
+#[test]
+fn tool_edits_are_the_tools_that_change_files() {
+    for name in ["Edit", "MultiEdit", "Write", "NotebookEdit", "apply_patch"] {
+        assert!(tool::is_edit(name), "{name}");
+    }
+    for name in ["Read", "Bash", "Grep", "Glob", "mcp__fs__write"] {
+        assert!(!tool::is_edit(name), "{name}");
+    }
+}
+
+fn send_fixture(db: &mut rusqlite::Connection, name: &str, at: u64) {
+    event::ingest(db, "/p/t", "claude", &fixture(name), at).unwrap();
+}
+
+fn call_rows(db: &rusqlite::Connection) -> i64 {
+    db.query_row("SELECT count(*) FROM tool_calls", [], |r| r.get(0)).unwrap()
+}
+
+#[test]
+fn tool_calls_are_logged_once_with_names_and_failures() {
+    let mut db = store::open_memory().unwrap();
+    send_fixture(&mut db, "claude-edit.json", 11);
+    send_fixture(&mut db, "claude-edit.json", 12);
+    send_fixture(&mut db, "claude-bash.json", 13);
+    send_fixture(&mut db, "claude-bash-failure.json", 14);
+    assert_eq!(call_rows(&db), 2);
+    let snapshot = store::snapshot(&db, 20).unwrap();
+    let calls = &snapshot.iter().find(|s| s.session_id == "s-claude").unwrap().calls;
+    assert_eq!(
+        calls,
+        &[
+            store::Call { tool: "Edit".into(), files: vec!["store.rs".into()], failed: false, at: 11 },
+            store::Call { tool: "Bash".into(), files: vec![], failed: true, at: 13 },
+        ]
+    );
+    let json = serde_json::to_string(&store::snapshot(&db, 20).unwrap()).unwrap();
+    assert!(!json.contains("/work/task"), "paths stay out: {json}");
+    assert!(!json.contains("SCHEMA_VERSION"), "edit contents stay out");
+}
+
+#[test]
+fn turns_start_on_each_new_request_only() {
+    let mut db = store::open_memory().unwrap();
+    for (turn, at) in [("one", 10), ("one", 11), ("two", 20)] {
+        event::ingest(&mut db, "/p/t", "codex", &json!({"session_id":"s","turn_id":turn,"hook_event_name":"UserPromptSubmit","prompt":"go"}), at).unwrap();
+    }
+    let turns = &store::snapshot(&db, 30).unwrap()[0].turns;
+    assert_eq!(
+        turns,
+        &[
+            store::Turn { kind: "prompt".into(), at: 10 },
+            store::Turn { kind: "prompt".into(), at: 20 },
+        ]
+    );
+    let mut many = Vec::new();
+    for at in 0..(store::TURN_LIMIT as u64 + 5) {
+        store::remember_turn(&mut many, "prompt", at);
+    }
+    assert_eq!(many.len(), store::TURN_LIMIT);
+    assert_eq!(many[0].at, 5);
+}
+
+#[test]
+fn snapshot_carries_only_the_last_three_hours_of_calls_and_turns() {
+    let mut db = store::open_memory().unwrap();
+    let hour = 3600;
+    hook(&mut db, "UserPromptSubmit", "", 1_000);
+    event::ingest(&mut db, "/p/t", "claude", &json!({"session_id":"s","hook_event_name":"PreToolUse","tool_use_id":"old","tool_name":"Read","tool_input":{"file_path":"/a/old.rs"}}), 1_000).unwrap();
+    hook(&mut db, "Stop", "", 1_001);
+    hook(&mut db, "UserPromptSubmit", "", 1_000 + 4 * hour);
+    for i in 0..310u64 {
+        event::ingest(&mut db, "/p/t", "claude", &json!({"session_id":"s","hook_event_name":"PreToolUse","tool_use_id":format!("c{i}"),"tool_name":"Bash","tool_input":{"command":"true"}}), 1_000 + 4 * hour + i).unwrap();
+    }
+    let s = &store::snapshot(&db, 1_000 + 4 * hour + 400).unwrap()[0];
+    assert_eq!(s.calls.len(), 300);
+    assert_eq!(s.calls[0].at, 1_000 + 4 * hour + 10, "the newest 300 are kept");
+    assert!(s.calls.iter().all(|c| c.tool == "Bash"), "the call from four hours ago is gone");
+    assert_eq!(s.turns.len(), 1);
+}
+
+#[test]
+fn a_session_without_calls_carries_no_calls_field() {
+    let mut db = store::open_memory().unwrap();
+    hook(&mut db, "Stop", "", 10);
+    let json = serde_json::to_value(&store::snapshot(&db, 20).unwrap()[0]).unwrap();
+    assert!(json.get("calls").is_none());
+    assert!(json.get("turns").is_none());
+}
+
+#[test]
+fn calls_age_out_after_a_day_and_go_with_a_recreated_workspace() {
+    let mut db = store::open_memory().unwrap();
+    hook(&mut db, "UserPromptSubmit", "", 10);
+    send_fixture(&mut db, "claude-read.json", 11);
+    assert_eq!(call_rows(&db), 1);
+    hook(&mut db, "UserPromptSubmit", "", 11 + 86400 + 1);
+    assert_eq!(call_rows(&db), 0);
+
+    send_fixture(&mut db, "claude-read.json", 100_000);
+    assert_eq!(call_rows(&db), 1);
+    store::forget_history(&db, "/p/t", "claude", "s-claude", "").unwrap();
+    assert_eq!(call_rows(&db), 0);
+}
+
+#[test]
+fn version_2_store_gains_the_call_log_and_keeps_its_history() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("state.sqlite3");
+    {
+        let v2 = rusqlite::Connection::open(&path).unwrap();
+        v2.execute_batch("CREATE TABLE sessions (workspace TEXT NOT NULL, provider TEXT NOT NULL, session TEXT NOT NULL, agent TEXT NOT NULL, data TEXT NOT NULL, updated INTEGER NOT NULL, PRIMARY KEY(workspace,provider,session,agent)); CREATE TABLE transitions (workspace TEXT NOT NULL, provider TEXT NOT NULL, session TEXT NOT NULL, agent TEXT NOT NULL, state TEXT NOT NULL, outcome TEXT NOT NULL, at INTEGER NOT NULL); PRAGMA user_version=2;").unwrap();
+        let s = store::Session { workspace: "/p/t".into(), provider: "claude".into(), session_id: "s".into(), state: "running".into(), observation: "observed".into(), updated_at: 10, state_changed_at: 10, ..Default::default() };
+        v2.execute("INSERT INTO sessions VALUES (?,?,?,?,?,?)", rusqlite::params![s.workspace, s.provider, s.session_id, s.agent_id, serde_json::to_string(&s).unwrap(), 10]).unwrap();
+        v2.execute("INSERT INTO transitions VALUES ('/p/t','claude','s','','running','',10)", []).unwrap();
+    }
+    let before = store::snapshot(&store::open_read(&path).unwrap(), 20).unwrap();
+    assert!(before[0].calls.is_empty(), "a version 2 store is read without calls");
+    let mut db = store::open(&path).unwrap();
+    let version: u32 = db.query_row("PRAGMA user_version", [], |r| r.get(0)).unwrap();
+    assert_eq!(version, 3);
+    hook(&mut db, "PreToolUse", "Bash", 30);
+    let after = store::snapshot(&store::open_read(&path).unwrap(), 40).unwrap();
+    assert_eq!(after[0].transitions, log(&[("running", 10, "")]));
+    assert_eq!(after[0].calls.len(), 1);
+}
+
+fn todos_of(db: &rusqlite::Connection, session: &str, now: u64) -> Option<store::TodoSummary> {
+    store::snapshot(db, now)
+        .unwrap()
+        .into_iter()
+        .find(|s| s.session_id == session)
+        .and_then(|s| s.todos)
+}
+
+#[test]
+fn todo_write_and_update_plan_replace_the_whole_list() {
+    let mut db = store::open_memory().unwrap();
+    send_fixture(&mut db, "claude-todo-write.json", 10);
+    assert_eq!(
+        todos_of(&db, "s-claude", 20),
+        Some(store::TodoSummary { total: 7, done: 3, active: "Ring layout".into() })
+    );
+    event::ingest(&mut db, "/p/t", "codex", &fixture("codex-update-plan.json"), 10).unwrap();
+    assert_eq!(
+        todos_of(&db, "s-codex", 20),
+        Some(store::TodoSummary { total: 5, done: 2, active: "Fix inode backend fallback".into() })
+    );
+    let json = serde_json::to_string(&store::snapshot(&db, 20).unwrap()).unwrap();
+    assert!(!json.contains("todoItems"), "the list itself stays in the store");
+    assert!(!json.contains("Privacy toggle"), "pending texts stay in the store");
+}
+
+#[test]
+fn task_tools_add_and_update_todos_by_id() {
+    let mut db = store::open_memory().unwrap();
+    send_fixture(&mut db, "claude-task-create.json", 10);
+    let mut second = fixture("claude-task-create.json");
+    second["tool_use_id"] = json!("toolu_task_2");
+    second["tool_input"]["subject"] = json!("Add turns");
+    second["tool_response"] = json!({});
+    event::ingest(&mut db, "/p/t", "claude", &second, 11).unwrap();
+    assert_eq!(
+        todos_of(&db, "s-claude", 20),
+        Some(store::TodoSummary { total: 2, done: 0, active: String::new() })
+    );
+    send_fixture(&mut db, "claude-task-update.json", 12);
+    assert_eq!(todos_of(&db, "s-claude", 20).unwrap().active, "Record tool calls");
+    for (id, status, at) in [("1", "completed", 13), ("2", "deleted", 14), ("9", "completed", 15)] {
+        let mut update = fixture("claude-task-update.json");
+        update["tool_use_id"] = json!(format!("u{at}"));
+        update["tool_input"] = json!({"taskId": id, "status": status});
+        event::ingest(&mut db, "/p/t", "claude", &update, at).unwrap();
+    }
+    assert_eq!(
+        todos_of(&db, "s-claude", 20),
+        Some(store::TodoSummary { total: 1, done: 1, active: String::new() })
+    );
+}
+
+#[test]
+fn unknown_todo_input_keeps_the_list_and_failed_calls_change_nothing() {
+    let mut db = store::open_memory().unwrap();
+    send_fixture(&mut db, "claude-todo-write.json", 10);
+    for (n, input) in [
+        json!({"todos": "not a list"}),
+        json!({"todos": [{"content": "x", "status": "someday"}]}),
+        json!({"todos": [{"status": "pending"}]}),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let mut bad = fixture("claude-todo-write.json");
+        bad["tool_use_id"] = json!(format!("bad{n}"));
+        bad["tool_input"] = input;
+        event::ingest(&mut db, "/p/t", "claude", &bad, 11).unwrap();
+    }
+    let mut failed = fixture("claude-todo-write.json");
+    failed["hook_event_name"] = json!("PostToolUseFailure");
+    failed["tool_use_id"] = json!("failed");
+    failed["tool_input"] = json!({"todos": []});
+    event::ingest(&mut db, "/p/t", "claude", &failed, 12).unwrap();
+    assert_eq!(todos_of(&db, "s-claude", 20).unwrap().total, 7);
+}
+
+#[test]
+fn todo_text_is_clipped_and_scrubbed() {
+    let mut db = store::open_memory().unwrap();
+    let mut long = fixture("claude-todo-write.json");
+    long["tool_input"] = json!({"todos": [
+        {"content": "x ".repeat(200), "status": "in_progress"},
+    ]});
+    event::ingest(&mut db, "/p/t", "claude", &long, 10).unwrap();
+    assert_eq!(todos_of(&db, "s-claude", 20).unwrap().active.chars().count(), 121);
+    let mut secret = fixture("claude-todo-write.json");
+    secret["tool_use_id"] = json!("secret");
+    secret["tool_input"] = json!({"todos": [
+        {"content": "rotate the api_key in prod", "status": "in_progress"},
+    ]});
+    event::ingest(&mut db, "/p/t", "claude", &secret, 11).unwrap();
+    assert_eq!(todos_of(&db, "s-claude", 20).unwrap().active, "[sensitive content omitted]");
+}
+
+#[test]
+fn todo_lists_are_capped() {
+    let mut items = Vec::new();
+    for _ in 0..(tool::MAX_TODOS + 5) {
+        tool::apply_todo(
+            &mut items,
+            tool::TodoChange::Create(tool::TodoItem { id: String::new(), text: "t".into(), status: "todo".into() }),
+        );
+    }
+    assert_eq!(items.len(), tool::MAX_TODOS);
+    assert_eq!(items.last().unwrap().id, (tool::MAX_TODOS + 5).to_string());
+}
+
+fn lines_of(name: &str) -> (u32, u32) {
+    let v = fixture(name);
+    tool::line_changes(v["tool_name"].as_str().unwrap(), &v["tool_input"])
+}
+
+fn kinds(command: &str) -> Vec<&'static str> {
+    tool::command_kinds("Bash", &json!({ "command": command }))
+}
+
+#[test]
+fn line_changes_come_from_the_edit_input() {
+    // old: "= 2;", "A"; new: "= 3;", "A", "B", "C" → three lines in, one out.
+    assert_eq!(lines_of("claude-edit.json"), (3, 1));
+    assert_eq!(lines_of("claude-write.json"), (3, 0));
+    // "+ fsevents", "+ start", "+#[test]", "+fn starts" in; "- inode" out.
+    assert_eq!(lines_of("codex-apply-patch.json"), (4, 1));
+    assert_eq!(lines_of("claude-read.json"), (0, 0));
+    let multi = json!({"edits": [
+        {"old_string": "a\nb", "new_string": "a\nc"},
+        {"old_string": "x", "new_string": "x\ny\nz"},
+    ]});
+    assert_eq!(tool::line_changes("MultiEdit", &multi), (3, 1));
+    assert_eq!(tool::line_changes("Edit", &json!({"old_string": 1})), (0, 0));
+}
+
+#[test]
+fn commands_are_classified_as_tests_and_commits_only() {
+    assert_eq!(kinds("cargo test -p agent-runtime && git status"), ["test"]);
+    assert_eq!(kinds("cargo +1.95.0 test --locked"), ["test"]);
+    assert_eq!(kinds("pnpm --filter @workbranch/companion test"), ["test"]);
+    assert_eq!(kinds("CI=1 pnpm exec vitest run tests/ring.test.ts"), ["test"]);
+    assert_eq!(kinds("./apps/cli/tests/run.sh"), ["test"]);
+    assert_eq!(kinds("python -m pytest -q"), ["test"]);
+    assert_eq!(kinds("pnpm test && git commit -m 'feat: ring'"), ["test", "commit"]);
+    assert_eq!(kinds("git -C app commit -m done"), ["commit"]);
+    assert!(kinds("git commit --dry-run -m x").is_empty());
+    assert!(kinds("rg test src").is_empty());
+    assert!(kinds("git status").is_empty());
+    assert_eq!(
+        tool::command_kinds("Bash", &json!({"command": ["cargo", "test"]})),
+        ["test"]
+    );
+    assert!(tool::command_kinds("Edit", &json!({"command": "cargo test"})).is_empty());
+}
+
+#[test]
+fn calls_keep_counts_and_kinds_but_never_the_command() {
+    let mut db = store::open_memory().unwrap();
+    send_fixture(&mut db, "claude-edit.json", 10);
+    send_fixture(&mut db, "claude-bash.json", 11);
+    let mut post = fixture("claude-bash.json");
+    post["hook_event_name"] = json!("PostToolUse");
+    post["tool_response"] = json!({"stdout": "ok"});
+    event::ingest(&mut db, "/p/t", "claude", &post, 12).unwrap();
+    let rows: Vec<(String, u32, u32, String)> = db
+        .prepare("SELECT tool, added, removed, kind FROM tool_calls ORDER BY at")
+        .unwrap()
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
+        .unwrap()
+        .map(Result::unwrap)
+        .collect();
+    assert_eq!(
+        rows,
+        [
+            ("Edit".into(), 3, 1, String::new()),
+            ("Bash".into(), 0, 0, "test ok".into()),
+        ]
+    );
+    let dump: String = db
+        .prepare("SELECT group_concat(tool || files || kind) FROM tool_calls")
+        .unwrap()
+        .query_row([], |r| r.get(0))
+        .unwrap();
+    assert!(!dump.contains("cargo"), "{dump}");
+}
+
+#[test]
+fn other_providers_confirm_or_fail_a_call_only_by_its_exit_code() {
+    let mut db = store::open_memory().unwrap();
+    let send = |db: &mut rusqlite::Connection, event: &str, id: &str, response: serde_json::Value, at| {
+        event::ingest(db, "/p/t", "codex", &json!({"session_id":"c","turn_id":"t","hook_event_name":event,"tool_use_id":id,"tool_name":"Bash","tool_input":{"command":"cargo test"},"tool_response":response}), at).unwrap();
+    };
+    for (id, response) in [("pass", json!({"exit_code": 0})), ("fail", json!({"exit_code": 101})), ("quiet", json!("output only"))] {
+        send(&mut db, "PreToolUse", id, json!(null), 10);
+        send(&mut db, "PostToolUse", id, response, 11);
+    }
+    let rows: Vec<(String, String, bool)> = db
+        .prepare("SELECT tool_use_id, kind, failed FROM tool_calls ORDER BY tool_use_id")
+        .unwrap()
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+        .unwrap()
+        .map(Result::unwrap)
+        .collect();
+    assert_eq!(
+        rows,
+        [
+            ("fail".into(), "test".into(), true),
+            ("pass".into(), "test ok".into(), false),
+            ("quiet".into(), "test".into(), false),
+        ]
+    );
+}
+
+fn claude(db: &mut rusqlite::Connection, v: serde_json::Value, at: u64) {
+    let mut v = v;
+    v["session_id"] = json!("turn");
+    event::ingest(db, "/p/t", "claude", &v, at).unwrap();
+}
+
+fn bash(db: &mut rusqlite::Connection, id: &str, command: &str, ok: bool, at: u64) {
+    claude(db, json!({"hook_event_name":"PreToolUse","tool_use_id":id,"tool_name":"Bash","tool_input":{"command":command}}), at);
+    claude(db, json!({"hook_event_name": if ok {"PostToolUse"} else {"PostToolUseFailure"},"tool_use_id":id,"tool_name":"Bash","tool_input":{"command":command},"tool_response":{}}), at + 1);
+}
+
+fn last_turn(db: &rusqlite::Connection, now: u64) -> Option<store::TurnSummary> {
+    store::snapshot(db, now).unwrap().into_iter().find(|s| s.session_id == "turn").and_then(|s| s.last_turn)
+}
+
+#[test]
+fn an_ended_turn_sums_its_edits_tests_and_commits() {
+    let mut db = store::open_memory().unwrap();
+    claude(&mut db, json!({"hook_event_name":"UserPromptSubmit","prompt":"first"}), 10);
+    claude(&mut db, fixture("claude-write.json"), 11);
+    claude(&mut db, json!({"hook_event_name":"Stop"}), 12);
+
+    claude(&mut db, json!({"hook_event_name":"UserPromptSubmit","prompt":"second"}), 20);
+    let mut edit = fixture("claude-edit.json");
+    edit["tool_use_id"] = json!("e1");
+    claude(&mut db, edit.clone(), 21);
+    edit["tool_use_id"] = json!("e2");
+    claude(&mut db, edit, 22);
+    let mut write = fixture("claude-write.json");
+    write["tool_use_id"] = json!("w2");
+    claude(&mut db, write, 23);
+    bash(&mut db, "t1", "cargo test", false, 24);
+    bash(&mut db, "t2", "cargo test", true, 26);
+    bash(&mut db, "c1", "git commit -m 'feat: ring'", true, 28);
+    bash(&mut db, "c2", "git commit -m 'oops'", false, 30);
+    assert_eq!(last_turn(&db, 40), None, "a running turn has no summary yet");
+    claude(&mut db, json!({"hook_event_name":"Stop"}), 40);
+    assert_eq!(
+        last_turn(&db, 50),
+        Some(store::TurnSummary {
+            started_at: 20,
+            files_changed: 2,
+            lines_added: 3 + 3 + 3,
+            lines_removed: 1 + 1,
+            tests: "passed".into(),
+            commits: 1,
+        })
+    );
+}
+
+#[test]
+fn a_turn_without_tests_says_none_and_the_last_test_decides() {
+    let mut db = store::open_memory().unwrap();
+    claude(&mut db, json!({"hook_event_name":"UserPromptSubmit","prompt":"go"}), 10);
+    claude(&mut db, json!({"hook_event_name":"Stop"}), 11);
+    assert_eq!(last_turn(&db, 20).unwrap().tests, "none");
+
+    claude(&mut db, json!({"hook_event_name":"UserPromptSubmit","prompt":"again"}), 30);
+    bash(&mut db, "t1", "pnpm test", true, 31);
+    bash(&mut db, "t2", "pnpm test", false, 33);
+    claude(&mut db, json!({"hook_event_name":"Stop"}), 40);
+    let summary = last_turn(&db, 50).unwrap();
+    assert_eq!(summary.tests, "failed");
+    assert_eq!(summary.started_at, 30);
+    assert_eq!(summary.files_changed, 0);
+
+    let json = serde_json::to_value(store::snapshot(&db, 50).unwrap()).unwrap();
+    let s = json.as_array().unwrap().iter().find(|s| s["sessionId"] == "turn").unwrap();
+    assert_eq!(s["lastTurn"]["filesChanged"], 0);
+    assert_eq!(s["lastTurn"]["tests"], "failed");
+}
+
+#[test]
+fn a_session_from_before_turn_starts_has_no_summary() {
+    let mut db = store::open_memory().unwrap();
+    hook(&mut db, "Stop", "", 10);
+    assert!(store::snapshot(&db, 20).unwrap()[0].last_turn.is_none());
+}
+
+#[test]
+fn a_subagent_report_ends_its_own_session_and_marks_an_agent_turn() {
+    let mut db = store::open_memory().unwrap();
+    claude(&mut db, json!({"hook_event_name":"UserPromptSubmit","prompt":"go"}), 10);
+    claude(&mut db, json!({"hook_event_name":"PreToolUse","tool_use_id":"sub","tool_name":"Agent","agent_id":"helper","tool_input":{"description":"explore"}}), 11);
+    claude(&mut db, json!({"hook_event_name":"SubagentStop","agent_id":"helper","agent_type":"Explore","last_assistant_message":"found it","stop_hook_active":false}), 20);
+    let snapshot = store::snapshot(&db, 30).unwrap();
+    let parent = snapshot.iter().find(|s| s.session_id == "turn" && s.agent_id.is_empty()).unwrap();
+    let helper = snapshot.iter().find(|s| s.agent_id == "helper").unwrap();
+    assert_eq!(parent.state, "running", "the parent keeps working");
+    assert_eq!(helper.state, "finished");
+    assert_eq!(helper.turns, [store::Turn { kind: "agent".into(), at: 20 }]);
+    assert!(helper.last_turn.is_none(), "a report is not a request turn");
+
+    claude(&mut db, json!({"hook_event_name":"SubagentStop"}), 40);
+    let parent = store::snapshot(&db, 50).unwrap().into_iter().find(|s| s.session_id == "turn" && s.agent_id.is_empty()).unwrap();
+    assert_eq!(parent.state, "running", "a report without an agent id is not the parent's stop");
+}
+
+#[test]
+fn claude_hooks_register_subagent_stop() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../integrations/agent-events/claude-code/plugins/workbranch-agent-events/hooks/hooks.json");
+    let hooks: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    assert_eq!(hooks["hooks"]["SubagentStop"], hooks["hooks"]["Stop"]);
 }
