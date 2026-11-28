@@ -367,7 +367,7 @@ function Middle({
 }) {
 	const large = size === "large";
 	const progress = ring.progress;
-	const failed = ring.turnEnds.at(-1)?.error === true;
+	const failed = ring.failed;
 	if (ring.state === "waiting")
 		return (
 			<g className="ring-middle" data-state="waiting">
@@ -632,9 +632,7 @@ const AGENT_NAMES: Readonly<Record<RingModel["agents"][number], string>> = {
 
 /** The pill's state: an ended turn that failed reads as its own state. */
 export function pillState(ring: RingModel): HistoryState | "error" {
-	return ring.state === "finished" && ring.turnEnds.at(-1)?.error === true
-		? "error"
-		: ring.state;
+	return ring.failed ? "error" : ring.state;
 }
 
 const PILL_LABELS: Readonly<Record<HistoryState | "error", string>> = {

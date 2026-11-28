@@ -419,7 +419,7 @@ describe("buildRing progress", () => {
 });
 
 describe("buildRing summary", () => {
-	it("takes the newest ended turn's summary among the task's sessions", () => {
+	it("takes the summary of the turn that ended last, not the one that began last", () => {
 		const turn = (startedAt: number, filesChanged: number) => ({
 			startedAt,
 			filesChanged,
@@ -430,29 +430,45 @@ describe("buildRing summary", () => {
 		});
 		const ring = buildRing(
 			row([
+				// Began first, ended just now.
 				session({
-					sessionId: "a",
+					sessionId: "long",
 					state: "finished",
-					lastTurn: turn(NOW - HOUR, 1),
+					stateChangedAt: NOW - 30,
+					lastTurn: turn(NOW - HOUR, 4),
 				}),
+				// Began later, ended earlier.
 				session({
-					sessionId: "b",
+					sessionId: "short",
 					state: "finished",
-					lastTurn: turn(NOW - 600, 4),
+					stateChangedAt: NOW - 600,
+					lastTurn: turn(NOW - 1_200, 1),
 				}),
-				session({ sessionId: "c" }),
+				session({ sessionId: "running" }),
 			]),
 			"finished",
 			NOW,
 		);
-		expect(ring.summary).toEqual({
-			filesChanged: 4,
-			linesAdded: 10,
-			linesRemoved: 2,
-			tests: "passed",
-			commits: 0,
-		});
+		expect(ring.summary?.filesChanged).toBe(4);
 		expect(buildRing(row([session()]), "running", NOW).summary).toBeUndefined();
+	});
+
+	it("knows a turn failed from the session's outcome even without a log", () => {
+		const old = session({
+			state: "finished",
+			outcome: "error",
+			stateChangedAt: NOW - 300,
+		});
+		const ring = buildRing(row([old]), "finished", NOW);
+		expect(ring.turnEnds).toEqual([]);
+		expect(ring.failed).toBe(true);
+		expect(
+			buildRing(row([{ ...old, outcome: "turn-ended" }]), "finished", NOW)
+				.failed,
+		).toBe(false);
+		expect(
+			buildRing(row([{ ...old, state: "running" }]), "running", NOW).failed,
+		).toBe(false);
 	});
 });
 

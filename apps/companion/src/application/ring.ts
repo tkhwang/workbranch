@@ -189,8 +189,13 @@ export type RingModel = {
 	readonly message: TaskMessage | undefined;
 	/** The todo list of the task's most recently updated session that has one. */
 	readonly progress: RingProgress | undefined;
-	/** The newest ended turn's summary among the task's sessions. */
+	/** The summary of the turn that ended last among the task's sessions. */
 	readonly summary: RingSummary | undefined;
+	/**
+	 * Whether the task's turn ended in an error: the lead session's own
+	 * outcome, which every collector records, or the log's last turn end.
+	 */
+	readonly failed: boolean;
 	readonly nowAngle: number;
 	/** Whether any session carries a transition log, or only its current state. */
 	readonly logged: boolean;
@@ -264,10 +269,12 @@ function recentFiles(
 	});
 }
 
+// The summary of the turn that ended last: sessions carry one only while
+// finished, and a finished session's state changed when its turn ended.
 function summaryOf(row: MainTaskRow): RingSummary | undefined {
 	const latest = row.sessions
-		.flatMap((s) => (s.lastTurn === undefined ? [] : [s.lastTurn]))
-		.sort((a, b) => b.startedAt - a.startedAt)[0];
+		.filter((s) => s.lastTurn !== undefined)
+		.sort((a, b) => b.stateChangedAt - a.stateChangedAt)[0]?.lastTurn;
 	if (latest === undefined) return undefined;
 	return {
 		filesChanged: latest.filesChanged,
@@ -307,6 +314,7 @@ export function buildRing(
 	const intervals = row.sessions.flatMap((s) => sessionIntervals(s, now));
 	const segments = mergeIntervals(intervals, now - windowSeconds, now);
 	const lead = leadSession(row, state);
+	const turnEndsOf = turnEnds(segments, intervals);
 	const calls = taskCalls(row, now - windowSeconds).map((call) =>
 		details ? call : { ...call, files: [] },
 	);
@@ -337,7 +345,7 @@ export function buildRing(
 			from: angle(segment.start),
 			to: angle(segment.end),
 		})),
-		turnEnds: turnEnds(segments, intervals).map((end) => ({
+		turnEnds: turnEndsOf.map((end) => ({
 			angle: angle(end.at),
 			error: end.error,
 		})),
@@ -369,6 +377,9 @@ export function buildRing(
 		message: details ? recentMessages(row, 1)[0] : undefined,
 		progress: progressOf(row, details),
 		summary: summaryOf(row),
+		failed:
+			state === "finished" &&
+			(lead?.outcome === "error" || turnEndsOf.at(-1)?.error === true),
 		nowAngle: angle(now),
 		logged: row.sessions.some(
 			(s) => s.transitions !== undefined && s.transitions.length > 0,

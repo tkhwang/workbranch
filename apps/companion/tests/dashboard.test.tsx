@@ -42,6 +42,7 @@ function ring(
 		message: undefined,
 		progress: undefined,
 		summary: undefined,
+		failed: false,
 		nowAngle: 266,
 		logged: true,
 		...fields,
@@ -311,6 +312,7 @@ describe("DashboardRing", () => {
 		message: undefined,
 		progress: undefined,
 		summary: undefined,
+		failed: false,
 		nowAngle: 266,
 		logged: true,
 	};
@@ -357,7 +359,11 @@ describe("DashboardRing", () => {
 		expect(plain).toContain(">✓ 턴 종료<");
 		expect(plain).toContain(">12분 전<");
 		expect(plain).toContain('<circle class="ring-turn-end"');
-		const failed = draw({ ...ended, turnEnds: [{ angle: 250, error: true }] });
+		const failed = draw({
+			...ended,
+			failed: true,
+			turnEnds: [{ angle: 250, error: true }],
+		});
 		expect(failed).toContain(">✕ 오류로 끝남<");
 		expect(failed).toContain('class="ring-turn-end" d=');
 	});
@@ -402,6 +408,7 @@ describe("DashboardRing", () => {
 		const failed = draw({
 			...ringBase,
 			state: "finished",
+			failed: true,
 			turnEnds: [{ angle: 250, error: true }],
 		});
 		expect(failed).toContain('class="ring-pill" data-state="error"');
