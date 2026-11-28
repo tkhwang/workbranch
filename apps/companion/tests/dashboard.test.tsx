@@ -10,8 +10,10 @@ import {
 	formatAgo,
 	formatElapsed,
 	hubRadius,
+	occurrenceKeys,
 	pillState,
 	repoTone,
+	ringDescription,
 	summaryLine,
 } from "../src/ui/DashboardRing";
 import { SegmentClock, segmentsFor } from "../src/ui/SegmentClock";
@@ -659,5 +661,97 @@ describe("DashboardRing", () => {
 		const compact = draw({ ...ringBase, activity: "Edit: ring.ts" }, "compact");
 		expect(compact).toContain('class="ring-pill"');
 		expect(compact).not.toContain("ring-caption");
+	});
+
+	it("gives fresh calls of one tool in one second their own comet", () => {
+		const html = draw({
+			...busy,
+			calls: [
+				{
+					angle: 260,
+					group: "Read",
+					failed: false,
+					recent: true,
+					fresh: true,
+					at: 9,
+					files: [],
+				},
+				{
+					angle: 260,
+					group: "Read",
+					failed: false,
+					recent: true,
+					fresh: true,
+					at: 9,
+					files: [],
+				},
+			],
+			hubs: [{ group: "Read", count: 2, angle: -57 }],
+		});
+		expect(html.match(/class="ring-comet"/g)).toHaveLength(2);
+		const keys = occurrenceKeys([
+			"comet:9:Read",
+			"comet:9:Read",
+			"comet:9:Edit",
+		]);
+		expect(new Set(keys).size).toBe(3);
+		expect(keys).toEqual([
+			"comet:9:Read:0",
+			"comet:9:Read:1",
+			"comet:9:Edit:0",
+		]);
+	});
+
+	it("speaks the drawing's numbers to assistive technology, details still gated", () => {
+		expect(
+			ringDescription({
+				...ringBase,
+				progress: { total: 7, done: 3, active: undefined },
+			}),
+		).toBe("todos 3/7");
+		expect(
+			ringDescription({
+				...ringBase,
+				progress: { total: 7, done: 3, active: "Ring layout" },
+			}),
+		).toBe("todos 3/7 · Ring layout");
+		expect(
+			ringDescription({
+				...ringBase,
+				state: "waiting",
+				waitReason: "question",
+			}),
+		).toBe("대기 이유: 질문");
+		expect(
+			ringDescription({
+				...ringBase,
+				state: "finished",
+				summary: {
+					filesChanged: 4,
+					linesAdded: 530,
+					linesRemoved: 133,
+					tests: "passed",
+					commits: 1,
+				},
+			}),
+		).toBe("4 files · +530 −133 · tests ✓ · 1 commit");
+		const html = draw({
+			...ringBase,
+			progress: { total: 7, done: 3, active: undefined },
+		});
+		expect(html).toContain('<p class="ring-sr">todos 3/7</p>');
+		expect(draw(ringBase)).not.toContain("ring-sr");
+	});
+
+	it("sizes compact rings by the narrower of height and width", () => {
+		const css = readFileSync(
+			new URL("../src/styles/dashboard-ring.css", import.meta.url),
+			"utf8",
+		);
+		expect(css).toMatch(
+			/\.ring\[data-size="compact"\] \.ring-face \{[^}]*width: min\(24vh, 18vw\)/,
+		);
+		expect(css).toMatch(/grid-template-columns: auto minmax\(0, 1fr\)/);
+		expect(css).toMatch(/grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
 	});
 });

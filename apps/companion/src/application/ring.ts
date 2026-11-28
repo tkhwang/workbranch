@@ -58,6 +58,7 @@ const GROUP_OF: Readonly<Record<string, ToolGroup>> = {
 	shell: "Bash",
 	exec_command: "Bash",
 	local_shell: "Bash",
+	run_terminal_command: "Bash",
 	Read: "Read",
 	NotebookRead: "Read",
 	Edit: "Edit",
@@ -86,7 +87,8 @@ const GROUP_OF: Readonly<Record<string, ToolGroup>> = {
 /** The ring's group for a provider's tool name; unknown names are Other. */
 export function toolGroup(tool: string): ToolGroup {
 	if (tool.startsWith("mcp__")) return "MCP";
-	return GROUP_OF[tool] ?? "Other";
+	// Own keys only: a name like "constructor" is a tool we do not know.
+	return Object.hasOwn(GROUP_OF, tool) ? (GROUP_OF[tool] ?? "Other") : "Other";
 }
 
 /** Where each group's node sits inside the ring, spread evenly from the top. */
@@ -193,7 +195,7 @@ export type RingModel = {
 	readonly summary: RingSummary | undefined;
 	/**
 	 * Whether the task's turn ended in an error: the lead session's own
-	 * outcome, which every collector records, or the log's last turn end.
+	 * outcome, which every collector records, else the log's last turn end.
 	 */
 	readonly failed: boolean;
 	readonly nowAngle: number;
@@ -377,9 +379,13 @@ export function buildRing(
 		message: details ? recentMessages(row, 1)[0] : undefined,
 		progress: progressOf(row, details),
 		summary: summaryOf(row),
+		// The lead's own outcome decides; the log's last turn end only when the
+		// lead has none, so another session's old error cannot override it.
 		failed:
 			state === "finished" &&
-			(lead?.outcome === "error" || turnEndsOf.at(-1)?.error === true),
+			(lead !== undefined && lead.outcome !== ""
+				? lead.outcome === "error"
+				: turnEndsOf.at(-1)?.error === true),
 		nowAngle: angle(now),
 		logged: row.sessions.some(
 			(s) => s.transitions !== undefined && s.transitions.length > 0,

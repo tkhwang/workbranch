@@ -497,3 +497,43 @@ describe("buildRing subagent reports", () => {
 		expect(ring.state).toBe("running");
 	});
 });
+
+describe("review fixes", () => {
+	it("groups Grok's terminal tool as Bash and never reads inherited names", () => {
+		expect(toolGroup("run_terminal_command")).toBe("Bash");
+		for (const name of [
+			"constructor",
+			"toString",
+			"__proto__",
+			"hasOwnProperty",
+		])
+			expect(toolGroup(name)).toBe("Other");
+	});
+
+	it("lets the lead's own successful outcome win over another session's old error", () => {
+		const ring = buildRing(
+			row([
+				session({
+					sessionId: "lead",
+					state: "finished",
+					outcome: "turn-ended",
+					stateChangedAt: NOW - 60,
+				}),
+				session({
+					sessionId: "older",
+					state: "finished",
+					outcome: "error",
+					stateChangedAt: NOW - HOUR,
+					transitions: [
+						{ state: "running", at: NOW - 2 * HOUR },
+						{ state: "finished", at: NOW - HOUR, outcome: "error" },
+					],
+				}),
+			]),
+			"finished",
+			NOW,
+		);
+		expect(ring.turnEnds.at(-1)?.error).toBe(true);
+		expect(ring.failed).toBe(false);
+	});
+});

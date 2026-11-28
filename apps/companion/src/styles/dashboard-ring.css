@@ -26,12 +26,18 @@
 	row-gap: 4vh;
 }
 
+/* Grid cells share the dashboard's width, so a portrait display fits them
+   and the text beside each compact ring gets whatever the ring leaves. */
+.rings[data-mode="grid"] {
+	justify-content: stretch;
+}
+
 .rings[data-mode="grid"][data-columns="2"] {
-	grid-template-columns: repeat(2, auto);
+	grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .rings[data-mode="grid"][data-columns="3"] {
-	grid-template-columns: repeat(3, auto);
+	grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .rings-empty {
@@ -242,7 +248,7 @@
 	align-items: center;
 	column-gap: 1.4vw;
 	grid-template-areas: "face title";
-	grid-template-columns: auto 22vw;
+	grid-template-columns: auto minmax(0, 1fr);
 	justify-items: start;
 }
 
@@ -260,25 +266,27 @@
 	order: 2;
 }
 
+/* Sized by the narrower of height and width, so a portrait display still
+   fits two compact rings side by side. */
 .ring[data-size="compact"] .ring-face {
 	flex: none;
-	height: 24vh;
+	height: min(24vh, 18vw);
 	max-height: none;
-	width: 24vh;
+	width: min(24vh, 18vw);
 }
 
 .rings[data-columns="3"] .ring[data-size="compact"] {
 	grid-template-areas:
 		"title"
 		"face";
-	grid-template-columns: 26vw;
+	grid-template-columns: minmax(0, 1fr);
 	justify-items: center;
 	row-gap: 0.6vh;
 }
 
 .rings[data-columns="3"] .ring[data-size="compact"] .ring-face {
-	height: 22vh;
-	width: 22vh;
+	height: min(22vh, 16vw);
+	width: min(22vh, 16vw);
 }
 
 .ring-track {
@@ -695,6 +703,17 @@
 		opacity: 0;
 		transform: scale(3);
 	}
+}
+
+/* Read by assistive technology, never shown. */
+.ring-sr {
+	clip-path: inset(50%);
+	height: 1px;
+	margin: 0;
+	overflow: hidden;
+	position: absolute;
+	white-space: nowrap;
+	width: 1px;
 }
 
 @keyframes ring-dot-pulse {

@@ -126,6 +126,20 @@ export function hubRadius(count: number): number {
 	return 4 + Math.sqrt(count) * 1.6;
 }
 
+/**
+ * Keys unique among siblings and stable across redraws: an item that repeats
+ * an earlier one takes its order among the repeats, which a clock tick does
+ * not change, so calls of one tool in one second never share a key.
+ */
+export function occurrenceKeys(bases: readonly string[]): readonly string[] {
+	const seen = new Map<string, number>();
+	return bases.map((base) => {
+		const n = seen.get(base) ?? 0;
+		seen.set(base, n + 1);
+		return `${base}:${n}`;
+	});
+}
+
 /** A clockwise arc on the ring; empty when it has no length. */
 export function arcPath(radius: number, from: number, to: number): string {
 	if (to - from <= 0.05) return "";
@@ -223,6 +237,10 @@ function Work({ ring }: { ring: RingModel }) {
 		at: callPoint(call, index),
 		key: `${call.angle}:${index}`,
 	}));
+	const fresh = placed.filter(({ call }) => call.fresh);
+	const cometKeys = occurrenceKeys(
+		fresh.map(({ call }) => `comet:${call.at}:${call.group}`),
+	);
 	return (
 		<g className="ring-work">
 			{placed
@@ -272,29 +290,27 @@ function Work({ ring }: { ring: RingModel }) {
 					/>
 				),
 			)}
-			{placed
-				.filter(({ call }) => call.fresh)
-				.map(({ call, at: [x, y] }) => {
-					const hub = hubAt.get(call.group);
-					if (hub === undefined) return null;
-					const path = `M${nx} ${ny} L${x} ${y} Q${((x + hub[0]) / 2) * 0.75} ${((y + hub[1]) / 2) * 0.75} ${hub[0]} ${hub[1]}`;
-					return (
-						<circle
-							className="ring-comet"
-							data-failed={call.failed ? "true" : undefined}
-							key={`comet:${call.at}:${call.group}`}
-							r={4.5}
-						>
-							<animateMotion dur="1.2s" fill="freeze" path={path} />
-							<animate
-								attributeName="opacity"
-								dur="1.2s"
-								fill="freeze"
-								values="1;1;0"
-							/>
-						</circle>
-					);
-				})}
+			{fresh.map(({ call, at: [x, y] }, index) => {
+				const hub = hubAt.get(call.group);
+				if (hub === undefined) return null;
+				const path = `M${nx} ${ny} L${x} ${y} Q${((x + hub[0]) / 2) * 0.75} ${((y + hub[1]) / 2) * 0.75} ${hub[0]} ${hub[1]}`;
+				return (
+					<circle
+						className="ring-comet"
+						data-failed={call.failed ? "true" : undefined}
+						key={cometKeys[index]}
+						r={4.5}
+					>
+						<animateMotion dur="1.2s" fill="freeze" path={path} />
+						<animate
+							attributeName="opacity"
+							dur="1.2s"
+							fill="freeze"
+							values="1;1;0"
+						/>
+					</circle>
+				);
+			})}
 			{ring.hubs.map((hub) => {
 				const [x, y] = point(R * 0.5, hub.angle);
 				const radius = hubRadius(hub.count);
@@ -702,6 +718,29 @@ function Caption({ ring, now }: { ring: RingModel; now: number }) {
 	);
 }
 
+/**
+ * What the drawing says, for assistive technology: the SVG is hidden from it,
+ * so its numbers are spoken here. Built from the same model, so work text that
+ * Settings hides stays hidden.
+ */
+export function ringDescription(ring: RingModel): string {
+	const parts: string[] = [];
+	if (ring.state === "waiting" && ring.waitReason !== "")
+		parts.push(`대기 이유: ${waitLabel(ring.waitReason)}`);
+	if (ring.progress !== undefined)
+		parts.push(
+			`todos ${ring.progress.done}/${ring.progress.total}` +
+				(ring.progress.active === undefined
+					? ""
+					: ` · ${ring.progress.active}`),
+		);
+	if (ring.state === "running" && ring.recentCalls > 0)
+		parts.push(`${ring.recentCalls} calls · 30m`);
+	if (ring.state === "finished" && ring.summary !== undefined)
+		parts.push(summaryLine(ring.summary));
+	return parts.join(" · ");
+}
+
 export function DashboardRing({
 	ring,
 	now,
@@ -721,6 +760,9 @@ export function DashboardRing({
 		>
 			<Title now={now} ring={ring} />
 			<Face now={now} ring={ring} size={size} />
+			{ringDescription(ring) === "" ? null : (
+				<p className="ring-sr">{ringDescription(ring)}</p>
+			)}
 			{size === "large" ? <Caption now={now} ring={ring} /> : null}
 		</article>
 	);
