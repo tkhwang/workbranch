@@ -4,7 +4,7 @@
 //! history of what the agent read or wrote.
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 /// File names kept per call; a patch touching more is cut here.
 pub const MAX_FILES: usize = 8;
@@ -296,15 +296,20 @@ fn common_lines(old: &[&str], new: &[&str]) -> usize {
     row[new.len()]
 }
 
+// Each old line can match one new line: count them once, then spend a count
+// per matching new line, in time linear in the two texts.
 fn unordered_common_lines(old: &[&str], new: &[&str]) -> usize {
-    let mut unmatched = old.to_vec();
+    let mut left: HashMap<&str, usize> = HashMap::new();
+    for line in old {
+        *left.entry(line).or_default() += 1;
+    }
     new.iter()
-        .filter(|line| {
-            unmatched
-                .iter()
-                .position(|old_line| old_line == *line)
-                .map(|index| unmatched.swap_remove(index))
-                .is_some()
+        .filter(|line| match left.get_mut(*line) {
+            Some(n) if *n > 0 => {
+                *n -= 1;
+                true
+            }
+            _ => false,
         })
         .count()
 }
@@ -374,6 +379,21 @@ fn is_test(words: &[&str]) -> bool {
     }
 }
 
+// `git [global options] commit …`: the subcommand, not any argument, must be
+// `commit` (`git branch commit` names a branch). `-C` and `-c` take a value.
 fn is_commit(words: &[&str]) -> bool {
-    words.first() == Some(&"git") && words.contains(&"commit") && !words.contains(&"--dry-run")
+    if words.first() != Some(&"git") {
+        return false;
+    }
+    let mut rest = words[1..].iter();
+    let subcommand = loop {
+        match rest.next() {
+            Some(&"-C" | &"-c") => {
+                rest.next();
+            }
+            Some(word) if word.starts_with('-') => {}
+            other => break other,
+        }
+    };
+    subcommand == Some(&"commit") && !words.contains(&"--dry-run")
 }

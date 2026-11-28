@@ -926,7 +926,7 @@ fn calls_keep_counts_and_kinds_but_never_the_command() {
         rows,
         [
             ("Edit".into(), 3, 1, String::new()),
-            ("Bash".into(), 0, 0, "test ok".into()),
+            ("Bash".into(), 0, 0, "test done ok".into()),
         ]
     );
     let dump: String = db
@@ -957,9 +957,9 @@ fn other_providers_confirm_or_fail_a_call_only_by_its_exit_code() {
     assert_eq!(
         rows,
         [
-            ("fail".into(), "test".into(), true),
-            ("pass".into(), "test ok".into(), false),
-            ("quiet".into(), "test".into(), false),
+            ("fail".into(), "test done".into(), true),
+            ("pass".into(), "test done ok".into(), false),
+            ("quiet".into(), "test done".into(), false),
         ]
     );
 }
@@ -1142,4 +1142,62 @@ fn an_ended_turns_summary_outlives_the_call_log() {
     assert_eq!((summary.files_changed, summary.lines_added), (1, 3));
     claude(&mut db, json!({"hook_event_name":"UserPromptSubmit","prompt":"next"}), 12 + 86400 + 30);
     assert_eq!(last_turn(&db, 12 + 86400 + 40), None, "a running turn shows no summary");
+}
+
+#[test]
+fn a_grok_turn_that_ends_at_idle_prompt_keeps_its_summary() {
+    let mut db = store::open_memory().unwrap();
+    let grok = |db: &mut rusqlite::Connection, v: serde_json::Value, at| {
+        event::ingest(db, "/p/t", "grok", &v, at).unwrap();
+    };
+    grok(&mut db, json!({"sessionId":"g","hookEventName":"user_prompt_submit","promptId":"p1","userPrompt":"go"}), 10);
+    grok(&mut db, json!({"sessionId":"g","hookEventName":"pre_tool_use","promptId":"p1","toolName":"run_terminal_command","toolUseId":"c","toolInput":{"command":"git commit -m x"}}), 11);
+    grok(&mut db, json!({"sessionId":"g","hookEventName":"post_tool_use","promptId":"p1","toolName":"run_terminal_command","toolUseId":"c","toolInput":{"command":"git commit -m x"}}), 12);
+    grok(&mut db, json!({"sessionId":"g","hookEventName":"notification","promptId":"p1","notificationType":"idle_prompt"}), 13);
+    let s = store::snapshot(&db, 20).unwrap().into_iter().find(|s| s.session_id == "g").unwrap();
+    assert_eq!(s.state, "finished");
+    assert_eq!(s.last_turn.unwrap().commits, 1, "an ended call without an exit code still made its commit");
+}
+
+#[test]
+fn a_turn_finds_its_calls_after_the_call_log_was_emptied() {
+    let mut db = store::open_memory().unwrap();
+    for i in 0..5u64 {
+        event::ingest(&mut db, "/p/t", "claude", &json!({"session_id":"old","hook_event_name":"PreToolUse","tool_use_id":format!("o{i}"),"tool_name":"Bash","tool_input":{"command":"true"}}), 10 + i).unwrap();
+    }
+    let later = 10 + 86400 + 100;
+    // The request captures the boundary, then its own write purges every call.
+    claude(&mut db, json!({"hook_event_name":"UserPromptSubmit","prompt":"go"}), later);
+    assert_eq!(call_rows(&db), 0);
+    claude(&mut db, fixture("claude-write.json"), later + 1);
+    claude(&mut db, json!({"hook_event_name":"Stop"}), later + 2);
+    assert_eq!(last_turn(&db, later + 10).unwrap().files_changed, 1);
+}
+
+#[test]
+fn an_interrupted_commit_that_never_ended_is_not_counted() {
+    let mut db = store::open_memory().unwrap();
+    claude(&mut db, json!({"hook_event_name":"UserPromptSubmit","prompt":"go"}), 10);
+    claude(&mut db, json!({"hook_event_name":"PreToolUse","tool_use_id":"c","tool_name":"Bash","tool_input":{"command":"git commit -m x"}}), 11);
+    claude(&mut db, json!({"hook_event_name":"Interrupt"}), 12);
+    assert_eq!(last_turn(&db, 20).unwrap().commits, 0);
+}
+
+#[test]
+fn only_the_git_subcommand_makes_a_commit() {
+    assert!(kinds("git branch commit").is_empty());
+    assert!(kinds("git log --grep commit").is_empty());
+    assert_eq!(kinds("git -C apps/companion commit -m x"), ["commit"]);
+    assert_eq!(kinds("git -c user.name=me commit -m x"), ["commit"]);
+    assert_eq!(kinds("git --no-pager commit -m x"), ["commit"]);
+    assert!(kinds("git commit --dry-run -m x").is_empty());
+}
+
+#[test]
+fn a_huge_unordered_edit_is_counted_in_linear_time() {
+    let old = (0..20_000).map(|i| format!("old {i}")).collect::<Vec<_>>().join("\n");
+    let new = (0..20_000).map(|i| format!("new {i}")).collect::<Vec<_>>().join("\n");
+    let started = std::time::Instant::now();
+    assert_eq!(tool::line_changes("Edit", &json!({"old_string": old, "new_string": new})), (20_000, 20_000));
+    assert!(started.elapsed() < std::time::Duration::from_secs(2), "{:?}", started.elapsed());
 }

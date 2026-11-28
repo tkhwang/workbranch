@@ -368,6 +368,8 @@ pub fn ingest(
         "Notification" => {
             if provider == "grok" && string(v, "notification_type") == "idle_prompt" {
                 s.state = "finished".into();
+                // Grok's turn can end here without a Stop.
+                s.last_turn = store::turn_summary(&tx, &s)?;
                 s.waits.clear();
                 s.active_tools.clear();
                 if s.outcome.is_empty() {
@@ -408,6 +410,8 @@ pub fn ingest(
             if id.is_empty() {
                 return Ok(());
             }
+            // The call ended: whatever it changed is done, not pending.
+            store::complete_call(&tx, &s, id)?;
             if event == "PostToolUse" {
                 // Claude Code reports a failed call with its own event, so a
                 // plain PostToolUse succeeded. Other providers report every

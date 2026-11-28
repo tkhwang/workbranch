@@ -353,6 +353,16 @@ pub fn record_call(db: &Connection, s: &Session, call: &CallRecord, at: u64) -> 
     Ok(())
 }
 
+/// Marks the call `tool_use_id` of `s` as ended, failed or not: a commit it
+/// ran then counts, while one still waiting (an interrupted turn) does not.
+pub fn complete_call(db: &Connection, s: &Session, tool_use_id: &str) -> Result<()> {
+    db.execute(
+        "UPDATE tool_calls SET kind = kind || ' done' WHERE workspace=? AND provider=? AND session=? AND agent=? AND tool_use_id=? AND kind <> '' AND ' ' || kind || ' ' NOT LIKE '% done %'",
+        params![s.workspace, s.provider, s.session_id, s.agent_id, tool_use_id],
+    )?;
+    Ok(())
+}
+
 /// Marks the call `tool_use_id` of `s` as known to have succeeded: a test or
 /// commit it ran then counts as passed or made.
 pub fn confirm_call(db: &Connection, s: &Session, tool_use_id: &str) -> Result<()> {
@@ -426,10 +436,20 @@ pub fn turn_summary(db: &Connection, s: &Session) -> Result<Option<TurnSummary>>
         return Ok(None);
     }
     let mut stmt = db.prepare(
-        "SELECT files, edit, added, removed, kind, failed FROM tool_calls WHERE workspace=? AND provider=? AND session=? AND agent=? AND rowid > ? ORDER BY rowid",
+        "SELECT files, edit, added, removed, kind, failed FROM tool_calls WHERE workspace=? AND provider=? AND session=? AND agent=? AND (rowid > ? OR at > ?) ORDER BY at, rowid",
     )?;
+    // After the boundary rowid, or in a later second than the request: a call
+    // in the request's own second belongs to it only past the boundary, and a
+    // rowid SQLite reuses once the log was emptied still counts by its time.
     let rows = stmt.query_map(
-        params![s.workspace, s.provider, s.session_id, s.agent_id, s.turn_calls_after],
+        params![
+            s.workspace,
+            s.provider,
+            s.session_id,
+            s.agent_id,
+            s.turn_calls_after,
+            i64::try_from(start)?
+        ],
         |r| {
             Ok((
                 r.get::<_, String>(0)?,
@@ -470,7 +490,8 @@ pub fn turn_summary(db: &Connection, s: &Session) -> Result<Option<TurnSummary>>
             }
             .into();
         }
-        if !failed {
+        // Only a commit whose call ended, and did not fail, was made.
+        if !failed && kinds.contains(&"done") {
             summary.commits += kinds.iter().filter(|kind| **kind == "commit").count();
         }
     }
