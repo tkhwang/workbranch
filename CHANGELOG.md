@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.43.0](https://github.com/tkhwang/workbranch/compare/v2.42.0...v2.43.0) (2026-11-28)
+
+
+### Features
+
+* **agent-runtime:** tool 호출·turn·todo·턴 요약을 수집하기 ([eb6d871](https://github.com/tkhwang/workbranch/commit/eb6d8711ada53e5395c64eddf5cf01da8b399a55))
+* **companion:** update dashboard ui - agent observability ([380f39e](https://github.com/tkhwang/workbranch/commit/380f39e13f3dcd49a0c51d194a1b5207e80b6a08))
+
+
+### Bug Fixes
+
+* **agent-runtime:** PR [#273](https://github.com/tkhwang/workbranch/issues/273) 2차 리뷰의 턴 경계·commit 집계 지적 반영하기 ([585b10b](https://github.com/tkhwang/workbranch/commit/585b10b32029bc51ff73672aa9b74238a6447e1e))
+* **agent-runtime:** PR [#273](https://github.com/tkhwang/workbranch/issues/273) 리뷰의 턴 요약·셸 분류 지적 반영하기 ([aaa9dd2](https://github.com/tkhwang/workbranch/commit/aaa9dd2abbcb6016e9d79dd09bb39dbe82998467))
+
 ## [2.42.0](https://github.com/tkhwang/workbranch/compare/v2.41.0...v2.42.0) (2026-11-26)
 
 
